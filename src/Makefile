@@ -1,21 +1,18 @@
 
 
-#managebackups: main.cc BackupCache.cc BackupEntry.cc
-#	c++ -Wno-c++11-extensions main.cc BackupCache.cc BackupEntry.cc -o managebackups
-
 IDIR =../include
 CC=c++
-CFLAGS=-I$(IDIR) -Wno-c++11-extensions
+CFLAGS=-I../include -I/usr/local/include -I/usr/local/Cellar/openssl@1.1/1.1.1j/include -Wno-c++11-extensions
 
 ODIR=../obj
 LDIR =../lib
 
-LIBS=-lm
+LIBS=-lm -L/usr/local/Cellar/pcre++/0.9.5/lib -L/usr/local/Cellar/openssl@1.1/1.1.1j/lib -lpcre++ -lcrypto
 
-_DEPS = BackupEntry.h BackupCache.h
+_DEPS = BackupEntry.h BackupCache.h BackupConfig.h util.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
-_OBJ = BackupEntry.o BackupCache.o managebackups.o
+_OBJ = BackupEntry.o BackupCache.o BackupConfig.o util.o managebackups.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 

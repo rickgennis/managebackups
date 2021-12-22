@@ -2,10 +2,51 @@
 #include <map>
 #include <string>
 #include <set>
-using namespace std;
+#include <fstream>
 
 #include "BackupEntry.h"
 #include "BackupCache.h"
+#include "util.h"
+
+using namespace std;
+
+    void BackupCache::saveCache(string filename) {
+        ofstream cacheFile;
+
+        cacheFile.open(filename);
+        if (cacheFile.is_open()) {
+
+            // write raw data
+            for (auto raw_it = rawData.begin(); raw_it != rawData.end(); ++raw_it) {
+                cacheFile << raw_it->second.class2string() << endl;
+            }
+
+            cacheFile.close();
+        }
+        else
+            log("unable to save cache to " + filename);
+    }
+
+
+    void BackupCache::restoreCache(string filename) {
+        ifstream cacheFile;
+
+        cacheFile.open(filename);
+        if (cacheFile.is_open()) {
+
+            string cacheData;
+            while (cacheFile >> cacheData) {
+                BackupEntry entry;
+                entry.string2class(cacheData);
+                addOrUpdate(entry);
+            }
+
+            cacheFile.close();
+        }
+        else
+            log("unable to read cache file " + filename);
+    }
+
 
     BackupEntry* BackupCache::getByFilename(string filename) {
         auto filename_it = indexByFilename.find(filename);
@@ -121,16 +162,16 @@ using namespace std;
         string result ("RAW Data\n");
         for (auto raw_it = rawData.begin(); raw_it != rawData.end(); ++raw_it) {
             result += "\tid:" + to_string(raw_it->first) + 
-                ", fln:" + raw_it->second.filename + 
+                ", file:" + raw_it->second.filename + 
                 ", md5:" + raw_it->second.md5 + 
-                ", byt:" + to_string(raw_it->second.bytes) + 
-                ", ind:" + to_string(raw_it->second.inode) + 
-                ", age:" + to_string(raw_it->second.age) + 
-                ", mth:" + to_string(raw_it->second.month_age) + 
+                ", size:" + to_string(raw_it->second.size) + 
+                ", inod:" + to_string(raw_it->second.inode) + 
+                ", dage:" + to_string(raw_it->second.day_age) + 
+                ", mage:" + to_string(raw_it->second.month_age) + 
                 ", dow:" + to_string(raw_it->second.dow) + 
-                ", day:" + to_string(raw_it->second.day) + 
-                ", lnk:" + to_string(raw_it->second.links) + 
-                ", mtm:" + to_string(raw_it->second.mtime) + "\n";
+                ", day:" + to_string(raw_it->second.date_day) + 
+                ", lnks:" + to_string(raw_it->second.links) + 
+                ", mtim:" + to_string(raw_it->second.mtime) + "\n";
         }
 
         result += "\nFilename Index\n";
@@ -140,11 +181,15 @@ using namespace std;
 
         result += "\nMD5 Index\n";
         for (auto md5_it = indexByMD5.begin(); md5_it != indexByMD5.end(); ++md5_it) {
+            result += "\t" + md5_it->first + ": ";
+
+            string detail;
             for (auto set_it = md5_it->second.begin(); set_it != md5_it->second.end(); ++set_it) {
-                result += "\t" + md5_it->first + ": " + to_string(*set_it) + "\n";
+                detail += string(detail.length() > 0 ? ", " : "") + to_string(*set_it);
             }
+
+            result += detail + "\n";
         }
 
         return result;
     }
-
