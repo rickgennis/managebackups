@@ -7,8 +7,15 @@
 #include "BackupEntry.h"
 #include "BackupCache.h"
 #include "util.h"
+#include "globals.h"
 
 using namespace std;
+
+    void BackupCache::updateAges(time_t refTime) {
+        for (auto raw_it = rawData.begin(); raw_it != rawData.end(); ++raw_it) 
+            raw_it->second.updateAges(refTime);
+    }
+
 
     void BackupCache::saveCache(string filename) {
         ofstream cacheFile;
@@ -35,7 +42,7 @@ using namespace std;
         if (cacheFile.is_open()) {
 
             string cacheData;
-            while (cacheFile >> cacheData) {
+            while (getline(cacheFile, cacheData)) {
                 BackupEntry entry;
                 entry.string2class(cacheData);
                 addOrUpdate(entry);
@@ -122,14 +129,20 @@ using namespace std;
                     // if the old one is in the index, remove it
                     if (md5_it != indexByMD5.end()) {
                         md5_it->second.erase(index);
-                        cout << "removed reference from old md5 (" << oldMD5 << ") to " << backupEntry.filename << endl;
+                        DEBUG(3) && cout << "removed reference from old md5 (" << oldMD5 << ") to " << backupEntry.filename << endl;
+
+                        if (!md5_it->second.size()) {
+                            indexByMD5.erase(oldMD5);
+                            DEBUG(3) && cout << "dropping old md5 (" << oldMD5 << ") as " << backupEntry.filename << " was the last reference" << endl;
+                        }
                     }
 
-                    // if the new one isn't in the index, add it
+                    // if the new md5 isn't in the index, add it
                     md5_it = indexByMD5.find(updatedEntry.md5);
                     if (md5_it != indexByMD5.end()) {
                         md5_it->second.insert(index);
                     }
+                    // if the md5 is already there, then just add this file to its list
                     else {
                         set<int> newSet;
                         newSet.insert(index);

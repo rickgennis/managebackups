@@ -1,13 +1,20 @@
 
+#ifndef BACKUPCONFIG_H
+#define BACKUPCONFIG_H
+
 #include <set>
 #include <string>
 using namespace std;
 
 class BackupConfig {
+        string config_filename;
+
     public:
+        bool modified;
+
         string title;
         string directory;
-        string filename;
+        string backup_filename;
         string backup_command;
 
         unsigned int default_days;
@@ -15,8 +22,8 @@ class BackupConfig {
         unsigned int default_months;
         unsigned int default_years;
 
-        unsigned short failsafe_backups;
-        unsigned short failsafe_days;
+        unsigned int failsafe_backups;
+        unsigned int failsafe_days;
 
         string cp_to;
         string sftp_to;
@@ -24,4 +31,11 @@ class BackupConfig {
         set<string> notify;
 
         BackupConfig();
+        ~BackupConfig();
+
+        void saveConfig();
+        bool loadConfig(string filename);
 };
+
+#endif
+

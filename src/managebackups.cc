@@ -1,37 +1,34 @@
 #include "BackupEntry.h"
 #include "BackupCache.h"
 #include "BackupConfig.h"
-#include "util.h"
+#include "ConfigManager.h"
 
+#include "syslog.h"
+#include "unistd.h"
 #include <sys/stat.h>
 #include <pcre++.h>
 #include <iostream>
 #include <filesystem>
 #include <dirent.h>
 #include <time.h>
+#include "globals.h"
+#include "util.h"
+
 
 using namespace pcrepp;
 
 const unsigned int DEBUG_LEVEL = 2;
 
-#define DBL1 (DEBUG_LEVEL > 0)
-#define DBL2 (DEBUG_LEVEL > 1)
-
-// GLOBALS
 time_t g_startupTime;
 unsigned long g_stats = 0;
 unsigned long g_md5s = 0;
+int g_pid = getpid();
 
 
-string addSlash(string str) {
-    return(str.length() && str[str.length() - 1] == '/' ? str : str + "/");
-}
-
-
-void parseDirToCache(string directory, string filename, BackupCache* cache) {
+void parseDirToCache(string directory, string fnamePattern, BackupCache* cache) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
-    Pcre regEx(filename);
+    Pcre regEx(fnamePattern);
 
     if ((c_dir = opendir(directory.c_str())) != NULL ) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
@@ -46,12 +43,12 @@ void parseDirToCache(string directory, string filename, BackupCache* cache) {
 
                 // recurse into subdirectories
                 if ((statData.st_mode & S_IFMT) == S_IFDIR) {
-                    parseDirToCache(fullFilename, filename, cache);
+                    parseDirToCache(fullFilename, fnamePattern, cache);
                 }
                 else {
                     // filter for filename if specified
-                    if (filename.length() && !regEx.search(string(c_dirEntry->d_name))) {
-                        DBL2 && cout << "skipping due to name mismatch: " << fullFilename << endl;
+                    if (fnamePattern.length() && !regEx.search(string(c_dirEntry->d_name))) {
+                        DEBUG(2) && cout << "skipping due to name mismatch: " << fullFilename << endl;
                         continue;
                     }
 
@@ -97,26 +94,23 @@ void parseDirToCache(string directory, string filename, BackupCache* cache) {
 
 void scanConfigToCache(BackupConfig* config, BackupCache* cache) {
     string directory = "";
-    string filename = "";
+    string fnamePattern = "";
 
     if (config->directory.length()) { directory = config->directory; }
 
-    // if there's a filename convert it into a wildcard version to match
+    // if there's a fnamePattern convert it into a wildcard version to match
     // backups with a date/time inserted.  i.e.
     //    myBigBackup.tgz --> myBigBackup*.tgz
-    if (config->filename.length()) {
+    if (config->backup_filename.length()) {
         Pcre regEx("(.*)\\.([^.]+)$");
         
-        if (regEx.search(config->filename)) {
-            if (regEx.matches()) {
-                filename = regEx.get_match(0) + "-20\\d{2}[-.]*\\d{2}[-.]*\\d{2}.*\\." + regEx.get_match(1);
-            }
-        }
+        if (regEx.search(config->backup_filename) && regEx.matches()) 
+            fnamePattern = regEx.get_match(0) + "-20\\d{2}[-.]*\\d{2}[-.]*\\d{2}.*\\." + regEx.get_match(1);
     }
     else 
-        filename = ".*-20\\d{2}[-.]*\\d{2}[-.]*\\d{2}.*";
+        fnamePattern = ".*-20\\d{2}[-.]*\\d{2}[-.]*\\d{2}.*";
 
-    parseDirToCache(directory, filename, cache);
+    parseDirToCache(directory, fnamePattern, cache);
 }
 
 
@@ -127,9 +121,13 @@ void pruneBackups() {
 
 int main() {
     time(&g_startupTime);
+    openlog("managebackups", LOG_PID | LOG_NDELAY, LOG_LOCAL1);
 
     BackupCache cache;
     BackupConfig config;
+    ConfigManager configManager;
+    configManager.configs.begin()++->modified = 1;
+
     BackupEntry* Myentry = new BackupEntry;
     cout << cache.size() << endl << endl;
 
@@ -140,6 +138,7 @@ int main() {
 
     cout << "size: " << cache.size() << "\t" << endl << endl;
     cout << cache.fullDump() << endl;
+
 
     cache.saveCache("cachedata.1");
     cout << "stats: " << g_stats << ", md5s: " << g_md5s << endl;

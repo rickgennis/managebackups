@@ -1,10 +1,14 @@
 #include <iostream>
 #include <fstream>
-#include "util.h"
 #include "time.h"
+#include <syslog.h>
+
+#include "util.h"
 
 
 void log(string message) {
+    syslog(LOG_CRIT, "%s", message.c_str());
+
     time_t now;
     char timeStamp[100];
 
@@ -21,3 +25,6 @@ void log(string message) {
 }
 
 
+string addSlash(string str) {
+    return(str.length() && str[str.length() - 1] == '/' ? str : str + "/");
+}

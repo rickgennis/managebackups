@@ -19,6 +19,7 @@ class BackupCache {
         string size(string md5);
         string fullDump();
 
+        void updateAges(time_t refTime = 0);
         void saveCache(string filename);
         void restoreCache(string filename);
 };

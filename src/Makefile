@@ -9,10 +9,10 @@ LDIR =../lib
 
 LIBS=-lm -L/usr/local/Cellar/pcre++/0.9.5/lib -L/usr/local/Cellar/openssl@1.1/1.1.1j/lib -lpcre++ -lcrypto
 
-_DEPS = BackupEntry.h BackupCache.h BackupConfig.h util.h
+_DEPS = BackupEntry.h BackupCache.h BackupConfig.h ConfigManager.h util.h globals.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
-_OBJ = BackupEntry.o BackupCache.o BackupConfig.o util.o managebackups.o
+_OBJ = BackupEntry.o BackupCache.o BackupConfig.o ConfigManager.o util.o managebackups.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 
