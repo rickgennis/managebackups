@@ -13,9 +13,9 @@ using namespace pcrepp;
 // ((?:\s|=|:)+)(.*?)\s*((?:#|//).*)*$
 
 
-#define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*")
-#define RE_COMMENT "\\s*((?:#|//).*)*$"
-#define RE_BLANK "^\\s*$"
+#define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
+#define RE_COMMENT "((?:\\s*#|//).*)*$"
+#define RE_BLANK "^((?:\\s*#|//).*)*$"
 #define RE_TITLE "(title)"
 #define RE_DIR "(dir|directory)"
 #define RE_FILE "(file|filename)"
@@ -36,26 +36,64 @@ using namespace pcrepp;
 class Config_Setting {
     public:
         Pcre regex;
-        bool is_numeric;
+        int var_type;   // string, int, set
         bool seen;
         void *variable;
 
-        string newValue();
-        Config_Setting(string pattern, bool numeric, void *realData);
+        string getValue();
+        void setValue(string);
+        Config_Setting(string pattern, int newType, void *realData);
 }; 
 
 
-Config_Setting::Config_Setting(string pattern, bool numeric, void *realData) {
-    regex = Pcre(pattern + CAPTURE_VALUE + RE_COMMENT + "*");
-    is_numeric = numeric;
+Config_Setting::Config_Setting(string pattern, int newType, void *realData) {
+    regex = Pcre(pattern + CAPTURE_VALUE + RE_COMMENT);
+    var_type = newType;
     seen = false;
     variable = realData;
 }
 
 
-string Config_Setting::newValue() {
+string Config_Setting::getValue() {
     seen = true;
-    return(is_numeric ? to_string(*(unsigned int*)variable) : *(string*)variable);
+
+    switch (var_type) {
+        case 0:  // string
+            return *(string*)variable;
+
+        case 1:  // int
+            return to_string(*(unsigned int*)variable);
+
+        case 2:  // set
+        default:
+            string result;
+            set<string> theSet = *(set<string>*)variable;
+            for (auto set_it = theSet.begin(); set_it != theSet.end(); ++set_it) {
+                result += (result.length() ? ", " : "") + *set_it;
+            }
+            return result;
+    }
+}
+
+
+void Config_Setting::setValue(string newValue) {
+    switch (var_type) {
+        case 0:  // string
+            *(string*)variable = newValue;
+            break;
+
+        case 1:  // int
+            *(unsigned int*)variable = stoi(newValue);
+            break;
+
+        case 2:  // set
+        default:
+            Pcre reDelimiters("\\s*[,;]\\s*", "g");
+            auto values = reDelimiters.split(newValue);
+
+            for (auto str_it = values.begin(); str_it != values.end(); ++str_it) 
+                ((set<string>*)variable)->insert(*str_it);
+    }
 }
 
 
@@ -75,7 +113,6 @@ BackupConfig::~BackupConfig() {
     if (modified)
         saveConfig();
 
-    cout << "SAVING CONFIG" << endl;
     modified = 0;
 }
 
@@ -122,6 +159,7 @@ void BackupConfig::saveConfig() {
         settings.insert(settings.begin(), Config_Setting(RE_YEARS, 1, &default_years));
         settings.insert(settings.begin(), Config_Setting(RE_FSBACKS, 1, &failsafe_backups));
         settings.insert(settings.begin(), Config_Setting(RE_FSDAYS, 1, &failsafe_days));
+        settings.insert(settings.begin(), Config_Setting(RE_NOTIFY, 2, &notify));
         Pcre reBlank(RE_BLANK);
 
         string dataLine;
@@ -135,16 +173,9 @@ void BackupConfig::saveConfig() {
                 // compare the line against each of the config settings until there's a match
                 bool identified = false;
                 for (auto cfg_it = settings.begin(); cfg_it != settings.end(); ++cfg_it) {
-                    cerr << dataLine << endl;
-                    if (!cfg_it->regex.search(dataLine))
-                        continue;
-                    cerr << "search: " << cfg_it->regex.search(dataLine) << ", matches: " << cfg_it->regex.matches() << endl;
-                    cerr << "0[" << cfg_it->regex.get_match(0) << "]" << endl;
-                    cerr << "1[" << cfg_it->regex.get_match(1) << "]" << endl;
-                    cerr << "2[" << cfg_it->regex.get_match(2) << "]" << endl;
-                    cerr << "3[" << cfg_it->regex.get_match(3) << "]" << endl;
-                    if (cfg_it->regex.search(dataLine) && cfg_it->regex.matches() > 3) {
-                        newFile << cfg_it->regex.get_match(0) + cfg_it->regex.get_match(1) + cfg_it->newValue() + cfg_it->regex.get_match(3) << endl;
+                    if (cfg_it->regex.search(dataLine) && cfg_it->regex.matches() > 2) {
+                        newFile << cfg_it->regex.get_match(0) << cfg_it->regex.get_match(1) << cfg_it->getValue() << 
+                            (cfg_it->regex.matches() > 3 ? cfg_it->regex.get_match(3) : "")  << endl;
                         identified = true;
                         break;
                     }
@@ -154,14 +185,15 @@ void BackupConfig::saveConfig() {
                 if (!identified && !reBlank.search(dataLine)) {
                     newFile << "// " << dataLine << "       # unknown setting?" << endl; 
                 }
-
-/*                if (reNotify.search(dataLine) && reNotify.matches()) {
-                    Pcre reDelimiters("\\s*[,;]\\s*", "g");
-                    auto notifies = reDelimiters.split(reNotify.get_match(2));
-                    for (auto not_it = notifies.begin(); not_it != notifies.end(); ++not_it)
-                        notify.insert(*not_it);
-                  }*/
+                else  // add as is (likely a comment)
+                    if (!identified)
+                        newFile << dataLine << endl;
             }
+
+            oldFile.close();
+            newFile.close();
+            //remove(config_filename.c_str());
+            //rename(temp_filename.c_str(), config_filename.c_str());
         }
         catch (...) {
             oldFile.close();
@@ -171,7 +203,6 @@ void BackupConfig::saveConfig() {
             cerr << "error: unable to process the directive on line " << line << " of " << config_filename << endl;
             cerr << "    " << dataLine << endl;
             exit(1);
-            
         }
     }
 }
@@ -184,23 +215,23 @@ bool BackupConfig::loadConfig(string filename) {
     if (configFile.is_open()) {
         string dataLine;
 
-        // precompile regexes
-        Pcre removeComments(RE_COMMENT);
-        Pcre reBlank(RE_BLANK);
-        Pcre reTitle(RE_TITLE + CAPTURE_VALUE);
-        Pcre reDirectory(RE_DIR + CAPTURE_VALUE);
-        Pcre reFilename(RE_FILE + CAPTURE_VALUE);
-        Pcre reCommand(RE_CMD + CAPTURE_VALUE);
-        Pcre reCP(RE_CP + CAPTURE_VALUE);
-        Pcre reSFTP(RE_SFTP + CAPTURE_VALUE);
-        Pcre reDays(RE_DAYS + CAPTURE_VALUE + RE_COMMENT);
-        Pcre reWeeks(RE_WEEKS + CAPTURE_VALUE);
-        Pcre reMonths(RE_MONTHS + CAPTURE_VALUE);
-        Pcre reYears(RE_YEARS + CAPTURE_VALUE);
-        Pcre reFailsafeBackups(RE_FSBACKS + CAPTURE_VALUE);
-        Pcre reFailsafeDays(RE_FSDAYS + CAPTURE_VALUE);
-        Pcre reNotify(RE_NOTIFY + CAPTURE_VALUE);
+        // precompile regexes and map settings to class variables
+        vector<Config_Setting> settings;
+        settings.insert(settings.begin(), Config_Setting(RE_TITLE, 0, &title));
+        settings.insert(settings.begin(), Config_Setting(RE_DIR, 0, &directory));
+        settings.insert(settings.begin(), Config_Setting(RE_FILE, 0, &backup_filename));
+        settings.insert(settings.begin(), Config_Setting(RE_CMD, 0, &backup_command));
+        settings.insert(settings.begin(), Config_Setting(RE_CP, 0, &cp_to));
+        settings.insert(settings.begin(), Config_Setting(RE_SFTP, 0, &sftp_to));
+        settings.insert(settings.begin(), Config_Setting(RE_DAYS, 1, &default_days));
+        settings.insert(settings.begin(), Config_Setting(RE_WEEKS, 1, &default_weeks));
+        settings.insert(settings.begin(), Config_Setting(RE_MONTHS, 1, &default_months));
+        settings.insert(settings.begin(), Config_Setting(RE_YEARS, 1, &default_years));
+        settings.insert(settings.begin(), Config_Setting(RE_FSBACKS, 1, &failsafe_backups));
+        settings.insert(settings.begin(), Config_Setting(RE_FSDAYS, 1, &failsafe_days));
+        settings.insert(settings.begin(), Config_Setting(RE_NOTIFY, 2, &notify));
 
+        Pcre reBlank(RE_BLANK);
         config_filename = filename;
 
         unsigned int line = 0;
@@ -208,66 +239,23 @@ bool BackupConfig::loadConfig(string filename) {
             while (getline(configFile, dataLine)) {
                 ++line;
 
-                // remove comments
-                dataLine = removeComments.replace(dataLine, "");
-
-                // match against specific directives
-                if (reTitle.search(dataLine) && reTitle.matches())
-                    title = reTitle.get_match(2);
-                else    // directory
-                    if (reDirectory.search(dataLine) && reDirectory.matches())
-                        directory = reDirectory.get_match(2);
-                else    // filename
-                    if (reFilename.search(dataLine) && reFilename.matches())
-                        backup_filename = reFilename.get_match(2);
-                else    // command
-                    if (reCommand.search(dataLine) && reCommand.matches())
-                        backup_command = reCommand.get_match(2);
-                else    // copyto
-                    if (reCP.search(dataLine) && reCP.matches())
-                        cp_to = reCP.get_match(2);
-                else    // sftp
-                    if (reSFTP.search(dataLine) && reSFTP.matches())
-                        sftp_to = reSFTP.get_match(2);
-                else    // days
-                    if (reDays.search(dataLine) && reDays.matches()) {
-                        cout << "matches = " << reDays.matches() << "; Match = " << reDays.get_match(2) << endl;
-                        continue;
-                        default_days = stoi(reDays.get_match(2));
+                // compare the line against each of the config settings until there's a match
+                bool identified = false;
+                for (auto cfg_it = settings.begin(); cfg_it != settings.end(); ++cfg_it) {
+                    cerr << dataLine << endl;
+                    if (cfg_it->regex.search(dataLine) && cfg_it->regex.matches() > 2) {
+                        cfg_it->setValue(cfg_it->regex.get_match(2));
+                        identified = true;
+                        break;
                     }
-                else    // weeks
-                    if (reWeeks.search(dataLine) && reWeeks.matches())
-                        default_weeks = stoi(reWeeks.get_match(2));
-                else    // months
-                    if (reMonths.search(dataLine) && reMonths.matches())
-                        default_months = stoi(reMonths.get_match(2));
-                else    // years
-                    if (reYears.search(dataLine) && reYears.matches())
-                        default_years = stoi(reYears.get_match(2));
-                else    // failsafe_backups 
-                    if (reFailsafeBackups.search(dataLine) && reFailsafeBackups.matches())
-                        failsafe_backups = stoi(reFailsafeBackups.get_match(2));
-                else    // failsafe_days
-                    if (reFailsafeDays.search(dataLine) && reFailsafeDays.matches())
-                        failsafe_days = stoi(reFailsafeDays.get_match(2));
-                else    // notify
-                    if (reNotify.search(dataLine) && reNotify.matches()) {
-                        Pcre reDelimiters("\\s*[,;]\\s*", "g");
-                        auto notifies = reDelimiters.split(reNotify.get_match(2));
-                        for (auto not_it = notifies.begin(); not_it != notifies.end(); ++not_it)
-                            notify.insert(*not_it);
-                    }
-                else    // skip blank lines
-                    if (reBlank.search(dataLine))
-                        continue;
-                else {
-                    configFile.close();
-                    log("error: unknown configuration directive on line " + to_string(line) + " of " + filename);
-                    cerr << "error: unknown configuration directive on line " << line << " of " << filename << endl;
-                    cerr << "    " << dataLine << endl;
-                    exit(1);
                 }
 
+                if (!identified && !reBlank.search(dataLine)) {
+                    cout << "error: unrecognized setting on line " << line << " of " << filename << endl;
+                    cout << "    " << dataLine << endl; 
+                    log("error: unrecognized setting on line " + to_string(line) + " of " + filename);
+                    exit(1);
+                }
             }   // while
         }
         catch (...) {
