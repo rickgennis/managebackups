@@ -2,6 +2,7 @@
 #include "BackupCache.h"
 #include "BackupConfig.h"
 #include "ConfigManager.h"
+#include "cxxopts.hpp"
 
 #include "syslog.h"
 #include "unistd.h"
@@ -17,8 +18,7 @@
 
 using namespace pcrepp;
 
-const unsigned int DEBUG_LEVEL = 2;
-
+unsigned int DEBUG_LEVEL = 0;
 time_t g_startupTime;
 unsigned long g_stats = 0;
 unsigned long g_md5s = 0;
@@ -95,16 +95,16 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache* cache) 
 void scanConfigToCache(BackupConfig* config, BackupCache* cache) {
     string directory = "";
     string fnamePattern = "";
-
-    if (config->directory.length()) { directory = config->directory; }
+    if (config->settings[sDirectory].getValue().length())
+        directory = config->settings[sDirectory].getValue();
 
     // if there's a fnamePattern convert it into a wildcard version to match
     // backups with a date/time inserted.  i.e.
     //    myBigBackup.tgz --> myBigBackup*.tgz
-    if (config->backup_filename.length()) {
+    if (config->settings[sBackupFilename].getValue().length()) {
         Pcre regEx("(.*)\\.([^.]+)$");
         
-        if (regEx.search(config->backup_filename) && regEx.matches()) 
+        if (regEx.search(config->settings[sBackupFilename].getValue()) && regEx.matches()) 
             fnamePattern = regEx.get_match(0) + "-20\\d{2}[-.]*\\d{2}[-.]*\\d{2}.*\\." + regEx.get_match(1);
     }
     else 
@@ -119,20 +119,29 @@ void pruneBackups() {
 }
 
 
-int main() {
+int main(int argc, char *argv[]) {
     time(&g_startupTime);
     openlog("managebackups", LOG_PID | LOG_NDELAY, LOG_LOCAL1);
+    cxxopts::Options options("managebackups", "Create and manage backups");
+
+    options.add_options()
+        ("i,integer", "Int param", cxxopts::value<int>())
+        ("f,file", "File name", cxxopts::value<std::string>())
+        ("v,verbose", "Verbose output", cxxopts::value<bool>()->default_value("false"));
+    auto cli = options.parse(argc, argv);
+
+    DEBUG_LEVEL = cli.count("verbose");
 
     BackupCache cache;
     BackupConfig config;
     ConfigManager configManager;
-    configManager.configs.begin()++->modified = 1;
+    //configManager.configs.begin()++->modified = 1;
 
     BackupEntry* Myentry = new BackupEntry;
     cout << cache.size() << endl << endl;
 
     //config.filename = "myFatCat.log";
-    config.directory = "/Users/rennis/test";
+    config.settings[sDirectory].setValue("/Users/rennis/test"); 
     cache.restoreCache("cachedata.1");
     scanConfigToCache(&config, &cache);
 

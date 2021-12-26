@@ -4,6 +4,7 @@
 #include <variant>
 
 #include "BackupConfig.h"
+#include "Setting.h"
 #include "util.h"
 #include "globals.h"
 #include <pcre++.h>
@@ -29,79 +30,25 @@ using namespace pcrepp;
 #define RE_NOTIFY "(notify)"
 
 
-class Config_Setting {
-    public:
-        Pcre regex;
-        int var_type;   // string, int, set
-        bool seen;
-        void *variable;
-
-        string getValue();
-        void setValue(string);
-        Config_Setting(string pattern, int newType, void *realData);
-}; 
-
-
-Config_Setting::Config_Setting(string pattern, int newType, void *realData) {
-    regex = Pcre(pattern + CAPTURE_VALUE + RE_COMMENT);
-    var_type = newType;
-    seen = false;
-    variable = realData;
-}
-
-
-string Config_Setting::getValue() {
-    seen = true;
-
-    switch (var_type) {
-        case 0:  // string
-            return *(string*)variable;
-
-        case 1:  // int
-            return to_string(*(unsigned int*)variable);
-
-        case 2:  // set
-        default:
-            string result;
-            set<string> theSet = *(set<string>*)variable;
-            for (auto set_it = theSet.begin(); set_it != theSet.end(); ++set_it) {
-                result += (result.length() ? ", " : "") + *set_it;
-            }
-            return result;
-    }
-}
-
-
-void Config_Setting::setValue(string newValue) {
-    switch (var_type) {
-        case 0:  // string
-            *(string*)variable = newValue;
-            break;
-
-        case 1:  // int
-            *(unsigned int*)variable = stoi(newValue);
-            break;
-
-        case 2:  // set
-        default:
-            Pcre reDelimiters("\\s*[,;]\\s*", "g");
-            auto values = reDelimiters.split(newValue);
-
-            for (auto str_it = values.begin(); str_it != values.end(); ++str_it) 
-                ((set<string>*)variable)->insert(*str_it);
-    }
-}
-
-
 BackupConfig::BackupConfig() {
-    title = directory = backup_filename = backup_command = cp_to = sftp_to = "";
-    failsafe_backups = failsafe_days = 0;
-    config_days = 14;
-    config_weeks = 4;
-    config_months = 6;
-    config_years = 1;
     modified = 0;
     config_filename = "";
+
+    // define settings and their defaults
+    // order of these inserts matter because they're accessed by position via the SetSpecifier enum
+    settings.insert(settings.end(), Setting("title", RE_TITLE, STRING, ""));
+    settings.insert(settings.end(), Setting("directory", RE_DIR, STRING, ""));
+    settings.insert(settings.end(), Setting("filename", RE_FILE, STRING, ""));
+    settings.insert(settings.end(), Setting("command", RE_CMD, STRING, ""));
+    settings.insert(settings.end(), Setting("copyto", RE_CP, STRING, ""));
+    settings.insert(settings.end(), Setting("sftpto", RE_SFTP, STRING, ""));
+    settings.insert(settings.end(), Setting("days", RE_DAYS, INT, 14));
+    settings.insert(settings.end(), Setting("weeks", RE_WEEKS, INT, 4));
+    settings.insert(settings.end(), Setting("months", RE_MONTHS, INT, 6));
+    settings.insert(settings.end(), Setting("years", RE_YEARS, INT, 2));
+    settings.insert(settings.end(), Setting("failsafe_backups", RE_FSBACKS, INT, 0));
+    settings.insert(settings.end(), Setting("failsafe_days", RE_FSDAYS, INT, 0));
+    settings.insert(settings.end(), Setting("notify", RE_NOTIFY, VECTOR, ""));
 }
 
 
@@ -119,7 +66,7 @@ void BackupConfig::saveConfig() {
 
     // construct a unique config filename if not already specified
     if (!config_filename.length())  {
-        string baseName = title.length() ? title : "default";
+        string baseName = settings[sTitle].getValue().length() ? settings[sTitle].getValue() : "default"; 
         if (stat((string(CONF_DIR) + baseName + ".conf").c_str(), NULL)) {
             int suffix = 1;
             while (stat((string(CONF_DIR) + baseName + to_string(suffix) + ".conf").c_str(), NULL)) 
@@ -141,55 +88,55 @@ void BackupConfig::saveConfig() {
     }
 
     if (oldFile.is_open()) {
-        // precompile regexes and map settings to class variables
-        vector<Config_Setting> settings;
-        settings.insert(settings.begin(), Config_Setting(RE_TITLE, 0, &title));
-        settings.insert(settings.begin(), Config_Setting(RE_DIR, 0, &directory));
-        settings.insert(settings.begin(), Config_Setting(RE_FILE, 0, &backup_filename));
-        settings.insert(settings.begin(), Config_Setting(RE_CMD, 0, &backup_command));
-        settings.insert(settings.begin(), Config_Setting(RE_CP, 0, &cp_to));
-        settings.insert(settings.begin(), Config_Setting(RE_SFTP, 0, &sftp_to));
-        settings.insert(settings.begin(), Config_Setting(RE_DAYS, 1, &config_days));
-        settings.insert(settings.begin(), Config_Setting(RE_WEEKS, 1, &config_weeks));
-        settings.insert(settings.begin(), Config_Setting(RE_MONTHS, 1, &config_months));
-        settings.insert(settings.begin(), Config_Setting(RE_YEARS, 1, &config_years));
-        settings.insert(settings.begin(), Config_Setting(RE_FSBACKS, 1, &failsafe_backups));
-        settings.insert(settings.begin(), Config_Setting(RE_FSDAYS, 1, &failsafe_days));
-        settings.insert(settings.begin(), Config_Setting(RE_NOTIFY, 2, &notify));
         Pcre reBlank(RE_BLANK);
 
         string dataLine;
         unsigned int line = 0;
 
         try {
+            string delimiter = ": ";
+
             // loop through lines of the existing config file
             while (getline(oldFile, dataLine)) {
                 ++line;
 
                 // compare the line against each of the config settings until there's a match
                 bool identified = false;
-                for (auto cfg_it = settings.begin(); cfg_it != settings.end(); ++cfg_it) {
-                    if (cfg_it->regex.search(dataLine) && cfg_it->regex.matches() > 2) {
-                        newFile << cfg_it->regex.get_match(0) << cfg_it->regex.get_match(1) << cfg_it->getValue() << 
-                            (cfg_it->regex.matches() > 3 ? cfg_it->regex.get_match(3) : "")  << endl;
-                        identified = true;
-                        break;
+                if (!reBlank.search(dataLine)) {
+                    for (auto cfg_it = settings.begin(); cfg_it != settings.end(); ++cfg_it) {
+                        if (cfg_it->regex.search(dataLine) && cfg_it->regex.matches() > 2) {
+                            delimiter = cfg_it->regex.get_match(1);  // save user's preferred delimiter
+                            newFile << cfg_it->regex.get_match(0) << cfg_it->regex.get_match(1) << cfg_it->getValue() << 
+                                (cfg_it->regex.matches() > 3 ? cfg_it->regex.get_match(3) : "")  << endl;
+                            identified = true;
+                            break;
+                        }
+                    }
+
+                    // comment out unrecognized settings
+                    if (!identified) { 
+                        newFile << "// " << dataLine << "       # unknown setting?" << endl; 
+                        continue;
                     }
                 }
 
-                // comment out unrecognized settings
-                if (!identified && !reBlank.search(dataLine)) {
-                    newFile << "// " << dataLine << "       # unknown setting?" << endl; 
-                }
-                else  // add the line as is (likely a comment)
-                    if (!identified)
-                        newFile << dataLine << endl;
+                // add the line as is (likely a comment or blank line)
+                if (!identified)
+                    newFile << dataLine << endl;
             }
+
+            // loop through settings that weren't specified in the existing config;
+            // if any of the current value (likely specified via command line parameters on startup)
+            // differ from the defaults, write them to the new file.
+            for (auto cfg_it = settings.begin(); cfg_it != settings.end(); ++cfg_it)
+                if (!cfg_it->seen && (cfg_it->getValue() != cfg_it->getValue(1))) {
+                    newFile << cfg_it->display_name << delimiter << cfg_it->getValue() << endl;
+                }
 
             oldFile.close();
             newFile.close();
-            //remove(config_filename.c_str());
-            //rename(temp_filename.c_str(), config_filename.c_str());
+            remove(config_filename.c_str());
+            rename(temp_filename.c_str(), config_filename.c_str());
         }
         catch (...) {
             oldFile.close();
@@ -211,22 +158,6 @@ bool BackupConfig::loadConfig(string filename) {
     if (configFile.is_open()) {
         string dataLine;
 
-        // precompile regexes and map settings to class variables
-        vector<Config_Setting> settings;
-        settings.insert(settings.begin(), Config_Setting(RE_TITLE, 0, &title));
-        settings.insert(settings.begin(), Config_Setting(RE_DIR, 0, &directory));
-        settings.insert(settings.begin(), Config_Setting(RE_FILE, 0, &backup_filename));
-        settings.insert(settings.begin(), Config_Setting(RE_CMD, 0, &backup_command));
-        settings.insert(settings.begin(), Config_Setting(RE_CP, 0, &cp_to));
-        settings.insert(settings.begin(), Config_Setting(RE_SFTP, 0, &sftp_to));
-        settings.insert(settings.begin(), Config_Setting(RE_DAYS, 1, &config_days));
-        settings.insert(settings.begin(), Config_Setting(RE_WEEKS, 1, &config_weeks));
-        settings.insert(settings.begin(), Config_Setting(RE_MONTHS, 1, &config_months));
-        settings.insert(settings.begin(), Config_Setting(RE_YEARS, 1, &config_years));
-        settings.insert(settings.begin(), Config_Setting(RE_FSBACKS, 1, &failsafe_backups));
-        settings.insert(settings.begin(), Config_Setting(RE_FSDAYS, 1, &failsafe_days));
-        settings.insert(settings.begin(), Config_Setting(RE_NOTIFY, 2, &notify));
-
         Pcre reBlank(RE_BLANK);
         config_filename = filename;
 
@@ -238,7 +169,6 @@ bool BackupConfig::loadConfig(string filename) {
                 // compare the line against each of the config settings until there's a match
                 bool identified = false;
                 for (auto cfg_it = settings.begin(); cfg_it != settings.end(); ++cfg_it) {
-                    cerr << dataLine << endl;
                     if (cfg_it->regex.search(dataLine) && cfg_it->regex.matches() > 2) {
                         cfg_it->setValue(cfg_it->regex.get_match(2));
                         identified = true;

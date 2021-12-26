@@ -18,10 +18,16 @@ string Setting::getValue(bool getDefault) {
 
     return std::visit([](auto&& arg) -> string {
             using T = std::decay_t<decltype(arg)>;
+
+            // int
             if constexpr (std::is_same_v<T, int>)
                 return to_string(arg);
+
+            // string
             else if constexpr (std::is_same_v<T, std::string>)
                 return(arg);
+
+            // vector
             else if constexpr (std::is_same_v<T, std::vector<string>>) {
                 auto vec = arg;
                 string result;
@@ -30,6 +36,7 @@ string Setting::getValue(bool getDefault) {
                 }
                 return result;
             }
+
             return "";  // should never get here
     }, getDefault ? default_value : data_value);
 }

@@ -2,17 +2,14 @@
 #ifndef BACKUPCONFIG_H
 #define BACKUPCONFIG_H
 
-#include <set>
+#include <vector>
+#include <variant>
 #include <string>
+#include <pcre++.h>
+#include "Setting.h"
+
 using namespace std;
-
-
-class Setting {
-    // its regex
-    // uid
-    // storage
-};
-
+using namespace pcrepp;
 
 
 class BackupConfig {
@@ -20,24 +17,7 @@ class BackupConfig {
 
     public:
         bool modified;
-
-        string title;
-        string directory;
-        string backup_filename;
-        string backup_command;
-
-        unsigned int config_days;
-        unsigned int config_weeks;
-        unsigned int config_months;
-        unsigned int config_years;
-
-        unsigned int failsafe_backups;
-        unsigned int failsafe_days;
-
-        string cp_to;
-        string sftp_to;
-
-        set<string> notify;
+        vector<Setting> settings;
 
         BackupConfig();
         ~BackupConfig();

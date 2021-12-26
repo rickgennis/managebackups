@@ -5,12 +5,13 @@
 
 using namespace std;
 
-struct ConfCmp {
+/*struct ConfCmp {
     // sort configs alphabetically by title
     bool operator()(const BackupConfig lhs, const BackupConfig rhs) const {
         return (lhs.title) < (rhs.title);
     }
 };
+*/
 
 
 class ConfigManager {

@@ -12,7 +12,7 @@ using namespace pcrepp;
 
 const BackupConfig *ConfigManager::config(string title) {
     for (auto cfg_it = configs.begin(); cfg_it != configs.end(); ++cfg_it)
-        if ((*cfg_it).title == title) {
+        if ((*cfg_it).settings[sTitle].getValue() == title) {  
             return &(*cfg_it);
         }
 

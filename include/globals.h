@@ -25,7 +25,7 @@
 #define RE_NOTIFY "(notify)"
 
 
-extern const unsigned int DEBUG_LEVEL;
+extern unsigned int DEBUG_LEVEL;
 
 extern time_t g_startupTime;
 extern unsigned long g_stats;
