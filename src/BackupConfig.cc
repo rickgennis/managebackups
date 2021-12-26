@@ -1,6 +1,7 @@
 #include <fstream>
 #include <sys/stat.h>
 #include <stdio.h>
+#include <variant>
 
 #include "BackupConfig.h"
 #include "util.h"
@@ -10,9 +11,6 @@
 using namespace pcrepp;
 
 // conf file regexes
-// ((?:\s|=|:)+)(.*?)\s*((?:#|//).*)*$
-
-
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
 #define RE_COMMENT "((?:\\s*#|//).*)*$"
 #define RE_BLANK "^((?:\\s*#|//).*)*$"
@@ -30,8 +28,6 @@ using namespace pcrepp;
 #define RE_FSDAYS "(failsafe_days)"
 #define RE_NOTIFY "(notify)"
 
-// define CAPTURE_VALUE string("(\\s|=|:)+([^#]+)")
-// define RE_COMMENT "(\\s*(#|//).*)"
 
 class Config_Setting {
     public:
@@ -100,10 +96,10 @@ void Config_Setting::setValue(string newValue) {
 BackupConfig::BackupConfig() {
     title = directory = backup_filename = backup_command = cp_to = sftp_to = "";
     failsafe_backups = failsafe_days = 0;
-    default_days = 14;
-    default_weeks = 4;
-    default_months = 6;
-    default_years = 1;
+    config_days = 14;
+    config_weeks = 4;
+    config_months = 6;
+    config_years = 1;
     modified = 0;
     config_filename = "";
 }
@@ -153,10 +149,10 @@ void BackupConfig::saveConfig() {
         settings.insert(settings.begin(), Config_Setting(RE_CMD, 0, &backup_command));
         settings.insert(settings.begin(), Config_Setting(RE_CP, 0, &cp_to));
         settings.insert(settings.begin(), Config_Setting(RE_SFTP, 0, &sftp_to));
-        settings.insert(settings.begin(), Config_Setting(RE_DAYS, 1, &default_days));
-        settings.insert(settings.begin(), Config_Setting(RE_WEEKS, 1, &default_weeks));
-        settings.insert(settings.begin(), Config_Setting(RE_MONTHS, 1, &default_months));
-        settings.insert(settings.begin(), Config_Setting(RE_YEARS, 1, &default_years));
+        settings.insert(settings.begin(), Config_Setting(RE_DAYS, 1, &config_days));
+        settings.insert(settings.begin(), Config_Setting(RE_WEEKS, 1, &config_weeks));
+        settings.insert(settings.begin(), Config_Setting(RE_MONTHS, 1, &config_months));
+        settings.insert(settings.begin(), Config_Setting(RE_YEARS, 1, &config_years));
         settings.insert(settings.begin(), Config_Setting(RE_FSBACKS, 1, &failsafe_backups));
         settings.insert(settings.begin(), Config_Setting(RE_FSDAYS, 1, &failsafe_days));
         settings.insert(settings.begin(), Config_Setting(RE_NOTIFY, 2, &notify));
@@ -185,7 +181,7 @@ void BackupConfig::saveConfig() {
                 if (!identified && !reBlank.search(dataLine)) {
                     newFile << "// " << dataLine << "       # unknown setting?" << endl; 
                 }
-                else  // add as is (likely a comment)
+                else  // add the line as is (likely a comment)
                     if (!identified)
                         newFile << dataLine << endl;
             }
@@ -223,10 +219,10 @@ bool BackupConfig::loadConfig(string filename) {
         settings.insert(settings.begin(), Config_Setting(RE_CMD, 0, &backup_command));
         settings.insert(settings.begin(), Config_Setting(RE_CP, 0, &cp_to));
         settings.insert(settings.begin(), Config_Setting(RE_SFTP, 0, &sftp_to));
-        settings.insert(settings.begin(), Config_Setting(RE_DAYS, 1, &default_days));
-        settings.insert(settings.begin(), Config_Setting(RE_WEEKS, 1, &default_weeks));
-        settings.insert(settings.begin(), Config_Setting(RE_MONTHS, 1, &default_months));
-        settings.insert(settings.begin(), Config_Setting(RE_YEARS, 1, &default_years));
+        settings.insert(settings.begin(), Config_Setting(RE_DAYS, 1, &config_days));
+        settings.insert(settings.begin(), Config_Setting(RE_WEEKS, 1, &config_weeks));
+        settings.insert(settings.begin(), Config_Setting(RE_MONTHS, 1, &config_months));
+        settings.insert(settings.begin(), Config_Setting(RE_YEARS, 1, &config_years));
         settings.insert(settings.begin(), Config_Setting(RE_FSBACKS, 1, &failsafe_backups));
         settings.insert(settings.begin(), Config_Setting(RE_FSDAYS, 1, &failsafe_days));
         settings.insert(settings.begin(), Config_Setting(RE_NOTIFY, 2, &notify));

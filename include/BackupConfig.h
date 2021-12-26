@@ -6,6 +6,15 @@
 #include <string>
 using namespace std;
 
+
+class Setting {
+    // its regex
+    // uid
+    // storage
+};
+
+
+
 class BackupConfig {
         string config_filename;
 
@@ -17,10 +26,10 @@ class BackupConfig {
         string backup_filename;
         string backup_command;
 
-        unsigned int default_days;
-        unsigned int default_weeks;
-        unsigned int default_months;
-        unsigned int default_years;
+        unsigned int config_days;
+        unsigned int config_weeks;
+        unsigned int config_months;
+        unsigned int config_years;
 
         unsigned int failsafe_backups;
         unsigned int failsafe_days;
