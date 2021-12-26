@@ -12,17 +12,13 @@
 #include <filesystem>
 #include <dirent.h>
 #include <time.h>
-#include "globals.h"
+#include "globalsdef.h"
 #include "util.h"
 
 
 using namespace pcrepp;
 
-unsigned int DEBUG_LEVEL = 0;
-time_t g_startupTime;
-unsigned long g_stats = 0;
-unsigned long g_md5s = 0;
-int g_pid = getpid();
+struct global_vars GLOBALS;
 
 
 void parseDirToCache(string directory, string fnamePattern, BackupCache* cache) {
@@ -37,7 +33,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache* cache) 
 
             string fullFilename = addSlash(directory) + string(c_dirEntry->d_name);
 
-            ++g_stats;
+            ++GLOBALS.statsCount;
             struct stat statData;
             if (!stat(fullFilename.c_str(), &statData)) {
 
@@ -64,7 +60,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache* cache) 
                             pCacheEntry->links = statData.st_nlink;
                             pCacheEntry->inode = statData.st_ino;
 
-                            cache->addOrUpdate(*pCacheEntry->updateAges(g_startupTime));
+                            cache->addOrUpdate(*pCacheEntry->updateAges(GLOBALS.startupTime));
                             continue;
                         }
                     }
@@ -77,9 +73,9 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache* cache) 
                     cacheEntry.mtime = statData.st_mtime;
                     cacheEntry.inode = statData.st_ino;
                     cacheEntry.size = statData.st_size;
-                    cacheEntry.updateAges(g_startupTime);
+                    cacheEntry.updateAges(GLOBALS.startupTime);
                     cacheEntry.calculateMD5();
-                    ++g_md5s;
+                    ++GLOBALS.md5Count;
 
                     cache->addOrUpdate(cacheEntry);                    
                 }
@@ -120,7 +116,12 @@ void pruneBackups() {
 
 
 int main(int argc, char *argv[]) {
-    time(&g_startupTime);
+    GLOBALS.debugLevel = 0;
+    GLOBALS.statsCount = 0;
+    GLOBALS.md5Count = 0;
+    GLOBALS.pid = getpid();
+
+    time(&GLOBALS.startupTime);
     openlog("managebackups", LOG_PID | LOG_NDELAY, LOG_LOCAL1);
     cxxopts::Options options("managebackups", "Create and manage backups");
 
@@ -130,7 +131,7 @@ int main(int argc, char *argv[]) {
         ("v,verbose", "Verbose output", cxxopts::value<bool>()->default_value("false"));
     auto cli = options.parse(argc, argv);
 
-    DEBUG_LEVEL = cli.count("verbose");
+    GLOBALS.debugLevel = cli.count("verbose");
 
     BackupCache cache;
     BackupConfig config;
@@ -150,7 +151,7 @@ int main(int argc, char *argv[]) {
 
 
     cache.saveCache("cachedata.1");
-    cout << "stats: " << g_stats << ", md5s: " << g_md5s << endl;
+    cout << "stats: " << GLOBALS.statsCount << ", md5s: " << GLOBALS.md5Count << endl;
 return 0;
 
     Myentry->filename = "foo";

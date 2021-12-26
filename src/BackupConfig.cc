@@ -77,7 +77,7 @@ void BackupConfig::saveConfig() {
     }
 
     // open existing and new config files
-    string temp_filename = config_filename + ".tmp." + to_string(g_pid);
+    string temp_filename = config_filename + ".tmp." + to_string(GLOBALS.pid);
     oldFile.open(config_filename);
     newFile.open(temp_filename);
 

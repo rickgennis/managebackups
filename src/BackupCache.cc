@@ -120,7 +120,7 @@ using namespace std;
 
                 // update the rawData entry
                 raw_it->second = updatedEntry;
-                cout << "updated raw data for " << backupEntry.filename << endl;
+                DEBUG(3) && cout << "updated raw data for " << backupEntry.filename << endl;
 
                 // if the md5 changed...
                 if (updatedEntry.md5 != oldMD5) {
