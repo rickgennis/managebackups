@@ -2,16 +2,16 @@
 #include "globals.h"
 
 
-Setting::Setting(string name, string pattern, enum SetType setType, SETTINGVARIANT defaultVal) {
+Setting::Setting(string name, string pattern, enum SetType setType, string defaultVal) {
     regex = Pcre(pattern + CAPTURE_VALUE + RE_COMMENT);
     display_name = name;
     data_type = setType;
-    default_value = defaultVal;
-    data_value = default_value;
+    defaultValue = defaultVal;
+    value = defaultValue;
     seen = false;
 }
 
-
+/*
 string Setting::getValue(bool getDefault) {
     string result;
     seen = true;
@@ -38,23 +38,23 @@ string Setting::getValue(bool getDefault) {
             }
 
             return "";  // should never get here
-    }, getDefault ? default_value : data_value);
+    }, getDefault ? defaultValue : value);
 }
 
 
-void Setting::setValue(string newValue) {
-    cout << "SETTING " << display_name << " [was {" << getValue() << "}] to " << newValue << endl;
+void Setting::value = string newValue) {
+    cout << "SETTING " << display_name << " [was {" << value << "}] to " << newValue << endl;
 
     switch (data_type) {
         case INT: {
             int tempVal = stoi(newValue);
-            data_value = tempVal;
+            value = tempVal;
             break;
         }
 
         case STRING:
         default:
-            data_value = newValue;
+            value = newValue;
             break;
 
         case VECTOR: {
@@ -65,17 +65,18 @@ void Setting::setValue(string newValue) {
             for (auto str_it = values.begin(); str_it != values.end(); ++str_it)
                 vec.insert(vec.end(), *str_it);
 
-            data_value = vec;
+            value = vec;
             break;
         }
     }
 }
 
 
-void Setting::setValue(int newValue) {   // convenience func
-    cout << "SETTING (int)" << display_name << " [was {" << getValue() << "}] to " << newValue << endl;
+void Setting::value = int newValue) {   // convenience func
+    cout << "SETTING (int)" << display_name << " [was {" << value << "}] to " << newValue << endl;
     assert(data_type == INT);
-    data_value = newValue;
+    value = newValue;
 
 }
+*/
 

@@ -90,16 +90,16 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
 void scanConfigToCache(BackupConfig& config) {
     string directory = "";
     string fnamePattern = "";
-    if (config.settings[sDirectory].getValue().length())
-        directory = config.settings[sDirectory].getValue();
+    if (config.settings[sDirectory].value.length())
+        directory = config.settings[sDirectory].value;
 
     // if there's a fnamePattern convert it into a wildcard version to match
     // backups with a date/time inserted.  i.e.
     //    myBigBackup.tgz --> myBigBackup*.tgz
-    if (config.settings[sBackupFilename].getValue().length()) {
+    if (config.settings[sBackupFilename].value.length()) {
         Pcre regEx("(.*)\\.([^.]+)$");
         
-        if (regEx.search(config.settings[sBackupFilename].getValue()) && regEx.matches()) 
+        if (regEx.search(config.settings[sBackupFilename].value) && regEx.matches()) 
             fnamePattern = regEx.get_match(0) + "-20\\d{2}[-.]*\\d{2}[-.]*\\d{2}.*\\." + regEx.get_match(1);
     }
     else 
@@ -128,13 +128,13 @@ void selectOrSetupConfig(ConfigManager &configManager) {
     for (auto setting_it = currentConf->settings.begin(); setting_it != currentConf->settings.end(); ++setting_it) 
         if (GLOBALS.cli.count(setting_it->display_name)) {
             if (setting_it->data_type == INT)  {
-                if (save && (setting_it->getValue() != to_string(GLOBALS.cli[setting_it->display_name].as<int>())))
+                if (save && (setting_it->value != to_string(GLOBALS.cli[setting_it->display_name].as<int>())))
                     currentConf->modified = 1;
 
-                setting_it->setValue(GLOBALS.cli[setting_it->display_name].as<int>());
+                setting_it->value = to_string(GLOBALS.cli[setting_it->display_name].as<int>());
             }
             else
-                setting_it->setValue(GLOBALS.cli[setting_it->display_name].as<string>());
+                setting_it->value = GLOBALS.cli[setting_it->display_name].as<string>();
         }
 
     if (currentConf == &tempConfig) 
@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
     configManager.fullDump();
 
     //config.filename = "myFatCat.log";
-//    config.settings[sDirectory].setValue("/Users/rennis/test"); 
+//    config.settings[sDirectory].value = "/Users/rennis/test"); 
 //    cache.restoreCache("cachedata.1");
     scanConfigToCache(configManager.configs[0]);
 
