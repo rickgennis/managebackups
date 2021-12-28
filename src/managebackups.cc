@@ -17,11 +17,10 @@
 
 
 using namespace pcrepp;
-
 struct global_vars GLOBALS;
 
 
-void parseDirToCache(string directory, string fnamePattern, BackupCache* cache) {
+void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
     Pcre regEx(fnamePattern);
@@ -52,7 +51,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache* cache) 
                     // what we just read from disk, consider the cache valid.  only update
                     // the inode & age info then bail out.
                     BackupEntry *pCacheEntry;
-                    if ((pCacheEntry = cache->getByFilename(fullFilename)) != NULL) {
+                    if ((pCacheEntry = cache.getByFilename(fullFilename)) != NULL) {
                         if (pCacheEntry->md5.length() && 
                            pCacheEntry->mtime &&
                            pCacheEntry->mtime == statData.st_mtime &&
@@ -60,7 +59,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache* cache) 
                             pCacheEntry->links = statData.st_nlink;
                             pCacheEntry->inode = statData.st_ino;
 
-                            cache->addOrUpdate(*pCacheEntry->updateAges(GLOBALS.startupTime));
+                            cache.addOrUpdate(*pCacheEntry->updateAges(GLOBALS.startupTime));
                             continue;
                         }
                     }
@@ -77,36 +76,69 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache* cache) 
                     cacheEntry.calculateMD5();
                     ++GLOBALS.md5Count;
 
-                    cache->addOrUpdate(cacheEntry);                    
+                    cache.addOrUpdate(cacheEntry);                    
                 }
             }
             else 
-                log("unable to stat " + fullFilename);
+                log("error: unable to stat " + fullFilename);
         }
         closedir(c_dir);
     }
 }
 
 
-void scanConfigToCache(BackupConfig* config, BackupCache* cache) {
+void scanConfigToCache(BackupConfig& config) {
     string directory = "";
     string fnamePattern = "";
-    if (config->settings[sDirectory].getValue().length())
-        directory = config->settings[sDirectory].getValue();
+    if (config.settings[sDirectory].getValue().length())
+        directory = config.settings[sDirectory].getValue();
 
     // if there's a fnamePattern convert it into a wildcard version to match
     // backups with a date/time inserted.  i.e.
     //    myBigBackup.tgz --> myBigBackup*.tgz
-    if (config->settings[sBackupFilename].getValue().length()) {
+    if (config.settings[sBackupFilename].getValue().length()) {
         Pcre regEx("(.*)\\.([^.]+)$");
         
-        if (regEx.search(config->settings[sBackupFilename].getValue()) && regEx.matches()) 
+        if (regEx.search(config.settings[sBackupFilename].getValue()) && regEx.matches()) 
             fnamePattern = regEx.get_match(0) + "-20\\d{2}[-.]*\\d{2}[-.]*\\d{2}.*\\." + regEx.get_match(1);
     }
     else 
         fnamePattern = ".*-20\\d{2}[-.]*\\d{2}[-.]*\\d{2}.*";
 
-    parseDirToCache(directory, fnamePattern, cache);
+    parseDirToCache(directory, fnamePattern, config.cache);
+}
+
+
+void selectOrSetupConfig(ConfigManager &configManager) {
+    string title;
+    BackupConfig tempConfig(true);
+    BackupConfig* currentConf = &tempConfig; 
+    bool save = GLOBALS.cli.count(CLI_SAVE) > 0;
+
+    // if --title is specified on the command line load saved settings (if they exist)
+    if (GLOBALS.cli.count(CLI_TITLE)) {
+       if (int configNumber = configManager.config(GLOBALS.cli[CLI_TITLE].as<string>())) {
+            configManager.activeConfig = configNumber - 1;
+            currentConf = &configManager.configs[configManager.activeConfig];
+       }
+    }
+
+    // if any other settings are given on the command line, incorporate them into the selected config.
+    // that config will be the one found from --title above (if any), or a temp config comprised only of defaults
+    for (auto setting_it = currentConf->settings.begin(); setting_it != currentConf->settings.end(); ++setting_it) 
+        if (GLOBALS.cli.count(setting_it->display_name)) {
+            if (setting_it->data_type == INT)  {
+                if (save && (setting_it->getValue() != to_string(GLOBALS.cli[setting_it->display_name].as<int>())))
+                    currentConf->modified = 1;
+
+                setting_it->setValue(GLOBALS.cli[setting_it->display_name].as<int>());
+            }
+            else
+                setting_it->setValue(GLOBALS.cli[setting_it->display_name].as<string>());
+        }
+
+    if (currentConf == &tempConfig) 
+        configManager.configs.insert(configManager.configs.end(), tempConfig);
 }
 
 
@@ -116,7 +148,6 @@ void pruneBackups() {
 
 
 int main(int argc, char *argv[]) {
-    GLOBALS.debugLevel = 0;
     GLOBALS.statsCount = 0;
     GLOBALS.md5Count = 0;
     GLOBALS.pid = getpid();
@@ -126,70 +157,57 @@ int main(int argc, char *argv[]) {
     cxxopts::Options options("managebackups", "Create and manage backups");
 
     options.add_options()
-        ("i,integer", "Int param", cxxopts::value<int>())
-        ("f,file", "File name", cxxopts::value<std::string>())
-        ("v,verbose", "Verbose output", cxxopts::value<bool>()->default_value("false"));
-    auto cli = options.parse(argc, argv);
+        ("d,days", "Days", cxxopts::value<int>())
+        ("w,weeks", "Weeks", cxxopts::value<int>())
+        ("m,months", "Months", cxxopts::value<int>())
+        ("y,years", "Years", cxxopts::value<int>())
+        ("failsafe_backups", "Failsafe Backups", cxxopts::value<int>())
+        ("failsafe_days", "Failsafe Days", cxxopts::value<int>())
+        (string("t,") + CLI_TITLE, "Title", cxxopts::value<std::string>())
+        ("directory", "Directory", cxxopts::value<std::string>())
+        ("f,filename", "Filename", cxxopts::value<std::string>())
+        ("c,command", "Command", cxxopts::value<std::string>())
+        ("copyto", "Copy To", cxxopts::value<std::string>())
+        ("sftpto", "SFTP To", cxxopts::value<std::string>())
+        ("n,notify", "Notify", cxxopts::value<std::string>())
+        ("v,verbose", "Verbose output", cxxopts::value<bool>()->default_value("false"))
+        (string(CLI_SAVE), "Saved config", cxxopts::value<bool>()->default_value("false"));
 
-    GLOBALS.debugLevel = cli.count("verbose");
+    try {
+        GLOBALS.cli = options.parse(argc, argv);
+        GLOBALS.debugLevel = GLOBALS.cli.count("verbose");
+    }
+    catch (cxxopts::OptionParseException& e) {
+        cerr << "managebackups: " << e.what() << endl;
+        exit(1);
+    }
 
-    BackupCache cache;
-    BackupConfig config;
+//    BackupCache cache;
+//    BackupConfig config;
     ConfigManager configManager;
     //configManager.configs.begin()++->modified = 1;
 
-    BackupEntry* Myentry = new BackupEntry;
-    cout << cache.size() << endl << endl;
+//    BackupEntry* Myentry = new BackupEntry;
+//    cout << cache.size() << endl << endl;
+
+    cout << "PRE-DUMP" << endl;
+    configManager.fullDump();
+    selectOrSetupConfig(configManager);
+    cout << "POST-DUMP" << endl;
+    configManager.fullDump();
 
     //config.filename = "myFatCat.log";
-    config.settings[sDirectory].setValue("/Users/rennis/test"); 
-    cache.restoreCache("cachedata.1");
-    scanConfigToCache(&config, &cache);
+//    config.settings[sDirectory].setValue("/Users/rennis/test"); 
+//    cache.restoreCache("cachedata.1");
+    scanConfigToCache(configManager.configs[0]);
 
-    cout << "size: " << cache.size() << "\t" << endl << endl;
-    cout << cache.fullDump() << endl;
+    cout << configManager.configs[0].cache.fullDump() << endl;
+
+//    cout << "size: " << cache.size() << "\t" << endl << endl;
+//    cout << cache.fullDump() << endl;
 
 
-    cache.saveCache("cachedata.1");
+//    cache.saveCache("cachedata.1");
     cout << "stats: " << GLOBALS.statsCount << ", md5s: " << GLOBALS.md5Count << endl;
-return 0;
-
-    Myentry->filename = "foo";
-    Myentry->md5 = "abcabcabcabc";
-    Myentry->links = 9;
-    cache.addOrUpdate(*Myentry);
-    cout << cache.size() << "\t" << cache.size(Myentry->md5) << endl << endl;
-
-    Myentry->filename = "bar";
-    cache.addOrUpdate(*Myentry);
-    cout << cache.size() << "\t" << cache.size(Myentry->md5) << endl << endl;
-
-    Myentry->filename = "fish";
-    Myentry->links = 15;
-    Myentry->size = 305;
-    Myentry->md5 = "ccccccccccccc";
-    cache.addOrUpdate(*Myentry);
-    cout << cache.size() << "\t" << cache.size(Myentry->md5) << endl << endl;
-    cout << cache.fullDump() << endl;
-
-    /*Myentry->filename = "foo";
-    Myentry->md5 = "newmd5";
-    Myentry->links = 4;
-    cache.addOrUpdate(*Myentry);
-    cout << cache.size() << "\t" << cache.size(Myentry->md5) << endl << endl;
-*/
-    cout << cache.fullDump() << endl;
-
-    BackupEntry* entry = cache.getByFilename("fish");
-    if (entry != NULL) {
-        cout << (*entry).md5 << endl;
-        (*entry).mtime = 567;
-//        cache.addOrUpdate(*entry);
-        cout << cache.fullDump() << endl;
-    }
-
-    auto md5set = cache.getByMD5("abcabcabcabc");
-    for (auto entry_it = md5set.begin(); entry_it != md5set.end(); ++entry_it) {
-        cout << "#" << (*entry_it)->filename << endl;
-    }
+    return 0;
 }

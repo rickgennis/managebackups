@@ -11,16 +11,33 @@
 
 using namespace std;
 
+BackupCache::BackupCache(string filename) {
+    BackupCache();
+    cacheFilename = filename;
+}
+
+BackupCache::BackupCache() {
+    modified = false;
+}
+
+BackupCache::~BackupCache() {
+    if (modified && cacheFilename.length())
+        saveCache();
+}
+
+
     void BackupCache::updateAges(time_t refTime) {
+        modified = true;
+
         for (auto raw_it = rawData.begin(); raw_it != rawData.end(); ++raw_it) 
             raw_it->second.updateAges(refTime);
     }
 
 
-    void BackupCache::saveCache(string filename) {
+    void BackupCache::saveCache() {
         ofstream cacheFile;
 
-        cacheFile.open(filename);
+        cacheFile.open(cacheFilename);
         if (cacheFile.is_open()) {
 
             // write raw data
@@ -31,14 +48,14 @@ using namespace std;
             cacheFile.close();
         }
         else
-            log("unable to save cache to " + filename);
+            log("unable to save cache to " + cacheFilename);
     }
 
 
-    void BackupCache::restoreCache(string filename) {
+    void BackupCache::restoreCache() {
         ifstream cacheFile;
 
-        cacheFile.open(filename);
+        cacheFile.open(cacheFilename);
         if (cacheFile.is_open()) {
 
             string cacheData;
@@ -51,7 +68,7 @@ using namespace std;
             cacheFile.close();
         }
         else
-            log("unable to read cache file " + filename);
+            log("unable to read cache file " + cacheFilename);
     }
 
 
@@ -84,6 +101,7 @@ using namespace std;
 
     void BackupCache::addOrUpdate(BackupEntry updatedEntry) {
         auto filename_it = indexByFilename.find(updatedEntry.filename);
+        modified = true;
 
         // filename doesn't exist
         if (filename_it == indexByFilename.end()) {

@@ -1,3 +1,6 @@
+#ifndef ENTRY_H
+#define ENTRY_H
+
 #include <string>
 #include <time.h>
 
@@ -24,4 +27,6 @@ class BackupEntry {
     BackupEntry* updateAges(time_t refTime = 0);
     void calculateMD5();
 };
+
+#endif
 

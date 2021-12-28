@@ -2,9 +2,15 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
+#include "cxxopts.hpp"
+
 #define CONF_DIR "/etc/managebackups"
 
 #define DEBUG(x) (GLOBALS.debugLevel >= x)
+
+// define commandline options
+#define CLI_TITLE "title"
+#define CLI_SAVE "save"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -31,6 +37,7 @@ struct global_vars {
     unsigned long statsCount;
     unsigned long md5Count;
     int pid;
+    cxxopts::ParseResult cli;
 };
 
 #endif

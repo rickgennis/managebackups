@@ -1,5 +1,4 @@
 #include "BackupEntry.h"
-#include <openssl/md5.h>
 #include <stdio.h>
 #include <iostream>
 #include <string>
@@ -74,24 +73,5 @@ BackupEntry* BackupEntry::updateAges(time_t refTime) {
 
 
 void BackupEntry::calculateMD5() {
-    FILE *inputFile;
-
-    if ((inputFile = fopen(filename.c_str(), "rb")) != NULL) {
-        unsigned char data[65536];
-        int bytesRead;
-        MD5_CTX md5Context;
-
-        MD5_Init(&md5Context);
-        while ((bytesRead = fread(data, 1, 65536, inputFile)) != 0)
-            MD5_Update(&md5Context, data, bytesRead);
-        
-        fclose(inputFile);
-        unsigned char md5Result[MD5_DIGEST_LENGTH];
-        MD5_Final(md5Result, &md5Context);
-
-        char tempStr[MD5_DIGEST_LENGTH * 2];
-        for (int i = 0; i < MD5_DIGEST_LENGTH; i++)
-            sprintf(tempStr+(2*i), "%02x", md5Result[i]);
-        md5 = tempStr;
-    }
+    md5 = MD5file(filename);
 }

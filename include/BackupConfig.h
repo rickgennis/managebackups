@@ -7,6 +7,7 @@
 #include <string>
 #include <pcre++.h>
 #include "Setting.h"
+#include "BackupCache.h"
 
 using namespace std;
 using namespace pcrepp;
@@ -18,8 +19,9 @@ class BackupConfig {
     public:
         bool modified;
         vector<Setting> settings;
+        BackupCache cache;
 
-        BackupConfig();
+        BackupConfig(bool temp = 0);
         ~BackupConfig();
 
         void saveConfig();

@@ -43,6 +43,8 @@ string Setting::getValue(bool getDefault) {
 
 
 void Setting::setValue(string newValue) {
+    cout << "SETTING " << display_name << " [was {" << getValue() << "}] to " << newValue << endl;
+
     switch (data_type) {
         case INT: {
             int tempVal = stoi(newValue);
@@ -71,7 +73,9 @@ void Setting::setValue(string newValue) {
 
 
 void Setting::setValue(int newValue) {   // convenience func
+    cout << "SETTING (int)" << display_name << " [was {" << getValue() << "}] to " << newValue << endl;
     assert(data_type == INT);
     data_value = newValue;
+
 }
 

@@ -1,4 +1,3 @@
-#include <set>
 #include <vector>
 #include <string>
 #include "BackupConfig.h"
@@ -16,9 +15,10 @@ using namespace std;
 
 class ConfigManager {
     public:
-        //set<BackupConfig, ConfCmp> configs;
+        int activeConfig;
         vector<BackupConfig> configs;
-        const BackupConfig* config(string title);
+        int config(string title);
+        void fullDump();
 
         ConfigManager();
 };
