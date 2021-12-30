@@ -37,14 +37,8 @@ ConfigManager::ConfigManager() {
 
             string fullFilename = addSlash(string(CONF_DIR)) + string(c_dirEntry->d_name);
             BackupConfig backupConfig;
-            cout << "A setting count: " << backupConfig.settings.size() << endl;
-            cout << "A days: " << backupConfig.settings[sDays].value << endl;
             backupConfig.loadConfig(fullFilename);
-            cout << "B setting count: " << backupConfig.settings.size() << endl;
-            cout << "B days: " << backupConfig.settings[sDays].value << endl;
             configs.insert(configs.begin(), backupConfig);
-            cout << "C days: " << (--configs.end())->settings[sDays].value << endl;
-            cout << "sDays = " << sDays << endl;
         }
 
         closedir(c_dir);

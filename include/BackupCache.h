@@ -11,12 +11,12 @@
 using namespace std;
 
 class BackupCache {
-    map<int, BackupEntry> rawData;
-    map<string, set<int> > indexByMD5;
-    map<string, int> indexByFilename;
-    bool modified;
-
     public:
+        map<int, BackupEntry> rawData;
+        map<string, set<int> > indexByMD5;
+        map<string, int> indexByFilename;
+        bool modified;
+
         string cacheFilename;
         BackupEntry* getByFilename(string filename);
         set<BackupEntry*> getByMD5(string md5);

@@ -16,17 +16,17 @@ using namespace std;
 BackupEntry::BackupEntry() {
     md5 = "";
     filename = "";
-    links = mtime = size = inode = day_age = month_age = dow = date_day = 0;
+    links = mtime = size = inode = day_age = month_age = dow = date_day = duration = 0;
 }
 
 string BackupEntry::class2string() {
     return("[" + filename + "]," + md5 + "," + to_string(links) + "," + to_string(mtime) + "," +
             to_string(size) + "," + to_string(inode) + "," + to_string(day_age) + "," +
-            to_string(month_age) + "," + to_string(dow) + "," + to_string(date_day));
+            to_string(month_age) + "," + to_string(dow) + "," + to_string(date_day) + "," + to_string(duration));
 }
 
 void BackupEntry::string2class(string data) {
-    Pcre regEx("\\[(.+)\\],([a-f0-9]+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)");
+    Pcre regEx("\\[(.+)\\],([a-f0-9]+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)");
 
     if (regEx.search(data) && regEx.matches() > 9) {
         filename = regEx.get_match(0);
@@ -39,6 +39,7 @@ void BackupEntry::string2class(string data) {
         month_age = stoi(regEx.get_match(7));
         dow = stoi(regEx.get_match(8));
         date_day = stoi(regEx.get_match(9));
+        duration = stoi(regEx.get_match(10));
     }
     else
         log("unable to parse cache line (" + data + ")");

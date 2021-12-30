@@ -10,7 +10,20 @@
 
 // define commandline options
 #define CLI_TITLE "title"
+#define CLI_DIR "directory"
+#define CLI_FILE "filename"
+#define CLI_COMMAND "command"
+#define CLI_DAYS "days"
+#define CLI_WEEKS "weeks"
+#define CLI_MONTHS "months"
+#define CLI_YEARS "years"
+#define CLI_FS_BACKUPS "failsafe_backups"
+#define CLI_FS_DAYS "failsave_days"
+#define CLI_COPYTO "copyto"
+#define CLI_SFTPTO "sftpto"
+#define CLI_NOTIFY "notify"
 #define CLI_SAVE "save"
+#define CLI_VERBOSE "verbose"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -38,6 +51,7 @@ struct global_vars {
     unsigned long md5Count;
     int pid;
     cxxopts::ParseResult cli;
+    bool color;
 };
 
 #endif

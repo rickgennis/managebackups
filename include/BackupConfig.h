@@ -14,9 +14,9 @@ using namespace pcrepp;
 
 
 class BackupConfig {
+    public:
         string config_filename;
 
-    public:
         bool modified;
         vector<Setting> settings;
         BackupCache cache;

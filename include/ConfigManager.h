@@ -1,3 +1,7 @@
+
+#ifndef CONFIGMANAGER
+#define CONFIGMANAGER
+
 #include <vector>
 #include <string>
 #include "BackupConfig.h"
@@ -23,3 +27,4 @@ class ConfigManager {
         ConfigManager();
 };
 
+#endif

@@ -19,19 +19,19 @@ BackupConfig::BackupConfig(bool temp) {
 
     // define settings and their defaults
     // order of these inserts matter because they're accessed by position via the SetSpecifier enum
-    settings.insert(settings.end(), Setting("title", RE_TITLE, STRING, ""));
-    settings.insert(settings.end(), Setting("directory", RE_DIR, STRING, ""));
-    settings.insert(settings.end(), Setting("filename", RE_FILE, STRING, ""));
-    settings.insert(settings.end(), Setting("command", RE_CMD, STRING, ""));
-    settings.insert(settings.end(), Setting("days", RE_DAYS, INT, "14"));
-    settings.insert(settings.end(), Setting("weeks", RE_WEEKS, INT, "4"));
-    settings.insert(settings.end(), Setting("months", RE_MONTHS, INT, "6"));
-    settings.insert(settings.end(), Setting("years", RE_YEARS, INT, "2"));
-    settings.insert(settings.end(), Setting("failsafe_backups", RE_FSBACKS, INT, "0"));
-    settings.insert(settings.end(), Setting("failsafe_days", RE_FSDAYS, INT, "0"));
-    settings.insert(settings.end(), Setting("copyto", RE_CP, STRING, ""));
-    settings.insert(settings.end(), Setting("sftpto", RE_SFTP, STRING, ""));
-    settings.insert(settings.end(), Setting("notify", RE_NOTIFY, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_TITLE, RE_TITLE, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_DIR, RE_DIR, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_FILE, RE_FILE, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_COMMAND, RE_CMD, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_DAYS, RE_DAYS, INT, "14"));
+    settings.insert(settings.end(), Setting(CLI_WEEKS, RE_WEEKS, INT, "4"));
+    settings.insert(settings.end(), Setting(CLI_MONTHS, RE_MONTHS, INT, "6"));
+    settings.insert(settings.end(), Setting(CLI_YEARS, RE_YEARS, INT, "2"));
+    settings.insert(settings.end(), Setting(CLI_FS_BACKUPS, RE_FSBACKS, INT, "0"));
+    settings.insert(settings.end(), Setting(CLI_FS_DAYS, RE_FSDAYS, INT, "0"));
+    settings.insert(settings.end(), Setting(CLI_COPYTO, RE_CP, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_SFTPTO, RE_SFTP, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_NOTIFY, RE_NOTIFY, STRING, ""));
 }
 
 
@@ -73,6 +73,7 @@ void BackupConfig::saveConfig() {
         exit(1);
     }
 
+    string usersDelimiter = ": ";
     if (oldFile.is_open()) {
         Pcre reBlank(RE_BLANK);
 
@@ -80,8 +81,6 @@ void BackupConfig::saveConfig() {
         unsigned int line = 0;
 
         try {
-            string usersDelimiter = ": ";
-
             // loop through lines of the existing config file
             while (getline(oldFile, dataLine)) {
                 ++line;
@@ -110,19 +109,6 @@ void BackupConfig::saveConfig() {
                 if (!identified)
                     newFile << dataLine << endl;
             }
-
-            // loop through settings that weren't specified in the existing config;
-            // if any of the current values (likely specified via command line parameters on startup)
-            // differ from the defaults, write them to the new file.
-            for (auto cfg_it = settings.begin(); cfg_it != settings.end(); ++cfg_it)
-                if (!cfg_it->seen && (cfg_it->value != cfg_it->defaultValue)) {
-                    newFile << cfg_it->display_name << usersDelimiter << cfg_it->value << endl;
-                }
-
-            oldFile.close();
-            newFile.close();
-            remove(config_filename.c_str());
-            rename(temp_filename.c_str(), config_filename.c_str());
         }
         catch (...) {
             oldFile.close();
@@ -133,7 +119,21 @@ void BackupConfig::saveConfig() {
             cerr << "    " << dataLine << endl;
             exit(1);
         }
+
+        oldFile.close();
     }
+
+    // loop through settings that weren't specified in the existing config;
+    // if any of the current values (likely specified via command line parameters on startup)
+    // differ from the defaults, write them to the new file.
+    for (auto cfg_it = settings.begin(); cfg_it != settings.end(); ++cfg_it)
+        if (!cfg_it->seen && (cfg_it->value != cfg_it->defaultValue)) {
+            newFile << cfg_it->display_name << usersDelimiter << cfg_it->value << endl;
+        }
+
+    newFile.close();
+    remove(config_filename.c_str());
+    rename(temp_filename.c_str(), config_filename.c_str());
 }
 
 
