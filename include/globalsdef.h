@@ -27,6 +27,7 @@
 #define CLI_NOCOLOR "nocolor"
 #define CLI_STATS1 "1"
 #define CLI_STATS2 "2"
+#define CLI_PRUNE "prune"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -44,9 +45,9 @@
 #define RE_YEARS "(yearly|yearlies|years)"
 #define RE_FSBACKS "(failsafe_backups)"
 #define RE_FSDAYS "(failsafe_days)"
+#define RE_PRUNE "(prune)"
 #define RE_NOTIFY "(notify)"
 
-#define TEMP_CONFIG_FILENAME "[temp]"
 
 struct global_vars {
     unsigned int debugLevel;

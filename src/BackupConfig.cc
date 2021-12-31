@@ -13,9 +13,10 @@
 using namespace pcrepp;
 
 
-BackupConfig::BackupConfig(bool temp) {
+BackupConfig::BackupConfig(bool makeTemp) {
     modified = 0;
-    config_filename = temp ? TEMP_CONFIG_FILENAME : "";
+    temp = makeTemp;
+    config_filename = "";
 
     // define settings and their defaults
     // order of these inserts matter because they're accessed by position via the SetSpecifier enum
@@ -31,6 +32,7 @@ BackupConfig::BackupConfig(bool temp) {
     settings.insert(settings.end(), Setting(CLI_FS_DAYS, RE_FSDAYS, INT, "0"));
     settings.insert(settings.end(), Setting(CLI_COPYTO, RE_CP, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_SFTPTO, RE_SFTP, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_PRUNE, RE_PRUNE, BOOL, "0"));
     settings.insert(settings.end(), Setting(CLI_NOTIFY, RE_NOTIFY, STRING, ""));
 }
 
@@ -46,7 +48,7 @@ void BackupConfig::saveConfig() {
     ofstream newFile;
 
     // don't save temp configs
-    if (config_filename == TEMP_CONFIG_FILENAME)
+    if (temp)
         return;
 
     // construct a unique config filename if not already specified
@@ -68,7 +70,10 @@ void BackupConfig::saveConfig() {
     newFile.open(temp_filename);
 
     if (!newFile.is_open()) {
-        cerr << "error: unable to create " << temp_filename << " (directory not writable?)" << endl;
+        cerr << "error: unable to create " << temp_filename << " (directory not writable?)" << endl << endl;
+        cerr << "When --save is specified managebackups writes its configs to " << CONF_DIR << "." << endl;
+        cerr << "An initial --save run via sudo is sufficient then leave --save off of subsequent runs." << endl;
+        cerr << "However, managebackups will always need write acces to " << CONF_DIR << "/caches." << endl;
         log("error: unable to create " + temp_filename + " (directory not writable?)");
         exit(1);
     }
@@ -199,4 +204,11 @@ void BackupConfig::loadConfigsCache() {
         mkdir((string(CONF_DIR) + "/caches").c_str(),  S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     }
 }
+
+
+void BackupConfig::fullDump() {
+    for (auto set_it = settings.begin(); set_it != settings.end(); ++set_it)
+        cout << "setting " << set_it->display_name << ": " << set_it->value << endl;
+}
+
 

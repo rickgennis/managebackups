@@ -20,16 +20,28 @@ void displayStatsForConfig(BackupConfig& config) {
         fnameLen = max(fnameLen, raw_it->second.filename.length());
     }
 
-    cout << ifcolor(BOLDBLUE) << onevarsprintf("%-" + to_string(fnameLen+1) + "s  ", 
-        "Filename") << "Size     Duration  Type  Lnks  Age" << ifcolor(RESET) << endl;
-
-    // loop through the list of backups
+    // loop through the list of backups via the filename cache
+    string lastMonthYear;
     auto fnameIdx = config.cache.indexByFilename;
     for (auto backup_it = fnameIdx.begin(); backup_it != fnameIdx.end(); ++backup_it) {
 
-        // format the data detail
+        // lookup the the raw data detail
         auto raw_it = config.cache.rawData.find(backup_it->second);
         if (raw_it != config.cache.rawData.end()) {
+
+            // extract the month and year from the mtime
+            char timeBuf[200];
+            struct tm *tM = localtime(&raw_it->second.mtime);
+            struct tm fileTime = *tM;
+            strftime(timeBuf, 200, "%B %Y", &fileTime);
+            string monthYear = timeBuf;
+
+            // print the month header
+            if (lastMonthYear != monthYear) 
+                cout << endl << ifcolor(BOLDBLUE) << onevarsprintf("%-" + to_string(fnameLen+1) + "s  ", monthYear) <<
+                    "Size     Duration  Type  Lnks  Age" << ifcolor(RESET) << endl;
+
+            // format the detail for output
             char result[1000];
             sprintf(result, 
                     // filename
@@ -64,8 +76,11 @@ void displayStatsForConfig(BackupConfig& config) {
             else
                 cout << ifcolor(RESET);
 
+            // print it out
             cout << result << endl;
+
             lastMD5 = raw_it->second.md5;
+            lastMonthYear = monthYear;
         }
     }
 
@@ -74,11 +89,11 @@ void displayStatsForConfig(BackupConfig& config) {
 
 
 void displayStats(ConfigManager& configManager) {
-    if (configManager.activeConfig > -1 && configManager.configs[configManager.activeConfig].config_filename != TEMP_CONFIG_FILENAME)
+    if (configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp)
         displayStatsForConfig(configManager.configs[configManager.activeConfig]);
     else {
         for (auto cfg_it = configManager.configs.begin(); cfg_it != configManager.configs.end(); ++cfg_it) {
-            if (cfg_it->config_filename != TEMP_CONFIG_FILENAME)
+            if (!cfg_it->temp)
                 displayStatsForConfig(*cfg_it);
         }
     }

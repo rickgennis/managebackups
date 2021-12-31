@@ -18,11 +18,14 @@ class BackupConfig {
         string config_filename;
 
         bool modified;
+        bool temp;
         vector<Setting> settings;
         BackupCache cache;
 
-        BackupConfig(bool temp = 0);
+        BackupConfig(bool makeTemp = 0);
         ~BackupConfig();
+
+        void fullDump();
 
         void saveConfig();
         bool loadConfig(string filename);

@@ -13,6 +13,7 @@
 #include <dirent.h>
 #include <time.h>
 #include "globalsdef.h"
+#include "colors.h"
 #include "statistics.h"
 #include "util.h"
 
@@ -128,7 +129,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
             currentConf = &configManager.configs[configManager.activeConfig];
         }
         else if (!bSave && bStats) {
-            cerr << "title not found; try -1 or -2 with no title to see all backups" << endl;
+            cerr << ifcolor(RED) << "error: title not found; try -1 or -2 with no title to see all backups" << ifcolor(RESET) << endl;
             exit(1);
         }
 
@@ -136,7 +137,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     }
     else {
         if (bSave) {
-            cerr << "error: --title must be specified in order to --save settings" << endl;
+            cerr << ifcolor(RED) << "error: --title must be specified in order to --save settings" << ifcolor(RESET) << endl;
             exit(1);
         }
 
@@ -144,21 +145,31 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
             configManager.loadAllConfigCaches();
     }
 
-
     // if any other settings are given on the command line, incorporate them into the selected config.
     // that config will be the one found from --title above (if any), or a temp config comprised only of defaults
     for (auto setting_it = currentConf->settings.begin(); setting_it != currentConf->settings.end(); ++setting_it) 
         if (GLOBALS.cli.count(setting_it->display_name)) {
-            if (setting_it->data_type == INT)  {
+            switch (setting_it->data_type) {
+
+                case INT:  
                 if (bSave && (setting_it->value != to_string(GLOBALS.cli[setting_it->display_name].as<int>())))
                     currentConf->modified = 1;
-
                 setting_it->value = to_string(GLOBALS.cli[setting_it->display_name].as<int>());
-            }
-            else {
+                break; 
+
+                case STRING:
+                default:
                 if (bSave && (setting_it->value != GLOBALS.cli[setting_it->display_name].as<string>()))
                     currentConf->modified = 1;
                 setting_it->value = GLOBALS.cli[setting_it->display_name].as<string>();
+                break;
+
+                case BOOL:
+                if (bSave && (setting_it->value != to_string(GLOBALS.cli[setting_it->display_name].as<bool>())))
+                    currentConf->modified = 1;
+                setting_it->value = to_string(GLOBALS.cli[setting_it->display_name].as<bool>());
+                cerr << "SETTING BOOL: " << setting_it->value << endl;
+                break;
             }
         }
 
@@ -169,16 +180,17 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
 
             string tempStr = search1.replace(tempConfig.settings[sTitle].value, "_");
             tempConfig.config_filename = addSlash(CONF_DIR) +search2.replace(tempStr, "") + ".conf";
-            cout << "CONFIG FILENAME = " << tempConfig.config_filename << endl;   
+            tempConfig.temp = false;
         }
 
         // if we're using a new/temp config, insert it into the list for configManager
         configManager.configs.insert(configManager.configs.end(), tempConfig);
         configManager.activeConfig = configManager.configs.size() - 1;
+        currentConf = &configManager.configs[configManager.activeConfig];
     }
 
     if (!bStats && !currentConf->settings[sDirectory].value.length()) {
-        cerr << "error: --directory is required" << endl;
+        cerr << ifcolor(RED) << "error: --directory is required" << ifcolor(RESET) << endl;
         exit(1);
     }
 
@@ -188,7 +200,19 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
 
 
 
-void pruneBackups() {
+void pruneBackups(BackupConfig& config) {
+    Pcre regEnabled("^(t|true|y|yes|1)$", "i");
+
+    if (!config.settings[sPruneLive].value.length() || !regEnabled.search(config.settings[sPruneLive].value)) {
+        cout << ifcolor(RED) << "warning: While a core feature, managebackups doesn't prune old backups" << endl;
+        cout << "until specifically enabled.  Use --prune to enable pruning.  Use --prune" << endl;
+        cout << "and --save to make it the default behavior for this backup config." << endl;
+        cout << "pruning skipped;  would have used these settings:" << endl;
+        cout << "\t--days " << config.settings[sDays].value << " --weeks " << config.settings[sWeeks].value;
+        cout << " --months " << config.settings[sMonths].value << " --years " << config.settings[sYears].value << ifcolor(RESET) << endl;
+        return;
+    }
+
 
 }
 
@@ -220,6 +244,7 @@ int main(int argc, char *argv[]) {
         (CLI_SFTPTO, "SFTP to", cxxopts::value<std::string>())
         (CLI_STATS1, "Stats summary", cxxopts::value<bool>()->default_value("false"))
         (CLI_STATS2, "Stats detail", cxxopts::value<bool>()->default_value("false"))
+        (CLI_PRUNE, "Enable pruning", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
         (CLI_NOCOLOR, "Disable color", cxxopts::value<bool>()->default_value("false"));
 
     try {
@@ -235,13 +260,12 @@ int main(int argc, char *argv[]) {
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager);
 
-    configManager.fullDump();
-
     if (GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2)) {
         displayStats(configManager);
         exit(0);
     }
 
+    pruneBackups(*currentConfig);
 
     //scanConfigToCache(*currentConfig);
     //cout << currentConfig->cache.fullDump() << endl;

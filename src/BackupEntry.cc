@@ -26,7 +26,7 @@ string BackupEntry::class2string() {
 }
 
 void BackupEntry::string2class(string data) {
-    Pcre regEx("\\[(.+)\\],([a-f0-9]+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)");
+    Pcre regEx("\\[(.+)\\],([a-f0-9]{32}),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)");
 
     if (regEx.search(data) && regEx.matches() > 9) {
         filename = regEx.get_match(0);

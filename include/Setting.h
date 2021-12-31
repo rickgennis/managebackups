@@ -8,9 +8,9 @@
 using namespace std;
 using namespace pcrepp;
 
-enum SetType { INT, STRING };
+enum SetType { INT, STRING, BOOL };
 enum SetSpecifier { sTitle, sDirectory, sBackupFilename, sBackupCommand, sDays, sWeeks, sMonths, sYears, sFailsafeBackups, sFailsafeDays,
-    sCPTo, sSFTPTo, sNotify };
+    sCPTo, sSFTPTo, sPruneLive, sNotify };
 
 class Setting {
     public:
