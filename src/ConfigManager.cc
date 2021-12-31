@@ -57,6 +57,17 @@ void ConfigManager::fullDump() {
         cout << "config " << index << " (months): " << c_it->settings[sMonths].value << endl;
         cout << "config " << index << " (title): " << c_it->settings[sTitle].value << endl;
         cout << "config " << index << " (dir): " << c_it->settings[sDirectory].value << endl;
+        cout << "config " << index << " (file): " << c_it->settings[sBackupFilename].value << endl;
         cout << "config " << index << " (cp): " << c_it->settings[sCPTo].value << endl;
+        cout << "config " << index << " (config_filename): " << c_it->config_filename << endl;
     }
 }
+
+
+void ConfigManager::loadAllConfigCaches() {
+    for (auto c_it = configs.begin(); c_it != configs.end(); ++c_it) {
+        c_it->loadConfigsCache();
+    }
+}
+
+

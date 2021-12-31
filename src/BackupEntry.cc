@@ -16,7 +16,7 @@ using namespace std;
 BackupEntry::BackupEntry() {
     md5 = "";
     filename = "";
-    links = mtime = size = inode = day_age = month_age = dow = date_day = duration = 0;
+    links = mtime = size = inode = day_age = month_age = dow = date_day = duration = current = 0;
 }
 
 string BackupEntry::class2string() {

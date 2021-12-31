@@ -15,7 +15,7 @@ using namespace pcrepp;
 
 BackupConfig::BackupConfig(bool temp) {
     modified = 0;
-    config_filename = temp ? "[temp]" : "";
+    config_filename = temp ? TEMP_CONFIG_FILENAME : "";
 
     // define settings and their defaults
     // order of these inserts matter because they're accessed by position via the SetSpecifier enum
@@ -46,7 +46,7 @@ void BackupConfig::saveConfig() {
     ofstream newFile;
 
     // don't save temp configs
-    if (config_filename == "[temp]")
+    if (config_filename == TEMP_CONFIG_FILENAME)
         return;
 
     // construct a unique config filename if not already specified
@@ -181,19 +181,22 @@ bool BackupConfig::loadConfig(string filename) {
         configFile.close();
         DEBUG(1) && cout << "successfully parsed config " << filename << endl;
 
-        // load the associated cache, if any
-        cache.cacheFilename = string(CONF_DIR) + "/caches/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value);
-        struct stat statBuf;
-        if (!stat(cache.cacheFilename.c_str(), &statBuf)) {
-            cache.restoreCache();
-        }
-        else {
-            mkdir((string(CONF_DIR) + "/caches").c_str(),  S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-        }
-
         return 1;
     }    
 
     return 0;
+}
+
+
+void BackupConfig::loadConfigsCache() {
+    cache.cacheFilename = string(CONF_DIR) + "/caches/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value);
+    struct stat statBuf;
+
+    if (!stat(cache.cacheFilename.c_str(), &statBuf)) {
+        cache.restoreCache();
+    }
+    else {
+        mkdir((string(CONF_DIR) + "/caches").c_str(),  S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    }
 }
 

@@ -52,7 +52,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
 
                     // if the cache has an existing md5 and the cache's mtime and size match
                     // what we just read from disk, consider the cache valid.  only update
-                    // the inode & age info then bail out.
+                    // the inode & age info. 
                     BackupEntry *pCacheEntry;
                     if ((pCacheEntry = cache.getByFilename(fullFilename)) != NULL) {
                         if (pCacheEntry->md5.length() && 
@@ -62,7 +62,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                             pCacheEntry->links = statData.st_nlink;
                             pCacheEntry->inode = statData.st_ino;
 
-                            cache.addOrUpdate(*pCacheEntry->updateAges(GLOBALS.startupTime));
+                            cache.addOrUpdate(*pCacheEntry->updateAges(GLOBALS.startupTime), true);
                             continue;
                         }
                     }
@@ -79,7 +79,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                     cacheEntry.calculateMD5();
                     ++GLOBALS.md5Count;
 
-                    cache.addOrUpdate(cacheEntry);                    
+                    cache.addOrUpdate(cacheEntry, true);
                 }
             }
             else 
@@ -108,27 +108,40 @@ void scanConfigToCache(BackupConfig& config) {
     else 
         fnamePattern = ".*-20\\d{2}[-.]*\\d{2}[-.]*\\d{2}.*";
 
+    config.cache.scanned = true;
     parseDirToCache(directory, fnamePattern, config.cache);
 }
 
 
-void selectOrSetupConfig(ConfigManager &configManager) {
+BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     string title;
     BackupConfig tempConfig(true);
     BackupConfig* currentConf = &tempConfig; 
-    bool bSave = GLOBALS.cli.count(CLI_SAVE) > 0;
-    bool bTitle = GLOBALS.cli.count(CLI_TITLE) > 0;
+    bool bSave = GLOBALS.cli.count(CLI_SAVE);
+    bool bTitle = GLOBALS.cli.count(CLI_TITLE);
+    bool bStats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2);
 
-    // if --title is specified on the command line load saved settings (if they exist)
+    // if --title is specified on the command line set the active config
     if (bTitle) {
-       if (int configNumber = configManager.config(GLOBALS.cli[CLI_TITLE].as<string>())) {
+        if (int configNumber = configManager.config(GLOBALS.cli[CLI_TITLE].as<string>())) {
             configManager.activeConfig = configNumber - 1;
             currentConf = &configManager.configs[configManager.activeConfig];
-       }
+        }
+        else if (!bSave && bStats) {
+            cerr << "title not found; try -1 or -2 with no title to see all backups" << endl;
+            exit(1);
+        }
+
+        currentConf->loadConfigsCache();
     }
-    else if (bSave) {
-        cerr << "error: --title must be specified in order to --save settings" << endl;
-        exit(1);
+    else {
+        if (bSave) {
+            cerr << "error: --title must be specified in order to --save settings" << endl;
+            exit(1);
+        }
+
+        if (bStats)
+            configManager.loadAllConfigCaches();
     }
 
 
@@ -164,10 +177,12 @@ void selectOrSetupConfig(ConfigManager &configManager) {
         configManager.activeConfig = configManager.configs.size() - 1;
     }
 
-    if (!currentConf->settings[sDirectory].value.length()) {
+    if (!bStats && !currentConf->settings[sDirectory].value.length()) {
         cerr << "error: --directory is required" << endl;
         exit(1);
     }
+
+    return(currentConf);
 }
 
 
@@ -182,7 +197,6 @@ int main(int argc, char *argv[]) {
     GLOBALS.statsCount = 0;
     GLOBALS.md5Count = 0;
     GLOBALS.pid = getpid();
-    GLOBALS.color = true;
 
     time(&GLOBALS.startupTime);
     openlog("managebackups", LOG_PID | LOG_NDELAY, LOG_LOCAL1);
@@ -202,44 +216,36 @@ int main(int argc, char *argv[]) {
         (CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())
         (CLI_FS_DAYS, "Failsafe Days", cxxopts::value<int>())
         (CLI_DIR, "Directory", cxxopts::value<std::string>())
-        (CLI_COPYTO, "Copy To", cxxopts::value<std::string>())
-        (CLI_SFTPTO, "SFTP To", cxxopts::value<std::string>());
+        (CLI_COPYTO, "Copy to", cxxopts::value<std::string>())
+        (CLI_SFTPTO, "SFTP to", cxxopts::value<std::string>())
+        (CLI_STATS1, "Stats summary", cxxopts::value<bool>()->default_value("false"))
+        (CLI_STATS2, "Stats detail", cxxopts::value<bool>()->default_value("false"))
+        (CLI_NOCOLOR, "Disable color", cxxopts::value<bool>()->default_value("false"));
 
     try {
         GLOBALS.cli = options.parse(argc, argv);
         GLOBALS.debugLevel = GLOBALS.cli.count("verbose");
+        GLOBALS.color = !GLOBALS.cli[CLI_NOCOLOR].as<bool>();
     }
     catch (cxxopts::OptionParseException& e) {
         cerr << "managebackups: " << e.what() << endl;
         exit(1);
     }
 
-//    BackupCache cache;
-//    BackupConfig config;
     ConfigManager configManager;
-    //configManager.configs.begin()++->modified = 1;
+    auto currentConfig = selectOrSetupConfig(configManager);
 
-//    BackupEntry* Myentry = new BackupEntry;
-//    cout << cache.size() << endl << endl;
-
-    selectOrSetupConfig(configManager);
-    displayStats(configManager);
-
-//    exit(1);
     configManager.fullDump();
 
-    //config.filename = "myFatCat.log";
-//    config.settings[sDirectory].value = "/Users/rennis/test"); 
-//    cache.restoreCache("cachedata.1");
-    scanConfigToCache(configManager.configs[configManager.config("firewall_main") - 1]);
-
-    cout << configManager.configs[0].cache.fullDump() << endl;
-
-//    cout << "size: " << cache.size() << "\t" << endl << endl;
-//    cout << cache.fullDump() << endl;
+    if (GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2)) {
+        displayStats(configManager);
+        exit(0);
+    }
 
 
-//    cache.saveCache("cachedata.1");
+    //scanConfigToCache(*currentConfig);
+    //cout << currentConfig->cache.fullDump() << endl;
+
     cout << "stats: " << GLOBALS.statsCount << ", md5s: " << GLOBALS.md5Count << endl;
     return 0;
 }

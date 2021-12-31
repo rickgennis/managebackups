@@ -19,6 +19,7 @@ class BackupEntry {
         int             dow;
         int             date_day;
         unsigned long   duration;
+        bool            current;
 
     BackupEntry();
 

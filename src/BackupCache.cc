@@ -17,18 +17,16 @@ BackupCache::BackupCache(string filename) {
 }
 
 BackupCache::BackupCache() {
-    modified = false;
+    scanned = false;
 }
 
 BackupCache::~BackupCache() {
-    if (modified && cacheFilename.length())
+    if (scanned && cacheFilename.length())
         saveCache();
 }
 
 
     void BackupCache::updateAges(time_t refTime) {
-        modified = true;
-
         for (auto raw_it = rawData.begin(); raw_it != rawData.end(); ++raw_it) 
             raw_it->second.updateAges(refTime);
     }
@@ -42,7 +40,11 @@ BackupCache::~BackupCache() {
 
             // write raw data
             for (auto raw_it = rawData.begin(); raw_it != rawData.end(); ++raw_it) {
-                cacheFile << raw_it->second.class2string() << endl;
+
+                // files need to be able to file out of the cache if they disappear from the filesystem.
+                // "current" means the file was seen in the most recent filesystem scan.
+                if (raw_it->second.current)
+                    cacheFile << raw_it->second.class2string() << endl;
             }
 
             cacheFile.close();
@@ -99,9 +101,9 @@ BackupCache::~BackupCache() {
         return result;
     }
 
-    void BackupCache::addOrUpdate(BackupEntry updatedEntry) {
+    void BackupCache::addOrUpdate(BackupEntry updatedEntry, bool markCurrent) {
         auto filename_it = indexByFilename.find(updatedEntry.filename);
-        modified = true;
+        updatedEntry.current = markCurrent;
 
         // filename doesn't exist
         if (filename_it == indexByFilename.end()) {

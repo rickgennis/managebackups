@@ -26,6 +26,7 @@ class BackupConfig {
 
         void saveConfig();
         bool loadConfig(string filename);
+        void loadConfigsCache();
 };
 
 #endif

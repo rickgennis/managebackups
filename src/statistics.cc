@@ -74,11 +74,13 @@ void displayStatsForConfig(BackupConfig& config) {
 
 
 void displayStats(ConfigManager& configManager) {
-    if (configManager.activeConfig > -1)
+    if (configManager.activeConfig > -1 && configManager.configs[configManager.activeConfig].config_filename != TEMP_CONFIG_FILENAME)
         displayStatsForConfig(configManager.configs[configManager.activeConfig]);
     else {
-        for (auto cfg_it = configManager.configs.begin(); cfg_it != configManager.configs.end(); ++cfg_it)
-            displayStatsForConfig(*cfg_it);
+        for (auto cfg_it = configManager.configs.begin(); cfg_it != configManager.configs.end(); ++cfg_it) {
+            if (cfg_it->config_filename != TEMP_CONFIG_FILENAME)
+                displayStatsForConfig(*cfg_it);
+        }
     }
 }
 

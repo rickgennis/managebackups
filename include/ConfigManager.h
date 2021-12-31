@@ -23,6 +23,7 @@ class ConfigManager {
         vector<BackupConfig> configs;
         int config(string title);
         void fullDump();
+        void loadAllConfigCaches();
 
         ConfigManager();
 };
