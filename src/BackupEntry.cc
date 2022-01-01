@@ -1,10 +1,12 @@
-#include "BackupEntry.h"
 #include <stdio.h>
 #include <iostream>
 #include <string>
 #include <math.h>
+#include "date.h"
+#include "BackupEntry.h"
 #include <pcre++.h>
 #include "util.h"
+#include "colors.h"
 
 #define SECS_PER_DAY (60*60*24)
 #define DAYS_PER_MONTH 30.43
@@ -14,6 +16,7 @@ using namespace std;
 
 
 BackupEntry::BackupEntry() {
+    dateRE = Pcre("-(20\\d{2})[-.]*(\\d{2})[-.]*(\\d{2})[-.]");
     md5 = "";
     filename = "";
     links = mtime = size = inode = day_age = month_age = dow = date_day = duration = current = 0;
@@ -50,24 +53,39 @@ BackupEntry* BackupEntry::updateAges(time_t refTime) {
     if (!refTime)
         time(&refTime);
 
-    struct tm *tM = localtime(&mtime);
-    struct tm fileTime = *tM;
-
-    tM = localtime(&refTime);
-    struct tm nowTime = *tM;
+    // identical backups from different days that we've hardlinked together will all share the 
+    // same mtime (single inode).  so mtime is useless for calculating the age.  we have to rely
+    // on the date format that's near the end of the filename.
     
-    day_age = floor((refTime - mtime) / SECS_PER_DAY);
+    if (dateRE.search(filename) && dateRE.matches() > 2) {
+        date_year  = stoi(dateRE.get_match(0));
+        date_month = stoi(dateRE.get_match(1));
+        date_day   = stoi(dateRE.get_match(2));
+    }
+    else {   // should never get here due to a similar regex limiting filenames getting initially added to the cache
+        cerr << ifcolor(RED) << "error: invalid log filename (" << filename << ")" << ifcolor(RESET) << endl;
+        exit(1);
+    }
 
-    if ((fileTime.tm_mday != nowTime.tm_mday) ||
-            (fileTime.tm_mon != nowTime.tm_mon) || 
-            (fileTime.tm_year != nowTime.tm_year))
-        ++day_age;
+    struct tm fileTime;
+    fileTime.tm_sec  = 0;
+    fileTime.tm_min  = 0;
+    fileTime.tm_hour = 0;
+    fileTime.tm_mday = date_day;
+    fileTime.tm_mon  = date_month - 1;
+    fileTime.tm_year = date_year - 1900;
+    fileTime.tm_isdst = -1;
 
+    auto fileMTime = mktime(&fileTime);
+
+    day_age = floor((refTime - fileMTime) / SECS_PER_DAY);
     month_age = floor(day_age / DAYS_PER_MONTH);
 
+    auto pFileTime = localtime(&fileMTime);
+
     // these never change but let's set them here since we already looked them up
-    dow = fileTime.tm_wday;
-    date_day = fileTime.tm_mday;
+    dow = pFileTime->tm_wday;
+    date_day = pFileTime->tm_mday;
 
     return this;
 }

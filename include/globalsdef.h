@@ -17,8 +17,9 @@
 #define CLI_WEEKS "weeks"
 #define CLI_MONTHS "months"
 #define CLI_YEARS "years"
-#define CLI_FS_BACKUPS "failsafe_backups"
-#define CLI_FS_DAYS "failsave_days"
+#define CLI_FS_BACKUPS "fs_backups"
+#define CLI_FS_DAYS "fs_days"
+#define CLI_FS_FP "fp"
 #define CLI_COPYTO "copyto"
 #define CLI_SFTPTO "sftpto"
 #define CLI_NOTIFY "notify"
@@ -28,6 +29,7 @@
 #define CLI_STATS1 "1"
 #define CLI_STATS2 "2"
 #define CLI_PRUNE "prune"
+#define CLI_NOPRUNE "noprune"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -43,10 +45,10 @@
 #define RE_WEEKS "(weekly|weeklies|weeks)"
 #define RE_MONTHS "(monthly|monthlies|months)"
 #define RE_YEARS "(yearly|yearlies|years)"
-#define RE_FSBACKS "(failsafe_backups)"
-#define RE_FSDAYS "(failsafe_days)"
-#define RE_PRUNE "(prune)"
+#define RE_FSBACKS "(fs_backups|fb|failsafe_backups)"
+#define RE_FSDAYS "(fs_days|fd|failsafe_days)"
 #define RE_NOTIFY "(notify)"
+#define RE_PRUNE "(prune)"
 
 
 struct global_vars {

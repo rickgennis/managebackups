@@ -3,10 +3,14 @@
 
 #include <string>
 #include <time.h>
+#include <pcre++.h>
 
+using namespace pcrepp;
 using namespace std;
 
 class BackupEntry {
+    Pcre dateRE;
+
     public:
         string          filename;
         string          md5;
@@ -17,7 +21,9 @@ class BackupEntry {
         unsigned long   day_age;
         unsigned int    month_age;
         int             dow;
+        int             date_month;
         int             date_day;
+        int             date_year;
         unsigned long   duration;
         bool            current;
 

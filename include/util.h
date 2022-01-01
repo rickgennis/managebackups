@@ -9,6 +9,7 @@ using namespace std;
 
 #define ifcolor(x) (GLOBALS.color ? x : "")
 
+string s(int number);
 
 void log(string message);
 

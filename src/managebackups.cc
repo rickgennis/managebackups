@@ -152,26 +152,36 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
             switch (setting_it->data_type) {
 
                 case INT:  
-                if (bSave && (setting_it->value != to_string(GLOBALS.cli[setting_it->display_name].as<int>())))
-                    currentConf->modified = 1;
-                setting_it->value = to_string(GLOBALS.cli[setting_it->display_name].as<int>());
-                break; 
+                    if (bSave && (setting_it->value != to_string(GLOBALS.cli[setting_it->display_name].as<int>())))
+                        currentConf->modified = 1;
+                    setting_it->value = to_string(GLOBALS.cli[setting_it->display_name].as<int>());
+                    break; 
 
                 case STRING:
-                default:
-                if (bSave && (setting_it->value != GLOBALS.cli[setting_it->display_name].as<string>()))
-                    currentConf->modified = 1;
-                setting_it->value = GLOBALS.cli[setting_it->display_name].as<string>();
-                break;
+                    default:
+                    if (bSave && (setting_it->value != GLOBALS.cli[setting_it->display_name].as<string>()))
+                        currentConf->modified = 1;
+                    setting_it->value = GLOBALS.cli[setting_it->display_name].as<string>();
+                    break;
 
                 case BOOL:
-                if (bSave && (setting_it->value != to_string(GLOBALS.cli[setting_it->display_name].as<bool>())))
-                    currentConf->modified = 1;
-                setting_it->value = to_string(GLOBALS.cli[setting_it->display_name].as<bool>());
-                cerr << "SETTING BOOL: " << setting_it->value << endl;
-                break;
+                    if (bSave && (setting_it->value != to_string(GLOBALS.cli[setting_it->display_name].as<bool>())))
+                        currentConf->modified = 1;
+                    setting_it->value = to_string(GLOBALS.cli[setting_it->display_name].as<bool>());
+                    break;
             }
         }
+
+    // convert --fp (failsafe paranoid) to its separate settings
+    if (GLOBALS.cli.count(CLI_FS_FP)) {
+        if (bSave && 
+                (currentConf->settings[sFailsafeDays].value != "2" ||
+                 currentConf->settings[sFailsafeBackups].value != "1"))
+            currentConf->modified = 1;
+
+        currentConf->settings[sFailsafeDays].value = "2";
+        currentConf->settings[sFailsafeBackups].value = "1";
+    }
 
     if (currentConf == &tempConfig) {
         if (bTitle && bSave) {
@@ -206,14 +216,43 @@ void pruneBackups(BackupConfig& config) {
     if (!config.settings[sPruneLive].value.length() || !regEnabled.search(config.settings[sPruneLive].value)) {
         cout << ifcolor(RED) << "warning: While a core feature, managebackups doesn't prune old backups" << endl;
         cout << "until specifically enabled.  Use --prune to enable pruning.  Use --prune" << endl;
-        cout << "and --save to make it the default behavior for this backup config." << endl;
+        cout << "and --save to make it the default behavior for this backup configuration." << endl;
         cout << "pruning skipped;  would have used these settings:" << endl;
         cout << "\t--days " << config.settings[sDays].value << " --weeks " << config.settings[sWeeks].value;
         cout << " --months " << config.settings[sMonths].value << " --years " << config.settings[sYears].value << ifcolor(RESET) << endl;
         return;
     }
 
+    // failsafe checks
+    int fb = stoi(config.settings[sFailsafeBackups].value, NULL);
+    int fd = stoi(config.settings[sFailsafeDays].value, NULL);
 
+    if (fb > 0 && fd > 0) {
+        int minValidBackups = 0;
+
+        auto fnameIdx = config.cache.indexByFilename;
+        for (auto fnameIdx_it = fnameIdx.begin(); fnameIdx_it != fnameIdx.end(); ++fnameIdx_it) {
+            auto raw_it = config.cache.rawData.find(fnameIdx_it->second);
+
+            if (raw_it != config.cache.rawData.end() && raw_it->second.day_age <= fd) {
+                ++minValidBackups;
+            }
+
+            if (minValidBackups >= fb)
+                break;
+        }
+
+        if (minValidBackups < fb) {
+            string message = "skipping pruning due to failsafe check; only " + to_string(fb) +
+                    " backup" + s(fb) + " within the last " + to_string(fd) + " day" + s(fd);
+            
+            cerr << ifcolor(RED) << "warning: " << message << ifcolor(RESET) << endl;
+            log("[" + config.settings[sTitle].value + "] " + message);
+            return;
+        }
+    }
+
+    cout << "PRUNING" << endl;
 }
 
 
@@ -239,12 +278,14 @@ int main(int argc, char *argv[]) {
         (string(CLI_SAVE), "Save config", cxxopts::value<bool>()->default_value("false"))
         (CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())
         (CLI_FS_DAYS, "Failsafe Days", cxxopts::value<int>())
+        (CLI_FS_FP, "Failsafe Paranoid", cxxopts::value<bool>()->default_value("false"))
         (CLI_DIR, "Directory", cxxopts::value<std::string>())
         (CLI_COPYTO, "Copy to", cxxopts::value<std::string>())
         (CLI_SFTPTO, "SFTP to", cxxopts::value<std::string>())
         (CLI_STATS1, "Stats summary", cxxopts::value<bool>()->default_value("false"))
         (CLI_STATS2, "Stats detail", cxxopts::value<bool>()->default_value("false"))
-        (CLI_PRUNE, "Enable pruning", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+        (CLI_PRUNE, "Enable pruning", cxxopts::value<bool>()->default_value("false"))
+        (CLI_NOPRUNE, "Disable pruning", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOCOLOR, "Disable color", cxxopts::value<bool>()->default_value("false"));
 
     try {
@@ -265,9 +306,11 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    pruneBackups(*currentConfig);
+    scanConfigToCache(*currentConfig);
+    pruneBackups(*currentConfig);           // only run after a scan
 
-    //scanConfigToCache(*currentConfig);
+    currentConfig->fullDump();
+
     //cout << currentConfig->cache.fullDump() << endl;
 
     cout << "stats: " << GLOBALS.statsCount << ", md5s: " << GLOBALS.md5Count << endl;

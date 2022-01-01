@@ -3,7 +3,7 @@
 
 
 Setting::Setting(string name, string pattern, enum SetType setType, string defaultVal) {
-    regex = Pcre(pattern + CAPTURE_VALUE + RE_COMMENT);
+    regex = Pcre("(?:^|\\s)" + pattern + CAPTURE_VALUE + RE_COMMENT);
     display_name = name;
     data_type = setType;
     defaultValue = defaultVal;

@@ -184,7 +184,7 @@ bool BackupConfig::loadConfig(string filename) {
         }
             
         configFile.close();
-        DEBUG(1) && cout << "successfully parsed config " << filename << endl;
+        DEBUG(1) && cout << "successfully parsed [" << settings[sTitle].value << "] config from " << filename << endl;
 
         return 1;
     }    

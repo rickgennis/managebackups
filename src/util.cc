@@ -7,6 +7,11 @@
 
 #include "util.h"
 
+string s(int number) {
+    return(number == 1 ? "" : "s");
+}
+
+
 void log(string message) {
     syslog(LOG_CRIT, "%s", message.c_str());
 
