@@ -9,6 +9,11 @@
 #define DEBUG(x,y) (GLOBALS.cli.count(CLI_VERBOSE) >= x) && cout << GREEN << __FUNCTION__ << "\t" << y << RESET << endl
 #define NOTQUIET (!GLOBALS.cli.count(CLI_QUIET))
 
+/* CLI_ and RE_
+ * The CLI_ constants are commandline switches while the RE_ are regex patterns
+ * that match lines of config files.  It can be a little confusing because some directives
+ * can be used in both (--days & days:). */
+ 
 // define commandline options
 #define CLI_TITLE "title"
 #define CLI_DIR "directory"
@@ -29,10 +34,13 @@
 #define CLI_NOCOLOR "nocolor"
 #define CLI_STATS1 "1"
 #define CLI_STATS2 "2"
+#define CLI_MAXLINKS "maxlinks"
 #define CLI_PRUNE "prune"
 #define CLI_NOPRUNE "noprune"
 #define CLI_TEST "test"
 #define CLI_QUIET "quiet"
+#define CLI_DEFAULTS "defaults"
+#define CLI_TIME "time"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -52,6 +60,10 @@
 #define RE_FSDAYS "(fs_days|fd|failsafe_days)"
 #define RE_NOTIFY "(notify)"
 #define RE_PRUNE "(prune)"
+#define RE_MAXLINKS "(maxlinks)"
+#define RE_TIME "(time)"
+
+enum helpType { hDefaults, hOptions, hExamples };
 
 struct global_vars {
     unsigned int debugLevel;

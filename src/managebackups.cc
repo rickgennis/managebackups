@@ -16,6 +16,7 @@
 #include "colors.h"
 #include "statistics.h"
 #include "util.h"
+#include "help.h"
 
 
 using namespace pcrepp;
@@ -60,6 +61,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                            pCacheEntry->mtime &&
                            pCacheEntry->mtime == statData.st_mtime &&
                            pCacheEntry->size == statData.st_size) {
+
                             pCacheEntry->links = statData.st_nlink;
                             pCacheEntry->inode = statData.st_ino;
 
@@ -310,6 +312,141 @@ void pruneBackups(BackupConfig& config) {
 }
 
 
+void updateLinks(BackupConfig& config) {
+    unsigned int maxLinksAllowed = config.settings[sMaxLinks].ivalue();
+    bool includeTime = config.settings[sIncTime].ivalue();
+    bool rescanRequired;
+    
+    /* The indexByMD5 is a list of lists ("map" of "set"s).  Here we loop through the list of MD5s
+     * (the map) once.  For each MD5, we loop through its list of associated files (the set) twice:
+     *     - 1st time to find the file with the greatest number of existing hard links (call this the reference file)
+     *     - 2nd time to relink any individual file to the reference file
+     * There are a number of caveats.  We don't relink any file that's less than a day old because it may be being
+     * updated.  And we also account for the configured max number of hard links.  If that number is reached a subsequent
+     * grouping of linked files is started.
+     */
+
+    if (maxLinksAllowed < 2)
+        return;
+
+    // loop through list of MD5s (the map)
+    for (auto md5_it = config.cache.indexByMD5.begin(); md5_it != config.cache.indexByMD5.end(); ++md5_it) {
+        
+        // only consider md5s with more than one file associated
+        if (md5_it->second.size() < 2)
+            continue;
+
+        do {
+            /* the rescan loop is a special case where we've hit maxLinksAllowed.  there may be more files
+             * with that same md5 still to be linked, which would require a new inode.  for that we need a 
+             * new reference file.  setting rescanrequired to true takes up back here to pick a new one.  */
+             
+            rescanRequired = false;
+
+            // find the file matching this md5 with the greatest number of links.
+            // some files matching this md5 may already be linked together while others
+            // are not.  we need the one with the greatest number of links so that
+            // we don't constantly relink the same files due to random selection.
+            BackupEntry *referenceFile = NULL;
+            unsigned int maxLinksFound = 0;
+
+            DEBUG(5, "top of scan for " << md5_it->first);
+
+            // 1st time: loop through the list of files (the set)
+            for (auto refFile_it = md5_it->second.begin(); refFile_it != md5_it->second.end(); ++refFile_it) {
+                auto refFileIdx = *refFile_it;
+                auto raw_it = config.cache.rawData.find(refFileIdx);
+
+                DEBUG(5, "considering " << raw_it->second.filename << " (" << raw_it->second.links << ")");
+                if (raw_it != config.cache.rawData.end()) {
+
+                    if (raw_it->second.links > maxLinksFound &&            // more links than previous files for this md5
+                            raw_it->second.links < maxLinksAllowed &&      // still less than the configured max
+                            raw_it->second.day_age) {                      // at least a day old (i.e. don't relink today's file)
+
+                        referenceFile = &raw_it->second;
+                        maxLinksFound = raw_it->second.links;
+
+                        DEBUG(5, "new ref file " << referenceFile->md5 << " " << referenceFile->filename << "; links=" << maxLinksFound);
+                    }
+                }
+            }
+
+            // the first actionable file (one that's not today's file and doesn't already have links at the maxLinksAllowed level)
+            // becomes the reference file.  if there's no reference file there's nothing to do for this md5.  skip to the next one.
+            if (referenceFile == NULL) {
+                DEBUG(5, "no reference file found for " << md5_it->first);
+                continue;
+            }
+
+            // 2nd time: loop through the list of files (the set)
+            for (auto refFile_it = md5_it->second.begin(); refFile_it != md5_it->second.end(); ++refFile_it) {
+                auto refFileIdx = *refFile_it;
+                auto raw_it = config.cache.rawData.find(refFileIdx);
+                DEBUG(5, "\texamining " << raw_it->second.filename);
+
+                if (raw_it != config.cache.rawData.end()) {
+
+                    // skip the reference file; can't relink it to itself
+                    if (referenceFile == &raw_it->second) {
+                        DEBUG(5, "\t\treference file itself");
+                        continue;
+                    }
+
+                    // skip files that are already linked
+                    if (referenceFile->inode == raw_it->second.inode) {
+                        DEBUG(5, "\t\talready linked");
+                        continue;
+                    }
+
+                    // skip today's file as it could still be being updated
+                    if (!raw_it->second.day_age && !includeTime) {
+                        DEBUG(5, "\t\ttoday's file");
+                        continue;            
+                    }
+
+                    // skip if this file already has the max links
+                    if (raw_it->second.links >= maxLinksAllowed) {
+                        DEBUG(5, "\t\tfile links already maxed out");
+                        continue;            
+                    }
+
+                    // relink the file to the reference file
+                    string detail = raw_it->second.filename + " <-> " + referenceFile->filename;
+                    if (GLOBALS.cli.count(CLI_TEST))
+                        cout << YELLOW << "[" << config.settings[sTitle].value << "] TESTMODE: would have linked " << detail << RESET << endl;
+                    else {
+                        if (!unlink(raw_it->second.filename.c_str())) {
+                            if (!link(referenceFile->filename.c_str(), raw_it->second.filename.c_str())) {
+                                cout << "linked " << detail << endl;
+                                log("[" + config.settings[sTitle].value + "] linked " + detail);
+
+                                config.cache.reStatMD5(md5_it->first);
+
+                                if (referenceFile->links >= maxLinksAllowed) {
+                                    rescanRequired = true;
+                                    break;
+                                }
+                            }
+                            else {
+                                cerr << RED << "error: unable to link " << detail << " (" << strerror(errno) << ")" << RESET << endl;
+                                log("[" + config.settings[sTitle].value + "] error: unable to link " + detail);
+                            }
+                        }
+                        else {
+                            cerr << RED << "error: unable to remove" << raw_it->second.filename << " in prep to link it (" 
+                                << strerror(errno) << ")" << RESET << endl;
+                            log("[" + config.settings[sTitle].value + "] error: unable to remove " + raw_it->second.filename + 
+                                " in prep to link it (" + strerror(errno) + ")");
+                        }
+                    }
+                }
+            }
+        } while (rescanRequired);    
+    }    
+}
+
+
 int main(int argc, char *argv[]) {
     GLOBALS.statsCount = 0;
     GLOBALS.md5Count = 0;
@@ -330,6 +467,7 @@ int main(int argc, char *argv[]) {
         (string("n,") + CLI_NOTIFY, "Notify", cxxopts::value<std::string>())
         (string("v,") + CLI_VERBOSE, "Verbose output", cxxopts::value<bool>()->default_value("false"))
         (string("q,") + CLI_QUIET, "No output", cxxopts::value<bool>()->default_value("false"))
+        (string("l,") + CLI_MAXLINKS, "Max hard links", cxxopts::value<int>())
         (CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))
         (CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())
         (CLI_FS_DAYS, "Failsafe Days", cxxopts::value<int>())
@@ -342,6 +480,8 @@ int main(int argc, char *argv[]) {
         (CLI_PRUNE, "Enable pruning", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOPRUNE, "Disable pruning", cxxopts::value<bool>()->default_value("false"))
         (CLI_TEST, "Test only mode", cxxopts::value<bool>()->default_value("false"))
+        (CLI_DEFAULTS, "Show defaults", cxxopts::value<bool>()->default_value("false"))
+        (CLI_TIME, "Include time", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOCOLOR, "Disable color", cxxopts::value<bool>()->default_value("false"));
 
     try {
@@ -354,6 +494,11 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    if (GLOBALS.cli.count(CLI_DEFAULTS)) {
+        showHelp(hDefaults);
+        exit(0);
+    }
+
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager);
 
@@ -364,6 +509,7 @@ int main(int argc, char *argv[]) {
 
     scanConfigToCache(*currentConfig);
     pruneBackups(*currentConfig);           // only run after a scan
+    updateLinks(*currentConfig);
 
     //currentConfig->fullDump();
 

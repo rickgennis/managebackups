@@ -3,6 +3,7 @@
 #include <string>
 #include <set>
 #include <fstream>
+#include <sys/stat.h>
 
 #include "BackupEntry.h"
 #include "BackupCache.h"
@@ -108,17 +109,17 @@ BackupCache::~BackupCache() {
 
         // filename doesn't exist
         if (filename_it == indexByFilename.end()) {
-            int index = rawData.rbegin() == rawData.rend() ? 1 : rawData.rbegin()->first + 1;
+            unsigned int index = rawData.rbegin() == rawData.rend() ? 1 : rawData.rbegin()->first + 1;
 
             // add rawData
-            rawData.insert(rawData.end(), pair<int, BackupEntry>(index, updatedEntry));
+            rawData.insert(rawData.end(), pair<unsigned int, BackupEntry>(index, updatedEntry));
 
             // update filename index
-            indexByFilename.insert(indexByFilename.end(), pair<string, int>(updatedEntry.filename, index));
+            indexByFilename.insert(indexByFilename.end(), pair<string, unsigned int>(updatedEntry.filename, index));
 
             // update MD5 index
             auto md5_it = indexByMD5.find(updatedEntry.md5);
-            set<int> md5_list;
+            set<unsigned int> md5_list;
 
             // is there an index (set) of files for this MD5?
             if (md5_it != indexByMD5.end()) {
@@ -126,14 +127,14 @@ BackupCache::~BackupCache() {
                 md5_it->second.insert(index);
             }
             else {
-                set<int> newSet; 
+                set<unsigned int> newSet; 
                 newSet.insert(index);
-                indexByMD5.insert(indexByMD5.end(), pair<string, set<int> >(updatedEntry.md5, newSet));
+                indexByMD5.insert(indexByMD5.end(), pair<string, set<unsigned int> >(updatedEntry.md5, newSet));
             }
         }
         // filename does exist and we're updating it's data
         else {
-            int index = filename_it->second;
+            unsigned int index = filename_it->second;
             auto raw_it = rawData.find(index);
             if (raw_it != rawData.end()) {
                 auto backupEntry = raw_it->second;
@@ -165,9 +166,9 @@ BackupCache::~BackupCache() {
                     }
                     // if the md5 is already there, then just add this file to its list
                     else {
-                        set<int> newSet;
+                        set<unsigned int> newSet;
                         newSet.insert(index);
-                        indexByMD5.insert(indexByMD5.end(), pair<string, set<int> >(updatedEntry.md5, newSet));
+                        indexByMD5.insert(indexByMD5.end(), pair<string, set<unsigned int> >(updatedEntry.md5, newSet));
                     }
                 }
             }
@@ -184,7 +185,7 @@ BackupCache::~BackupCache() {
         // find the entry in the filename index
         auto filename_it = indexByFilename.find(oldEntry.filename);
         if (filename_it != indexByFilename.end()) {
-            int index = filename_it->second;
+            unsigned int index = filename_it->second;
             indexByFilename.erase(oldEntry.filename);    // and remove it
             DEBUG(4, ": removed " << oldEntry.filename << " from filename index");
 
@@ -258,3 +259,29 @@ BackupCache::~BackupCache() {
 
         return result;
     }
+
+
+void BackupCache::reStatMD5(string md5) {
+    struct stat statBuf;
+
+    auto md5_it = indexByMD5.find(md5);
+    if (md5_it != indexByMD5.end()) {
+
+        for (auto set_it = md5_it->second.begin(); set_it != md5_it->second.end(); ++set_it) {
+            auto raw_it = rawData.find(*set_it);
+
+            if (raw_it != rawData.end()) {
+                ++GLOBALS.statsCount;
+                if (!stat(raw_it->second.filename.c_str(), &statBuf)) {
+                    raw_it->second.links = statBuf.st_nlink;
+                    raw_it->second.mtime = statBuf.st_mtime;
+                    raw_it->second.inode = statBuf.st_ino;
+                    DEBUG(5, "restat: " << raw_it->second.filename << " (links " << raw_it->second.links << ")");
+                }
+            }
+        }
+    }        
+}
+
+
+

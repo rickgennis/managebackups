@@ -12,22 +12,23 @@ using namespace std;
 
 class BackupCache {
     public:
-        map<int, BackupEntry> rawData;
-        map<string, set<int> > indexByMD5;
-        map<string, int> indexByFilename;
+        map<unsigned int, BackupEntry> rawData;
+        map<string, set<unsigned int> > indexByMD5;
+        map<string, unsigned int> indexByFilename;
         bool scanned;
 
         string cacheFilename;
         BackupEntry* getByFilename(string filename);
         set<BackupEntry*> getByMD5(string md5);
         void addOrUpdate(BackupEntry updatedEntry, bool markCurrent = 0);
+        void updateAges(time_t refTime = 0);
+        void reStatMD5(string md5);
         void remove(BackupEntry oldEntry);
 
         string size();
         string size(string md5);
         string fullDump();
 
-        void updateAges(time_t refTime = 0);
         void saveCache();
         void restoreCache();
 
