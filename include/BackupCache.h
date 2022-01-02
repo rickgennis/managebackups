@@ -21,6 +21,7 @@ class BackupCache {
         BackupEntry* getByFilename(string filename);
         set<BackupEntry*> getByMD5(string md5);
         void addOrUpdate(BackupEntry updatedEntry, bool markCurrent = 0);
+        void remove(BackupEntry oldEntry);
 
         string size();
         string size(string md5);

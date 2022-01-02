@@ -47,7 +47,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                 else {
                     // filter for filename if specified
                     if (fnamePattern.length() && !fnameRE.search(string(c_dirEntry->d_name))) {
-                        DEBUG(2) && cout << "skipping due to name mismatch: " << fullFilename << endl;
+                        DEBUG(4, "skipping due to name mismatch: " << fullFilename);
                         continue;
                     }
 
@@ -129,7 +129,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
             currentConf = &configManager.configs[configManager.activeConfig];
         }
         else if (!bSave && bStats) {
-            cerr << ifcolor(RED) << "error: title not found; try -1 or -2 with no title to see all backups" << ifcolor(RESET) << endl;
+            cerr << RED << "error: title not found; try -1 or -2 with no title to see all backups" << RESET << endl;
             exit(1);
         }
 
@@ -137,7 +137,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     }
     else {
         if (bSave) {
-            cerr << ifcolor(RED) << "error: --title must be specified in order to --save settings" << ifcolor(RESET) << endl;
+            cerr << RED << "error: --title must be specified in order to --save settings" << RESET << endl;
             exit(1);
         }
 
@@ -200,7 +200,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     }
 
     if (!bStats && !currentConf->settings[sDirectory].value.length()) {
-        cerr << ifcolor(RED) << "error: --directory is required" << ifcolor(RESET) << endl;
+        cerr << RED << "error: --directory is required" << RESET << endl;
         exit(1);
     }
 
@@ -213,24 +213,27 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
 void pruneBackups(BackupConfig& config) {
     Pcre regEnabled("^(t|true|y|yes|1)$", "i");
 
+    if (GLOBALS.cli.count(CLI_NOPRUNE))
+        return;
+
     if (!config.settings[sPruneLive].value.length() || !regEnabled.search(config.settings[sPruneLive].value)) {
-        cout << ifcolor(RED) << "warning: While a core feature, managebackups doesn't prune old backups" << endl;
+        cout << RED << "warning: While a core feature, managebackups doesn't prune old backups" << endl;
         cout << "until specifically enabled.  Use --prune to enable pruning.  Use --prune" << endl;
         cout << "and --save to make it the default behavior for this backup configuration." << endl;
         cout << "pruning skipped;  would have used these settings:" << endl;
         cout << "\t--days " << config.settings[sDays].value << " --weeks " << config.settings[sWeeks].value;
-        cout << " --months " << config.settings[sMonths].value << " --years " << config.settings[sYears].value << ifcolor(RESET) << endl;
+        cout << " --months " << config.settings[sMonths].value << " --years " << config.settings[sYears].value << RESET << endl;
         return;
     }
 
     // failsafe checks
     int fb = stoi(config.settings[sFailsafeBackups].value, NULL);
     int fd = stoi(config.settings[sFailsafeDays].value, NULL);
+    auto fnameIdx = config.cache.indexByFilename;
 
     if (fb > 0 && fd > 0) {
         int minValidBackups = 0;
 
-        auto fnameIdx = config.cache.indexByFilename;
         for (auto fnameIdx_it = fnameIdx.begin(); fnameIdx_it != fnameIdx.end(); ++fnameIdx_it) {
             auto raw_it = config.cache.rawData.find(fnameIdx_it->second);
 
@@ -246,13 +249,64 @@ void pruneBackups(BackupConfig& config) {
             string message = "skipping pruning due to failsafe check; only " + to_string(fb) +
                     " backup" + s(fb) + " within the last " + to_string(fd) + " day" + s(fd);
             
-            cerr << ifcolor(RED) << "warning: " << message << ifcolor(RESET) << endl;
+            cerr << RED << "warning: " << message << RESET << endl;
             log("[" + config.settings[sTitle].value + "] " + message);
             return;
         }
     }
 
-    cout << "PRUNING" << endl;
+    // loop through the filename index sorted by filename (i.e. all backups by age)
+    for (auto fnameIdx_it = fnameIdx.begin(); fnameIdx_it != fnameIdx.end(); ++fnameIdx_it) {
+        auto raw_it = config.cache.rawData.find(fnameIdx_it->second);
+
+        if (raw_it != config.cache.rawData.end()) { 
+            int filenameAge = raw_it->second.day_age;
+            int filenameDOW = raw_it->second.dow;
+
+            // daily
+            if (filenameAge <= config.settings[sDays].ivalue()) {
+                DEBUG(2, "keep_daily: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
+                continue;
+            }
+
+            // weekly
+            if (filenameAge / 7 <= config.settings[sWeeks].ivalue() && filenameDOW == 0) {
+                DEBUG(2, "keep_weekly: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
+                continue;
+            }
+
+            // monthly
+            auto monthLimit = config.settings[sMonths].ivalue();
+            if (monthLimit && raw_it->second.month_age <= monthLimit && raw_it->second.date_day == 1) {
+                DEBUG(2, "keep_monthly: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
+                continue;
+            }
+
+            // yearly
+            auto yearLimit = config.settings[sYears].ivalue();
+            if (yearLimit && filenameAge / 365 <= yearLimit && raw_it->second.date_day == 1 && raw_it->second.date_day == 1) {
+                DEBUG(2, "\tkeep_yearly: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
+                continue;
+            }
+
+            if (GLOBALS.cli.count(CLI_TEST))
+                cout << YELLOW << "[" << config.settings[sTitle].value << "] TESTMODE: would have deleted " <<
+                    raw_it->second.filename << " (age=" + to_string(filenameAge) << ", dow=" + dw(filenameDOW) <<
+                    ")" << RESET << endl;
+            else {
+                NOTQUIET && cout << "[" << config.settings[sTitle].value + "] removing " << raw_it->second.filename << endl; 
+                log("[" + config.settings[sTitle].value + "] removing " + raw_it->second.filename + 
+                        " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")");
+
+                // delete the file and remove it from all caches
+                unlink(raw_it->second.filename.c_str());
+                config.cache.remove(raw_it->second);
+            }
+        }
+    }
+
+    if (!GLOBALS.cli.count(CLI_TEST))
+        config.removeEmptyDirs();
 }
 
 
@@ -275,7 +329,8 @@ int main(int argc, char *argv[]) {
         (string("c,") + CLI_COMMAND, "Command", cxxopts::value<std::string>())
         (string("n,") + CLI_NOTIFY, "Notify", cxxopts::value<std::string>())
         (string("v,") + CLI_VERBOSE, "Verbose output", cxxopts::value<bool>()->default_value("false"))
-        (string(CLI_SAVE), "Save config", cxxopts::value<bool>()->default_value("false"))
+        (string("q,") + CLI_QUIET, "No output", cxxopts::value<bool>()->default_value("false"))
+        (CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))
         (CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())
         (CLI_FS_DAYS, "Failsafe Days", cxxopts::value<int>())
         (CLI_FS_FP, "Failsafe Paranoid", cxxopts::value<bool>()->default_value("false"))
@@ -286,11 +341,12 @@ int main(int argc, char *argv[]) {
         (CLI_STATS2, "Stats detail", cxxopts::value<bool>()->default_value("false"))
         (CLI_PRUNE, "Enable pruning", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOPRUNE, "Disable pruning", cxxopts::value<bool>()->default_value("false"))
+        (CLI_TEST, "Test only mode", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOCOLOR, "Disable color", cxxopts::value<bool>()->default_value("false"));
 
     try {
         GLOBALS.cli = options.parse(argc, argv);
-        GLOBALS.debugLevel = GLOBALS.cli.count("verbose");
+        GLOBALS.debugLevel = GLOBALS.cli.count(CLI_VERBOSE);
         GLOBALS.color = !GLOBALS.cli[CLI_NOCOLOR].as<bool>();
     }
     catch (cxxopts::OptionParseException& e) {
@@ -309,10 +365,10 @@ int main(int argc, char *argv[]) {
     scanConfigToCache(*currentConfig);
     pruneBackups(*currentConfig);           // only run after a scan
 
-    currentConfig->fullDump();
+    //currentConfig->fullDump();
 
     //cout << currentConfig->cache.fullDump() << endl;
 
-    cout << "stats: " << GLOBALS.statsCount << ", md5s: " << GLOBALS.md5Count << endl;
+    DEBUG(1, "stats: " << GLOBALS.statsCount << ", md5s: " << GLOBALS.md5Count);
     return 0;
 }

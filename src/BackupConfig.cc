@@ -3,11 +3,13 @@
 #include <stdio.h>
 #include <variant>
 #include <unistd.h>
+#include <dirent.h>
 
 #include "BackupConfig.h"
 #include "Setting.h"
 #include "util.h"
 #include "globals.h"
+#include "colors.h"
 #include <pcre++.h>
 
 using namespace pcrepp;
@@ -184,7 +186,7 @@ bool BackupConfig::loadConfig(string filename) {
         }
             
         configFile.close();
-        DEBUG(1) && cout << "successfully parsed [" << settings[sTitle].value << "] config from " << filename << endl;
+        DEBUG(1, "successfully parsed [" << settings[sTitle].value << "] config from " << filename);
 
         return 1;
     }    
@@ -211,4 +213,42 @@ void BackupConfig::fullDump() {
         cout << "setting " << set_it->display_name << ": " << set_it->value << endl;
 }
 
+
+unsigned int BackupConfig::removeEmptyDirs(string directory) {
+    DIR *c_dir;
+    struct dirent *c_dirEntry;
+
+    string dir = directory.length() ? directory : settings[sDirectory].value;
+    if ((c_dir = opendir(dir.c_str())) != NULL) {
+        unsigned int entryCount = 0;
+
+        while ((c_dirEntry = readdir(c_dir)) != NULL) {
+
+            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+               continue; 
+
+            ++entryCount;
+            ++GLOBALS.statsCount;
+            struct stat statData;
+            string fullFilename = addSlash(dir) + string(c_dirEntry->d_name);
+            if (!stat(fullFilename.c_str(), &statData)) {
+
+                // recurse into subdirectories
+                if ((statData.st_mode & S_IFMT) == S_IFDIR) {
+                    if (!removeEmptyDirs(fullFilename)) {
+                        NOTQUIET && cout << "[" << settings[sTitle].value + "] removing empty directory " << fullFilename << endl;
+                        log("[" + settings[sTitle].value + "] removing empty directory " + fullFilename);
+                        rmdir(fullFilename.c_str());    // remove empty subdirectory
+                        --entryCount;
+                    }
+                }
+            }
+        }
+
+        closedir(c_dir);
+        return entryCount;
+    }
+
+    return 1;
+}
 

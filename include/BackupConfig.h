@@ -14,6 +14,7 @@ using namespace pcrepp;
 
 
 class BackupConfig {
+
     public:
         string config_filename;
 
@@ -30,6 +31,8 @@ class BackupConfig {
         void saveConfig();
         bool loadConfig(string filename);
         void loadConfigsCache();
+
+        unsigned int removeEmptyDirs(string dir = "");
 };
 
 #endif

@@ -155,4 +155,8 @@ string timeDiff(unsigned long start, unsigned long end, int maxUnits) {
 }
 
 
+string dw(int which) {
+    const char* DOW[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+    return(DOW[which]);
+}
 

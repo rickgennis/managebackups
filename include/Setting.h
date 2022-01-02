@@ -21,6 +21,7 @@ class Setting {
         Pcre regex;
         bool seen;
 
+        int ivalue() { return stoi(value); }
         Setting(string name, string pattern, enum SetType setType, string defaultVal);
 };
 

@@ -12,8 +12,8 @@ using namespace std;
 
 void displayStatsForConfig(BackupConfig& config) {
     unsigned long fnameLen = 0;
-    set<string> colors { { GREEN, MAGENTA, CYAN, BLUE, YELLOW, BOLDGREEN, BOLDMAGENTA, BOLDYELLOW, BOLDCYAN } };
-    auto currentColor_it = ++colors.begin();
+    vector<string> colors { { GREEN, MAGENTA, CYAN, BLUE, YELLOW, BOLDGREEN, BOLDMAGENTA, BOLDYELLOW, BOLDCYAN } };
+    auto currentColor_it = colors.begin()++;
     string lastMD5;
 
     for (auto raw_it = config.cache.rawData.begin(); raw_it != config.cache.rawData.end(); ++raw_it) {
@@ -38,8 +38,8 @@ void displayStatsForConfig(BackupConfig& config) {
 
             // print the month header
             if (lastMonthYear != monthYear) 
-                cout << endl << ifcolor(BOLDBLUE) << onevarsprintf("%-" + to_string(fnameLen+1) + "s  ", monthYear) <<
-                    "Size     Duration  Type  Lnks  Age" << ifcolor(RESET) << endl;
+                cout << endl << BOLDBLUE << onevarsprintf("%-" + to_string(fnameLen+1) + "s  ", monthYear) <<
+                    "Size     Duration  Type  Lnks  Age" << RESET << endl;
 
             // format the detail for output
             char result[1000];
@@ -71,10 +71,10 @@ void displayStatsForConfig(BackupConfig& config) {
                         currentColor_it = ++colors.begin();
                 }
 
-                cout << ifcolor(*currentColor_it);
+                cout << *currentColor_it;
             }
             else
-                cout << ifcolor(RESET);
+                cout << RESET;
 
             // print it out
             cout << result << endl;
@@ -84,7 +84,7 @@ void displayStatsForConfig(BackupConfig& config) {
         }
     }
 
-    cout << ifcolor(RESET);
+    cout << RESET;
 }
 
 

@@ -12,20 +12,26 @@ class BackupEntry {
     Pcre dateRE;
 
     public:
+        bool            current;
         string          filename;
         string          md5;
         unsigned int    links;
         time_t          mtime;
         unsigned long   size;
         unsigned long   inode;
+        unsigned long   duration;       // how long the backup took to run
+
+        /* all of the below are calculated off the date in the filename (mybackup-20210102.tgz),
+           *NOT* via the mtime.  This is because we'll have multiple backups from different days
+           that are all hardlinked together (due to having identical content) and that means they
+           share the same inode and same single mtime entry.  mtime won't show when they were taken. */
+
         unsigned long   day_age;
         unsigned int    month_age;
         int             dow;
         int             date_month;
         int             date_day;
         int             date_year;
-        unsigned long   duration;
-        bool            current;
 
     BackupEntry();
 

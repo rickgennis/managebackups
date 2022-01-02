@@ -6,7 +6,8 @@
 
 #define CONF_DIR "/etc/managebackups"
 
-#define DEBUG(x) (GLOBALS.debugLevel >= x)
+#define DEBUG(x,y) (GLOBALS.cli.count(CLI_VERBOSE) >= x) && cout << GREEN << __FUNCTION__ << "\t" << y << RESET << endl
+#define NOTQUIET (!GLOBALS.cli.count(CLI_QUIET))
 
 // define commandline options
 #define CLI_TITLE "title"
@@ -30,6 +31,8 @@
 #define CLI_STATS2 "2"
 #define CLI_PRUNE "prune"
 #define CLI_NOPRUNE "noprune"
+#define CLI_TEST "test"
+#define CLI_QUIET "quiet"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -49,7 +52,6 @@
 #define RE_FSDAYS "(fs_days|fd|failsafe_days)"
 #define RE_NOTIFY "(notify)"
 #define RE_PRUNE "(prune)"
-
 
 struct global_vars {
     unsigned int debugLevel;

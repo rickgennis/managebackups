@@ -8,6 +8,7 @@
 #include "BackupCache.h"
 #include "util.h"
 #include "globals.h"
+#include "colors.h"
 
 using namespace std;
 
@@ -140,7 +141,7 @@ BackupCache::~BackupCache() {
 
                 // update the rawData entry
                 raw_it->second = updatedEntry;
-                DEBUG(3) && cout << "updated raw data for " << backupEntry.filename << endl;
+                DEBUG(4, "updated raw data for " << backupEntry.filename);
 
                 // if the md5 changed...
                 if (updatedEntry.md5 != oldMD5) {
@@ -149,11 +150,11 @@ BackupCache::~BackupCache() {
                     // if the old one is in the index, remove it
                     if (md5_it != indexByMD5.end()) {
                         md5_it->second.erase(index);
-                        DEBUG(3) && cout << "removed reference from old md5 (" << oldMD5 << ") to " << backupEntry.filename << endl;
+                        DEBUG(4, "removed reference from old md5 (" << oldMD5 << ") to " << backupEntry.filename);
 
                         if (!md5_it->second.size()) {
                             indexByMD5.erase(oldMD5);
-                            DEBUG(3) && cout << "dropping old md5 (" << oldMD5 << ") as " << backupEntry.filename << " was the last reference" << endl;
+                            DEBUG(4, "dropping old md5 (" << oldMD5 << ") as " << backupEntry.filename << " was the last reference");
                         }
                     }
 
@@ -172,10 +173,41 @@ BackupCache::~BackupCache() {
             }
             else {
                 // entry is in the filenameIndex but not the raw data.  should never get here.
-                cout << "LOGIC ERROR - NO RAW DATA" << endl;
+                cerr << RED << "LOGIC ERROR - NO RAW DATA" << RESET << endl;
+                exit(1);
             }
         }
     }
+
+
+    void BackupCache::remove(BackupEntry oldEntry) {
+        // find the entry in the filename index
+        auto filename_it = indexByFilename.find(oldEntry.filename);
+        if (filename_it != indexByFilename.end()) {
+            int index = filename_it->second;
+            indexByFilename.erase(oldEntry.filename);    // and remove it
+            DEBUG(4, ": removed " << oldEntry.filename << " from filename index");
+
+            // find the entry in the raw data
+            auto raw_it = rawData.find(index);
+            if (raw_it != rawData.end()) {
+                string fileMD5 = raw_it->second.md5;
+                rawData.erase(index);                    // and remove it
+                DEBUG(4, ": removed " << index << " from raw data");
+
+                    // find the entry in the md5 index
+                    auto md5_it = indexByMD5.find(fileMD5);
+                    if (md5_it != indexByMD5.end()) {
+                        md5_it->second.erase(index);     // and remove it
+                        DEBUG(4, ": removed " << fileMD5 << " from md5 index");
+
+                        if (!md5_it->second.size())      // if that was the last/only file with that MD5
+                            indexByMD5.erase(fileMD5);   // then remove that MD5 entirely from the index
+                    }
+            }
+        }
+    }
+
 
     string BackupCache::size() {
         return (to_string(rawData.size()) + string(" cache entries, ") + 
@@ -201,7 +233,7 @@ BackupCache::~BackupCache() {
                 ", inod:" + to_string(raw_it->second.inode) + 
                 ", dage:" + to_string(raw_it->second.day_age) + 
                 ", mage:" + to_string(raw_it->second.month_age) + 
-                ", dow:" + to_string(raw_it->second.dow) + 
+                ", dow:" + dw(raw_it->second.dow) + 
                 ", day:" + to_string(raw_it->second.date_day) + 
                 ", lnks:" + to_string(raw_it->second.links) + 
                 ", mtim:" + to_string(raw_it->second.mtime) + "\n";

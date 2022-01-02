@@ -2,7 +2,6 @@
 #include <iostream>
 #include <string>
 #include <math.h>
-#include "date.h"
 #include "BackupEntry.h"
 #include <pcre++.h>
 #include "util.h"
@@ -63,7 +62,7 @@ BackupEntry* BackupEntry::updateAges(time_t refTime) {
         date_day   = stoi(dateRE.get_match(2));
     }
     else {   // should never get here due to a similar regex limiting filenames getting initially added to the cache
-        cerr << ifcolor(RED) << "error: invalid log filename (" << filename << ")" << ifcolor(RESET) << endl;
+        cerr << RED << "error: invalid log filename (" << filename << ")" << RESET << endl;
         exit(1);
     }
 

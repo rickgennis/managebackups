@@ -26,5 +26,7 @@ string seconds2hms(unsigned long seconds);
 
 string timeDiff(unsigned long start, unsigned long end = GLOBALS.startupTime, int maxUnits = 2);
 
+string dw(int which);
+
 #endif
 
