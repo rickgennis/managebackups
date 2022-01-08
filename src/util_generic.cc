@@ -1,11 +1,17 @@
 #include <iostream>
 #include <fstream>
+#include <unistd.h>
 #include "time.h"
 #include <syslog.h>
 #include <openssl/md5.h>
+#include <sys/stat.h>
+#include "pcre++.h"
 #include "math.h"
 
-#include "util.h"
+#include "pcre++.h"
+#include "util_generic.h"
+
+using namespace pcrepp;
 
 string s(int number) {
     return(number == 1 ? "" : "s");
@@ -100,6 +106,7 @@ string approximate(double size) {
 }
 
 
+
 string seconds2hms(unsigned long seconds) {
     string result;
     int unit[] = {3600, 60, 1};
@@ -117,7 +124,7 @@ string seconds2hms(unsigned long seconds) {
             dataAdded = true;
         }
         else {
-            result += dataAdded ? ":00" : "   ";
+            result += dataAdded ? ":00" : index == (sizeof(unit) / sizeof(unit[0])) - 1 ? "  " : "   ";
         }
     }
 
@@ -160,3 +167,77 @@ string dw(int which) {
     return(DOW[which]);
 }
 
+
+void mkdirp(string dir) {
+    struct stat statBuf;
+
+    if (stat(dir.c_str(), &statBuf) == -1) {
+        char data[1500];
+        strcpy(data, dir.c_str());
+        char *p = strtok(data, "/");
+        string path;
+
+        while (p) {
+            path += string("/") + p;   
+
+            if (stat(path.c_str(), &statBuf) == -1)
+               mkdir(path.c_str(), 0755);
+
+            p = strtok(NULL, "/");
+        }
+    }
+}
+
+
+string trimSpace(const string &s) {
+    auto start = s.begin();
+    while (start != s.end() && isspace(*start))
+        start++;
+
+    auto end = s.end();
+    do {
+        end--;
+    } while (distance(start, end) > 0 && isspace(*end));
+
+    return string(start, end + 1);
+}
+
+
+string trimQuotes(string s) {
+    Pcre reg("([\'\"]+)(.+?)\\g1");
+
+    if (reg.search(s) && reg.matches())
+        return reg.get_match(1);
+
+    return s;
+}
+
+
+int varexec(string fullCommand) {
+    Pcre cmdRE("('.*?'|\".*?\"|\\S+)", "g");
+    char *params[300];
+
+    int index = 0;
+    size_t pos = 0;
+    while (pos <= fullCommand.length() && cmdRE.search(fullCommand, pos)) {
+        pos = cmdRE.get_match_end(0);
+        ++pos;
+
+        params[index] = (char *)malloc(cmdRE.get_match(0).length() + 1);
+        strcpy(params[index++], trimQuotes(cmdRE.get_match(0)).c_str());
+    }
+    params[index] = NULL;
+
+    if (!index) {
+        cerr << "********* EXEC NO CMD ************" << endl;
+        exit(1);
+    }
+
+    if (index == 1)
+        execlp(params[0], "");
+
+    execvp(params[0], params);
+
+    cerr << "********* EXEC FAILED ************" << endl;
+    exit(1);
+}

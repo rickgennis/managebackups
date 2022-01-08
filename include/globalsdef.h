@@ -9,6 +9,8 @@
 #define DEBUG(x,y) (GLOBALS.cli.count(CLI_VERBOSE) >= x) && cout << GREEN << __FUNCTION__ << "\t" << y << RESET << endl
 #define NOTQUIET (!GLOBALS.cli.count(CLI_QUIET))
 
+#define DATE_REGEX "-(20\\d{2})[-.]*(\\d{2})[-.]*(\\d{2})[-.]"
+
 /* CLI_ and RE_
  * The CLI_ constants are commandline switches while the RE_ are regex patterns
  * that match lines of config files.  It can be a little confusing because some directives
@@ -41,6 +43,7 @@
 #define CLI_QUIET "quiet"
 #define CLI_DEFAULTS "defaults"
 #define CLI_TIME "time"
+#define CLI_NOBACKUP "nobackup"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -63,7 +66,7 @@
 #define RE_MAXLINKS "(maxlinks)"
 #define RE_TIME "(time)"
 
-enum helpType { hDefaults, hOptions, hExamples };
+enum helpType { hDefaults, hOptions, hExamples, hSyntax };
 
 struct global_vars {
     unsigned int debugLevel;
@@ -71,6 +74,7 @@ struct global_vars {
     unsigned long statsCount;
     unsigned long md5Count;
     int pid;
+    int minBackupSize;
     cxxopts::ParseResult cli;
     bool color;
 };

@@ -4,7 +4,7 @@
 #include <math.h>
 #include "BackupEntry.h"
 #include <pcre++.h>
-#include "util.h"
+#include "util_generic.h"
 #include "colors.h"
 
 #define SECS_PER_DAY (60*60*24)
@@ -15,7 +15,7 @@ using namespace std;
 
 
 BackupEntry::BackupEntry() {
-    dateRE = Pcre("-(20\\d{2})[-.]*(\\d{2})[-.]*(\\d{2})[-.]");
+    dateRE = Pcre(DATE_REGEX);
     md5 = "";
     filename = "";
     links = mtime = size = inode = day_age = month_age = dow = date_day = duration = current = 0;

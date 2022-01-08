@@ -1,8 +1,3 @@
-#include "BackupEntry.h"
-#include "BackupCache.h"
-#include "BackupConfig.h"
-#include "ConfigManager.h"
-#include "cxxopts.hpp"
 
 #include "syslog.h"
 #include "unistd.h"
@@ -12,11 +7,18 @@
 #include <filesystem>
 #include <dirent.h>
 #include <time.h>
+
+#include "BackupEntry.h"
+#include "BackupCache.h"
+#include "BackupConfig.h"
+#include "ConfigManager.h"
+#include "cxxopts.hpp"
 #include "globalsdef.h"
 #include "colors.h"
 #include "statistics.h"
-#include "util.h"
+#include "util_generic.h"
 #include "help.h"
+#include "PipeExec.h"
 
 
 using namespace pcrepp;
@@ -106,10 +108,10 @@ void scanConfigToCache(BackupConfig& config) {
         Pcre regEx("(.*)\\.([^.]+)$");
         
         if (regEx.search(config.settings[sBackupFilename].value) && regEx.matches()) 
-            fnamePattern = regEx.get_match(0) + "-20\\d{2}[-.]*\\d{2}[-.]*\\d{2}.*\\." + regEx.get_match(1);
+            fnamePattern = regEx.get_match(0) + DATE_REGEX + ".*" + regEx.get_match(1);
     }
     else 
-        fnamePattern = ".*-20\\d{2}[-.]*\\d{2}[-.]*\\d{2}.*";
+        fnamePattern = DATE_REGEX;
 
     config.cache.scanned = true;
     parseDirToCache(directory, fnamePattern, config.cache);
@@ -257,6 +259,8 @@ void pruneBackups(BackupConfig& config) {
         }
     }
 
+    set<string> changedMD5s;
+
     // loop through the filename index sorted by filename (i.e. all backups by age)
     for (auto fnameIdx_it = fnameIdx.begin(); fnameIdx_it != fnameIdx.end(); ++fnameIdx_it) {
         auto raw_it = config.cache.rawData.find(fnameIdx_it->second);
@@ -296,19 +300,26 @@ void pruneBackups(BackupConfig& config) {
                     raw_it->second.filename << " (age=" + to_string(filenameAge) << ", dow=" + dw(filenameDOW) <<
                     ")" << RESET << endl;
             else {
-                NOTQUIET && cout << "[" << config.settings[sTitle].value + "] removing " << raw_it->second.filename << endl; 
-                log("[" + config.settings[sTitle].value + "] removing " + raw_it->second.filename + 
-                        " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")");
 
                 // delete the file and remove it from all caches
-                unlink(raw_it->second.filename.c_str());
-                config.cache.remove(raw_it->second);
+                if (!unlink(raw_it->second.filename.c_str())) {
+                    NOTQUIET && cout << "removed " << raw_it->second.filename << endl; 
+                    log("[" + config.settings[sTitle].value + "] removing " + raw_it->second.filename + 
+                        " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")");
+
+                    changedMD5s.insert(raw_it->second.md5);
+                    config.cache.remove(raw_it->second);
+                }
             }
         }
     }
 
-    if (!GLOBALS.cli.count(CLI_TEST))
+    if (!GLOBALS.cli.count(CLI_TEST)) {
         config.removeEmptyDirs();
+
+        for (auto md5_it = changedMD5s.begin(); md5_it != changedMD5s.end(); ++md5_it)
+            config.cache.reStatMD5(*md5_it);
+    }
 }
 
 
@@ -447,10 +458,103 @@ void updateLinks(BackupConfig& config) {
 }
 
 
+
+void performBackup(BackupConfig& config) {
+    bool incTime = GLOBALS.cli.count(CLI_TIME);
+    string setFname = config.settings[sBackupFilename].value;
+    string setDir = config.settings[sDirectory].value;
+    string tempExtension = ".tmp." + to_string(GLOBALS.pid);
+
+    if (!setFname.length() || GLOBALS.cli.count(CLI_NOBACKUP))
+        return;
+
+    // setup path names and filenames
+    time_t now;
+    char buffer[100];
+    now = time(NULL);
+
+    strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d/": "%Y/%m/", localtime(&now));
+    string subDir = buffer;
+        
+    strftime(buffer, sizeof(buffer), incTime ? "-%Y%m%d-%H:%M:%S": "-%Y%m%d", localtime(&now));
+    string fnameInsert = buffer;
+
+    string fullDirectory = addSlash(setDir) + subDir;
+    string backupFilename;
+
+    Pcre fnamePartsRE("(.*)(\\.[^.]+)$");
+    if (fnamePartsRE.search(setFname) && fnamePartsRE.matches() > 1) 
+        backupFilename = fullDirectory + fnamePartsRE.get_match(0) + fnameInsert + fnamePartsRE.get_match(1);
+    else
+        backupFilename = fullDirectory +  setFname + fnameInsert;
+
+    if (GLOBALS.cli.count(CLI_TEST)) {
+        cout << YELLOW << "[" << config.settings[sTitle].value << "] TESTMODE: would have begun backup to " <<
+            backupFilename << RESET << endl;
+        return;
+    }
+
+    // make sure the destination directory exists
+    mkdirp(fullDirectory);
+
+    log("[" + config.settings[sTitle].value + "] starting backup to " + backupFilename);
+
+    // note start time
+    time_t startTime;
+    time(&startTime);
+
+    // begin backing up
+    PipeExec proc(config.settings[sBackupCommand].value);
+    proc.execute2file(backupFilename + tempExtension);
+
+    // note finish time
+    time_t finishTime;
+    time(&finishTime);
+
+    struct stat statData;
+    if (!stat(string(backupFilename + tempExtension).c_str(), &statData)) {
+        if (statData.st_size >= GLOBALS.minBackupSize) {
+            if (!rename(string(backupFilename + tempExtension).c_str(), backupFilename.c_str())) {
+                log("[" + config.settings[sTitle].value + "] completed backup to " + backupFilename + " in " + 
+                        timeDiff(startTime, finishTime, 3));
+                NOTQUIET && cout << "\t• successfully backed up to " << backupFilename << endl;
+
+                BackupEntry cacheEntry;
+                cacheEntry.filename = backupFilename;
+                cacheEntry.links = statData.st_nlink;
+                cacheEntry.mtime = statData.st_mtime;
+                cacheEntry.inode = statData.st_ino;
+                cacheEntry.size = statData.st_size;
+                cacheEntry.duration = finishTime - startTime;
+                cacheEntry.updateAges(finishTime);
+                cacheEntry.calculateMD5();
+
+                config.cache.addOrUpdate(cacheEntry, true);
+                config.cache.reStatMD5(cacheEntry.md5);
+            }
+            else {
+                log("[" + config.settings[sTitle].value + "] backup failed, unable to rename temp file to " + backupFilename);
+                unlink(string(backupFilename + tempExtension).c_str());
+                NOTQUIET && cout << "\t" << RED << "• backup failed to " << backupFilename << RESET << endl;
+            }
+        }
+        else {
+            log("[" + config.settings[sTitle].value + "] backup failed to " + backupFilename + " (insufficient output/size)");
+            NOTQUIET && cout << "\t" << RED << "• backup failed to " << backupFilename << " (insufficient output/size)" << RESET << endl;
+        }
+    }
+    else {
+        log("[" + config.settings[sTitle].value + "] backup command failed to generate any output");
+        NOTQUIET && cout << "\t" << RED << "• backup failed to generate any output" << RESET << endl;
+    }
+}
+
+
 int main(int argc, char *argv[]) {
     GLOBALS.statsCount = 0;
     GLOBALS.md5Count = 0;
     GLOBALS.pid = getpid();
+    GLOBALS.minBackupSize = 1500;
 
     time(&GLOBALS.startupTime);
     openlog("managebackups", LOG_PID | LOG_NDELAY, LOG_LOCAL1);
@@ -482,6 +586,7 @@ int main(int argc, char *argv[]) {
         (CLI_TEST, "Test only mode", cxxopts::value<bool>()->default_value("false"))
         (CLI_DEFAULTS, "Show defaults", cxxopts::value<bool>()->default_value("false"))
         (CLI_TIME, "Include time", cxxopts::value<bool>()->default_value("false"))
+        (CLI_NOBACKUP, "Don't backup", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOCOLOR, "Disable color", cxxopts::value<bool>()->default_value("false"));
 
     try {
@@ -492,6 +597,11 @@ int main(int argc, char *argv[]) {
     catch (cxxopts::OptionParseException& e) {
         cerr << "managebackups: " << e.what() << endl;
         exit(1);
+    }
+
+    if (argc == 1) {
+        showHelp(hSyntax);
+        exit(0);
     }
 
     if (GLOBALS.cli.count(CLI_DEFAULTS)) {
@@ -510,11 +620,9 @@ int main(int argc, char *argv[]) {
     scanConfigToCache(*currentConfig);
     pruneBackups(*currentConfig);           // only run after a scan
     updateLinks(*currentConfig);
-
-    //currentConfig->fullDump();
-
-    //cout << currentConfig->cache.fullDump() << endl;
+    performBackup(*currentConfig);
 
     DEBUG(1, "stats: " << GLOBALS.statsCount << ", md5s: " << GLOBALS.md5Count);
+
     return 0;
 }

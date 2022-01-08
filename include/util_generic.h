@@ -28,5 +28,13 @@ string timeDiff(unsigned long start, unsigned long end = GLOBALS.startupTime, in
 
 string dw(int which);
 
+void mkdirp(string dir);
+
+string trimSpace(const string &s);
+
+string trimQuotes(string s);
+
+int varexec(string fullCommand);
+
 #endif
 

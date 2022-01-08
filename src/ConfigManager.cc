@@ -5,7 +5,7 @@
 
 #include "ConfigManager.h"
 #include "globals.h"
-#include "util.h"
+#include "util_generic.h"
 
 using namespace pcrepp;
 

@@ -7,7 +7,7 @@
 
 #include "BackupEntry.h"
 #include "BackupCache.h"
-#include "util.h"
+#include "util_generic.h"
 #include "globals.h"
 #include "colors.h"
 
@@ -43,13 +43,14 @@ BackupCache::~BackupCache() {
             // write raw data
             for (auto raw_it = rawData.begin(); raw_it != rawData.end(); ++raw_it) {
 
-                // files need to be able to file out of the cache if they disappear from the filesystem.
+                // files need to be able to fall out of the cache if they disappear from the filesystem.
                 // "current" means the file was seen in the most recent filesystem scan.
                 if (raw_it->second.current)
                     cacheFile << raw_it->second.class2string() << endl;
             }
 
             cacheFile.close();
+            DEBUG(2, "cache saved to " << cacheFilename);
         }
         else
             log("unable to save cache to " + cacheFilename);
