@@ -17,15 +17,13 @@ typedef struct ProcDetail {
 } procDetail;
 
 
-
-
 class PipeExec {
     vector<procDetail> procs;
 
     public:
         PipeExec(string cmd);
-        procDetail execute();
-        bool execute2file(string toFile);
+        procDetail execute(string title);    // title is for error logging as a subdirectory name
+        bool execute2file(string toFile, string title);
         void dump();
 };
 

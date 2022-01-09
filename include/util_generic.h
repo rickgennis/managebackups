@@ -41,7 +41,13 @@ string trimSpace(const string &s);
 
 string trimQuotes(string s);
 
+string safeFilename(string filename);
+
 int varexec(string fullCommand);
+
+vector<string> expandWildcardFilespec(string filespec);
+
+void strReplaceAll(string& s, string const& toReplace, string const& replaceWith);
 
 #endif
 

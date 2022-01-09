@@ -194,11 +194,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
 
     if (currentConf == &tempConfig) {
         if (bTitle && bSave) {
-            Pcre search1("[\\s#;\\/\\\\]+", "g");
-            Pcre search2("[\\?\\!]+", "g");
-
-            string tempStr = search1.replace(tempConfig.settings[sTitle].value, "_");
-            tempConfig.config_filename = addSlash(CONF_DIR) +search2.replace(tempStr, "") + ".conf";
+            tempConfig.config_filename = addSlash(CONF_DIR) + safeFilename(tempConfig.settings[sTitle].value) + ".conf";
             tempConfig.temp = false;
         }
 
@@ -511,7 +507,7 @@ void performBackup(BackupConfig& config) {
 
     // begin backing up
     PipeExec proc(setCommand);
-    proc.execute2file(backupFilename + tempExtension);
+    proc.execute2file(backupFilename + tempExtension, safeFilename(config.settings[sTitle].value));
 
     // note finish time
     time_t finishTime;

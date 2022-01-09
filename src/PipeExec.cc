@@ -55,14 +55,23 @@ void PipeExec::dump() {
 }
 
 
-procDetail PipeExec::execute() {
-    int devNull = open("/dev/null", O_WRONLY);
-
+procDetail PipeExec::execute(string title) {
     procs.insert(procs.begin(), procDetail("head"));
+
+    string errorFilename = "/tmp/managebackups_stderr/" + title + "/";
+    mkdirp(errorFilename.c_str());
+
+    int commandIdx = -1;
     for (auto proc_it = procs.begin(); proc_it != procs.end(); ++proc_it) {
+        ++commandIdx;
+        string commandPrefix = proc_it->command.substr(0, proc_it->command.find(" "));
 
         // last loop
         if (*proc_it == procs[procs.size() - 1]) {
+            int errorFd = open(string(errorFilename + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stderr").c_str(), 
+                O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+            if (errorFd > 0)
+                DUP2(errorFd, 2);
             DUP2(procs[0].fd[WRITE_END], WRITE_END);
             varexec(proc_it->command);
         }
@@ -70,11 +79,13 @@ procDetail PipeExec::execute() {
             // create the pipe & fork
             pipe(proc_it->fd);
             if ((proc_it->childPID = fork())) {
-                if (devNull > 0)
-                    DUP2(devNull, 2);
 
                 // PARENT - all subsequent parents
                 if (*proc_it != procs[0]) {
+                    int errorFd = open(string(errorFilename + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stderr").c_str(), 
+                            O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+                    if (errorFd > 0)
+                        DUP2(errorFd, 2);
                     close(proc_it->fd[READ_END]);
                     DUP2(proc_it->fd[WRITE_END], WRITE_END);
                     varexec(proc_it->command);
@@ -87,9 +98,6 @@ procDetail PipeExec::execute() {
         }
         
         // CHILD 
-        if (devNull > 0)
-            DUP2(devNull, 2);
-
         if (*proc_it != procs[0]) {
             close(proc_it->fd[WRITE_END]);
             DUP2(proc_it->fd[READ_END], READ_END);
@@ -100,7 +108,7 @@ procDetail PipeExec::execute() {
 }
 
 
-bool PipeExec::execute2file(string toFile) {
+bool PipeExec::execute2file(string toFile, string title) {
     int outFile;
     int bytesRead;
     int bytesWritten;
@@ -109,7 +117,7 @@ bool PipeExec::execute2file(string toFile) {
     char data[16 * 1024];
 
     if ((outFile = open(toFile.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR)) > 0) {
-        auto proc = execute();
+        auto proc = execute(title);
 
         while ((bytesRead = read(proc.fd[0], data, sizeof(data)))) {
             pos = 0;
