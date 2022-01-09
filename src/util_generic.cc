@@ -65,11 +65,14 @@ s_pathSplit pathSplit(string path) {
 }
 
 
-string MD5file(string filename) {
+string MD5file(string filename, bool quiet) {
     FILE *inputFile;
 
     if ((inputFile = fopen(filename.c_str(), "rb")) != NULL) {
-        cerr << "MD5 of " << filename << endl;
+        string message = "MD5 " + filename + "...";
+        if (!quiet)
+            cout << message << flush;
+
         unsigned char data[65536];
         int bytesRead;
         MD5_CTX md5Context;
@@ -85,6 +88,13 @@ string MD5file(string filename) {
         char tempStr[MD5_DIGEST_LENGTH * 2];
         for (int i = 0; i < MD5_DIGEST_LENGTH; i++)
             sprintf(tempStr+(2*i), "%02x", md5Result[i]);
+
+        if (!quiet) {
+            string back = string(message.length(), '\b');
+            string blank = string(message.length() , ' ');
+            cout << back << blank << back << flush;
+        }
+
         return(tempStr);
     }
 

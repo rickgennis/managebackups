@@ -45,7 +45,6 @@ void display1LineForConfig(BackupConfig& config) {
     int saved = floor((1 - double(bytesUsed / (bytesUsed + bytesSaved))) * 100 + 0.5);
 
     auto firstEntry = config.cache.indexByFilename.begin();
-    ++firstEntry;
     auto lastEntry = config.cache.indexByFilename.end();
     --lastEntry;
     
@@ -71,7 +70,7 @@ void display1LineForConfig(BackupConfig& config) {
             seconds2hms(last_it->second.duration).c_str(),
             rawSize,
             saved,
-            string(timeDiff(first_it->second.mtime) + BOLDBLUE + " -> " + RESET + timeDiff(last_it->second.mtime).c_str()).c_str());
+            string(timeDiff(first_it->second.name_mtime) + BOLDBLUE + " -> " + RESET + timeDiff(last_it->second.mtime).c_str()).c_str());
             cout << result << "\n";
     }
 }
@@ -137,6 +136,20 @@ void displayStatsForConfig(BackupConfig& config) {
                 cout << endl << BOLDBLUE << onevarsprintf("%-" + to_string(fnameLen+1) + "s  ", monthYear) <<
                     "Size    Duration  Type  Lnks  Age" << RESET << endl;
 
+
+            // file age can be calculated from the mtime which is an accurate number returned by
+            // stat(), but in the case of multiple backups hardlinked together (due to identical content)
+            // will actually be the mtime of the most recent of those files
+            //      OR
+            // file age can be calculaed from name_mtime, which is based on the date in the filename rounded
+            // to midnight.
+            //
+            // precisetime (prectime) says use the filesystem mtime if the number of hard links is 1 (i.e.
+            // only one backup using that inode and mtime) or if the file is less than a day old.  then we
+            // get precision.  if more than one file shares that inode (links > 1) and the file older than
+            // today, revert to the midnight rounded date derived from the filename.
+            bool prectime = raw_it->second.links == 1 || !raw_it->second.day_age;
+
             // format the detail for output
             char result[1000];
             sprintf(result, 
@@ -155,7 +168,7 @@ void displayStatsForConfig(BackupConfig& config) {
                         raw_it->second.filename.c_str(), approximate(raw_it->second.size).c_str(), 
                         seconds2hms(raw_it->second.duration).c_str(),
                         raw_it->second.date_day == 1 ? "Mnth" : raw_it->second.dow == 0 ? "Week" : "Day",
-                        raw_it->second.links, timeDiff(raw_it->second.mtime).c_str());
+                        raw_it->second.links, timeDiff(prectime ? raw_it->second.mtime : raw_it->second.name_mtime).c_str());
 
             // if there's more than 1 file with this MD5 then color code it as a set; otherwise no color
             if (config.cache.getByMD5(raw_it->second.md5).size() > 1) {
@@ -204,7 +217,7 @@ void displayStats(ConfigManager& configManager) {
 
 
 void display1LineStats(ConfigManager& configManager) {
-    cout << BOLDBLUE << "Backup                                    Size             Duration  Num  Saved  Age\n" << RESET;
+    cout << BOLDBLUE << "Most Recent Backup                        Size (Total)     Duration  Num  Saved  Age Range\n" << RESET;
     if (configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp)
         display1LineForConfig(configManager.configs[configManager.activeConfig]);
     else {

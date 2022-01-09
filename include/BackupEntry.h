@@ -32,6 +32,7 @@ class BackupEntry {
         int             date_month;
         int             date_day;
         int             date_year;
+        time_t          name_mtime;
 
     BackupEntry();
 

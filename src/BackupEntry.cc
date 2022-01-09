@@ -16,32 +16,25 @@ using namespace std;
 
 BackupEntry::BackupEntry() {
     dateRE = Pcre(DATE_REGEX);
-    md5 = "";
-    filename = "";
-    links = mtime = size = inode = day_age = month_age = dow = date_day = duration = current = 0;
+    md5 = filename = "";
+    links = mtime = size = inode = day_age = month_age = dow = date_day = duration = current = name_mtime = 0;
 }
 
 string BackupEntry::class2string() {
     return("[" + filename + "]," + md5 + "," + to_string(links) + "," + to_string(mtime) + "," +
-            to_string(size) + "," + to_string(inode) + "," + to_string(day_age) + "," +
-            to_string(month_age) + "," + to_string(dow) + "," + to_string(date_day) + "," + to_string(duration));
+            to_string(size) + "," + to_string(duration));
 }
 
 void BackupEntry::string2class(string data) {
-    Pcre regEx("\\[(.+)\\],([a-f0-9]{32}),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)");
+    Pcre regEx("\\[(.+)\\],([a-f0-9]{32}),(\\d+),(\\d+),(\\d+),(\\d+)");
 
-    if (regEx.search(data) && regEx.matches() > 9) {
+    if (regEx.search(data) && regEx.matches() > 4) {
         filename = regEx.get_match(0);
         md5 = regEx.get_match(1);
         links = stoi(regEx.get_match(2));
         mtime = stoi(regEx.get_match(3));
         size = stoi(regEx.get_match(4));
-        inode = stoi(regEx.get_match(5));
-        day_age = stoi(regEx.get_match(6));
-        month_age = stoi(regEx.get_match(7));
-        dow = stoi(regEx.get_match(8));
-        date_day = stoi(regEx.get_match(9));
-        duration = stoi(regEx.get_match(10));
+        duration = stoi(regEx.get_match(5));
     }
     else
         log("unable to parse cache line (" + data + ")");
@@ -77,12 +70,11 @@ BackupEntry* BackupEntry::updateAges(time_t refTime) {
 
     auto fileMTime = mktime(&fileTime);
 
+    name_mtime = fileMTime;
     day_age = floor((refTime - fileMTime) / SECS_PER_DAY);
     month_age = floor(day_age / DAYS_PER_MONTH);
 
     auto pFileTime = localtime(&fileMTime);
-
-    // these never change but let's set them here since we already looked them up
     dow = pFileTime->tm_wday;
     date_day = pFileTime->tm_mday;
 
@@ -91,5 +83,5 @@ BackupEntry* BackupEntry::updateAges(time_t refTime) {
 
 
 void BackupEntry::calculateMD5() {
-    md5 = MD5file(filename);
+    md5 = MD5file(filename, !NOTQUIET);
 }

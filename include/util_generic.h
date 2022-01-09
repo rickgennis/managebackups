@@ -22,7 +22,7 @@ s_pathSplit pathSplit(string path);
 
 string addSlash(string str);
 
-string MD5file(string filename);
+string MD5file(string filename, bool quiet = 0);
 string MD5string(string data);
 
 string onevarsprintf(string format, string data);
