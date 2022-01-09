@@ -2,6 +2,11 @@
 #ifndef PIPE_EXEC_H
 #define PIPE_EXEC_H
 
+#include <string>
+#include <vector>
+
+using namespace std;
+
 
 typedef struct ProcDetail {
     int fd[2];
@@ -19,10 +24,14 @@ typedef struct ProcDetail {
 
 class PipeExec {
     vector<procDetail> procs;
+    int numProcs;
 
     public:
         PipeExec(string cmd);
-        procDetail execute(string title);    // title is for error logging as a subdirectory name
+        ~PipeExec();
+
+        int executeWrite(string title);
+        int executeRead(string title);    // title is for error logging as a subdirectory name
         bool execute2file(string toFile, string title);
         void dump();
 };
