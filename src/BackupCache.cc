@@ -37,6 +37,9 @@ BackupCache::~BackupCache() {
     void BackupCache::saveCache() {
         ofstream cacheFile;
 
+        if (!rawData.size() || !cacheFilename.length())
+            return;
+
         cacheFile.open(cacheFilename);
         if (cacheFile.is_open()) {
 
@@ -71,6 +74,7 @@ BackupCache::~BackupCache() {
             }
 
             cacheFile.close();
+            DEBUG(2, "loaded cache from " << cacheFilename);
         }
         else
             log("unable to read cache file " + cacheFilename);
@@ -152,11 +156,11 @@ BackupCache::~BackupCache() {
                     // if the old one is in the index, remove it
                     if (md5_it != indexByMD5.end()) {
                         md5_it->second.erase(index);
-                        DEBUG(4, "removed reference from old md5 (" << oldMD5 << ") to " << backupEntry.filename);
+                        DEBUG(4, "(" << markCurrent << ") removed reference from old md5 (" << oldMD5 << ") to " << backupEntry.filename);
 
                         if (!md5_it->second.size()) {
                             indexByMD5.erase(oldMD5);
-                            DEBUG(4, "dropping old md5 (" << oldMD5 << ") as " << backupEntry.filename << " was the last reference");
+                            DEBUG(4, "(" << markCurrent << ") dropping old md5 " << oldMD5 << ",  as " << backupEntry.filename << " was the last reference");
                         }
                     }
 

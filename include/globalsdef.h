@@ -19,7 +19,7 @@
 // define commandline options
 #define CLI_TITLE "title"
 #define CLI_DIR "directory"
-#define CLI_FILE "filename"
+#define CLI_FILE "file"
 #define CLI_COMMAND "command"
 #define CLI_DAYS "days"
 #define CLI_WEEKS "weeks"
@@ -35,7 +35,7 @@
 #define CLI_VERBOSE "verbose"
 #define CLI_NOCOLOR "nocolor"
 #define CLI_STATS1 "1"
-#define CLI_STATS2 "2"
+#define CLI_STATS2 "0"
 #define CLI_MAXLINKS "maxlinks"
 #define CLI_PRUNE "prune"
 #define CLI_NOPRUNE "noprune"
@@ -77,6 +77,7 @@ struct global_vars {
     int minBackupSize;
     cxxopts::ParseResult cli;
     bool color;
+    bool stats;
 };
 
 #endif

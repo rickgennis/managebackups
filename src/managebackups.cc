@@ -59,10 +59,8 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                     // the inode & age info. 
                     BackupEntry *pCacheEntry;
                     if ((pCacheEntry = cache.getByFilename(fullFilename)) != NULL) {
-                        if (pCacheEntry->md5.length() && 
-                           pCacheEntry->mtime &&
-                           pCacheEntry->mtime == statData.st_mtime &&
-                           pCacheEntry->size == statData.st_size) {
+                        if (pCacheEntry->md5.length() && pCacheEntry->size == statData.st_size &&
+                           pCacheEntry->mtime && pCacheEntry->mtime == statData.st_mtime) {
 
                             pCacheEntry->links = statData.st_nlink;
                             pCacheEntry->inode = statData.st_ino;
@@ -124,7 +122,6 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     BackupConfig* currentConf = &tempConfig; 
     bool bSave = GLOBALS.cli.count(CLI_SAVE);
     bool bTitle = GLOBALS.cli.count(CLI_TITLE);
-    bool bStats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2);
 
     // if --title is specified on the command line set the active config
     if (bTitle) {
@@ -132,7 +129,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
             configManager.activeConfig = configNumber - 1;
             currentConf = &configManager.configs[configManager.activeConfig];
         }
-        else if (!bSave && bStats) {
+        else if (!bSave && GLOBALS.stats) {
             cerr << RED << "error: title not found; try -1 or -2 with no title to see all backups" << RESET << endl;
             exit(1);
         }
@@ -141,12 +138,20 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     }
     else {
         if (bSave) {
-            cerr << RED << "error: --title must be specified in order to --save settings" << RESET << endl;
+            cerr << RED << "error: --title must be specified in order to --save settings.\n";
+            cerr << "Once saved --title becomes a macro for all settings specified with the --save.\n";
+            cerr << "For example, these two commands would do the same things:\n\n";
+            cerr << "\tmanagebackups --title myback --directory /etc --file etc.tgz --daily 5 --save\n";
+            cerr << "\tmanagebackups --title myback\n\n"; 
+            cerr << "Options specified with a title that's aleady been saved will override that\n";
+            cerr << "option for this run only (unless --save is given again)." << RESET << endl;
             exit(1);
         }
 
-        if (bStats)
+        if (GLOBALS.stats)
             configManager.loadAllConfigCaches();
+        else
+            currentConf->loadConfigsCache();
     }
 
     // if any other settings are given on the command line, incorporate them into the selected config.
@@ -203,7 +208,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
         currentConf = &configManager.configs[configManager.activeConfig];
     }
 
-    if (!bStats && !currentConf->settings[sDirectory].value.length()) {
+    if (!GLOBALS.stats && !currentConf->settings[sDirectory].value.length()) {
         cerr << RED << "error: --directory is required" << RESET << endl;
         exit(1);
     }
@@ -254,7 +259,7 @@ void pruneBackups(BackupConfig& config) {
                     " backup" + s(fb) + " within the last " + to_string(fd) + " day" + s(fd);
             
             cerr << RED << "warning: " << message << RESET << endl;
-            log("[" + config.settings[sTitle].value + "] " + message);
+            log(config.ifTitle() + " " + message);
             return;
         }
     }
@@ -296,7 +301,7 @@ void pruneBackups(BackupConfig& config) {
             }
 
             if (GLOBALS.cli.count(CLI_TEST))
-                cout << YELLOW << "[" << config.settings[sTitle].value << "] TESTMODE: would have deleted " <<
+                cout << YELLOW << config.ifTitle() << " TESTMODE: would have deleted " <<
                     raw_it->second.filename << " (age=" + to_string(filenameAge) << ", dow=" + dw(filenameDOW) <<
                     ")" << RESET << endl;
             else {
@@ -304,7 +309,7 @@ void pruneBackups(BackupConfig& config) {
                 // delete the file and remove it from all caches
                 if (!unlink(raw_it->second.filename.c_str())) {
                     NOTQUIET && cout << "removed " << raw_it->second.filename << endl; 
-                    log("[" + config.settings[sTitle].value + "] removing " + raw_it->second.filename + 
+                    log(config.ifTitle() + " removing " + raw_it->second.filename + 
                         " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")");
 
                     changedMD5s.insert(raw_it->second.md5);
@@ -425,12 +430,12 @@ void updateLinks(BackupConfig& config) {
                     // relink the file to the reference file
                     string detail = raw_it->second.filename + " <-> " + referenceFile->filename;
                     if (GLOBALS.cli.count(CLI_TEST))
-                        cout << YELLOW << "[" << config.settings[sTitle].value << "] TESTMODE: would have linked " << detail << RESET << endl;
+                        cout << YELLOW << config.ifTitle() << " TESTMODE: would have linked " << detail << RESET << endl;
                     else {
                         if (!unlink(raw_it->second.filename.c_str())) {
                             if (!link(referenceFile->filename.c_str(), raw_it->second.filename.c_str())) {
                                 cout << "linked " << detail << endl;
-                                log("[" + config.settings[sTitle].value + "] linked " + detail);
+                                log(config.ifTitle() + " linked " + detail);
 
                                 config.cache.reStatMD5(md5_it->first);
 
@@ -441,13 +446,13 @@ void updateLinks(BackupConfig& config) {
                             }
                             else {
                                 cerr << RED << "error: unable to link " << detail << " (" << strerror(errno) << ")" << RESET << endl;
-                                log("[" + config.settings[sTitle].value + "] error: unable to link " + detail);
+                                log(config.ifTitle() + " error: unable to link " + detail);
                             }
                         }
                         else {
                             cerr << RED << "error: unable to remove" << raw_it->second.filename << " in prep to link it (" 
                                 << strerror(errno) << ")" << RESET << endl;
-                            log("[" + config.settings[sTitle].value + "] error: unable to remove " + raw_it->second.filename + 
+                            log(config.ifTitle() + " error: unable to remove " + raw_it->second.filename + 
                                 " in prep to link it (" + strerror(errno) + ")");
                         }
                     }
@@ -463,9 +468,10 @@ void performBackup(BackupConfig& config) {
     bool incTime = GLOBALS.cli.count(CLI_TIME);
     string setFname = config.settings[sBackupFilename].value;
     string setDir = config.settings[sDirectory].value;
+    string setCommand = config.settings[sBackupCommand].value;
     string tempExtension = ".tmp." + to_string(GLOBALS.pid);
 
-    if (!setFname.length() || GLOBALS.cli.count(CLI_NOBACKUP))
+    if (!setFname.length() || GLOBALS.cli.count(CLI_NOBACKUP) || !setCommand.length())
         return;
 
     // setup path names and filenames
@@ -489,7 +495,7 @@ void performBackup(BackupConfig& config) {
         backupFilename = fullDirectory +  setFname + fnameInsert;
 
     if (GLOBALS.cli.count(CLI_TEST)) {
-        cout << YELLOW << "[" << config.settings[sTitle].value << "] TESTMODE: would have begun backup to " <<
+        cout << YELLOW << config.ifTitle() << " TESTMODE: would have begun backup to " <<
             backupFilename << RESET << endl;
         return;
     }
@@ -497,25 +503,26 @@ void performBackup(BackupConfig& config) {
     // make sure the destination directory exists
     mkdirp(fullDirectory);
 
-    log("[" + config.settings[sTitle].value + "] starting backup to " + backupFilename);
+    log(config.ifTitle() + " starting backup to " + backupFilename);
 
     // note start time
     time_t startTime;
     time(&startTime);
 
     // begin backing up
-    PipeExec proc(config.settings[sBackupCommand].value);
+    PipeExec proc(setCommand);
     proc.execute2file(backupFilename + tempExtension);
 
     // note finish time
     time_t finishTime;
     time(&finishTime);
 
+    // determine results
     struct stat statData;
     if (!stat(string(backupFilename + tempExtension).c_str(), &statData)) {
         if (statData.st_size >= GLOBALS.minBackupSize) {
             if (!rename(string(backupFilename + tempExtension).c_str(), backupFilename.c_str())) {
-                log("[" + config.settings[sTitle].value + "] completed backup to " + backupFilename + " in " + 
+                log(config.ifTitle() + " completed backup of " + backupFilename + " in " + 
                         timeDiff(startTime, finishTime, 3));
                 NOTQUIET && cout << "\t• successfully backed up to " << backupFilename << endl;
 
@@ -533,18 +540,18 @@ void performBackup(BackupConfig& config) {
                 config.cache.reStatMD5(cacheEntry.md5);
             }
             else {
-                log("[" + config.settings[sTitle].value + "] backup failed, unable to rename temp file to " + backupFilename);
+                log(config.ifTitle() + " backup failed, unable to rename temp file to " + backupFilename);
                 unlink(string(backupFilename + tempExtension).c_str());
                 NOTQUIET && cout << "\t" << RED << "• backup failed to " << backupFilename << RESET << endl;
             }
         }
         else {
-            log("[" + config.settings[sTitle].value + "] backup failed to " + backupFilename + " (insufficient output/size)");
+            log(config.ifTitle() + " backup failed to " + backupFilename + " (insufficient output/size)");
             NOTQUIET && cout << "\t" << RED << "• backup failed to " << backupFilename << " (insufficient output/size)" << RESET << endl;
         }
     }
     else {
-        log("[" + config.settings[sTitle].value + "] backup command failed to generate any output");
+        log(config.ifTitle() + " backup command failed to generate any output");
         NOTQUIET && cout << "\t" << RED << "• backup failed to generate any output" << RESET << endl;
     }
 }
@@ -554,7 +561,7 @@ int main(int argc, char *argv[]) {
     GLOBALS.statsCount = 0;
     GLOBALS.md5Count = 0;
     GLOBALS.pid = getpid();
-    GLOBALS.minBackupSize = 1500;
+    GLOBALS.minBackupSize = 500;
 
     time(&GLOBALS.startupTime);
     openlog("managebackups", LOG_PID | LOG_NDELAY, LOG_LOCAL1);
@@ -593,6 +600,7 @@ int main(int argc, char *argv[]) {
         GLOBALS.cli = options.parse(argc, argv);
         GLOBALS.debugLevel = GLOBALS.cli.count(CLI_VERBOSE);
         GLOBALS.color = !GLOBALS.cli[CLI_NOCOLOR].as<bool>();
+        GLOBALS.stats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2);
     }
     catch (cxxopts::OptionParseException& e) {
         cerr << "managebackups: " << e.what() << endl;
@@ -612,13 +620,23 @@ int main(int argc, char *argv[]) {
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager);
 
-    if (GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2)) {
-        displayStats(configManager);
+    // if displaying stats and --title hasn't been specified (or matched successfully)
+    // then rescan all configs;  otherwise just scan the --title config
+    if (GLOBALS.stats && currentConfig->temp) {
+        for (auto cfg_it = configManager.configs.begin(); cfg_it != configManager.configs.end(); ++cfg_it) {
+            scanConfigToCache(*cfg_it);
+            cfg_it->cache.saveCache();
+        }
+    }
+    else
+        scanConfigToCache(*currentConfig);
+
+    if (GLOBALS.stats) {
+        GLOBALS.cli.count(CLI_STATS1) ? displayStats(configManager) : display1LineStats(configManager);
         exit(0);
     }
 
-    scanConfigToCache(*currentConfig);
-    pruneBackups(*currentConfig);           // only run after a scan
+    pruneBackups(*currentConfig);
     updateLinks(*currentConfig);
     performBackup(*currentConfig);
 

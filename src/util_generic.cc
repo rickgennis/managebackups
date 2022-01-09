@@ -42,10 +42,34 @@ string addSlash(string str) {
 }
 
 
+s_pathSplit pathSplit(string path) {
+    s_pathSplit s;
+
+    auto pos = path.rfind("/");
+    s.file = path.substr(pos + 1);
+    s.dir = path.substr(0, pos);
+
+    if (!pos)
+        s.dir = "/";
+
+    if (pos == string::npos) {
+        if (s.file == "..") {
+            s.dir = "..";
+            s.file = ".";
+        }
+        else 
+            s.dir = ".";
+    }
+
+    return s;
+}
+
+
 string MD5file(string filename) {
     FILE *inputFile;
 
     if ((inputFile = fopen(filename.c_str(), "rb")) != NULL) {
+        cerr << "MD5 of " << filename << endl;
         unsigned char data[65536];
         int bytesRead;
         MD5_CTX md5Context;

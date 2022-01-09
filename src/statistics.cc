@@ -2,6 +2,7 @@
 #include <set>
 #include <vector>
 #include <algorithm>
+#include <libgen.h>
 
 #include "statistics.h"
 #include "util_generic.h"
@@ -10,11 +11,76 @@
 
 using namespace std;
 
+string mtime2MY(time_t mtime) {
+    char timeBuf[200];
+    struct tm *tM = localtime(&mtime);
+    struct tm fileTime = *tM;
+    strftime(timeBuf, 200, "%B %Y", &fileTime);
+    return(timeBuf);
+}
+
+
+void display1LineForConfig(BackupConfig& config) {
+    double bytesUsed = 0;
+    double bytesSaved = 0;
+    set<unsigned long> countedInode;
+
+    unsigned long rawSize = config.cache.rawData.size();
+    if (rawSize < 1)
+        return;
+
+    // calcuclate stats from the entire list of backups
+    for (auto raw_it = config.cache.rawData.begin(); raw_it != config.cache.rawData.end(); ++raw_it) {
+
+        // calculate total bytes used and saved
+        if (countedInode.find(raw_it->second.inode) == countedInode.end()) {
+            countedInode.insert(raw_it->second.inode);
+            bytesUsed += raw_it->second.size;
+        }
+        else
+            bytesSaved += raw_it->second.size;
+    }
+
+    // calcuclate percentage saved
+    int saved = floor((1 - double(bytesUsed / (bytesUsed + bytesSaved))) * 100 + 0.5);
+
+    auto firstEntry = config.cache.indexByFilename.begin();
+    ++firstEntry;
+    auto lastEntry = config.cache.indexByFilename.end();
+    --lastEntry;
+    
+    auto first_it = config.cache.rawData.find(firstEntry->second);
+    auto last_it = config.cache.rawData.find(lastEntry->second);
+    if (last_it != config.cache.rawData.end() && first_it != config.cache.rawData.end()) {
+        char result[1000];
+        sprintf(result,
+            // filename
+            string(string("%-") + to_string(40) + "s  " +
+            // size
+            "%-15s  " +
+            // duration
+            "%s  " +
+            // number 
+            "%-4u  " +
+            // saved
+            "%3i%%  "+
+            // content age
+            "%s").c_str(),
+            pathSplit(last_it->second.filename).file.c_str(), (approximate(last_it->second.size) + " (" +
+            approximate(bytesUsed) + ")").c_str(),
+            seconds2hms(last_it->second.duration).c_str(),
+            rawSize,
+            saved,
+            string(timeDiff(first_it->second.mtime) + BOLDBLUE + " -> " + RESET + timeDiff(last_it->second.mtime).c_str()).c_str());
+            cout << result << "\n";
+    }
+}
+
 
 void displayStatsForConfig(BackupConfig& config) {
     unsigned long fnameLen = 0;
-    double totalBytesUsed = 0;
-    double totalBytesSaved = 0;
+    double bytesUsed = 0;
+    double bytesSaved = 0;
     set<unsigned long> countedInode;
 
     // calcuclate stats from the entire list of backups
@@ -26,14 +92,14 @@ void displayStatsForConfig(BackupConfig& config) {
         // calculate total bytes used and saved
         if (countedInode.find(raw_it->second.inode) == countedInode.end()) {
             countedInode.insert(raw_it->second.inode);
-            totalBytesUsed += raw_it->second.size;
+            bytesUsed += raw_it->second.size;
         }
         else
-            totalBytesSaved += raw_it->second.size;
+            bytesSaved += raw_it->second.size;
     }
 
     // calcuclate percentage saved
-    int saved = floor((1 - double(totalBytesUsed / (totalBytesUsed + totalBytesSaved))) * 100 + 0.5);
+    int saved = floor((1 - double(bytesUsed / (bytesUsed + bytesSaved))) * 100 + 0.5);
 
     // make a pretty line
     char dash[5];
@@ -49,7 +115,7 @@ void displayStatsForConfig(BackupConfig& config) {
     if (config.settings[sTitle].value.length()) cout << "Title: " << config.settings[sTitle].value << "\n";
     cout << "Directory: " << config.settings[sDirectory].value << " (" << config.settings[sBackupFilename].value << ")\n";
     cout << rawSize << " backup" << s(rawSize) << ", " << md5Size << " unique" << s(md5Size) << "\n";
-    cout << approximate(totalBytesUsed + totalBytesSaved) << " using " << approximate(totalBytesUsed) << " on disk (saved " << saved << "%)\n";
+    cout << approximate(bytesUsed + bytesSaved) << " using " << approximate(bytesUsed) << " on disk (saved " << saved << "%)\n";
     cout << line << endl;
 
     string lastMonthYear;
@@ -64,13 +130,7 @@ void displayStatsForConfig(BackupConfig& config) {
         // lookup the the raw data detail
         auto raw_it = config.cache.rawData.find(backup_it->second);
         if (raw_it != config.cache.rawData.end()) {
-
-            // extract the month and year from the mtime
-            char timeBuf[200];
-            struct tm *tM = localtime(&raw_it->second.mtime);
-            struct tm fileTime = *tM;
-            strftime(timeBuf, 200, "%B %Y", &fileTime);
-            string monthYear = timeBuf;
+            string monthYear = mtime2MY(raw_it->second.mtime);
 
             // print the month header
             if (lastMonthYear != monthYear) 
@@ -138,6 +198,19 @@ void displayStats(ConfigManager& configManager) {
                 displayStatsForConfig(*cfg_it);
                 previous = true;
             }
+        }
+    }
+}
+
+
+void display1LineStats(ConfigManager& configManager) {
+    cout << BOLDBLUE << "Backup                                    Size             Duration  Num  Saved  Age\n" << RESET;
+    if (configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp)
+        display1LineForConfig(configManager.configs[configManager.activeConfig]);
+    else {
+        for (auto cfg_it = configManager.configs.begin(); cfg_it != configManager.configs.end(); ++cfg_it) {
+            if (!cfg_it->temp)
+                display1LineForConfig(*cfg_it);
         }
     }
 }

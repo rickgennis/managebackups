@@ -210,6 +210,10 @@ void BackupConfig::loadConfigsCache() {
 }
 
 
+string BackupConfig::ifTitle() {
+    return (settings[sTitle].value.length() ? string("[") + settings[sTitle].value + "]" : "");
+}
+
 void BackupConfig::fullDump() {
     for (auto set_it = settings.begin(); set_it != settings.end(); ++set_it)
         cout << "setting " << set_it->display_name << ": " << set_it->value << endl;

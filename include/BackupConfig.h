@@ -32,6 +32,7 @@ class BackupConfig {
         bool loadConfig(string filename);
         void loadConfigsCache();
 
+        string ifTitle();
         unsigned int removeEmptyDirs(string dir = "");
 };
 

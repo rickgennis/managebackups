@@ -13,6 +13,13 @@ string s(int number);
 
 void log(string message);
 
+struct s_pathSplit {
+    string dir;
+    string file;
+};
+
+s_pathSplit pathSplit(string path);
+
 string addSlash(string str);
 
 string MD5file(string filename);
