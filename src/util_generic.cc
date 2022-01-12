@@ -367,7 +367,7 @@ vector<string> expandWildcardSub(string fileSpec, string baseDir, int index) {
                         }
                     }
                     else {
-                        // unable to stat()
+                        log("expandWildcard: unable to stat " + baseDir + "/" + c_dirEntry->d_name);
                     }
                 }
             }
@@ -415,4 +415,37 @@ void strReplaceAll(string& s, string const& toReplace, string const& replaceWith
     oss << s.substr(prevPos);
     s = oss.str();
 }
+
+
+string locateBinary(string app) {
+    string tempStr;
+    string path = getenv("PATH");
+    stringstream tokenizer(path);
+    vector<string> parts;
+
+    if (app.find("/") == string::npos) {
+        while (getline(tokenizer, tempStr, ':'))
+            parts.push_back(tempStr);
+
+        for (auto it: parts) {
+            string binary = string(it) + "/" + app;
+            if (!access(binary.c_str(), X_OK))
+                return binary;
+        }
+    }
+    else
+        if (!access(app.c_str(), X_OK))
+            return(app);
+
+    return "";
+}
+
+
+bool str2bool(string text) {
+    Pcre regTrue("^\\s*(t|true|y|yes|1)\\s*$", "i");
+
+    return(regTrue.search(text));
+}
+
+
 

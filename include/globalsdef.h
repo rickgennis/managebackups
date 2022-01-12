@@ -5,6 +5,8 @@
 #include "cxxopts.hpp"
 
 #define CONF_DIR "/etc/managebackups"
+#define TMP_OUTPUT_DIR "/tmp/managebackups_output"
+
 
 #define DEBUG(x,y) (GLOBALS.cli.count(CLI_VERBOSE) >= x) && cout << GREEN << __FUNCTION__ << "\t" << y << RESET << endl
 #define NOTQUIET (!GLOBALS.cli.count(CLI_QUIET))
@@ -17,7 +19,7 @@
  * can be used in both (--days & days:). */
  
 // define commandline options
-#define CLI_TITLE "title"
+#define CLI_PROFILE "profile"
 #define CLI_DIR "directory"
 #define CLI_FILE "file"
 #define CLI_COMMAND "command"
@@ -28,8 +30,8 @@
 #define CLI_FS_BACKUPS "fs_backups"
 #define CLI_FS_DAYS "fs_days"
 #define CLI_FS_FP "fp"
-#define CLI_COPYTO "copyto"
-#define CLI_SFTPTO "sftpto"
+#define CLI_SCPTO "scp"
+#define CLI_SFTPTO "sftp"
 #define CLI_NOTIFY "notify"
 #define CLI_SAVE "save"
 #define CLI_VERBOSE "verbose"
@@ -49,11 +51,11 @@
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
 #define RE_COMMENT "((?:\\s*#|//).*)*$"
 #define RE_BLANK "^((?:\\s*#|//).*)*$"
-#define RE_TITLE "(title)"
+#define RE_PROFILE "(profile)"
 #define RE_DIR "(dir|directory)"
 #define RE_FILE "(file|filename)"
 #define RE_CMD "(command|cmd)"
-#define RE_CP "(copy|copyto|copy_to|cp)"
+#define RE_SCP "(scp|scp_to|scpto)"
 #define RE_SFTP "(sftp|sftp_to|sftpto)"
 #define RE_DAYS "(daily|dailies|days)"
 #define RE_WEEKS "(weekly|weeklies|weeks)"
@@ -65,6 +67,10 @@
 #define RE_PRUNE "(prune)"
 #define RE_MAXLINKS "(maxlinks)"
 #define RE_TIME "(time)"
+
+#define INTERP_FULLDIR "{fulldir}"
+#define INTERP_SUBDIR "{subdir}"
+#define INTERP_FILE "{file}"
 
 enum helpType { hDefaults, hOptions, hExamples, hSyntax };
 

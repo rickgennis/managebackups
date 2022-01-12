@@ -73,7 +73,7 @@ void PipeExec::dump() {
 int PipeExec::executeWrite(string title) {
     procs.insert(procs.begin(), procDetail("head"));
 
-    string errorFilename = "/tmp/managebackups_output/" + title + "/";
+    string errorFilename = TMP_OUTPUT_DIR + title + "/";
     mkdirp(errorFilename.c_str());
 
     int commandIdx = -1;
@@ -154,7 +154,7 @@ int PipeExec::executeWrite(string title) {
 int PipeExec::executeRead(string title) {
     procs.insert(procs.begin(), procDetail("head"));
 
-    string errorFilename = "/tmp/managebackups_output/" + title + "/";
+    string errorFilename = TMP_OUTPUT_DIR + title + "/";
     mkdirp(errorFilename.c_str());
 
     int commandIdx = -1;

@@ -22,7 +22,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
 
     // define settings and their defaults
     // order of these inserts matter because they're accessed by position via the SetSpecifier enum
-    settings.insert(settings.end(), Setting(CLI_TITLE, RE_TITLE, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_PROFILE, RE_PROFILE, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_DIR, RE_DIR, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_FILE, RE_FILE, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_COMMAND, RE_CMD, STRING, ""));
@@ -32,7 +32,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_YEARS, RE_YEARS, INT, "2"));
     settings.insert(settings.end(), Setting(CLI_FS_BACKUPS, RE_FSBACKS, INT, "0"));
     settings.insert(settings.end(), Setting(CLI_FS_DAYS, RE_FSDAYS, INT, "0"));
-    settings.insert(settings.end(), Setting(CLI_COPYTO, RE_CP, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_SCPTO, RE_SCP, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_SFTPTO, RE_SFTP, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_PRUNE, RE_PRUNE, BOOL, "0"));
     settings.insert(settings.end(), Setting(CLI_NOTIFY, RE_NOTIFY, STRING, ""));

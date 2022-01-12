@@ -2,6 +2,7 @@
 #include "syslog.h"
 #include "unistd.h"
 #include <sys/stat.h>
+#include <stdlib.h>
 #include <pcre++.h>
 #include <iostream>
 #include <filesystem>
@@ -117,20 +118,20 @@ void scanConfigToCache(BackupConfig& config) {
 
 
 BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
-    string title;
+    string profile;
     BackupConfig tempConfig(true);
     BackupConfig* currentConf = &tempConfig; 
     bool bSave = GLOBALS.cli.count(CLI_SAVE);
-    bool bTitle = GLOBALS.cli.count(CLI_TITLE);
+    bool bTitle = GLOBALS.cli.count(CLI_PROFILE);
 
-    // if --title is specified on the command line set the active config
+    // if --profile is specified on the command line set the active config
     if (bTitle) {
-        if (int configNumber = configManager.config(GLOBALS.cli[CLI_TITLE].as<string>())) {
+        if (int configNumber = configManager.config(GLOBALS.cli[CLI_PROFILE].as<string>())) {
             configManager.activeConfig = configNumber - 1;
             currentConf = &configManager.configs[configManager.activeConfig];
         }
         else if (!bSave && GLOBALS.stats) {
-            cerr << RED << "error: title not found; try -1 or -2 with no title to see all backups" << RESET << endl;
+            cerr << RED << "error: profile not found; try -1 or -2 with no profile to see all backups" << RESET << endl;
             exit(1);
         }
 
@@ -138,12 +139,12 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     }
     else {
         if (bSave) {
-            cerr << RED << "error: --title must be specified in order to --save settings.\n";
-            cerr << "Once saved --title becomes a macro for all settings specified with the --save.\n";
+            cerr << RED << "error: --profile must be specified in order to --save settings.\n";
+            cerr << "Once saved --profile becomes a macro for all settings specified with the --save.\n";
             cerr << "For example, these two commands would do the same things:\n\n";
-            cerr << "\tmanagebackups --title myback --directory /etc --file etc.tgz --daily 5 --save\n";
-            cerr << "\tmanagebackups --title myback\n\n"; 
-            cerr << "Options specified with a title that's aleady been saved will override that\n";
+            cerr << "\tmanagebackups --profile myback --directory /etc --file etc.tgz --daily 5 --save\n";
+            cerr << "\tmanagebackups --profile myback\n\n"; 
+            cerr << "Options specified with a profile that's aleady been saved will override that\n";
             cerr << "option for this run only (unless --save is given again)." << RESET << endl;
             exit(1);
         }
@@ -155,7 +156,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     }
 
     // if any other settings are given on the command line, incorporate them into the selected config.
-    // that config will be the one found from --title above (if any), or a temp config comprised only of defaults
+    // that config will be the one found from --profile above (if any), or a temp config comprised only of defaults
     for (auto setting_it = currentConf->settings.begin(); setting_it != currentConf->settings.end(); ++setting_it) 
         if (GLOBALS.cli.count(setting_it->display_name)) {
             switch (setting_it->data_type) {
@@ -216,12 +217,10 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
 
 
 void pruneBackups(BackupConfig& config) {
-    Pcre regEnabled("^(t|true|y|yes|1)$", "i");
-
     if (GLOBALS.cli.count(CLI_NOPRUNE))
         return;
 
-    if (!config.settings[sPruneLive].value.length() || !regEnabled.search(config.settings[sPruneLive].value)) {
+    if (!config.settings[sPruneLive].value.length() && !GLOBALS.cli.count(CLI_NOPRUNE) && !GLOBALS.cli.count(CLI_QUIET)) {
         cout << RED << "warning: While a core feature, managebackups doesn't prune old backups" << endl;
         cout << "until specifically enabled.  Use --prune to enable pruning.  Use --prune" << endl;
         cout << "and --save to make it the default behavior for this backup configuration." << endl;
@@ -459,9 +458,106 @@ void updateLinks(BackupConfig& config) {
 }
 
 
+string interpolate(string command, string subDir, string fullDirectory, string basicFilename) {
+    size_t pos;
+
+    while ((pos = command.find(INTERP_SUBDIR)) != string::npos)
+        command.replace(pos, string(INTERP_SUBDIR).length(), subDir);
+
+    while ((pos = command.find(INTERP_FULLDIR)) != string::npos)
+        command.replace(pos, string(INTERP_FULLDIR).length(), fullDirectory);
+
+    while ((pos = command.find(INTERP_FILE)) != string::npos)
+        command.replace(pos, string(INTERP_FILE).length(), basicFilename);
+
+    return(command);
+}
+ 
+
+void sCpBackup(BackupConfig& config, string backupFilename, string subDir, string sCpParams) {
+    string sCpBinary = locateBinary("scp");
+    PipeExec sCp(sCpBinary + " " + backupFilename + " " + sCpParams);
+
+    if (GLOBALS.cli.count(CLI_TEST)) {
+        cout << YELLOW << config.ifTitle() + " TESTMODE: would have SCP'd " +  backupFilename +
+            " to " << sCpParams << RESET << endl;
+        return;
+    }
+
+    // execute the scp
+    int result = system(string(sCpBinary + " " + backupFilename + " " + sCpParams).c_str());
+
+    if (result == -1 || result == 127) {
+        log(config.settings[sTitle].value + " error executing " + sCpBinary);
+        NOTQUIET && cout << "\t" << RED << "• SCP failed for " << backupFilename << " to " << sCpParams << RESET << endl;
+    }
+    else {
+        log(config.ifTitle() + " " + backupFilename + " scp'd to " + sCpParams);
+        NOTQUIET && cout << "\t• SCP'd " << backupFilename << " to " << sCpParams << endl;
+    }
+}
+
+
+void sFtpBackup(BackupConfig& config, string backupFilename, string subDir, string sFtpParams) {
+    string sFtpBinary = locateBinary("sftp");
+    bool makeDirs = sFtpParams.find("//") == string::npos;
+    strReplaceAll(sFtpParams, "//", "/");
+    PipeExec sFtp(sFtpBinary + " " + sFtpParams);
+    string command;
+    timer sftpTime;
+
+    if (GLOBALS.cli.count(CLI_TEST)) {
+        cout << YELLOW << config.ifTitle() + " TESTMODE: would have SFTP'd via '" + sFtpParams + 
+            "' and uploaded " + subDir + "/" + backupFilename << RESET << endl;
+        return;
+    }
+
+    if (!sFtpBinary.length()) {
+        log("SFTP skipped due to inability to find an executable 'sftp' binary in the PATH");
+        return;
+    }
+
+    // execute the sftp command
+    sftpTime.start();
+    int fd = sFtp.executeWrite(config.settings[sTitle].value);
+
+    if (makeDirs) {
+        char data[1500];
+        strcpy(data, subDir.c_str());
+        char *p = strtok(data, "/");
+        string path;
+
+        // make each component of the subdirectory "mkdir -p" style
+        while (p) {
+            path += string("/") + p;
+            command = "mkdir " + path + "\n";
+            write(fd, command.c_str(), command.length());
+            p = strtok(NULL, "/");
+        }
+
+        // cd to the new subdirectory
+        command = "cd " + subDir + "\n";
+        write(fd, command.c_str(), command.length());
+    }
+
+    // upload the backup file
+    command = "put " + backupFilename + "\n";
+    write(fd, command.c_str(), command.length());
+    sftpTime.stop();
+
+    if (!close(fd)) {
+        log(config.ifTitle() + " " + backupFilename + " sftp'd via " + sFtpParams + " in " + sftpTime.elapsed());
+        NOTQUIET && cout << "\t• SFTP'd " << backupFilename << " via " << sFtpParams << " in " << sftpTime.elapsed() << endl;
+    }
+    else {
+        log(config.ifTitle() + " failed to sftp " + backupFilename + "  via " + sFtpParams + "; see " + string(TMP_OUTPUT_DIR));
+        NOTQUIET && cout << "\t" << RED << "• SFTP failed for " << backupFilename << " via " << sFtpParams << RESET << endl;
+    }
+}
+
 
 void performBackup(BackupConfig& config) {
-    bool incTime = GLOBALS.cli.count(CLI_TIME);
+    bool incTime = str2bool(config.settings[sIncTime].value);
     string setFname = config.settings[sBackupFilename].value;
     string setDir = config.settings[sDirectory].value;
     string setCommand = config.settings[sBackupCommand].value;
@@ -475,20 +571,21 @@ void performBackup(BackupConfig& config) {
     char buffer[100];
     now = time(NULL);
 
-    strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d/": "%Y/%m/", localtime(&now));
+    strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d": "%Y/%m", localtime(&now));
     string subDir = buffer;
-        
+
     strftime(buffer, sizeof(buffer), incTime ? "-%Y%m%d-%H:%M:%S": "-%Y%m%d", localtime(&now));
     string fnameInsert = buffer;
 
-    string fullDirectory = addSlash(setDir) + subDir;
-    string backupFilename;
+    string fullDirectory = addSlash(setDir) + subDir + "/";
+    string basicFilename;
 
     Pcre fnamePartsRE("(.*)(\\.[^.]+)$");
     if (fnamePartsRE.search(setFname) && fnamePartsRE.matches() > 1) 
-        backupFilename = fullDirectory + fnamePartsRE.get_match(0) + fnameInsert + fnamePartsRE.get_match(1);
+        basicFilename = fnamePartsRE.get_match(0) + fnameInsert + fnamePartsRE.get_match(1);
     else
-        backupFilename = fullDirectory +  setFname + fnameInsert;
+        basicFilename = setFname + fnameInsert;
+    string backupFilename = fullDirectory + basicFilename;
 
     if (GLOBALS.cli.count(CLI_TEST)) {
         cout << YELLOW << config.ifTitle() << " TESTMODE: would have begun backup to " <<
@@ -502,25 +599,24 @@ void performBackup(BackupConfig& config) {
     log(config.ifTitle() + " starting backup to " + backupFilename);
 
     // note start time
-    time_t startTime;
-    time(&startTime);
+    timer backupTime;
+    backupTime.start();
 
     // begin backing up
     PipeExec proc(setCommand);
     proc.execute2file(backupFilename + tempExtension, safeFilename(config.settings[sTitle].value));
 
     // note finish time
-    time_t finishTime;
-    time(&finishTime);
+    backupTime.stop();
 
     // determine results
     struct stat statData;
     if (!stat(string(backupFilename + tempExtension).c_str(), &statData)) {
         if (statData.st_size >= GLOBALS.minBackupSize) {
             if (!rename(string(backupFilename + tempExtension).c_str(), backupFilename.c_str())) {
-                log(config.ifTitle() + " completed backup of " + backupFilename + " in " + 
-                        timeDiff(startTime, finishTime, 3));
-                NOTQUIET && cout << "\t• successfully backed up to " << backupFilename << endl;
+                log(config.ifTitle() + " completed backup of " + backupFilename + " in " + backupTime.elapsed());
+                NOTQUIET && cout << "\t• successfully backed up to " << BOLDBLUE << backupFilename << RESET <<
+                    " in " << backupTime.elapsed() << endl;
 
                 BackupEntry cacheEntry;
                 cacheEntry.filename = backupFilename;
@@ -528,12 +624,23 @@ void performBackup(BackupConfig& config) {
                 cacheEntry.mtime = statData.st_mtime;
                 cacheEntry.inode = statData.st_ino;
                 cacheEntry.size = statData.st_size;
-                cacheEntry.duration = finishTime - startTime;
-                cacheEntry.updateAges(finishTime);
+                cacheEntry.duration = backupTime.seconds();
+                cacheEntry.updateAges(backupTime.endTime);
                 cacheEntry.calculateMD5();
 
                 config.cache.addOrUpdate(cacheEntry, true);
                 config.cache.reStatMD5(cacheEntry.md5);
+
+                if (config.settings[sSFTPTo].value.length()) {
+                    string sFtpParams = interpolate(config.settings[sSFTPTo].value, subDir, fullDirectory, basicFilename);
+                    sFtpBackup(config, backupFilename, subDir, sFtpParams);
+                }
+
+                if (config.settings[sSCPTo].value.length()) {
+                    string sCpParams = interpolate(config.settings[sSCPTo].value, subDir, fullDirectory, basicFilename);
+                    sCpBackup(config, backupFilename, subDir, sCpParams);
+                }
+
             }
             else {
                 log(config.ifTitle() + " backup failed, unable to rename temp file to " + backupFilename);
@@ -564,7 +671,7 @@ int main(int argc, char *argv[]) {
     cxxopts::Options options("managebackups", "Create and manage backups");
 
     options.add_options()
-        (string("t,") + CLI_TITLE, "Title", cxxopts::value<std::string>())
+        (string("p,") + CLI_PROFILE, "Profile", cxxopts::value<std::string>())
         (string("d,") + CLI_DAYS, "Days", cxxopts::value<int>())
         (string("w,") + CLI_WEEKS, "Weeks", cxxopts::value<int>())
         (string("m,") + CLI_MONTHS, "Months", cxxopts::value<int>())
@@ -580,7 +687,7 @@ int main(int argc, char *argv[]) {
         (CLI_FS_DAYS, "Failsafe Days", cxxopts::value<int>())
         (CLI_FS_FP, "Failsafe Paranoid", cxxopts::value<bool>()->default_value("false"))
         (CLI_DIR, "Directory", cxxopts::value<std::string>())
-        (CLI_COPYTO, "Copy to", cxxopts::value<std::string>())
+        (CLI_SCPTO, "SCP to", cxxopts::value<std::string>())
         (CLI_SFTPTO, "SFTP to", cxxopts::value<std::string>())
         (CLI_STATS1, "Stats summary", cxxopts::value<bool>()->default_value("false"))
         (CLI_STATS2, "Stats detail", cxxopts::value<bool>()->default_value("false"))
@@ -616,8 +723,8 @@ int main(int argc, char *argv[]) {
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager);
 
-    // if displaying stats and --title hasn't been specified (or matched successfully)
-    // then rescan all configs;  otherwise just scan the --title config
+    // if displaying stats and --profile hasn't been specified (or matched successfully)
+    // then rescan all configs;  otherwise just scan the --profile config
     if (GLOBALS.stats && currentConfig->temp) {
         for (auto cfg_it = configManager.configs.begin(); cfg_it != configManager.configs.end(); ++cfg_it) {
             scanConfigToCache(*cfg_it);
