@@ -504,7 +504,7 @@ void sFtpBackup(BackupConfig& config, string backupFilename, string subDir, stri
     strReplaceAll(sFtpParams, "//", "/");
     PipeExec sFtp(sFtpBinary + " " + sFtpParams);
     string command;
-    timer sftpTime;
+    timer sFtpTime;
 
     if (GLOBALS.cli.count(CLI_TEST)) {
         cout << YELLOW << config.ifTitle() + " TESTMODE: would have SFTP'd via '" + sFtpParams + 
@@ -518,8 +518,8 @@ void sFtpBackup(BackupConfig& config, string backupFilename, string subDir, stri
     }
 
     // execute the sftp command
-    sftpTime.start();
-    int fd = sFtp.executeWrite(config.settings[sTitle].value);
+    sFtpTime.start();
+    auto fds = sFtp.execute(config.settings[sTitle].value);
 
     if (makeDirs) {
         char data[1500];
@@ -531,23 +531,29 @@ void sFtpBackup(BackupConfig& config, string backupFilename, string subDir, stri
         while (p) {
             path += string("/") + p;
             command = "mkdir " + path + "\n";
-            write(fd, command.c_str(), command.length());
+            write(fds.write, command.c_str(), command.length());
             p = strtok(NULL, "/");
         }
 
         // cd to the new subdirectory
         command = "cd " + subDir + "\n";
-        write(fd, command.c_str(), command.length());
+        write(fds.write, command.c_str(), command.length());
     }
 
     // upload the backup file
     command = "put " + backupFilename + "\n";
-    write(fd, command.c_str(), command.length());
-    sftpTime.stop();
+    write(fds.write, command.c_str(), command.length());
 
-    if (!close(fd)) {
-        log(config.ifTitle() + " " + backupFilename + " sftp'd via " + sFtpParams + " in " + sftpTime.elapsed());
-        NOTQUIET && cout << "\t• SFTP'd " << backupFilename << " via " << sFtpParams << " in " << sftpTime.elapsed() << endl;
+    command = string("quit") + "\n";
+    write(fds.write, command.c_str(), command.length());
+
+    bool success = sFtp.readAndMatch("Uploading");
+    sFtp.closeall();
+    sFtpTime.stop();
+
+    if (success) {
+        log(config.ifTitle() + " " + backupFilename + " sftp'd via " + sFtpParams + " in " + sFtpTime.elapsed());
+        NOTQUIET && cout << "\t• SFTP'd " << backupFilename << " via " << sFtpParams << " in " << sFtpTime.elapsed() << endl;
     }
     else {
         log(config.ifTitle() + " failed to sftp " + backupFilename + "  via " + sFtpParams + "; see " + string(TMP_OUTPUT_DIR));

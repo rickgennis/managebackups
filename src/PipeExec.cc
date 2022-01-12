@@ -47,13 +47,22 @@ PipeExec::PipeExec(string fullCommand) {
 
 
 PipeExec::~PipeExec() {
-    if (procs.size() > 0) {
-        close(procs[0].fd[READ_END]);
-        close(procs[0].fd[WRITE_END]);
-    }
+    closeall();
 
     while (numProcs--)
         waitpid(-1, NULL, WNOHANG);
+}
+
+
+int PipeExec::closeall() {
+    if (procs.size() > 0) {
+        close(procs[0].fd[READ_END]);
+        int a = close(procs[0].fd[WRITE_END]);
+        int b = close(procs[0].readfd[READ_END]);
+        return(!(a == 0 && b == 0));
+    }
+
+    return 0;
 }
 
 
@@ -70,10 +79,10 @@ void PipeExec::dump() {
 }
 
 
-int PipeExec::executeWrite(string title) {
+fdPair PipeExec::execute(string procName) {
     procs.insert(procs.begin(), procDetail("head"));
 
-    string errorFilename = TMP_OUTPUT_DIR + title + "/";
+    string errorFilename = TMP_OUTPUT_DIR + procName + "/";
     mkdirp(errorFilename.c_str());
 
     int commandIdx = -1;
@@ -90,20 +99,26 @@ int PipeExec::executeWrite(string title) {
                 DUP2(errorFd, 2);
 
             // redirect stdout to a file
-            int outFd = open(string(errorFilename + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stdout").c_str(), 
+            /*int outFd = open(string(errorFilename + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stdout").c_str(), 
                 O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
             if (outFd > 0)
-                DUP2(outFd, 1);
+                DUP2(outFd, 1); */
 
             // dup and close remaining fds
             auto back_it = proc_it - 1;
             DUP2(back_it->fd[READ_END], READ_END);
             close(procs[0].fd[WRITE_END]);
+            close(procs[0].readfd[READ_END]);
+            DUP2(procs[0].readfd[WRITE_END], 1);
 
             // exec the last process
             varexec(proc_it->command);
         }
         else  {
+            if (*proc_it == procs[0]) {
+                pipe(proc_it->readfd);
+            }
+
             // create the pipe & fork
             pipe(proc_it->fd);
             if ((proc_it->childPID = fork())) {
@@ -136,7 +151,8 @@ int PipeExec::executeWrite(string title) {
 
                 // PARENT - first parent
                 close(proc_it->fd[READ_END]);
-                return proc_it->fd[WRITE_END];
+                close(proc_it->readfd[WRITE_END]);
+                return(fdPair(proc_it->readfd[READ_END],  proc_it->fd[WRITE_END]));
             }
         }
         
@@ -151,60 +167,7 @@ int PipeExec::executeWrite(string title) {
 }
 
 
-int PipeExec::executeRead(string title) {
-    procs.insert(procs.begin(), procDetail("head"));
-
-    string errorFilename = TMP_OUTPUT_DIR + title + "/";
-    mkdirp(errorFilename.c_str());
-
-    int commandIdx = -1;
-    for (auto proc_it = procs.begin(); proc_it != procs.end(); ++proc_it) {
-        ++commandIdx;
-        string commandPrefix = proc_it->command.substr(0, proc_it->command.find(" "));
-
-        // last loop
-        if (*proc_it == procs[procs.size() - 1]) {
-            int errorFd = open(string(errorFilename + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stderr").c_str(), 
-                O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-            if (errorFd > 0)
-                DUP2(errorFd, 2);
-            DUP2(procs[0].fd[WRITE_END], WRITE_END);
-            varexec(proc_it->command);
-        }
-        else  {
-            // create the pipe & fork
-            pipe(proc_it->fd);
-            if ((proc_it->childPID = fork())) {
-
-                // PARENT - all subsequent parents
-                if (*proc_it != procs[0]) {
-                    int errorFd = open(string(errorFilename + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stderr").c_str(), 
-                            O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-                    if (errorFd > 0)
-                        DUP2(errorFd, 2);
-                    close(proc_it->fd[READ_END]);
-                    DUP2(proc_it->fd[WRITE_END], WRITE_END);
-                    varexec(proc_it->command);
-                }
-
-                // PARENT - first parent
-                close(proc_it->fd[WRITE_END]);
-                return proc_it->fd[READ_END];
-            }
-        }
-        
-        // CHILD 
-        if (*proc_it != procs[0]) {
-            close(proc_it->fd[WRITE_END]);
-            DUP2(proc_it->fd[READ_END], READ_END);
-        }
-    }
-
-    exit(1);  // never get here
-}
-
-
-bool PipeExec::execute2file(string toFile, string title) {
+bool PipeExec::execute2file(string toFile, string procName) {
     int outFile;
     int bytesRead;
     int bytesWritten;
@@ -213,9 +176,9 @@ bool PipeExec::execute2file(string toFile, string title) {
     char data[16 * 1024];
 
     if ((outFile = open(toFile.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR)) > 0) {
-        auto fd = executeRead(title);
+        auto fds = execute(procName);
 
-        while ((bytesRead = read(fd, data, sizeof(data)))) {
+        while ((bytesRead = read(fds.read, data, sizeof(data)))) {
             pos = 0;
             while (((bytesWritten = write(outFile, data+pos, bytesRead)) < bytesRead) && (errno == EINTR)) {
                 pos += bytesRead;
@@ -223,15 +186,40 @@ bool PipeExec::execute2file(string toFile, string title) {
         }
 
         close(outFile);
-        close(fd);
+        close(fds.read);
         success = true;
     }
     else
-        log("Unable to write to " + toFile + ": " + strerror(errno));
+        log("unable to write to " + toFile + ": " + strerror(errno));
 
     while (wait(NULL) > 0);
 
     return success;
+}
+
+
+void PipeExec::readAndTrash() {
+    int bytesRead;
+    char buffer[1024*8];
+
+    while ((bytesRead = read(procs[0].readfd[READ_END], &buffer, sizeof(buffer))));
+        // throw away bytes read until fd is closed on the other end
+}
+
+
+bool PipeExec::readAndMatch(string matchStr) {
+    int bytesRead;
+    char buffer[1024*2+1];
+    bool found = false;
+
+    while ((bytesRead = read(procs[0].readfd[READ_END], &buffer, sizeof(buffer) - 1))) {
+        buffer[sizeof(buffer) - 1] = 0;
+        if (strstr(buffer, matchStr.c_str()) != NULL)
+            found = true;
+        // keep reading the rest of the content to let the remote process finish
+    }
+
+    return found;
 }
 
 
