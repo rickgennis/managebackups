@@ -11,14 +11,6 @@
 
 using namespace std;
 
-string mtime2MY(time_t mtime) {
-    char timeBuf[200];
-    struct tm *tM = localtime(&mtime);
-    struct tm fileTime = *tM;
-    strftime(timeBuf, 200, "%B %Y", &fileTime);
-    return(timeBuf);
-}
-
 
 void display1LineForConfig(BackupConfig& config) {
     double bytesUsed = 0;
@@ -129,7 +121,7 @@ void displayStatsForConfig(BackupConfig& config) {
         // lookup the the raw data detail
         auto raw_it = config.cache.rawData.find(backup_it->second);
         if (raw_it != config.cache.rawData.end()) {
-            string monthYear = mtime2MY(raw_it->second.mtime);
+            string monthYear = vars2MY(raw_it->second.date_month, raw_it->second.date_year);
 
             // print the month header
             if (lastMonthYear != monthYear) 
@@ -148,7 +140,11 @@ void displayStatsForConfig(BackupConfig& config) {
             // only one backup using that inode and mtime) or if the file is less than a day old.  then we
             // get precision.  if more than one file shares that inode (links > 1) and the file older than
             // today, revert to the midnight rounded date derived from the filename.
-            bool prectime = raw_it->second.links == 1 || !raw_it->second.day_age;
+            //
+            // if the mtime and the name_mtime refer to completely different days then go non-precise and use
+            // the name_mtime.
+            bool prectime = mtimesAreSameDay(raw_it->second.mtime, raw_it->second.name_mtime) && 
+                (raw_it->second.links == 1 || !raw_it->second.day_age);
 
             // format the detail for output
             char result[1000];

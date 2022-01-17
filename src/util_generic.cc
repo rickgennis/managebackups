@@ -448,4 +448,21 @@ bool str2bool(string text) {
 }
 
 
+string vars2MY(int month, int year) {
+    char monthName[12][15] = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
+
+    return(string(monthName[month - 1]) + " " + to_string(year));
+}
+
+
+bool mtimesAreSameDay(time_t m1, time_t m2) {
+    struct tm *temp = localtime(&m1);  // localtime always returns the same internal pointer
+    struct tm tM1 = *temp;             // so two calls to it require a temp to hold the first's data
+    struct tm *tM2 = localtime(&m2);
+
+    return (tM1.tm_year == tM2->tm_year && 
+            tM1.tm_mon  == tM2->tm_mon && 
+            tM1.tm_mday == tM2->tm_mday);
+}
+
 
