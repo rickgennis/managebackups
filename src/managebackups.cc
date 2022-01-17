@@ -26,6 +26,14 @@
 using namespace pcrepp;
 struct global_vars GLOBALS;
 
+struct methodStatus {
+    bool success;
+    string detail;
+
+    methodStatus() { success = true; }
+    methodStatus(bool s, string d) { success = s; detail = d; }
+};
+
 
 void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) {
     DIR *c_dir;
@@ -475,18 +483,20 @@ string interpolate(string command, string subDir, string fullDirectory, string b
 }
  
 
-void sCpBackup(BackupConfig& config, string backupFilename, string subDir, string sCpParams) {
+methodStatus sCpBackup(BackupConfig& config, string backupFilename, string subDir, string sCpParams) {
     string sCpBinary = locateBinary("scp");
 
+    // superfluous check as test mode bombs out of performBackup() long before it ever calls sCpBackup().
+    // but just in case future logic changes, testing here
     if (GLOBALS.cli.count(CLI_TEST)) {
         cout << YELLOW << config.ifTitle() + " TESTMODE: would have SCP'd " +  backupFilename +
             " to " << sCpParams << RESET << endl;
-        return;
+        return methodStatus(true, "");
     }
 
     if (!sCpBinary.length()) {
-        SCREENERR("\t• SCP skipped (unable to find 'scp' binary in the PATH)");
-        return;
+        SCREENERR("\t• SCP skipped (unable to locate 'scp' binary in the PATH)");
+        return methodStatus(false, "\t• SCP: unable to locate 'scp' binary in the PATH");
     }
 
     // execute the scp
@@ -495,15 +505,17 @@ void sCpBackup(BackupConfig& config, string backupFilename, string subDir, strin
     if (result == -1 || result == 127) {
         log(config.settings[sTitle].value + " error executing " + sCpBinary);
         SCREENERR("\t• SCP failed for " << backupFilename << " to " << sCpParams);
+        return methodStatus(false, "\t• SCP: error executing " + sCpBinary);
     }
     else {
         log(config.ifTitle() + " " + backupFilename + " scp'd to " + sCpParams);
         NOTQUIET && cout << "\t• SCP'd " << backupFilename << " to " << sCpParams << endl;
+        return methodStatus(true, "\t• SCP'd " + backupFilename + " to " + sCpParams);
     }
 }
 
 
-void sFtpBackup(BackupConfig& config, string backupFilename, string subDir, string sFtpParams) {
+methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subDir, string sFtpParams) {
     string sFtpBinary = locateBinary("sftp");
     bool makeDirs = sFtpParams.find("//") == string::npos;
     strReplaceAll(sFtpParams, "//", "/");
@@ -511,15 +523,17 @@ void sFtpBackup(BackupConfig& config, string backupFilename, string subDir, stri
     string command;
     timer sFtpTime;
 
+    // superfluous check as test mode bombs out of performBackup() long before it ever calls sFtpBackup().
+    // but just in case future logic changes, testing here
     if (GLOBALS.cli.count(CLI_TEST)) {
         cout << YELLOW << config.ifTitle() + " TESTMODE: would have SFTP'd via '" + sFtpParams + 
             "' and uploaded " + subDir + "/" + backupFilename << RESET << endl;
-        return;
+        return methodStatus(true, "");
     }
 
     if (!sFtpBinary.length()) {
-        SCREENERR("\t• SFTP skipped (unable to find 'sftp' binary in the PATH");
-        return;
+        SCREENERR("\t• SFTP skipped (unable to locate 'sftp' binary in the PATH");
+        return methodStatus(false, "\t• SFTP: unable to locate 'sftp' binary in the PATH");
     }
 
     // execute the sftp command
@@ -559,10 +573,12 @@ void sFtpBackup(BackupConfig& config, string backupFilename, string subDir, stri
     if (success) {
         log(config.ifTitle() + " " + backupFilename + " sftp'd via " + sFtpParams + " in " + sFtpTime.elapsed());
         NOTQUIET && cout << "\t• SFTP'd " << backupFilename << " via " << sFtpParams << " in " << sFtpTime.elapsed() << endl;
+        return methodStatus(true, "\t• SFTP'd " + backupFilename + " via " + sFtpParams + " in " + sFtpTime.elapsed());
     }
     else {
         log(config.ifTitle() + " failed to sftp " + backupFilename + "  via " + sFtpParams + "; see " + string(TMP_OUTPUT_DIR));
         SCREENERR("\t• SFTP failed for " << backupFilename << " via " << sFtpParams);
+        return methodStatus(false, "\t• SFTP failed for " + backupFilename + " via " + sFtpParams + "; see " + string(TMP_OUTPUT_DIR));
     }
 }
 
@@ -608,6 +624,10 @@ void performBackup(BackupConfig& config) {
     mkdirp(fullDirectory);
 
     log(config.ifTitle() + " starting backup to " + backupFilename);
+    string screenMessage = config.ifTitle() + " backing up to temp file " + backupFilename + tempExtension + "... ";
+    string backspaces = string(screenMessage.length(), '\b');
+    string blankspaces = string(screenMessage.length() , ' ');
+    NOTQUIET && cout << screenMessage << flush;
 
     // note start time
     timer backupTime;
@@ -619,6 +639,7 @@ void performBackup(BackupConfig& config) {
 
     // note finish time
     backupTime.stop();
+    NOTQUIET && cout << backspaces << blankspaces << backspaces << flush;
 
     // determine results
     struct stat statData;
@@ -642,18 +663,24 @@ void performBackup(BackupConfig& config) {
                 config.cache.addOrUpdate(cacheEntry, true);
                 config.cache.reStatMD5(cacheEntry.md5);
 
-                notify(config, config.ifTitle() + "\nCompleted backup of " + backupFilename + " in " + backupTime.elapsed() + "\n", true);
+                bool overallSuccess = true;
+                string notifyMessage = config.ifTitle() + "\n\t• completed backup of " + backupFilename + " in " + backupTime.elapsed() + "\n\n";
 
                 if (config.settings[sSFTPTo].value.length()) {
                     string sFtpParams = interpolate(config.settings[sSFTPTo].value, subDir, fullDirectory, basicFilename);
-                    sFtpBackup(config, backupFilename, subDir, sFtpParams);
+                    auto sFTPStatus = sFtpBackup(config, backupFilename, subDir, sFtpParams);
+                    overallSuccess &= sFTPStatus.success;
+                    notifyMessage += sFTPStatus.detail + "\n";
                 }
 
                 if (config.settings[sSCPTo].value.length()) {
                     string sCpParams = interpolate(config.settings[sSCPTo].value, subDir, fullDirectory, basicFilename);
-                    sCpBackup(config, backupFilename, subDir, sCpParams);
+                    auto sCPStatus = sCpBackup(config, backupFilename, subDir, sCpParams);
+                    overallSuccess &= sCPStatus.success;
+                    notifyMessage += sCPStatus.detail + "\n";
                 }
 
+                notify(config, notifyMessage, overallSuccess);
             }
             else {
                 log(config.ifTitle() + " backup failed, unable to rename temp file to " + backupFilename);
