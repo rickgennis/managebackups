@@ -134,8 +134,8 @@ Rather than specifying the two settings individually, there's also a Failsafe Pa
 **managebackups -p mymac --directory /opt/backups --file mymac.tgz --cmd "tar -cz /Users /var" --scp archiver@vaultserver:/mydata --time --notify "me@zmail.com, /usr/local/bin/push_alert_to_phone.sh" --save**
 : Create a gzipped backup of /Users and /var in /opt/backups/YYYY/MM/DD/mymac-YYYY-MM-DD-HH::MM.tgz. Upon success copy the file to the vaultserver's /mydata directory. Upon failure notify me with via and a script that pushes an alert to my phone.
 
-**managebackups -p mymac --daily 10**
-: Re-run the mymac profile that was saved in the previous example with all of its options, but override the daily retention quota, effectively having **managebackups** delete dailies that are older than 10 days. Because **--save** was not specified the **--daily 10** is only for this run and doesn't cecome part of the mymac profile moving forward (unless another **--save** is added).
+**managebackups -p mymac --daily 10 --fp**
+: Re-run the mymac profile that was saved in the previous example with all of its options, but override the daily retention quota, effectively having **managebackups** delete dailies that are older than 10 days. Also include the Failsafe Paranoid check to make certain current a recent backup was taken before removing any older files.  Because **--save** was not specified the **--daily 10** (and paranoid setting) is only for this run and doesn't become part of the mymac profile moving forward (unless another **--save** is added).
 
 **managebackups -1**
 : Show details of all backups taken.
