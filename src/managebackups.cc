@@ -476,7 +476,6 @@ string interpolate(string command, string subDir, string fullDirectory, string b
 
 void sCpBackup(BackupConfig& config, string backupFilename, string subDir, string sCpParams) {
     string sCpBinary = locateBinary("scp");
-    PipeExec sCp(sCpBinary + " " + backupFilename + " " + sCpParams);
 
     if (GLOBALS.cli.count(CLI_TEST)) {
         cout << YELLOW << config.ifTitle() + " TESTMODE: would have SCP'd " +  backupFilename +
@@ -519,7 +518,7 @@ void sFtpBackup(BackupConfig& config, string backupFilename, string subDir, stri
 
     // execute the sftp command
     sFtpTime.start();
-    auto fds = sFtp.execute(config.settings[sTitle].value);
+    sFtp.execute(config.settings[sTitle].value);
 
     if (makeDirs) {
         char data[1500];
@@ -531,24 +530,24 @@ void sFtpBackup(BackupConfig& config, string backupFilename, string subDir, stri
         while (p) {
             path += string("/") + p;
             command = "mkdir " + path + "\n";
-            write(fds.write, command.c_str(), command.length());
+            sFtp.writeProc(command.c_str(), command.length());
             p = strtok(NULL, "/");
         }
 
         // cd to the new subdirectory
         command = "cd " + subDir + "\n";
-        write(fds.write, command.c_str(), command.length());
+        sFtp.writeProc(command.c_str(), command.length());
     }
 
     // upload the backup file
     command = "put " + backupFilename + "\n";
-    write(fds.write, command.c_str(), command.length());
+    sFtp.writeProc(command.c_str(), command.length());
 
     command = string("quit") + "\n";
-    write(fds.write, command.c_str(), command.length());
+    sFtp.writeProc(command.c_str(), command.length());
 
     bool success = sFtp.readAndMatch("Uploading");
-    sFtp.closeall();
+    sFtp.closeAll();
     sFtpTime.stop();
 
     if (success) {

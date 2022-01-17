@@ -294,7 +294,7 @@ int varexec(string fullCommand) {
 
 string safeFilename(string filename) {
     Pcre search1("[\\s#;\\/\\\\]+", "g");   // these characters get converted to underscores
-    Pcre search2("[\\?\\!]+", "g");         // these characters get removed
+    Pcre search2("[\\?\\!\\*]+", "g");         // these characters get removed
 
     string tempStr = search1.replace(filename, "_");
     return search2.replace(tempStr, "");

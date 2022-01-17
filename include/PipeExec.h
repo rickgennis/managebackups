@@ -14,33 +14,25 @@
  *
  * Examples:
  *
- * PipeExec proc("cat /etc/pass | grep oo | cut -b1-20");
- * proc.execute();
- * if (proc.readAndMatch("root"))
+ * PipeExec p("cat /etc/pass | grep oo | cut -b1-20");
+ * p.execute();
+ * if (p.readAndMatch("root"))
  *     cout << "success" << endl;
- * proc.closeall();
+ * p.closeAll();
  *
- * PipeExec proc("sort | head");
- * auto fds = proc.execute();
- * write(fds.write, "cat\ndog\nfish", sizeof("cat\ndog\nfish\n"));
- * close(fds.write);
+ * PipeExec p("sort | head");
+ * p.execute();
+ * char msg[] = "cat\ndog\nfish\n";
+ * p.writeProc(msg, sizeof(msg));
+ * p.closeWrite();
  * int bytesRead;
- * while ((bytesRead = read(fds.read, buf, sizeof(buf))))
+ * while ((bytesRead = p.readProc(buf, sizeof(buf))))
  *     cout << buf;
- * proc.closeall();
+ * p.closeAll();
  *
  */
 
-
-
 using namespace std;
-
-struct fdPair {
-    int read;
-    int write;
-
-    fdPair(int r, int w) { read = r;  write = w; }
-};
 
 
 typedef struct ProcDetail {
@@ -66,11 +58,18 @@ class PipeExec {
         PipeExec(string cmd);
         ~PipeExec();
 
-        fdPair execute(string procName = "");
+        void execute(string procName = "");    // procName is used to make a unique subdir under /tmp for STDERR output
         bool execute2file(string toFile, string procName);
+
+        ssize_t readProc(void *buf, size_t count);
+        ssize_t writeProc(const void *buf, size_t count);
+
         void readAndTrash();
         bool readAndMatch(string matchStr);
-        int closeall();
+        
+        int closeWrite();
+        int closeRead();
+        int closeAll();
         void dump();
 };
 

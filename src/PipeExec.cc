@@ -47,20 +47,36 @@ PipeExec::PipeExec(string fullCommand) {
 
 
 PipeExec::~PipeExec() {
-    closeall();
+    closeAll();
 
     while (numProcs--)
         waitpid(-1, NULL, WNOHANG);
 }
 
 
-int PipeExec::closeall() {
+int PipeExec::closeAll() {
     if (procs.size() > 0) {
         close(procs[0].fd[READ_END]);
         int a = close(procs[0].fd[WRITE_END]);
         int b = close(procs[0].readfd[READ_END]);
         return(!(a == 0 && b == 0));
     }
+
+    return 0;
+}
+
+
+int PipeExec::closeRead() {
+    if (procs.size() > 0)
+        return close(procs[0].fd[READ_END]);
+
+    return 0;
+}
+
+
+int PipeExec::closeWrite() {
+    if (procs.size() > 0)
+        return close(procs[0].fd[WRITE_END]);
 
     return 0;
 }
@@ -79,10 +95,10 @@ void PipeExec::dump() {
 }
 
 
-fdPair PipeExec::execute(string procName) {
+void PipeExec::execute(string procName) {
     procs.insert(procs.begin(), procDetail("head"));
 
-    string errorFilename = TMP_OUTPUT_DIR + procName + "/";
+    string errorFilename = TMP_OUTPUT_DIR + safeFilename(procName) + "/";
     mkdirp(errorFilename.c_str());
 
     int commandIdx = -1;
@@ -152,7 +168,8 @@ fdPair PipeExec::execute(string procName) {
                 // PARENT - first parent
                 close(proc_it->fd[READ_END]);
                 close(proc_it->readfd[WRITE_END]);
-                return(fdPair(proc_it->readfd[READ_END],  proc_it->fd[WRITE_END]));
+                //return(fdPair(proc_it->readfd[READ_END],  proc_it->fd[WRITE_END]));
+                return;
             }
         }
         
@@ -176,9 +193,9 @@ bool PipeExec::execute2file(string toFile, string procName) {
     char data[16 * 1024];
 
     if ((outFile = open(toFile.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR)) > 0) {
-        auto fds = execute(procName);
+        execute(procName);
 
-        while ((bytesRead = read(fds.read, data, sizeof(data)))) {
+        while ((bytesRead = readProc(data, sizeof(data)))) {
             pos = 0;
             while (((bytesWritten = write(outFile, data+pos, bytesRead)) < bytesRead) && (errno == EINTR)) {
                 pos += bytesRead;
@@ -186,7 +203,7 @@ bool PipeExec::execute2file(string toFile, string procName) {
         }
 
         close(outFile);
-        close(fds.read);
+        close(procs[0].readfd[READ_END]);
         success = true;
     }
     else
@@ -202,7 +219,7 @@ void PipeExec::readAndTrash() {
     int bytesRead;
     char buffer[1024*8];
 
-    while ((bytesRead = read(procs[0].readfd[READ_END], &buffer, sizeof(buffer))));
+    while ((bytesRead = readProc(&buffer, sizeof(buffer))));
         // throw away bytes read until fd is closed on the other end
 }
 
@@ -212,7 +229,7 @@ bool PipeExec::readAndMatch(string matchStr) {
     char buffer[1024*2+1];
     bool found = false;
 
-    while ((bytesRead = read(procs[0].readfd[READ_END], &buffer, sizeof(buffer) - 1))) {
+    while ((bytesRead = readProc(&buffer, sizeof(buffer) - 1))) {
         buffer[sizeof(buffer) - 1] = 0;
         if (strstr(buffer, matchStr.c_str()) != NULL)
             found = true;
@@ -221,5 +238,17 @@ bool PipeExec::readAndMatch(string matchStr) {
 
     return found;
 }
+
+
+ssize_t PipeExec::readProc(void *buf, size_t count) {
+    return read(procs[0].readfd[READ_END], buf, count); 
+}
+
+
+ssize_t PipeExec::writeProc(const void *buf, size_t count) {
+    return write(procs[0].fd[WRITE_END], buf, count);
+}
+
+
 
 
