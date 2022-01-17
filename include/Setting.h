@@ -10,7 +10,7 @@ using namespace pcrepp;
 
 enum SetType { INT, STRING, BOOL };
 enum SetSpecifier { sTitle, sDirectory, sBackupFilename, sBackupCommand, sDays, sWeeks, sMonths, sYears, sFailsafeBackups, sFailsafeDays,
-    sSCPTo, sSFTPTo, sPruneLive, sNotify, sMaxLinks, sIncTime };
+    sSCPTo, sSFTPTo, sPruneLive, sNotify, sMaxLinks, sIncTime, sNos };
 
 class Setting {
     public:

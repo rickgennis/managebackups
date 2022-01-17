@@ -10,9 +10,13 @@
 #include <sys/stat.h>
 #include "pcre++.h"
 #include "math.h"
+#include <sys/types.h>
+#include <pwd.h>
 
 #include "pcre++.h"
 #include "util_generic.h"
+#include "globals.h"
+
 
 using namespace pcrepp;
 
@@ -22,7 +26,15 @@ string s(int number) {
 
 
 void log(string message) {
-    syslog(LOG_CRIT, "%s", message.c_str());
+#ifdef ON_MAC
+    if (!GLOBALS.logFilename.length()) {
+        if (!access("/var/log", W_OK)) 
+            GLOBALS.logFilename = "/var/log/managebackups.log";
+        else {
+            struct passwd *pw = getpwuid(getuid());
+            GLOBALS.logFilename = string(pw->pw_dir) + "/managebackups.log";
+        }
+    }
 
     time_t now;
     char timeStamp[100];
@@ -31,12 +43,15 @@ void log(string message) {
     strftime(timeStamp, sizeof(timeStamp), "%b %d %Y %H:%M:%S ", localtime(&now));
 
     ofstream logFile;
-    logFile.open("managebackups.log", ios::app);
+    logFile.open(GLOBALS.logFilename, ios::app);
 
     if (logFile.is_open()) {
         logFile << string(timeStamp) << message << endl;
         logFile.close();
     }
+#else
+    syslog(LOG_CRIT, "%s", message.c_str());
+#endif
 }
 
 
@@ -437,6 +452,7 @@ string locateBinary(string app) {
         if (!access(app.c_str(), X_OK))
             return(app);
 
+    log("unable to locate/execute '" + app + "' command");
     return "";
 }
 

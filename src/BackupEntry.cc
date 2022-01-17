@@ -55,7 +55,7 @@ BackupEntry* BackupEntry::updateAges(time_t refTime) {
         date_day   = stoi(dateRE.get_match(2));
     }
     else {   // should never get here due to a similar regex limiting filenames getting initially added to the cache
-        cerr << RED << "error: invalid log filename (" << filename << ")" << RESET << endl;
+        SCREENERR("error: invalid log filename (" << filename << ")");
         exit(1);
     }
 

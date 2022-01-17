@@ -18,6 +18,7 @@
 #include "colors.h"
 #include "statistics.h"
 #include "util_generic.h"
+#include "notify.h"
 #include "help.h"
 #include "PipeExec.h"
 
@@ -131,7 +132,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
             currentConf = &configManager.configs[configManager.activeConfig];
         }
         else if (!bSave && GLOBALS.stats) {
-            cerr << RED << "error: profile not found; try -1 or -2 with no profile to see all backups" << RESET << endl;
+            SCREENERR("error: profile not found; try -1 or -2 with no profile to see all backups");
             exit(1);
         }
 
@@ -139,13 +140,13 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     }
     else {
         if (bSave) {
-            cerr << RED << "error: --profile must be specified in order to --save settings.\n";
-            cerr << "Once saved --profile becomes a macro for all settings specified with the --save.\n";
-            cerr << "For example, these two commands would do the same things:\n\n";
-            cerr << "\tmanagebackups --profile myback --directory /etc --file etc.tgz --daily 5 --save\n";
-            cerr << "\tmanagebackups --profile myback\n\n"; 
-            cerr << "Options specified with a profile that's aleady been saved will override that\n";
-            cerr << "option for this run only (unless --save is given again)." << RESET << endl;
+            SCREENERR("error: --profile must be specified in order to --save settings.\n" 
+                << "Once saved --profile becomes a macro for all settings specified with the --save.\n"
+                << "For example, these two commands would do the same things:\n\n"
+                << "\tmanagebackups --profile myback --directory /etc --file etc.tgz --daily 5 --save\n"
+                << "\tmanagebackups --profile myback\n\n"
+                << "Options specified with a profile that's aleady been saved will override that\n"
+                << "option for this run only (unless --save is given again).");
             exit(1);
         }
 
@@ -206,7 +207,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     }
 
     if (!GLOBALS.stats && !currentConf->settings[sDirectory].value.length()) {
-        cerr << RED << "error: --directory is required" << RESET << endl;
+        SCREENERR("error: --directory is required");
         exit(1);
     }
 
@@ -221,12 +222,12 @@ void pruneBackups(BackupConfig& config) {
         return;
 
     if (!config.settings[sPruneLive].value.length() && !GLOBALS.cli.count(CLI_NOPRUNE) && !GLOBALS.cli.count(CLI_QUIET)) {
-        cout << RED << "warning: While a core feature, managebackups doesn't prune old backups" << endl;
-        cout << "until specifically enabled.  Use --prune to enable pruning.  Use --prune" << endl;
-        cout << "and --save to make it the default behavior for this backup configuration." << endl;
-        cout << "pruning skipped;  would have used these settings:" << endl;
-        cout << "\t--days " << config.settings[sDays].value << " --weeks " << config.settings[sWeeks].value;
-        cout << " --months " << config.settings[sMonths].value << " --years " << config.settings[sYears].value << RESET << endl;
+        SCREENERR("warning: While a core feature, managebackups doesn't prune old backups" 
+            << "until specifically enabled.  Use --prune to enable pruning.  Use --prune"
+            << "and --save to make it the default behavior for this backup configuration."
+            << "pruning skipped;  would have used these settings:"
+            << "\t--days " << config.settings[sDays].value << " --weeks " << config.settings[sWeeks].value
+            << " --months " << config.settings[sMonths].value << " --years " << config.settings[sYears].value);
         return;
     }
 
@@ -253,7 +254,7 @@ void pruneBackups(BackupConfig& config) {
             string message = "skipping pruning due to failsafe check; only " + to_string(fb) +
                     " backup" + s(fb) + " within the last " + to_string(fd) + " day" + s(fd);
             
-            cerr << RED << "warning: " << message << RESET << endl;
+            SCREENERR("warning: " << message);
             log(config.ifTitle() + " " + message);
             return;
         }
@@ -325,7 +326,7 @@ void pruneBackups(BackupConfig& config) {
 
 void updateLinks(BackupConfig& config) {
     unsigned int maxLinksAllowed = config.settings[sMaxLinks].ivalue();
-    bool includeTime = config.settings[sIncTime].ivalue();
+    bool includeTime = str2bool(config.settings[sIncTime].value);
     bool rescanRequired;
     
     /* The indexByMD5 is a list of lists ("map" of "set"s).  Here we loop through the list of MD5s
@@ -440,13 +441,13 @@ void updateLinks(BackupConfig& config) {
                                 }
                             }
                             else {
-                                cerr << RED << "error: unable to link " << detail << " (" << strerror(errno) << ")" << RESET << endl;
+                                SCREENERR("error: unable to link " << detail << " (" << strerror(errno) << ")");
                                 log(config.ifTitle() + " error: unable to link " + detail);
                             }
                         }
                         else {
-                            cerr << RED << "error: unable to remove" << raw_it->second.filename << " in prep to link it (" 
-                                << strerror(errno) << ")" << RESET << endl;
+                            SCREENERR("error: unable to remove" << raw_it->second.filename << " in prep to link it (" 
+                                << strerror(errno) << ")");
                             log(config.ifTitle() + " error: unable to remove " + raw_it->second.filename + 
                                 " in prep to link it (" + strerror(errno) + ")");
                         }
@@ -483,12 +484,17 @@ void sCpBackup(BackupConfig& config, string backupFilename, string subDir, strin
         return;
     }
 
+    if (!sCpBinary.length()) {
+        SCREENERR("\t• SCP skipped (unable to find 'scp' binary in the PATH)");
+        return;
+    }
+
     // execute the scp
     int result = system(string(sCpBinary + " " + backupFilename + " " + sCpParams).c_str());
 
     if (result == -1 || result == 127) {
         log(config.settings[sTitle].value + " error executing " + sCpBinary);
-        NOTQUIET && cout << "\t" << RED << "• SCP failed for " << backupFilename << " to " << sCpParams << RESET << endl;
+        SCREENERR("\t• SCP failed for " << backupFilename << " to " << sCpParams);
     }
     else {
         log(config.ifTitle() + " " + backupFilename + " scp'd to " + sCpParams);
@@ -512,7 +518,7 @@ void sFtpBackup(BackupConfig& config, string backupFilename, string subDir, stri
     }
 
     if (!sFtpBinary.length()) {
-        log("SFTP skipped due to inability to find an executable 'sftp' binary in the PATH");
+        SCREENERR("\t• SFTP skipped (unable to find 'sftp' binary in the PATH");
         return;
     }
 
@@ -556,7 +562,7 @@ void sFtpBackup(BackupConfig& config, string backupFilename, string subDir, stri
     }
     else {
         log(config.ifTitle() + " failed to sftp " + backupFilename + "  via " + sFtpParams + "; see " + string(TMP_OUTPUT_DIR));
-        NOTQUIET && cout << "\t" << RED << "• SFTP failed for " << backupFilename << " via " << sFtpParams << RESET << endl;
+        SCREENERR("\t• SFTP failed for " << backupFilename << " via " << sFtpParams);
     }
 }
 
@@ -619,7 +625,7 @@ void performBackup(BackupConfig& config) {
     if (!stat(string(backupFilename + tempExtension).c_str(), &statData)) {
         if (statData.st_size >= GLOBALS.minBackupSize) {
             if (!rename(string(backupFilename + tempExtension).c_str(), backupFilename.c_str())) {
-                log(config.ifTitle() + " completed backup of " + backupFilename + " in " + backupTime.elapsed());
+                log(config.ifTitle() + " completed backup to " + backupFilename + " in " + backupTime.elapsed());
                 NOTQUIET && cout << "\t• successfully backed up to " << BOLDBLUE << backupFilename << RESET <<
                     " in " << backupTime.elapsed() << endl;
 
@@ -636,6 +642,8 @@ void performBackup(BackupConfig& config) {
                 config.cache.addOrUpdate(cacheEntry, true);
                 config.cache.reStatMD5(cacheEntry.md5);
 
+                notify(config, config.ifTitle() + "\nCompleted backup of " + backupFilename + " in " + backupTime.elapsed() + "\n", true);
+
                 if (config.settings[sSFTPTo].value.length()) {
                     string sFtpParams = interpolate(config.settings[sSFTPTo].value, subDir, fullDirectory, basicFilename);
                     sFtpBackup(config, backupFilename, subDir, sFtpParams);
@@ -650,17 +658,20 @@ void performBackup(BackupConfig& config) {
             else {
                 log(config.ifTitle() + " backup failed, unable to rename temp file to " + backupFilename);
                 unlink(string(backupFilename + tempExtension).c_str());
-                NOTQUIET && cout << "\t" << RED << "• backup failed to " << backupFilename << RESET << endl;
+                notify(config, config.ifTitle() + "\nFailed to backup to " + backupFilename + "\nUnable to rename temp file.\n", false);
+                SCREENERR("\t• backup failed to " << backupFilename);
             }
         }
         else {
             log(config.ifTitle() + " backup failed to " + backupFilename + " (insufficient output/size)");
-            NOTQUIET && cout << "\t" << RED << "• backup failed to " << backupFilename << " (insufficient output/size)" << RESET << endl;
+            notify(config, config.ifTitle() + "\nFailed to backup to " + backupFilename + "\nInsufficient output.\n", false);
+            SCREENERR("\t• backup failed to " << backupFilename << " (insufficient output/size)");
         }
     }
     else {
         log(config.ifTitle() + " backup command failed to generate any output");
-        NOTQUIET && cout << "\t" << RED << "• backup failed to generate any output" << RESET << endl;
+        notify(config, config.ifTitle() + "\nFailed to backup to " + backupFilename + "\nNo output generated by backup command.\n", false);
+        SCREENERR("\t• backup failed to generate any output");
     }
 }
 
@@ -687,6 +698,7 @@ int main(int argc, char *argv[]) {
         (string("v,") + CLI_VERBOSE, "Verbose output", cxxopts::value<bool>()->default_value("false"))
         (string("q,") + CLI_QUIET, "No output", cxxopts::value<bool>()->default_value("false"))
         (string("l,") + CLI_MAXLINKS, "Max hard links", cxxopts::value<int>())
+        (CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))
         (CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))
         (CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())
         (CLI_FS_DAYS, "Failsafe Days", cxxopts::value<int>())

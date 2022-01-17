@@ -38,6 +38,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_NOTIFY, RE_NOTIFY, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_MAXLINKS, RE_MAXLINKS, INT, "20"));
     settings.insert(settings.end(), Setting(CLI_TIME, RE_TIME, BOOL, "0"));
+    settings.insert(settings.end(), Setting(CLI_NOS, RE_NOS, BOOL, "0"));
 }
 
 
@@ -256,5 +257,39 @@ unsigned int BackupConfig::removeEmptyDirs(string directory) {
     }
 
     return 1;
+}
+
+
+bool BackupConfig::getPreviousSuccess() {
+    string stateFilename = string(CONF_DIR) + "/caches/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".state";
+    bool previousSuccess = true;
+
+    ifstream stateFile;
+    stateFile.open(stateFilename);
+
+    if (stateFile.is_open()) {
+        string temp;
+        stateFile >> temp;
+        previousSuccess = str2bool(temp);
+        stateFile.close();
+    }
+
+    return previousSuccess;
+}
+
+
+void BackupConfig::setPreviousSuccess(bool state) {
+    string stateFilename = string(CONF_DIR) + "/caches/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".state";
+    mkdir((string(CONF_DIR) + "/caches").c_str(),  S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+
+    ofstream stateFile;
+    stateFile.open(stateFilename);
+
+    if (stateFile.is_open()) {
+        stateFile << to_string(state) << endl;
+        stateFile.close();
+    }
+    else
+        log("unable to save state for notifications to " + stateFilename + " (directory not writable?)");
 }
 

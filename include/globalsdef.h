@@ -2,7 +2,10 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
+#define ON_MAC 1
+
 #include "cxxopts.hpp"
+#include "colors.h"
 
 #define CONF_DIR "/etc/managebackups"
 #define TMP_OUTPUT_DIR "/tmp/managebackups_output"
@@ -10,6 +13,7 @@
 
 #define DEBUG(x,y) (GLOBALS.cli.count(CLI_VERBOSE) >= x) && cout << GREEN << __FUNCTION__ << "\t" << y << RESET << endl
 #define NOTQUIET (!GLOBALS.cli.count(CLI_QUIET))
+#define SCREENERR(x) cerr << RED << x << RESET << endl;
 
 #define DATE_REGEX "-(20\\d{2})[-.]*(\\d{2})[-.]*(\\d{2})[-.]"
 
@@ -33,6 +37,7 @@
 #define CLI_SCPTO "scp"
 #define CLI_SFTPTO "sftp"
 #define CLI_NOTIFY "notify"
+#define CLI_NOS "nos"
 #define CLI_SAVE "save"
 #define CLI_VERBOSE "verbose"
 #define CLI_NOCOLOR "nocolor"
@@ -64,6 +69,7 @@
 #define RE_FSBACKS "(fs_backups|fb|failsafe_backups)"
 #define RE_FSDAYS "(fs_days|fd|failsafe_days)"
 #define RE_NOTIFY "(notify)"
+#define RE_NOS "(nos)"
 #define RE_PRUNE "(prune)"
 #define RE_MAXLINKS "(maxlinks)"
 #define RE_TIME "(time)"
@@ -84,6 +90,7 @@ struct global_vars {
     cxxopts::ParseResult cli;
     bool color;
     bool stats;
+    std::string logFilename;
 };
 
 #endif

@@ -179,7 +179,7 @@ BackupCache::~BackupCache() {
             }
             else {
                 // entry is in the filenameIndex but not the raw data.  should never get here.
-                cerr << RED << "LOGIC ERROR - NO RAW DATA" << RESET << endl;
+                SCREENERR("LOGIC ERROR - NO RAW DATA");
                 exit(1);
             }
         }
