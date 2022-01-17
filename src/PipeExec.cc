@@ -6,6 +6,8 @@
 #include <vector>
 #include "pcre++.h"
 #include "util_generic.h"
+#include "colors.h"
+#include "globals.h"
 #include "PipeExec.h"
 
 #define READ_END STDIN_FILENO
@@ -29,6 +31,7 @@ bool operator==(const struct ProcDetail& A, const struct ProcDetail& B) {
 
 
 PipeExec::PipeExec(string fullCommand) {
+    origCommand = fullCommand;
     char *data;
 
     data = (char*)malloc(fullCommand.length() + 1);
@@ -98,8 +101,10 @@ void PipeExec::dump() {
 void PipeExec::execute(string procName) {
     procs.insert(procs.begin(), procDetail("head"));
 
-    string errorFilename = TMP_OUTPUT_DIR + safeFilename(procName) + "/";
-    mkdirp(errorFilename.c_str());
+    string errorFilename = string(TMP_OUTPUT_DIR) + "/" + safeFilename(procName) + "/";
+    mkdirp(errorFilename);
+
+    DEBUG(3, "preparing full command [" << origCommand << "]");
 
     int commandIdx = -1;
     for (auto proc_it = procs.begin(); proc_it != procs.end(); ++proc_it) {
@@ -108,17 +113,12 @@ void PipeExec::execute(string procName) {
 
         // last loop
         if (*proc_it == procs[procs.size() - 1]) {
+            DEBUG(3, "executing final command [" << proc_it->command << "]");
             // redirect stderr to a file
             int errorFd = open(string(errorFilename + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stderr").c_str(), 
                 O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
             if (errorFd > 0)
                 DUP2(errorFd, 2);
-
-            // redirect stdout to a file
-            /*int outFd = open(string(errorFilename + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stdout").c_str(), 
-                O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-            if (outFd > 0)
-                DUP2(outFd, 1); */
 
             // dup and close remaining fds
             auto back_it = proc_it - 1;
@@ -141,6 +141,8 @@ void PipeExec::execute(string procName) {
 
                 // PARENT - all subsequent parents
                 if (*proc_it != procs[0]) {
+                    DEBUG(3, "executing mid command [" << proc_it->command << "]");
+
                     // redirect stderr to a file
                     int errorFd = open(string(errorFilename + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stderr").c_str(), 
                             O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
@@ -168,7 +170,6 @@ void PipeExec::execute(string procName) {
                 // PARENT - first parent
                 close(proc_it->fd[READ_END]);
                 close(proc_it->readfd[WRITE_END]);
-                //return(fdPair(proc_it->readfd[READ_END],  proc_it->fd[WRITE_END]));
                 return;
             }
         }
@@ -192,10 +193,12 @@ bool PipeExec::execute2file(string toFile, string procName) {
     bool success = false;
     char data[16 * 1024];
 
+    DEBUG(3, "toFile=" << toFile << "; procName=" << procName);
+
     if ((outFile = open(toFile.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR)) > 0) {
         execute(procName);
 
-        while ((bytesRead = readProc(data, sizeof(data)))) {
+        while ((bytesRead = readProc(&data, sizeof(data)))) {
             pos = 0;
             while (((bytesWritten = write(outFile, data+pos, bytesRead)) < bytesRead) && (errno == EINTR)) {
                 pos += bytesRead;

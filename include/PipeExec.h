@@ -51,6 +51,7 @@ typedef struct ProcDetail {
 
 
 class PipeExec {
+    string origCommand;
     vector<procDetail> procs;
     int numProcs;
 
