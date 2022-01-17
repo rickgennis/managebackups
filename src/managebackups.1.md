@@ -12,7 +12,7 @@ managebackups - Take and manage backups
 **managebackups** provides three functions that can be run independently or in combination:
 
 ## Take Backups
-Given a backup command (tar, cpio, dump, etc) **managebackups** will execute the command, saving the output to a file named with the current date (and optionally time).  By default the resulting filename will be of the form *directory*/YYYY/MM/*filename*-YYYYMMDD.*ext*.  When time is included the day of month is also added to the directory structure (*directory*/YYYY/MM/DD/*filename*-YYYYMMDD-HH::MM:SS.*ext*). 
+Given a backup command (tar, cpio, dump, etc) **managebackups** will execute the command, saving the output to a file named with the current date (and optionally time).  By default the resulting filename will be of the form *directory*/YYYY/MM/*filename*-YYYYMMDD.*ext*.  When time is included the day of month is also added to the directory structure (*directory*/YYYY/MM/DD/*filename*-YYYYMMDD-HH::MM:SS.*ext*). Note: Without time included (**--time**) multiple backups on the same day taken with the same settings will overwrite each other resulting in a single backup for the day.  With time included each backup is saved separately.
 
 ## Prune Backups
 **managebackups** deletes old backups that have aged out.  The aging critera is configured on a daily, weekly, monthly and yearly basis.  By default *managebackups* will keep 14 dailies, 4 weeklies, 6 monthlies and 2 yearly backups.
@@ -37,7 +37,7 @@ Options are relative to the three functions of **managebackups**.
 : Use *PROFILE* for the current run.  
 
 **--save**
-: Save the currently specified settings (everything on the command line) with the specified title.
+: Save the currently specified settings (everything on the command line) with the specified profile name.
 
 **-0**
 : Provide a summary of backups.
@@ -45,19 +45,71 @@ Options are relative to the three functions of **managebackups**.
 **-1**
 : Provide detail of backups.
 
-**--notify**
-: Notify after a backup completes.
+**--notify** [contact1, contact2, ...]
+: Notify after a backup completes. By default, only failed backups trigger notifications (see **--nos**). A contact can be an email address or the full path to a script to execute. The NOTIFICATIONS section below has more detail.
+
+**--nos**
+: Notify on successful backups also.
+
+**--test**
+: Run in test mode. No changes are actually made to disk (no backups, pruning or linking).
+
+**--defaults**
+: Display the default settings for all profiles.
+
+**--nocolor**
+: Disable color on console output.
+
+**-q**, **--quiet**
+: Quiet mode is to minimize output; useful for cron invocations where important messages will be seen in the log or via **--notify**.
 
 ## Take Backups Options
 
-**--directory**
-: Specify the directory in which to store and look for backups.
+**--directory** [*directory*]
+: Store and look for backups in *directory*.
 
-**--file**
-: Specify the base filename to create for new backups.  The date and optionally time are inserted before the extension, or if no extension, at the end.  A filename of mybackup.tgz will become mybackup-YYYYMMDD.tgz.
+**--file** [*filename*]
+: Use *filename* as the base filename to create for new backups.  The date and optionally time are inserted before the extension, or if no extension, at the end.  A filename of mybackup.tgz will become mybackup-YYYYMMDD.tgz.
+
+**--cmd**, **--command** [*cmd*]
+: Use *cmd* to perform a backup.  *cmd* should be double-quoted and may include as many pipes as desired. Have the command send the backed up data to its STDOUT.  For example, **--cmd** "tar -cz /mydata" or **--cmd** "/usr/bin/tar -c /opt | /usr/bin/gzip -n".
 
 **--time**
-: Include the time in the filename of the newly created backup.  The day of month will also be included in the subdirectory.
+: Include the time in the filename of the newly created backup.  The day of month will also be included in the subdirectory. Without time included multiple backups on the same day taken with the same settings will overwrite each other resulting in a single backup for the day. With time included each backup is saved separately.
+
+**--scp** [*destination*]
+: On completion of a successful backup, SCP the newly created backup file to *destination*.  *destination* can include user@ notation and an optional hardcoded filename.  If filename is omitted the newly created date-based filename is used, the same as with a standard cp command. Additionally the strings {fulldir}, {subdir} and {file} can be used; they'll be automatically replaced with the values relative to the newly created backup.
+
+**--sftp** [*destination*]
+: On completion of a successful backup, SFTP the newly created backup file to *destination*. *destination* can include user@ notation, machine name and/or directory name. SFTP parameters (such as -P and others) can be included as well. Additionally the strings {fulldir}, {subdir} and {file} can be used; they'll be automatically replaced with the values relative to the newly created backup. By default, a current year and month subdirectory will be created on the destination after connecting and then the file is "put" into that directory. Use a double-slash anywhere in the *destination* to disable creation and use of the YEAR/MONTH subdirectory structure on the destination server.  For example, **--sftp** "backupuser@vaultserver:/data//".
+
+**--nobackup**
+: Disable performing backups for this run. To disable permanently moving forward, remove the "command" directive from the profile's config file.
+
+## Pruning Options
+
+**--prune**
+: By default, **managebackups** doesn't prune. Pruning can be enabled with this option or via the config file. To enable pruning moving forward use **-p**, **--save**, and **-prune** together. Then future runs of that profile will include pruning.
+
+**--noprune**
+: Disable pruning (when previously enabled) for this run. Like other options, to make this permanent for the profile moving forward add **--save**.
+
+**-d**, **--days**, **--daily**
+: Specify the number of daily backups to keep. Defaults to 14.
+
+**-w**, **--weeks**, **--weekly**
+: Specify the number of weekly backups to keep. Defaults to 4.
+
+**-m**, **--months**, **--monthly**
+: Specify the number of monthly backups to keep. Defaults to 6.
+
+**-y**, **--years**, **--yearly**
+: Specify the number of yearly backups to keep. Defaults to 2.
+
+## Linking Options
+
+**-l**, **--maxlinks** [*links*]
+: Use *links* as the maximum number of links for a backup. For example, if the max is set to 10 and there are 25 identical content backups on disk, the first 10 all share inodes (i.e. there's only one copy of that data on disk for those 10 backups), the next 10 share another set of inodes, and the final 5 share another set of inodes.  From a disk space and allocation perspective those 25 identical copies of data are taking up the space of 3 copies, not 25.  In effect, increasing **--maxlinks** saves disk space. But an accidental mis-edit to one of those files could damage more backups with a higher number. Set **--maxlinks** to 0 or 1 to disable linking. Defaults to 20. 
 
 # NOTIFICATIONS
 **managebackups** can notify on success or failure of a backup via two methods: email or script. Multiple emails and/or scripts can be specified for the same backup.
@@ -70,5 +122,24 @@ Notification scripts configured for the current profile are only considered on a
 
 Notification scripts are passed a single parameter, which is a message describing details of the backup event.
 
+# FAILSAFE
+**managebackups** can use a failsafe check to make sure that if backups begin failing, it won't continue to prune (remove) old/good ones. The failsafe check has two components: the number of successful backups required (B) and the number of days (D) for a contextual timeframe. To pass the check and allow pruning, there must be at least B valid backups within the last D days. These values can be specified individually via **--fs_backups** and **--fs_days**. By default the failsafe check is disabled.
 
+Rather than specifying the two settings individually, there's also a Failsafe Paranoid option (**--fp**) which sets backups to 1 and days to 2. In other words, there has to be a valid backup within the last two days before pruning is allowed.
+
+# EXAMPLES
+**managebackups --profile homedirs --directory /var/backups --file homedirs.tgz --cmd "tar -cz /home" --weekly 2 --notify me@zmail.com --save**
+: Create a gzipped backup of /home and store it in /var/backups/YYYY/MM/homedirs-YYYY-MM-DD.tgz. Override the weekly retention to 2 while keeping the daily, monthly and yearly settings at their defaults. This performs pruning and linking with their default settings and emails on failure. Because **--save** is include, all of the settings are associated with the homedirs profile, allowing the same command to be run again (or cron'd) simply as **managebackups -p homedirs**.
+
+**managebackups -p mymac --directory /opt/backups --file mymac.tgz --cmd "tar -cz /Users /var" --scp archiver@vaultserver:/mydata --time --notify "me@zmail.com, /usr/local/bin/push_alert_to_phone.sh" --save**
+: Create a gzipped backup of /Users and /var in /opt/backups/YYYY/MM/DD/mymac-YYYY-MM-DD-HH::MM.tgz. Upon success copy the file to the vaultserver's /mydata directory. Upon failure notify me with via and a script that pushes an alert to my phone.
+
+**managebackups -p mymac --daily 10**
+: Re-run the mymac profile that was saved in the previous example with all of its options, but override the daily retention quota, effectively having **managebackups** delete dailies that are older than 10 days. Because **--save** was not specified the **--daily 10** is only for this run and doesn't cecome part of the mymac profile moving forward (unless another **--save** is added).
+
+**managebackups -1**
+: Show details of all backups taken.
+
+**managebackups -0**
+: Show a one-line summary for each backup profile. The summary includes detail on the most recent backup as well as the number of backups, age ranges and total disk space.
 
