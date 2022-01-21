@@ -727,6 +727,10 @@ int main(int argc, char *argv[]) {
     if (temp.length())
         GLOBALS.cacheDir = temp;
 
+    temp = cppgetenv("MB_LOGDIR");
+    if (temp.length())
+        GLOBALS.logDir = temp;
+
     time(&GLOBALS.startupTime);
     openlog("managebackups", LOG_PID | LOG_NDELAY, LOG_LOCAL1);
     cxxopts::Options options("managebackups", "Create and manage backups");
@@ -763,6 +767,7 @@ int main(int argc, char *argv[]) {
         (CLI_HELP, "Show help", cxxopts::value<bool>()->default_value("false"))
         (CLI_CONFDIR, "Configuration directory", cxxopts::value<std::string>())
         (CLI_CACHEDIR, "Cache directory", cxxopts::value<std::string>())
+        (CLI_LOGDIR, "Log directory", cxxopts::value<std::string>())
         (CLI_INSTALL, "Install", cxxopts::value<bool>()->default_value("false"));
 
     try {
@@ -776,6 +781,9 @@ int main(int argc, char *argv[]) {
 
         if (GLOBALS.cli.count(CLI_CACHEDIR))
             GLOBALS.cacheDir = GLOBALS.cli[CLI_CACHEDIR].as<string>();
+
+        if (GLOBALS.cli.count(CLI_LOGDIR))
+            GLOBALS.logDir = GLOBALS.cli[CLI_LOGDIR].as<string>();
     }
     catch (cxxopts::OptionParseException& e) {
         cerr << "managebackups: " << e.what() << endl;

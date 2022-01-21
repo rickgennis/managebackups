@@ -170,6 +170,19 @@ Disable color on console output.
 \f[B]-q\f[R], \f[B]\[en]quiet\f[R]
 Quiet mode is to minimize output; useful for cron invocations where
 important messages will be seen in the log or via \f[B]\[en]notify\f[R].
+.TP
+\f[B]\[en]confdir\f[R] [\f[I]dir\f[R]]
+Use \f[I]dir\f[R] for all configuration files.
+Defaults to /etc/managebackups.
+.TP
+\f[B]\[en]cachedir\f[R] [\f[I]dir\f[R]]
+Use \f[I]dir\f[R] for all cache files.
+Defaults to /var/managebackups/caches.
+.TP
+\f[B]\[en]logdir\f[R] [\f[I]dir\f[R]]
+Use \f[I]dir\f[R] for all log files.
+Defaults to /var/log if writable by the process, otherwise the
+user\[cq]s home directory.
 .SS Take Backups Options
 .TP
 \f[B]\[en]directory\f[R] [\f[I]directory\f[R]]
@@ -385,6 +398,23 @@ Show details of all backups taken that are associated with a profile.
 Show a one-line summary for each backup profile.
 The summary includes detail on the most recent backup as well as the
 number of backups, age ranges and total disk space.
+.SH ENVIRONMENT VARIABLES
+.TP
+\f[B]MB_CONFDIR\f[R]
+Directory to use for configuration files.
+See also \f[B]\[en]confdir\f[R].
+Defaults to /etc/managebackups.
+.TP
+\f[B]MB_CACHEDIR\f[R]
+Directory to use for cache files.
+See also \f[B]\[en]cachedir\f[R].
+Defaults to /var/managebackups/caches.
+.TP
+\f[B]MB_LOGDIR\f[R]
+Directory to use for logging.
+See also \f[B]\[en]logdir\f[R].
+Defaults to /var/log if writable by the process, otherwise the
+user\[cq]s home directory.
 .SH AUTHORS
 Rick Ennis.
 )END"); }

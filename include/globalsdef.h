@@ -57,6 +57,7 @@
 #define CLI_HELP "help"
 #define CLI_CONFDIR "confdir"
 #define CLI_CACHEDIR "cachedir"
+#define CLI_LOGDIR "logdir"
 
 
 // conf file regexes
@@ -97,7 +98,7 @@ struct global_vars {
     cxxopts::ParseResult cli;
     bool color;
     bool stats;
-    std::string logFilename;
+    std::string logDir;
     std::string confDir;
     std::string cacheDir;
 };

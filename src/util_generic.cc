@@ -38,12 +38,12 @@ string cppgetenv(string variable) {
 
 void log(string message) {
 #ifdef ON_MAC
-    if (!GLOBALS.logFilename.length()) {
+    if (!GLOBALS.logDir.length()) {
         if (!access("/var/log", W_OK) || !access("/var/log/managebackups.log", W_OK)) 
-            GLOBALS.logFilename = "/var/log/managebackups.log";
+            GLOBALS.logDir = "/var/log";
         else {
             struct passwd *pw = getpwuid(getuid());
-            GLOBALS.logFilename = string(pw->pw_dir) + "/managebackups.log";
+            GLOBALS.logDir = string(pw->pw_dir);
         }
     }
 
@@ -54,7 +54,7 @@ void log(string message) {
     strftime(timeStamp, sizeof(timeStamp), "%b %d %Y %H:%M:%S ", localtime(&now));
 
     ofstream logFile;
-    logFile.open(GLOBALS.logFilename, ios::app);
+    logFile.open(GLOBALS.logDir + "/managebackups.log", ios::app);
 
     if (logFile.is_open()) {
         logFile << string(timeStamp) << message << endl;

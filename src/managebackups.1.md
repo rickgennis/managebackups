@@ -69,6 +69,15 @@ Options are relative to the three functions of **managebackups**.
 **-q**, **--quiet**
 : Quiet mode is to minimize output; useful for cron invocations where important messages will be seen in the log or via **--notify**.
 
+**--confdir** [*dir*]
+: Use *dir* for all configuration files. Defaults to /etc/managebackups.
+
+**--cachedir** [*dir*]
+: Use *dir* for all cache files. Defaults to /var/managebackups/caches.
+
+**--logdir** [*dir*]
+: Use *dir* for all log files. Defaults to /var/log if writable by the process, otherwise the user's home directory.
+
 ## Take Backups Options
 
 **--directory** [*directory*]
@@ -158,4 +167,13 @@ Profile configuration files are managed by **managebackups** though they can be 
 **managebackups -0**
 : Show a one-line summary for each backup profile. The summary includes detail on the most recent backup as well as the number of backups, age ranges and total disk space.
 
+# ENVIRONMENT VARIABLES
+**MB_CONFDIR**
+: Directory to use for configuration files. See also **--confdir**. Defaults to /etc/managebackups.
+
+**MB_CACHEDIR**
+: Directory to use for cache files. See also **--cachedir**. Defaults to /var/managebackups/caches.
+
+**MB_LOGDIR**
+: Directory to use for logging. See also **--logdir**. Defaults to /var/log if writable by the process, otherwise the user's home directory. 
 
