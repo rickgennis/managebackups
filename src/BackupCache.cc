@@ -42,18 +42,21 @@ BackupCache::~BackupCache() {
 
         cacheFile.open(cacheFilename);
         if (cacheFile.is_open()) {
+            unsigned int count = 0;
 
             // write raw data
             for (auto raw_it = rawData.begin(); raw_it != rawData.end(); ++raw_it) {
 
                 // files need to be able to fall out of the cache if they disappear from the filesystem.
                 // "current" means the file was seen in the most recent filesystem scan.
-                if (raw_it->second.current)
+                if (raw_it->second.current) {
                     cacheFile << raw_it->second.class2string() << endl;
+                    ++count;
+                }
             }
 
             cacheFile.close();
-            DEBUG(2, "cache saved to " << cacheFilename);
+            DEBUG(2, "cache saved to " << cacheFilename << " (" << count << " entries)");
         }
         else
             log("unable to save cache to " + cacheFilename);

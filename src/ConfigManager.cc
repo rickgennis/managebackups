@@ -26,7 +26,7 @@ ConfigManager::ConfigManager() {
     DIR *c_dir;
     struct dirent *c_dirEntry;
 
-    if ((c_dir = opendir(CONF_DIR)) != NULL ) {
+    if ((c_dir = opendir(GLOBALS.confDir.c_str())) != NULL ) {
         Pcre regEx(".*\\.conf$");
 
         // loop through *.conf files
@@ -35,7 +35,7 @@ ConfigManager::ConfigManager() {
                     !strcmp(c_dirEntry->d_name, "managebackups.conf") || !regEx.search(string(c_dirEntry->d_name)))
                 continue;
 
-            string fullFilename = addSlash(string(CONF_DIR)) + string(c_dirEntry->d_name);
+            string fullFilename = addSlash(GLOBALS.confDir) + string(c_dirEntry->d_name);
             BackupConfig backupConfig;
             backupConfig.loadConfig(fullFilename);
             configs.insert(configs.begin(), backupConfig);

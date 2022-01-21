@@ -25,10 +25,21 @@ string s(int number) {
 }
 
 
+string cppgetenv(string variable) {
+    char* c;
+
+    c = getenv(variable.c_str());
+    if (c == NULL)
+        return "";
+    else
+        return c;
+}
+
+
 void log(string message) {
 #ifdef ON_MAC
     if (!GLOBALS.logFilename.length()) {
-        if (!access("/var/log", W_OK)) 
+        if (!access("/var/log", W_OK) || !access("/var/log/managebackups.log", W_OK)) 
             GLOBALS.logFilename = "/var/log/managebackups.log";
         else {
             struct passwd *pw = getpwuid(getuid());
@@ -220,8 +231,9 @@ string dw(int which) {
 }
 
 
-void mkdirp(string dir) {
+int mkdirp(string dir) {
     struct stat statBuf;
+    int result = 0;
 
     if (stat(dir.c_str(), &statBuf) == -1) {
         char data[1500];
@@ -233,11 +245,16 @@ void mkdirp(string dir) {
             path += string("/") + p;   
 
             if (stat(path.c_str(), &statBuf) == -1)
-               mkdir(path.c_str(), 0755);
+               result = mkdir(path.c_str(), 0775);
+
+            if (result)
+                return(result);
 
             p = strtok(NULL, "/");
         }
     }
+
+    return 0;
 }
 
 
@@ -434,7 +451,7 @@ void strReplaceAll(string& s, string const& toReplace, string const& replaceWith
 
 string locateBinary(string app) {
     string tempStr;
-    string path = getenv("PATH");
+    string path = cppgetenv("PATH");
     stringstream tokenizer(path);
     vector<string> parts;
 

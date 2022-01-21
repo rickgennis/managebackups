@@ -10,6 +10,8 @@ using namespace std;
 
 #define ifcolor(x) (GLOBALS.color ? x : "")
 
+string cppgetenv(string variable);
+
 string s(int number);
 
 void log(string message);
@@ -61,7 +63,7 @@ string seconds2hms(unsigned long seconds);
 
 string dw(int which);
 
-void mkdirp(string dir);
+int mkdirp(string dir);
 
 string trimSpace(const string &s);
 

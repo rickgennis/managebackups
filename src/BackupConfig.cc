@@ -39,6 +39,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_MAXLINKS, RE_MAXLINKS, INT, "20"));
     settings.insert(settings.end(), Setting(CLI_TIME, RE_TIME, BOOL, "0"));
     settings.insert(settings.end(), Setting(CLI_NOS, RE_NOS, BOOL, "0"));
+    settings.insert(settings.end(), Setting(CLI_MINSIZE, RE_MINSIZE, INT, "500"));
 }
 
 
@@ -60,12 +61,12 @@ void BackupConfig::saveConfig() {
     if (!config_filename.length()) {
         string baseName = settings[sTitle].value.length() ? settings[sTitle].value : "default"; 
         struct stat statBuf;
-        if (stat((string(CONF_DIR) + baseName + ".conf").c_str(), &statBuf)) {
+        if (stat((GLOBALS.confDir + baseName + ".conf").c_str(), &statBuf)) {
             int suffix = 1;
-            while (stat((string(CONF_DIR) + baseName + to_string(suffix) + ".conf").c_str(), &statBuf)) 
+            while (stat((GLOBALS.confDir + baseName + to_string(suffix) + ".conf").c_str(), &statBuf)) 
                 ++suffix;
 
-            config_filename = string(CONF_DIR) + baseName + to_string(suffix) + ".conf";
+            config_filename = GLOBALS.confDir + baseName + to_string(suffix) + ".conf";
         }
     }
 
@@ -76,9 +77,11 @@ void BackupConfig::saveConfig() {
 
     if (!newFile.is_open()) {
         cerr << "error: unable to create " << temp_filename << " (directory not writable?)" << endl << endl;
-        cerr << "When --save is specified managebackups writes its configs to " << CONF_DIR << "." << endl;
+        cerr << "When --save is specified managebackups writes its configs to " << GLOBALS.confDir << "." << endl;
         cerr << "An initial --save run via sudo is sufficient then leave --save off of subsequent runs." << endl;
-        cerr << "However, managebackups will always need write acces to " << CONF_DIR << "/caches." << endl;
+        cerr << "However, managebackups will always need write acces to " << GLOBALS.cacheDir << "." << endl;
+        cerr << "These locations can be overriden via --confdir, --cachedir or the environment variables\n";
+        cerr << "MB_CONFDIR, MB_CACHEDIR." << endl;
         log("error: unable to create " + temp_filename + " (directory not writable?)");
         exit(1);
     }
@@ -199,14 +202,14 @@ bool BackupConfig::loadConfig(string filename) {
 
 
 void BackupConfig::loadConfigsCache() {
-    cache.cacheFilename = string(CONF_DIR) + "/caches/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value);
+    cache.cacheFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value);
     struct stat statBuf;
 
     if (!stat(cache.cacheFilename.c_str(), &statBuf)) {
         cache.restoreCache();
     }
     else {
-        mkdir((string(CONF_DIR) + "/caches").c_str(),  S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+        mkdirp(GLOBALS.cacheDir);
     }
 }
 
@@ -261,7 +264,7 @@ unsigned int BackupConfig::removeEmptyDirs(string directory) {
 
 
 bool BackupConfig::getPreviousSuccess() {
-    string stateFilename = string(CONF_DIR) + "/caches/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".state";
+    string stateFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".state";
     bool previousSuccess = true;
 
     ifstream stateFile;
@@ -279,8 +282,8 @@ bool BackupConfig::getPreviousSuccess() {
 
 
 void BackupConfig::setPreviousSuccess(bool state) {
-    string stateFilename = string(CONF_DIR) + "/caches/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".state";
-    mkdir((string(CONF_DIR) + "/caches").c_str(),  S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    string stateFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".state";
+    mkdirp(GLOBALS.cacheDir);
 
     ofstream stateFile;
     stateFile.open(stateFilename);

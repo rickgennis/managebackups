@@ -21,6 +21,7 @@
 #include "notify.h"
 #include "help.h"
 #include "PipeExec.h"
+#include "setup.h"
 
 
 using namespace pcrepp;
@@ -40,6 +41,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
     struct dirent *c_dirEntry;
     Pcre fnameRE(fnamePattern);
     Pcre tempRE("\\.tmp\\.\\d+$");
+    bool testMode = GLOBALS.cli.count(CLI_TEST);
 
     if ((c_dir = opendir(directory.c_str())) != NULL ) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
@@ -204,7 +206,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
 
     if (currentConf == &tempConfig) {
         if (bTitle && bSave) {
-            tempConfig.config_filename = addSlash(CONF_DIR) + safeFilename(tempConfig.settings[sTitle].value) + ".conf";
+            tempConfig.config_filename = addSlash(GLOBALS.confDir) + safeFilename(tempConfig.settings[sTitle].value) + ".conf";
             tempConfig.temp = false;
         }
 
@@ -299,7 +301,7 @@ void pruneBackups(BackupConfig& config) {
 
             // yearly
             auto yearLimit = config.settings[sYears].ivalue();
-            if (yearLimit && filenameAge / 365 <= yearLimit && raw_it->second.date_day == 1 && raw_it->second.date_day == 1) {
+            if (yearLimit && filenameAge / 365 <= yearLimit && raw_it->second.date_month == 1 && raw_it->second.date_day == 1) {
                 DEBUG(2, "\tkeep_yearly: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
                 continue;
             }
@@ -485,6 +487,7 @@ string interpolate(string command, string subDir, string fullDirectory, string b
 
 methodStatus sCpBackup(BackupConfig& config, string backupFilename, string subDir, string sCpParams) {
     string sCpBinary = locateBinary("scp");
+    timer sCpTime;
 
     // superfluous check as test mode bombs out of performBackup() long before it ever calls sCpBackup().
     // but just in case future logic changes, testing here
@@ -500,17 +503,19 @@ methodStatus sCpBackup(BackupConfig& config, string backupFilename, string subDi
     }
 
     // execute the scp
+    sCpTime.start();
     int result = system(string(sCpBinary + " " + backupFilename + " " + sCpParams).c_str());
+    sCpTime.stop();
 
     if (result == -1 || result == 127) {
-        log(config.settings[sTitle].value + " error executing " + sCpBinary);
+        log(config.ifTitle() + " error executing " + sCpBinary);
         SCREENERR("\t• SCP failed for " << backupFilename << " to " << sCpParams);
         return methodStatus(false, "\t• SCP: error executing " + sCpBinary);
     }
     else {
-        log(config.ifTitle() + " " + backupFilename + " scp'd to " + sCpParams);
-        NOTQUIET && cout << "\t• SCP'd " << backupFilename << " to " << sCpParams << endl;
-        return methodStatus(true, "\t• SCP'd " + backupFilename + " to " + sCpParams);
+        log(config.ifTitle() + " " + backupFilename + " scp'd to " + sCpParams + " in " + sCpTime.elapsed());
+        NOTQUIET && cout << "\t• SCP'd " << backupFilename << " to " << sCpParams << " in " << sCpTime.elapsed() << endl;
+        return methodStatus(true, "\t• SCP'd " + backupFilename + " to " + sCpParams + " in " + sCpTime.elapsed());
     }
 }
 
@@ -644,7 +649,7 @@ void performBackup(BackupConfig& config) {
     // determine results
     struct stat statData;
     if (!stat(string(backupFilename + tempExtension).c_str(), &statData)) {
-        if (statData.st_size >= GLOBALS.minBackupSize) {
+        if (statData.st_size >= config.settings[sMinSize].ivalue()) {
             if (!rename(string(backupFilename + tempExtension).c_str(), backupFilename.c_str())) {
                 log(config.ifTitle() + " completed backup to " + backupFilename + " in " + backupTime.elapsed());
                 NOTQUIET && cout << "\t• successfully backed up to " << BOLDBLUE << backupFilename << RESET <<
@@ -707,7 +712,20 @@ int main(int argc, char *argv[]) {
     GLOBALS.statsCount = 0;
     GLOBALS.md5Count = 0;
     GLOBALS.pid = getpid();
-    GLOBALS.minBackupSize = 500;
+
+    // default directories
+    GLOBALS.confDir = CONF_DIR;
+    GLOBALS.cacheDir = CACHE_DIR;
+
+    // overwrite with env vars (if any)
+    string temp;
+    temp = cppgetenv("MB_CONFDIR");
+    if (temp.length())
+        GLOBALS.confDir = temp;
+
+    temp = cppgetenv("MB_CACHEDIR");
+    if (temp.length())
+        GLOBALS.cacheDir = temp;
 
     time(&GLOBALS.startupTime);
     openlog("managebackups", LOG_PID | LOG_NDELAY, LOG_LOCAL1);
@@ -741,13 +759,23 @@ int main(int argc, char *argv[]) {
         (CLI_DEFAULTS, "Show defaults", cxxopts::value<bool>()->default_value("false"))
         (CLI_TIME, "Include time", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOBACKUP, "Don't backup", cxxopts::value<bool>()->default_value("false"))
-        (CLI_NOCOLOR, "Disable color", cxxopts::value<bool>()->default_value("false"));
+        (CLI_NOCOLOR, "Disable color", cxxopts::value<bool>()->default_value("false"))
+        (CLI_HELP, "Show help", cxxopts::value<bool>()->default_value("false"))
+        (CLI_CONFDIR, "Configuration directory", cxxopts::value<std::string>())
+        (CLI_CACHEDIR, "Cache directory", cxxopts::value<std::string>())
+        (CLI_INSTALL, "Install", cxxopts::value<bool>()->default_value("false"));
 
     try {
         GLOBALS.cli = options.parse(argc, argv);
         GLOBALS.debugLevel = GLOBALS.cli.count(CLI_VERBOSE);
         GLOBALS.color = !GLOBALS.cli[CLI_NOCOLOR].as<bool>();
         GLOBALS.stats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2);
+
+        if (GLOBALS.cli.count(CLI_CONFDIR))
+            GLOBALS.confDir = GLOBALS.cli[CLI_CONFDIR].as<string>();
+
+        if (GLOBALS.cli.count(CLI_CACHEDIR))
+            GLOBALS.cacheDir = GLOBALS.cli[CLI_CACHEDIR].as<string>();
     }
     catch (cxxopts::OptionParseException& e) {
         cerr << "managebackups: " << e.what() << endl;
@@ -761,6 +789,16 @@ int main(int argc, char *argv[]) {
 
     if (GLOBALS.cli.count(CLI_DEFAULTS)) {
         showHelp(hDefaults);
+        exit(0);
+    }
+
+    if (GLOBALS.cli.count(CLI_HELP)) {
+        showHelp(hOptions);
+        exit(0);
+    }
+
+    if (GLOBALS.cli.count(CLI_INSTALL)) {
+        install(argv[0]);
         exit(0);
     }
 

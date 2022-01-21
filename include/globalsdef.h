@@ -8,6 +8,7 @@
 #include "colors.h"
 
 #define CONF_DIR "/etc/managebackups"
+#define CACHE_DIR "/var/managebackups/caches"
 #define TMP_OUTPUT_DIR "/tmp/managebackups_output"
 
 
@@ -51,6 +52,12 @@
 #define CLI_DEFAULTS "defaults"
 #define CLI_TIME "time"
 #define CLI_NOBACKUP "nobackup"
+#define CLI_MINSIZE "minsize"
+#define CLI_INSTALL "install"
+#define CLI_HELP "help"
+#define CLI_CONFDIR "confdir"
+#define CLI_CACHEDIR "cachedir"
+
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -73,6 +80,7 @@
 #define RE_PRUNE "(prune)"
 #define RE_MAXLINKS "(maxlinks)"
 #define RE_TIME "(time)"
+#define RE_MINSIZE "(minsize)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"
@@ -86,11 +94,12 @@ struct global_vars {
     unsigned long statsCount;
     unsigned long md5Count;
     int pid;
-    int minBackupSize;
     cxxopts::ParseResult cli;
     bool color;
     bool stats;
     std::string logFilename;
+    std::string confDir;
+    std::string cacheDir;
 };
 
 #endif
