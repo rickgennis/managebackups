@@ -193,8 +193,20 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
             }
         }
 
+    // apply fp from the config file, if set
+    if (str2bool(currentConf->settings[sFP].value)) {
+        currentConf->settings[sFailsafeDays].value = "2";
+        currentConf->settings[sFailsafeBackups].value = "1";
+    }
+
     // convert --fp (failsafe paranoid) to its separate settings
     if (GLOBALS.cli.count(CLI_FS_FP)) {
+
+        if (GLOBALS.cli.count(CLI_FS_DAYS) || GLOBALS.cli.count(CLI_FS_BACKUPS)) {
+            SCREENERR("error: --fp is mutually exclusive with --fs_days & --fs_backups");
+            exit(1);
+        }
+
         if (bSave && 
                 (currentConf->settings[sFailsafeDays].value != "2" ||
                  currentConf->settings[sFailsafeBackups].value != "1"))
@@ -242,8 +254,8 @@ void pruneBackups(BackupConfig& config) {
     }
 
     // failsafe checks
-    int fb = stoi(config.settings[sFailsafeBackups].value, NULL);
-    int fd = stoi(config.settings[sFailsafeDays].value, NULL);
+    int fb = config.settings[sFailsafeBackups].ivalue();
+    int fd = config.settings[sFailsafeDays].ivalue();
     auto fnameIdx = config.cache.indexByFilename;
 
     if (fb > 0 && fd > 0) {
@@ -271,6 +283,7 @@ void pruneBackups(BackupConfig& config) {
     }
 
     set<string> changedMD5s;
+    DEBUG(4, "weeklies set to dow " << config.settings[sDOW].ivalue());
 
     // loop through the filename index sorted by filename (i.e. all backups by age)
     for (auto fnameIdx_it = fnameIdx.begin(); fnameIdx_it != fnameIdx.end(); ++fnameIdx_it) {
@@ -287,7 +300,7 @@ void pruneBackups(BackupConfig& config) {
             }
 
             // weekly
-            if (filenameAge / 7 <= config.settings[sWeeks].ivalue() && filenameDOW == 0) {
+            if (filenameAge / 7 <= config.settings[sWeeks].ivalue() && filenameDOW == config.settings[sDOW].ivalue()) {
                 DEBUG(2, "keep_weekly: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
                 continue;
             }
@@ -768,6 +781,8 @@ int main(int argc, char *argv[]) {
         (CLI_CONFDIR, "Configuration directory", cxxopts::value<std::string>())
         (CLI_CACHEDIR, "Cache directory", cxxopts::value<std::string>())
         (CLI_LOGDIR, "Log directory", cxxopts::value<std::string>())
+        (CLI_DOW, "Day of week for weeklies", cxxopts::value<int>())
+        (CLI_INSTALLMAN, "Install man", cxxopts::value<bool>()->default_value("false"))
         (CLI_INSTALL, "Install", cxxopts::value<bool>()->default_value("false"));
 
     try {
@@ -802,6 +817,11 @@ int main(int argc, char *argv[]) {
 
     if (GLOBALS.cli.count(CLI_HELP)) {
         showHelp(hOptions);
+        exit(0);
+    }
+    
+    if (GLOBALS.cli.count(CLI_INSTALLMAN)) {
+        installman();
         exit(0);
     }
 

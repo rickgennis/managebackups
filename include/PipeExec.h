@@ -59,7 +59,19 @@ class PipeExec {
         PipeExec(string cmd);
         ~PipeExec();
 
-        void execute(string procName = "");    // procName is used to make a unique subdir under /tmp for STDERR output
+        /* execute(procName, leaveOutput)
+         * This executes the entire cmd from the constructor, inclusive all off sub-processes required for any
+         * embedded pipes. STDIO is passed from proc to proc (STDOUT of proc 1 to STDIN of proc 2, etc).  STDERR
+         * from each child proc (if any) would spill to the screen and look ugly. Instead we redirect the STDERRs
+         * to files under /tmp.
+         *
+         * The final child proc's STDOUT is redirected back to the initial parent to be able to read its output.
+         * If it's preferable to just have the final child's STDOUT appear on the screen (such as if you're
+         * calling "less" and piping text to it, set leaveOutput to true. If the PipeExec class goes out of scope,
+         * including the main executable terminating, then wait(NULL) should be called if the sub-process
+         * (like "less") will need time to finish.
+         */
+        void execute(string procName = "", bool leaveOutput = 0);    // procName is used to make a unique subdir under /tmp for STDERR output
         bool execute2file(string toFile, string procName);
 
         ssize_t readProc(void *buf, size_t count);

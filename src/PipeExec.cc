@@ -13,7 +13,7 @@
 #define READ_END STDIN_FILENO
 #define WRITE_END STDOUT_FILENO
 
-#define DUP2(x,y) while (dup2(x,y) < 0 && errno == EINTR);
+#define DUP2(x,y) while (dup2(x,y) < 0 && errno == EINTR)
 
 using namespace std;
 using namespace pcrepp;
@@ -98,7 +98,7 @@ void PipeExec::dump() {
 }
 
 
-void PipeExec::execute(string procName) {
+void PipeExec::execute(string procName, bool leaveOutput) {
     procs.insert(procs.begin(), procDetail("head"));
 
     string errorFilename = string(TMP_OUTPUT_DIR) + "/" + safeFilename(procName) + "/";
@@ -110,22 +110,33 @@ void PipeExec::execute(string procName) {
     for (auto proc_it = procs.begin(); proc_it != procs.end(); ++proc_it) {
         ++commandIdx;
         string commandPrefix = proc_it->command.substr(0, proc_it->command.find(" "));
+        string stderrFname = errorFilename + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stderr";
 
         // last loop
         if (*proc_it == procs[procs.size() - 1]) {
             DEBUG(3, "executing final command [" << proc_it->command << "]");
+
             // redirect stderr to a file
-            int errorFd = open(string(errorFilename + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stderr").c_str(), 
-                O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-            if (errorFd > 0)
-                DUP2(errorFd, 2);
+            if (procName.length()) {
+                int errorFd = open(stderrFname.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+                if (errorFd > 0) 
+                    DUP2(errorFd, 2);
+                else { 
+                    string msg = "warning: unable to redirect STDERR of subprocess because " + stderrFname + " isn't writable";
+                    SCREENERR("\n" << msg);
+                    log(msg);
+                }
+            }
 
             // dup and close remaining fds
+            //auto back_it = proc_it - 1;
             auto back_it = proc_it - 1;
             DUP2(back_it->fd[READ_END], READ_END);
             close(procs[0].fd[WRITE_END]);
             close(procs[0].readfd[READ_END]);
-            DUP2(procs[0].readfd[WRITE_END], 1);
+
+            if (!leaveOutput)
+                DUP2(procs[0].readfd[WRITE_END], 1);
 
             // exec the last process
             varexec(proc_it->command);
@@ -141,13 +152,19 @@ void PipeExec::execute(string procName) {
 
                 // PARENT - all subsequent parents
                 if (*proc_it != procs[0]) {
-                    DEBUG(3, "executing mid command [" << proc_it->command << "]");
+                    DEBUG(3, "executing mid command [" << proc_it->command << "] with pipes " << proc_it->fd[0] << " & " << proc_it->fd[1]);
 
                     // redirect stderr to a file
-                    int errorFd = open(string(errorFilename + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stderr").c_str(), 
-                            O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-                    if (errorFd > 0)
-                        DUP2(errorFd, 2);
+                    if (procName.length()) {
+                        int errorFd = open(stderrFname.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+                        if (errorFd > 0) 
+                            DUP2(errorFd, 2);
+                        else {
+                            string msg = "warning: unable to redirect STDERR of subprocess because " + stderrFname + " isn't writable";
+                            SCREENERR("\n" << msg);
+                            log(msg);
+                        }
+                    }
 
                     // close fds from two procs back
                     if (procs.size() > 2 && *proc_it != procs[1]) {

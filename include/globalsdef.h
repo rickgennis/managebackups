@@ -54,11 +54,12 @@
 #define CLI_NOBACKUP "nobackup"
 #define CLI_MINSIZE "minsize"
 #define CLI_INSTALL "install"
+#define CLI_INSTALLMAN "installman"
 #define CLI_HELP "help"
 #define CLI_CONFDIR "confdir"
 #define CLI_CACHEDIR "cachedir"
 #define CLI_LOGDIR "logdir"
-
+#define CLI_DOW "dow"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -74,14 +75,16 @@
 #define RE_WEEKS "(weekly|weeklies|weeks)"
 #define RE_MONTHS "(monthly|monthlies|months)"
 #define RE_YEARS "(yearly|yearlies|years)"
-#define RE_FSBACKS "(fs_backups|fb|failsafe_backups)"
+#define RE_FSBACKUPS "(fs_backups|fb|failsafe_backups)"
 #define RE_FSDAYS "(fs_days|fd|failsafe_days)"
+#define RE_FS_FP "(fp)"
 #define RE_NOTIFY "(notify)"
 #define RE_NOS "(nos)"
 #define RE_PRUNE "(prune)"
 #define RE_MAXLINKS "(maxlinks)"
 #define RE_TIME "(time)"
 #define RE_MINSIZE "(minsize)"
+#define RE_DOW "(dow)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"

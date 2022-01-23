@@ -198,13 +198,13 @@ void displayStats(ConfigManager& configManager) {
         displayStatsForConfig(configManager.configs[configManager.activeConfig]);
     else {
         bool previous = false;
-        for (auto cfg_it = configManager.configs.begin(); cfg_it != configManager.configs.end(); ++cfg_it) {
-            if (!cfg_it->temp) {
+        for (auto cfg_it : configManager.configs) {
+            if (!cfg_it.temp) {
 
                 if (previous)
                     cout << "\n\n";
 
-                displayStatsForConfig(*cfg_it);
+                displayStatsForConfig(cfg_it);
                 previous = true;
             }
         }
@@ -217,9 +217,9 @@ void display1LineStats(ConfigManager& configManager) {
     if (configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp)
         display1LineForConfig(configManager.configs[configManager.activeConfig]);
     else {
-        for (auto cfg_it = configManager.configs.begin(); cfg_it != configManager.configs.end(); ++cfg_it) {
-            if (!cfg_it->temp)
-                display1LineForConfig(*cfg_it);
+        for (auto cfg_it : configManager.configs) {
+            if (!cfg_it.temp)
+                display1LineForConfig(cfg_it);
         }
     }
 }

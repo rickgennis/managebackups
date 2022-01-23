@@ -283,8 +283,9 @@ string trimQuotes(string s) {
 
 
 int varexec(string fullCommand) {
-    Pcre cmdRE("('.*?'|\".*?\"|\\S+)", "g");
-    char *params[300];
+    // split the command into a parameter list on spaces, except when quoted or escaped
+    Pcre cmdRE("((?:([\'\"])(?:(?!\\g2).|(?:(?<=\\\\)[\'\"]))+(?<!\\\\)\\g2)|(?:\\S|(?:(?<=\\\\)\\s))+)", "g");
+    char *params[400];
     string match;
 
     int index = 0;
@@ -294,16 +295,34 @@ int varexec(string fullCommand) {
         ++pos;
         match = cmdRE.get_match(0);
 
-        if (match.find("*") != string::npos || match.find("?") != string::npos) {
+        // if its a valid string
+        if (match.length() &&
+                // not quoted
+                !((match.front() == '\'' || match.front() == '\"') && match.front() == match.back()) &&
+                // and has shell wildcards
+                (match.find("*") != string::npos || match.find("?") != string::npos)) {
+                
+            // then replace the parameter will a wildcard expansion of the maching files
             auto files = expandWildcardFilespec(trimQuotes(match));
 
             for (auto entry: files) {
+                // no need to free() this because we're going to exec()
                 params[index] = (char *)malloc(entry.length() + 1);
+
+                // add each matching file as a parameter for exec()
                 strcpy(params[index++], entry.c_str());
             }
-        }
+        } 
         else {
+            size_t altpos;
+            // escaping is handled above by cmdRE and is complete by the time we get here
+            // so now we remove any remaining backslashes in the string
+            if ((altpos = match.find("\\")) != string::npos)
+                match.erase(altpos, 1);
+
             params[index] = (char *)malloc(match.length() + 1);
+
+            // and drop any quotes that are on the ends
             strcpy(params[index++], trimQuotes(match).c_str());
         }
     }
@@ -326,7 +345,7 @@ int varexec(string fullCommand) {
 
 string safeFilename(string filename) {
     Pcre search1("[\\s#;\\/\\\\]+", "g");   // these characters get converted to underscores
-    Pcre search2("[\\?\\!\\*]+", "g");         // these characters get removed
+    Pcre search2("[\\?\\!\\*]+", "g");      // these characters get removed
 
     string tempStr = search1.replace(filename, "_");
     return search2.replace(tempStr, "");

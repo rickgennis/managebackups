@@ -36,6 +36,9 @@ Options are relative to the three functions of **managebackups**.
 **--install**
 : **managebackups** needs write access under /var to store caches of MD5s and under /etc/managebackups to update configs from commandline parameters. It can run entirely as root. But to facilitate a safer setup, it can be configured to run setgid as group "daemon" and the required directories configured to allow writes from that group. **--install** installs the **managebackups** binary in /usr/local/bin (setgid), creates the config and cache directories (writable by "daemon") and installs the man page in /usr/local/share/man/man1. It's designed for a one-time execution as **sudo managebackups --install** after which root access is no longer required.
 
+**--installman**
+:Only install the man page to /usr/local/share/man/man1.
+
 **-p**, **--profile** [*profile*]
 : Use *profile* for the current run.  
 

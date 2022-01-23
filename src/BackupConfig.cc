@@ -30,7 +30,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_WEEKS, RE_WEEKS, INT, "4"));
     settings.insert(settings.end(), Setting(CLI_MONTHS, RE_MONTHS, INT, "6"));
     settings.insert(settings.end(), Setting(CLI_YEARS, RE_YEARS, INT, "2"));
-    settings.insert(settings.end(), Setting(CLI_FS_BACKUPS, RE_FSBACKS, INT, "0"));
+    settings.insert(settings.end(), Setting(CLI_FS_BACKUPS, RE_FSBACKUPS, INT, "0"));
     settings.insert(settings.end(), Setting(CLI_FS_DAYS, RE_FSDAYS, INT, "0"));
     settings.insert(settings.end(), Setting(CLI_SCPTO, RE_SCP, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_SFTPTO, RE_SFTP, STRING, ""));
@@ -40,6 +40,8 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_TIME, RE_TIME, BOOL, "0"));
     settings.insert(settings.end(), Setting(CLI_NOS, RE_NOS, BOOL, "0"));
     settings.insert(settings.end(), Setting(CLI_MINSIZE, RE_MINSIZE, INT, "500"));
+    settings.insert(settings.end(), Setting(CLI_DOW, RE_DOW, INT, "0"));
+    settings.insert(settings.end(), Setting(CLI_FS_FP, RE_FS_FP, BOOL, "0"));
 }
 
 
