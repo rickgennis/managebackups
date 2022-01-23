@@ -38,12 +38,27 @@ string cppgetenv(string variable) {
 
 void log(string message) {
 #ifdef ON_MAC
-    if (!GLOBALS.logDir.length()) {
-        if (!access("/var/log", W_OK) || !access("/var/log/managebackups.log", W_OK)) 
-            GLOBALS.logDir = "/var/log";
+    if (!GLOBALS.logDir.length()) {  
+        string defaultDir = "/var/log";
+
+        ofstream logFile;
+        logFile.open(defaultDir + "/managebackups.log");
+        if (logFile.is_open()) {
+            logFile.close();
+            GLOBALS.logDir = defaultDir;
+        }
         else {
-            struct passwd *pw = getpwuid(getuid());
-            GLOBALS.logDir = string(pw->pw_dir);
+            string testFile = defaultDir + ".testfile." + to_string(GLOBALS.pid);
+            logFile.open(testFile);
+            if (logFile.is_open()) {
+                logFile.close();
+                unlink(testFile.c_str());
+                GLOBALS.logDir = defaultDir;
+            }
+            else {
+                struct passwd *pw = getpwuid(getuid());
+                GLOBALS.logDir = string(pw->pw_dir);
+            }
         }
     }
 

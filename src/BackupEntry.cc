@@ -28,16 +28,21 @@ string BackupEntry::class2string() {
 void BackupEntry::string2class(string data) {
     Pcre regEx("\\[(.+)\\],([a-f0-9]{32}),(\\d+),(\\d+),(\\d+),(\\d+)");
 
-    if (regEx.search(data) && regEx.matches() > 4) {
-        filename = regEx.get_match(0);
-        md5 = regEx.get_match(1);
-        links = stoi(regEx.get_match(2));
-        mtime = stoi(regEx.get_match(3));
-        size = stoi(regEx.get_match(4));
-        duration = stoi(regEx.get_match(5));
+    try {
+        if (regEx.search(data) && regEx.matches() > 4) {
+            filename = regEx.get_match(0);
+            md5 = regEx.get_match(1);
+            links = stoi(regEx.get_match(2));
+            mtime = stol(regEx.get_match(3));
+            size = stol(regEx.get_match(4));
+            duration = stol(regEx.get_match(5));
+        }
+        else
+            log("unable to parse cache line (" + data + ")");
     }
-    else
-        log("unable to parse cache line (" + data + ")");
+    catch (...) {
+        SCREENERR("error: cannot parse config data: " << data);
+    }
 }
 
 

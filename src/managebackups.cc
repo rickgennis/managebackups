@@ -273,8 +273,8 @@ void pruneBackups(BackupConfig& config) {
         }
 
         if (minValidBackups < fb) {
-            string message = "skipping pruning due to failsafe check; only " + to_string(fb) +
-                    " backup" + s(fb) + " within the last " + to_string(fd) + " day" + s(fd);
+            string message = "skipping pruning due to failsafe check; only " + to_string(minValidBackups) +
+                    " backup" + s(minValidBackups) + " within the last " + to_string(fd) + " day" + s(fd);
             
             SCREENERR("warning: " << message);
             log(config.ifTitle() + " " + message);
