@@ -66,6 +66,9 @@ void log(string message) {
 }
 
 
+struct timeval mktimeval(unsigned long secs) { struct timeval t; t.tv_sec = secs; t.tv_usec = 0; return t; }
+
+
 string addSlash(string str) {
     return(str.length() && str[str.length() - 1] == '/' ? str : str + "/");
 }
@@ -195,8 +198,11 @@ string seconds2hms(unsigned long seconds) {
 }
 
 
-string timeDiff(unsigned long start, unsigned long end, int maxUnits) {
-    unsigned long offset = end - start;
+string timeDiff(struct timeval start, struct timeval end, int maxUnits) {
+    unsigned long totalus = (end.tv_sec * MILLION + end.tv_usec) - (start.tv_sec * MILLION + start.tv_usec);
+    unsigned long secs = floor(1.0 * totalus / MILLION);
+    unsigned long us = secs ? totalus % (secs * MILLION) : totalus;
+    unsigned long offset = secs;
     int unitsUsed = 0;
     string result;
     map<unsigned long, string> units { 
@@ -219,6 +225,28 @@ string timeDiff(unsigned long start, unsigned long end, int maxUnits) {
             if (++unitsUsed == maxUnits)
                 break;
         }
+    }
+
+    // if the duration is less than a minute and microseconds
+    // are also provided, include them
+    if (secs < 60 && us) {
+        char ms[10];
+        sprintf(ms, "%.2f", 1.0 * us / MILLION);
+
+        string sms = ms;
+        if (sms.back() == '0')
+            sms.pop_back();
+
+        auto pos = result.find(" ");
+        if (pos != string::npos) {
+            sms.erase(0, 1);
+            result.replace(pos, 0, sms);
+
+            if (result.back() != 's')
+                result += "s";
+        }
+        else
+            result = sms + " seconds";
     }
 
     return(result.length() ? result : "0 seconds");

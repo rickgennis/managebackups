@@ -675,7 +675,7 @@ void performBackup(BackupConfig& config) {
                 cacheEntry.inode = statData.st_ino;
                 cacheEntry.size = statData.st_size;
                 cacheEntry.duration = backupTime.seconds();
-                cacheEntry.updateAges(backupTime.endTime);
+                cacheEntry.updateAges(backupTime.endTime.tv_sec);
                 cacheEntry.calculateMD5();
 
                 config.cache.addOrUpdate(cacheEntry, true);

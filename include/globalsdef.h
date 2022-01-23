@@ -90,6 +90,8 @@
 #define INTERP_SUBDIR "{subdir}"
 #define INTERP_FILE "{file}"
 
+#define MILLION 1000000
+
 enum helpType { hDefaults, hOptions, hExamples, hSyntax };
 
 struct global_vars {

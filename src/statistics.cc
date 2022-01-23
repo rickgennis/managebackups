@@ -62,7 +62,7 @@ void display1LineForConfig(BackupConfig& config) {
             seconds2hms(last_it->second.duration).c_str(),
             rawSize,
             saved,
-            string(timeDiff(first_it->second.name_mtime) + BOLDBLUE + " -> " + RESET + timeDiff(last_it->second.mtime).c_str()).c_str());
+            string(timeDiff(mktimeval(first_it->second.name_mtime)) + BOLDBLUE + " -> " + RESET + timeDiff(mktimeval(last_it->second.mtime)).c_str()).c_str());
             cout << result << "\n";
     }
 }
@@ -164,7 +164,7 @@ void displayStatsForConfig(BackupConfig& config) {
                         raw_it->second.filename.c_str(), approximate(raw_it->second.size).c_str(), 
                         seconds2hms(raw_it->second.duration).c_str(),
                         raw_it->second.date_day == 1 ? "Mnth" : raw_it->second.dow == 0 ? "Week" : "Day",
-                        raw_it->second.links, timeDiff(prectime ? raw_it->second.mtime : raw_it->second.name_mtime).c_str());
+                        raw_it->second.links, timeDiff(mktimeval(prectime ? raw_it->second.mtime : raw_it->second.name_mtime)).c_str());
 
             // if there's more than 1 file with this MD5 then color code it as a set; otherwise no color
             if (config.cache.getByMD5(raw_it->second.md5).size() > 1) {

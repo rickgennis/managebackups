@@ -4,6 +4,7 @@
 
 #include <string>
 #include <time.h>
+#include <sys/time.h>
 #include "globals.h"
 
 using namespace std;
@@ -16,20 +17,22 @@ string s(int number);
 
 void log(string message);
 
-string timeDiff(unsigned long start, unsigned long end = GLOBALS.startupTime, int maxUnits = 2);
+struct timeval mktimeval(unsigned long secs);
+
+string timeDiff(struct timeval start, struct timeval end = mktimeval(GLOBALS.startupTime), int maxUnits = 2);
 
 
 class timer {
     string duration;
 
     public:
-        time_t startTime;
-        time_t endTime;
+        struct timeval startTime;
+        struct timeval endTime;
     
-        void start() { time(&startTime); duration = ""; }
-        void stop() { time(&endTime); }
+        void start() { gettimeofday(&startTime, NULL); duration = ""; }
+        void stop() { gettimeofday(&endTime, NULL); }
 
-        time_t seconds() { return(endTime - startTime); }
+        time_t seconds() { return(endTime.tv_sec - startTime.tv_sec); }
 
         string elapsed() {
             if (!duration.length()) 
@@ -38,7 +41,7 @@ class timer {
             return(duration);
         }
 
-        timer() { startTime = 0; }
+        timer() { startTime.tv_sec = 0; startTime.tv_usec = 0; }
 };
 
 
