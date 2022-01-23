@@ -4,6 +4,8 @@
 
 #define ON_MAC 1
 
+#define VERSION '1.2.0'
+
 #include "cxxopts.hpp"
 #include "colors.h"
 
@@ -60,6 +62,7 @@
 #define CLI_CACHEDIR "cachedir"
 #define CLI_LOGDIR "logdir"
 #define CLI_DOW "dow"
+#define CLI_VERSION "version"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")

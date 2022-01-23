@@ -32,7 +32,10 @@ class timer {
         void start() { gettimeofday(&startTime, NULL); duration = ""; }
         void stop() { gettimeofday(&endTime, NULL); }
 
-        time_t seconds() { return(endTime.tv_sec - startTime.tv_sec); }
+        time_t seconds() { 
+            auto r = endTime.tv_sec - startTime.tv_sec - (endTime.tv_usec > startTime.tv_usec ? 1 : 0); 
+            return(r > 0 ? r : 0); 
+        }
 
         string elapsed() {
             if (!duration.length()) 

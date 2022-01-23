@@ -37,6 +37,9 @@ class BackupConfig {
 
         string ifTitle();
         unsigned int removeEmptyDirs(string dir = "");
+
+        friend bool operator<(const BackupConfig& b1, const BackupConfig&b2);
+        friend bool operator>(const BackupConfig& b1, const BackupConfig&b2);
 };
 
 #endif

@@ -42,7 +42,7 @@ void log(string message) {
         string defaultDir = "/var/log";
 
         ofstream logFile;
-        logFile.open(defaultDir + "/managebackups.log");
+        logFile.open(defaultDir + "/managebackups.log", ios::app);
         if (logFile.is_open()) {
             logFile.close();
             GLOBALS.logDir = defaultDir;

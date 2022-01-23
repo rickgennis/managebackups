@@ -594,7 +594,7 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
         return methodStatus(true, "\t• SFTP'd " + backupFilename + " via " + sFtpParams + " in " + sFtpTime.elapsed());
     }
     else {
-        log(config.ifTitle() + " failed to sftp " + backupFilename + "  via " + sFtpParams + "; see " + string(TMP_OUTPUT_DIR));
+        log(config.ifTitle() + " failed to sftp " + backupFilename + " via " + sFtpParams + "; see " + string(TMP_OUTPUT_DIR));
         SCREENERR("\t• SFTP failed for " << backupFilename << " via " << sFtpParams);
         return methodStatus(false, "\t• SFTP failed for " + backupFilename + " via " + sFtpParams + "; see " + string(TMP_OUTPUT_DIR));
     }
@@ -782,6 +782,7 @@ int main(int argc, char *argv[]) {
         (CLI_CACHEDIR, "Cache directory", cxxopts::value<std::string>())
         (CLI_LOGDIR, "Log directory", cxxopts::value<std::string>())
         (CLI_DOW, "Day of week for weeklies", cxxopts::value<int>())
+        (CLI_VERSION, "Version", cxxopts::value<bool>()->default_value("false"))
         (CLI_INSTALLMAN, "Install man", cxxopts::value<bool>()->default_value("false"))
         (CLI_INSTALL, "Install", cxxopts::value<bool>()->default_value("false"));
 
@@ -827,6 +828,11 @@ int main(int argc, char *argv[]) {
 
     if (GLOBALS.cli.count(CLI_INSTALL)) {
         install(argv[0]);
+        exit(0);
+    }
+
+    if (GLOBALS.cli.count(CLI_VERSION)) {
+        cout << "managebackups " << VERSION << endl;
         exit(0);
     }
 

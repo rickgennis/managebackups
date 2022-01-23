@@ -2,7 +2,7 @@
 #include <fstream>
 #include <dirent.h>
 #include "pcre++.h"
-
+#include <algorithm>
 #include "ConfigManager.h"
 #include "globals.h"
 #include "util_generic.h"
@@ -45,6 +45,7 @@ ConfigManager::ConfigManager() {
     }
 
     activeConfig = -1;
+    sort(configs.begin(), configs.end());
 }
 
 
