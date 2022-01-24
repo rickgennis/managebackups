@@ -561,3 +561,15 @@ bool mtimesAreSameDay(time_t m1, time_t m2) {
 }
 
 
+string horizontalLine(int length) {
+    char dash[5];
+    sprintf(dash, "\u2501");
+    string line;
+
+    for (int x = 0; x < length; ++x)
+        line += dash;
+
+    return line;
+}
+
+

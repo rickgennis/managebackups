@@ -91,5 +91,7 @@ string vars2MY(int month, int year);
 
 bool mtimesAreSameDay(time_t m1, time_t m2);
 
+string horizontalLine(int length);
+
 #endif
 

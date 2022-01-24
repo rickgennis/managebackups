@@ -11,15 +11,29 @@
 
 using namespace std;
 
+struct summaryStats {
+    bool success;
+    unsigned long lastBackupBytes;
+    unsigned long totalBytesUsed;
+    unsigned long totalBytesSaved;
+    long numberOfBackups;
+    unsigned long duration;
 
-void display1LineForConfig(BackupConfig& config) {
-    double bytesUsed = 0;
-    double bytesSaved = 0;
+    summaryStats() {
+        success = false;
+        lastBackupBytes = totalBytesUsed = totalBytesSaved = numberOfBackups = duration = 0;
+    }
+};
+
+
+summaryStats display1LineForConfig(BackupConfig& config) {
     set<unsigned long> countedInode;
+    struct summaryStats resultStats;
 
     unsigned long rawSize = config.cache.rawData.size();
-    if (rawSize < 1)
-        return;
+    if (rawSize < 1) {
+        return resultStats;
+    }
 
     // calcuclate stats from the entire list of backups
     for (auto raw_it = config.cache.rawData.begin(); raw_it != config.cache.rawData.end(); ++raw_it) {
@@ -27,14 +41,15 @@ void display1LineForConfig(BackupConfig& config) {
         // calculate total bytes used and saved
         if (countedInode.find(raw_it->second.inode) == countedInode.end()) {
             countedInode.insert(raw_it->second.inode);
-            bytesUsed += raw_it->second.size;
+            resultStats.totalBytesUsed += raw_it->second.size;
         }
         else
-            bytesSaved += raw_it->second.size;
+            resultStats.totalBytesSaved += raw_it->second.size;
     }
+    resultStats.numberOfBackups = config.cache.rawData.size();
 
     // calcuclate percentage saved
-    int saved = floor((1 - double(bytesUsed / (bytesUsed + bytesSaved))) * 100 + 0.5);
+    int saved = floor((1 - ((long double)resultStats.totalBytesUsed / ((long double)resultStats.totalBytesUsed + (long double)resultStats.totalBytesSaved))) * 100 + 0.5);
 
     auto firstEntry = config.cache.indexByFilename.begin();
     auto lastEntry = config.cache.indexByFilename.end();
@@ -58,13 +73,19 @@ void display1LineForConfig(BackupConfig& config) {
             // content age
             "%s").c_str(),
             pathSplit(last_it->second.filename).file.c_str(), (approximate(last_it->second.size) + " (" +
-            approximate(bytesUsed) + ")").c_str(),
+            approximate(resultStats.totalBytesUsed) + ")").c_str(),
             seconds2hms(last_it->second.duration).c_str(),
             rawSize,
             saved,
             string(timeDiff(mktimeval(first_it->second.name_mtime)) + BOLDBLUE + " -> " + RESET + timeDiff(mktimeval(last_it->second.mtime)).c_str()).c_str());
             cout << result << "\n";
+
+            resultStats.duration = last_it->second.duration;
+            resultStats.lastBackupBytes = last_it->second.size;
     }
+
+    resultStats.success = true;
+    return resultStats;
 }
 
 
@@ -90,14 +111,9 @@ void displayStatsForConfig(BackupConfig& config) {
     }
 
     // calcuclate percentage saved
-    int saved = floor((1 - double(bytesUsed / (bytesUsed + bytesSaved))) * 100 + 0.5);
+    int saved = floor((1 - (long double)(bytesUsed / (bytesUsed + bytesSaved))) * 100 + 0.5);
 
-    // make a pretty line
-    char dash[5];
-    sprintf(dash, "\u2501");
-    string line;
-    for (int x = 0; x < 60; ++x)
-        line += dash;
+    auto line = horizontalLine(60);
         
     // print top summary of backups
     unsigned long rawSize = config.cache.rawData.size();
@@ -198,7 +214,7 @@ void displayStats(ConfigManager& configManager) {
         displayStatsForConfig(configManager.configs[configManager.activeConfig]);
     else {
         bool previous = false;
-        for (auto cfg_it : configManager.configs) {
+        for (auto cfg_it: configManager.configs) {
             if (!cfg_it.temp) {
 
                 if (previous)
@@ -217,11 +233,52 @@ void display1LineStats(ConfigManager& configManager) {
     if (configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp)
         display1LineForConfig(configManager.configs[configManager.activeConfig]);
     else {
-        for (auto cfg_it : configManager.configs) {
-            if (!cfg_it.temp)
-                display1LineForConfig(cfg_it);
+        struct summaryStats perStats;
+        struct summaryStats totalStats;
+
+        int nonTempConfigs = 0;
+        for (auto cfg_it: configManager.configs) {
+            if (!cfg_it.temp) {
+                ++nonTempConfigs;
+                perStats = display1LineForConfig(cfg_it);
+                totalStats.lastBackupBytes += perStats.lastBackupBytes;
+                totalStats.totalBytesUsed += perStats.totalBytesUsed;
+                totalStats.totalBytesSaved += perStats.totalBytesSaved;
+                totalStats.numberOfBackups += perStats.numberOfBackups;
+                totalStats.duration += perStats.duration;
+            }
+        }
+
+        if (nonTempConfigs > 1) {
+            //cout << horizontalLine(80) << "\n";
+            char result[1000];
+
+            sprintf(result,
+            // size
+            string(string("%-15s  ") +
+            // duration
+            "%s  " +
+            // number
+            "%-4ld  " +
+            // saved
+            "%3i%%  "+
+            // content age
+            "%s").c_str(),
+
+            (approximate(totalStats.lastBackupBytes) + " (" +
+                approximate(totalStats.totalBytesUsed) + ")").c_str(),
+
+            seconds2hms(totalStats.duration).c_str(),
+
+            totalStats.numberOfBackups,
+
+            int(floor((1 - ((long double)totalStats.totalBytesUsed / ((long double)totalStats.totalBytesUsed + (long double)totalStats.totalBytesSaved))) * 100 + 0.5)),
+
+            string(string("Would have taken ") + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved)).c_str());
+
+            cout << BOLDWHITE << "TOTALS                                    " << result << RESET << "\n";
         }
     }
+
+    return;
 }
-
-
