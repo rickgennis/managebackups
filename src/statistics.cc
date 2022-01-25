@@ -77,7 +77,8 @@ summaryStats display1LineForConfig(BackupConfig& config) {
             seconds2hms(last_it->second.duration).c_str(),
             rawSize,
             saved,
-            string(timeDiff(mktimeval(first_it->second.name_mtime)) + BOLDBLUE + " -> " + RESET + timeDiff(mktimeval(last_it->second.mtime)).c_str()).c_str());
+            string(BOLDBLUE + string("[") + RESET + timeDiff(mktimeval(first_it->second.name_mtime)) + BOLDBLUE + " -> " + 
+                RESET + timeDiff(mktimeval(last_it->second.mtime)).c_str() + BOLDBLUE + "]" + RESET).c_str());
             cout << result << "\n";
 
             resultStats.duration = last_it->second.duration;
