@@ -1,0 +1,12 @@
+
+v1.2.4 (1/25/22)	Bug fixes
+		•  Commit cache immediately after a backup + MD5 of that backup.
+		   Improves -0 and -1 performance for concurrent invocations.
+
+		•  Catch interrupts to handle SIGINT & SIGTERM and clean up temp
+		   files.
+
+
+v1.2.2 (1/24/22)	Initial C++ release
+
+

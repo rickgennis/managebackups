@@ -119,7 +119,7 @@ void displayStatsForConfig(BackupConfig& config) {
     unsigned long rawSize = config.cache.rawData.size();
     unsigned long md5Size = config.cache.indexByMD5.size();
     cout << line << "\n";
-    if (config.settings[sTitle].value.length()) cout << "Title: " << config.settings[sTitle].value << "\n";
+    if (config.settings[sTitle].value.length()) cout << "Profile: " << config.settings[sTitle].value << "\n";
     cout << "Directory: " << config.settings[sDirectory].value << " (" << config.settings[sBackupFilename].value << ")\n";
     cout << rawSize << " backup" << s(rawSize) << ", " << md5Size << " unique" << s(md5Size) << "\n";
     cout << approximate(bytesUsed + bytesSaved) << " using " << approximate(bytesUsed) << " on disk (saved " << saved << "%)\n";
