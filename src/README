@@ -1,0 +1,65 @@
+
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+*-*       QUICK START GUIDE       *-*
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+
+1. PERMISSIONS
+
+To run managebackups you should first decide on a permission model.  Because it generally doesn't 
+require root privileges (unless you're reading other's files) it can be setup to run as any normal
+user.  The default setup stores everything in central locations so that any user can invoke it with
+the same results.
+
+    A. Default setup.
+       The default locations are:
+
+            • config: /etc/managebackups
+            • cache:  /var/managebackups/cache
+            • logs:   /var/log (syslog isn't used on MacOS because it goes to a database)
+
+        These require root access to create the directories and set them SGID for the "deamon"
+        user. The binary gets installed to /usr/local/bin SGID "daemon" as well. Default
+        setup is enabled with a one-time run of "sudo managebackups --install".
+
+
+    B.  User-specific setup.
+        The file locations are:
+
+            • config: ~/managebackups/etc
+            • cache:  ~/managebackups/var/cache
+            • logs:   ~/managebackups/var/log
+
+        No root access is required for this setup.  Config and cache files created when
+        user foo runs the app are not available when user bar runs it. This setup
+        is enabled by specifying --user (or simply -u) on every run.
+
+
+    C.  Custom setup.
+        The file locations are wherever specified. The file locations can be configured for
+        each run by either commandline parameter (--confdir, --cachedir, --logdir) or
+        environment variable (MB_CONFDIR, MB_CACHEDIR, MB_LOGDIR). These are the only
+        commandline parameter that are not automatically persisted for future runs with the
+        use of the --save options.
+        
+
+2.  CONFIG
+
+managebackups config files are plain text, editable and support comments. But rather than
+learn the directive names it's far easier to craft a commandline with the desired settings and
+then use the --save option to have managebackups write the config file for you.  managebackups
+serves 3 functions but most uses fall into one of two classes:
+
+        A. take and manage backups
+        B. manage backups created by another tool
+
+Though the retention policy functionality ("pruning") will work in either scenario the other 
+value of managebackups is in linking identical copies of content (such as several successive
+day's backups) together to save disk space. This works most effectively when every backup is
+a "full," such as via tar or cpio. But it's not required. To use scenario B simply omit
+the "execute a backup" parameters. See "managebackups --help" for specifics. 
+
+The EXAMPLES section of the man page is a good next step. "sudo managebackups --install"
+includes installing the man page. Or if you don't want the central /etc, /var file setup
+"sudo managebackups --installman" will *only* install the man page.
+
+
