@@ -8,6 +8,8 @@
 #include <filesystem>
 #include <dirent.h>
 #include <time.h>
+#include <sys/types.h>
+#include <pwd.h>
 
 #include "BackupEntry.h"
 #include "BackupCache.h"
@@ -721,7 +723,22 @@ void performBackup(BackupConfig& config) {
 }
 
 
+void setupUserDirectories() {
+    struct passwd *pws;
+    if ((pws = getpwuid(getuid())) == NULL) {
+        SCREENERR("error: unable to lookup current user");
+        exit(1);
+    }
+    
+    string mbs = "managebackups";
+    GLOBALS.confDir = addSlash(pws->pw_dir) + mbs + "/etc";
+    GLOBALS.cacheDir = addSlash(pws->pw_dir) + mbs + "/var/cache";
+    GLOBALS.logDir = addSlash(pws->pw_dir) + mbs + "/var/log";
+}
+
+
 int main(int argc, char *argv[]) {
+    GLOBALS.saveErrorSeen = false;
     GLOBALS.statsCount = 0;
     GLOBALS.md5Count = 0;
     GLOBALS.pid = getpid();
@@ -760,6 +777,7 @@ int main(int argc, char *argv[]) {
         (string("v,") + CLI_VERBOSE, "Verbose output", cxxopts::value<bool>()->default_value("false"))
         (string("q,") + CLI_QUIET, "No output", cxxopts::value<bool>()->default_value("false"))
         (string("l,") + CLI_MAXLINKS, "Max hard links", cxxopts::value<int>())
+        (string("u,") + CLI_USER, "User", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))
         (CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))
         (CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())
@@ -791,6 +809,9 @@ int main(int argc, char *argv[]) {
         GLOBALS.debugLevel = GLOBALS.cli.count(CLI_VERBOSE);
         GLOBALS.color = !GLOBALS.cli[CLI_NOCOLOR].as<bool>();
         GLOBALS.stats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2);
+
+        if (GLOBALS.cli.count(CLI_USER)) 
+            setupUserDirectories();
 
         if (GLOBALS.cli.count(CLI_CONFDIR))
             GLOBALS.confDir = GLOBALS.cli[CLI_CONFDIR].as<string>();

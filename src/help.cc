@@ -30,18 +30,25 @@ void showHelp(enum helpType kind) {
             + string(BOLDBLUE) + "EXECUTE A BACKUP" + string(RESET) + "\n"
             + "   --directory [dir]   Directory to save to and look for backups in\n"
             + "   --cmd [command]     Command to take a backup; the backup result should be written to STDOUT.\n" 
-            + "   --file [filename]   The base filename to save the backup to. The date and/or time will automatically be inserted.\n"
+            + "   --file [filename]   The base filename to save the backup to. The date and, optionally, time will automatically be inserted.\n"
+            + "   --time              Include the time in the backup filename; also inserts the day into the subdirectory.\n"
+            + "   --scp [dest]        SCP the new backup to the destination. Dest can include user@machine:/dir/dirs.\n"
+            + "   --sftp [dest]       SFTP the new backup to the destination. Dest can include SCP details plus SFTP flags (like -P for port).\n"
+            + "                       SCP & SFTP also support variable interpolation of these strings which will be sustituted with values\n"
+            + "                       relative to the newly created backup: {fulldir}, {subdir}, {filename}.\n"
             + "\n" + string(BOLDBLUE) + "PRUNING\n" + RESET
             + "   --daily [x]         Keep x daily backups\n"
             + "   --weekly [x]        Keep x weekly backups\n"
             + "   --monthly [x]       Keep x monthly backups\n"
             + "   --yearly [x]        Keep x yearly backups\n"
             + "   --dow [x]           Day of week to save for weeklies (0=Sunday, 1=Monday, etc). defaults to Sunday.\n"
-            + "   --fb [b]            FAILSAFE: Require b backups before pruning\n"
-            + "   --fd [d]            FAILSAFE: within the last d days.\n"
+            + "   --fs_backups [b]    FAILSAFE: Require b backups before pruning\n"
+            + "   --fs_days [d]       FAILSAFE: within the last d days.\n"
             + "   --fp                FAILSAFE: Paranoid mode; sets --fb=1, --fd=2\n"
             + "\n" + string(BOLDBLUE) + "HARD LINKING\n" + RESET
-            + "   --maxlinks          Max number of links to a file (default 20).\n"
+            + "   --maxlinks [x]      Max number of links to a file (default 20).\n"
+            + "   --prune             Enable pruning.\n"
+            + "   --noprune           Disable pruning.\n"
             + "\n" + string(BOLDBLUE) + "GENERAL\n" + RESET
             + "   --profile [name]    Use the specified profile for the current run.\n"
             + "   --save              Save all the specified settings to the specified profile.\n"
@@ -52,12 +59,18 @@ void showHelp(enum helpType kind) {
             + "   -1                  Provide detail of backups.\n"
             + "   --install           Install this binary in /usr/local/bin, update directory perms and create the man page.\n"
             + "   --installman        Only create and install the man page.\n"
+            + "   --confdir [dir]     Use dir for the configuration directory (default /etc/managebackups).\n"
+            + "   --cachedir [dir]    Use dir for the cache directory (default /var/managebackups/cache).\n"
+            + "   --logdir [dir]      Use dir for the log directory (default /var/log).\n"
+            + "   --user              Set directories (config, cache and log) to the calling user's home directory (~/managebackups/).\n"
             + "   --nocolor           Disable color output.\n"
             + "   --test              Run in test mode. No changes are persisted to disk except for caches.\n"
             + "   -q                  Quit mode -- limit output, for use in scripts.\n"
             + "   -v                  Verbose output for debugging (can be specified multiple times)\n"
+            + "   --defaults          Display the default settings for all profiles.\n"
             + "\nSee 'man managebackups' for more detail.\n";
 
+            /*
             // find a pager
             string pagerBin = locateBinary("less");
             if (!pagerBin.length()) {
@@ -76,6 +89,7 @@ void showHelp(enum helpType kind) {
                 wait(NULL);
             }
             else
+            */
                 cout << helpText;
         }
 
@@ -86,9 +100,13 @@ void showHelp(enum helpType kind) {
             cout << R"END(managebackups performs backups and/or manages existing backups. Managing consists
 of deleting previous backups via a defined retention schedule (keep the configured
 number of daily, weekly, monthly, yearly copies) as well as hard linking backups
-that have identical content together to save disk space. See "man managebackups"
-for full detail. Use "sudo managebackups --install" to create the man page if it
-doesn't exist yet.)END" << endl;
+that have identical content together to save disk space.
+
+    • Use "managebackups --help" for options.
+
+    • See "man managebackups" for full detail. 
+
+    • Use "sudo managebackups --install" to create the man page if it doesn't exist yet.)END" << endl;
         break;
     }
 }
@@ -231,6 +249,13 @@ Defaults to /var/managebackups/caches.
 Use \f[I]dir\f[R] for all log files.
 Defaults to /var/log if writable by the process, otherwise the
 user\[cq]s home directory.
+.TP
+\f[B]-u\f[R],\f[B]\[en]user\f[R]
+Set all three directories (config, cache and log) to use the calling
+user\[cq]s home directory (\[ti]/managebackups/).
+Directory setting precedence from highest to lowest is a specific
+commandline directive (like \f[B]\[en]confdir\f[R]), then
+\f[B]\[en]user\f[R], and finally environment values (shown below).
 .SS Take Backups Options
 .TP
 \f[B]\[en]directory\f[R] [\f[I]directory\f[R]]
@@ -265,7 +290,7 @@ to \f[I]destination\f[R].
 hardcoded filename.
 If filename is omitted the newly created date-based filename is used,
 the same as with a standard cp command.
-Additionally the strings {fulldir}, {subdir} and {file} can be used;
+Additionally the strings {fulldir}, {subdir} and {filename} can be used;
 they\[cq]ll be automatically replaced with the values relative to the
 newly created backup.
 .TP
@@ -275,7 +300,7 @@ to \f[I]destination\f[R].
 \f[I]destination\f[R] can include user\[at] notation, machine name
 and/or directory name.
 SFTP parameters (such as -P and others) can be included as well.
-Additionally the strings {fulldir}, {subdir} and {file} can be used;
+Additionally the strings {fulldir}, {subdir} and {filename} can be used;
 they\[cq]ll be automatically replaced with the values relative to the
 newly created backup.
 By default, a current year and month subdirectory will be created on the
@@ -447,6 +472,10 @@ Show a one-line summary for each backup profile.
 The summary includes detail on the most recent backup as well as the
 number of backups, age ranges and total disk space.
 .SH ENVIRONMENT VARIABLES
+.PP
+Environment variables are overriden by \f[B]\[en]user\f[R],
+\f[B]\[en]confdir\f[R], \f[B]\[en]cachedir\f[R], and
+\f[B]\[en]logdir\f[R].
 .TP
 \f[B]MB_CONFDIR\f[R]
 Directory to use for configuration files.

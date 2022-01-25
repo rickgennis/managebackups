@@ -58,8 +58,16 @@ BackupCache::~BackupCache() {
             cacheFile.close();
             DEBUG(2, "cache saved to " << cacheFilename << " (" << count << " entries)");
         }
-        else
+        else {
             log("unable to save cache to " + cacheFilename);
+
+            if (!GLOBALS.saveErrorSeen) {
+                GLOBALS.saveErrorSeen = true;
+
+                SCREENERR("warning: unable to save cache to disk (" << cacheFilename << "\n" <<
+                        "isn't writable); MD5s will continue to be recalculated until corrected.");
+            }
+        }
     }
 
 

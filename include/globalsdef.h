@@ -62,6 +62,7 @@
 #define CLI_CACHEDIR "cachedir"
 #define CLI_LOGDIR "logdir"
 #define CLI_DOW "dow"
+#define CLI_USER "user"
 #define CLI_VERSION "version"
 
 // conf file regexes
@@ -91,7 +92,7 @@
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"
-#define INTERP_FILE "{file}"
+#define INTERP_FILE "{filename}"
 
 #define MILLION 1000000
 
@@ -109,6 +110,7 @@ struct global_vars {
     std::string logDir;
     std::string confDir;
     std::string cacheDir;
+    bool saveErrorSeen;
 };
 
 #endif
