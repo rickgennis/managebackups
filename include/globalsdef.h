@@ -4,7 +4,7 @@
 
 #define ON_MAC 1
 
-#define VERSION "1.2.2"
+#define VERSION "1.2.4"
 
 #include "cxxopts.hpp"
 #include "colors.h"
