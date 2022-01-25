@@ -3,6 +3,7 @@
 #include "unistd.h"
 #include <sys/stat.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <pcre++.h>
 #include <iostream>
 #include <filesystem>
@@ -655,7 +656,9 @@ void performBackup(BackupConfig& config) {
 
     // begin backing up
     PipeExec proc(setCommand);
-    proc.execute2file(backupFilename + tempExtension, safeFilename(config.settings[sTitle].value));
+    GLOBALS.interruptFilename = backupFilename + tempExtension;
+    proc.execute2file(GLOBALS.interruptFilename, safeFilename(config.settings[sTitle].value));
+    GLOBALS.interruptFilename = "";  // interruptFilename gets cleaned up on SIGINT & SIGTERM
 
     // note finish time
     backupTime.stop();
@@ -665,23 +668,39 @@ void performBackup(BackupConfig& config) {
     struct stat statData;
     if (!stat(string(backupFilename + tempExtension).c_str(), &statData)) {
         if (statData.st_size >= config.settings[sMinSize].ivalue()) {
+
+            // calculate the md5 while its still a temp file so that its ignored by other
+            // invocations of managebackups (i.e. someone running -0 while a backup is still
+            // running in the background). then rename the file when we're all done.
+            BackupEntry cacheEntry;
+            cacheEntry.filename = backupFilename + tempExtension;
+            cacheEntry.links = statData.st_nlink;
+            cacheEntry.mtime = statData.st_mtime;
+            cacheEntry.inode = statData.st_ino;
+            cacheEntry.size = statData.st_size;
+            cacheEntry.duration = backupTime.seconds();
+            cacheEntry.updateAges(backupTime.endTime.tv_sec);
+            cacheEntry.calculateMD5();
+
+            // rename the file
             if (!rename(string(backupFilename + tempExtension).c_str(), backupFilename.c_str())) {
                 log(config.ifTitle() + " completed backup to " + backupFilename + " in " + backupTime.elapsed());
                 NOTQUIET && cout << "\t• successfully backed up to " << BOLDBLUE << backupFilename << RESET <<
                     " in " << backupTime.elapsed() << endl;
 
-                BackupEntry cacheEntry;
-                cacheEntry.filename = backupFilename;
-                cacheEntry.links = statData.st_nlink;
-                cacheEntry.mtime = statData.st_mtime;
-                cacheEntry.inode = statData.st_ino;
-                cacheEntry.size = statData.st_size;
-                cacheEntry.duration = backupTime.seconds();
-                cacheEntry.updateAges(backupTime.endTime.tv_sec);
-                cacheEntry.calculateMD5();
-
+                cacheEntry.filename = backupFilename;         // rename the file in the cache entry
                 config.cache.addOrUpdate(cacheEntry, true);
                 config.cache.reStatMD5(cacheEntry.md5);
+
+                // this is a redundant save as the cache gets written out to disk by the destructor anyway.
+                // we do it an extra time here to provide a better user experience for when a backup is
+                // running in the background and someone attempts to run -0 or -1 from the commandline.
+                // if they ask for the stats while the backup is still backing up its a temp file and
+                // the file is ignored.  if they do it during the sftp/scp phase (which could take a while
+                // for a large file) they'll have to wait for the md5 to be calculcated even though we did
+                // it above. this save pushes that new md5 to disk and makes it available to other invocations
+                // of managebackups during the scp/sftp phase.
+                config.cache.saveCache();
 
                 bool overallSuccess = true;
                 string notifyMessage = config.ifTitle() + "\n\t• completed backup of " + backupFilename + " in " + backupTime.elapsed() + "\n\n";
@@ -737,7 +756,22 @@ void setupUserDirectories() {
 }
 
 
+void sigTermHandler(int sig) {
+    if (GLOBALS.interruptFilename.length()) {
+        cerr << "\ninterrupt: aborting backup, cleaning up... ";
+        unlink(GLOBALS.interruptFilename.c_str());
+        cerr << "done." << endl;
+    }
+
+    log("error: operation aborted on signal " + to_string(sig));
+    exit(1);
+}
+
+
 int main(int argc, char *argv[]) {
+    signal(SIGTERM, sigTermHandler);
+    signal(SIGINT, sigTermHandler);
+
     GLOBALS.saveErrorSeen = false;
     GLOBALS.statsCount = 0;
     GLOBALS.md5Count = 0;

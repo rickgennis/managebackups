@@ -96,6 +96,8 @@
 
 #define MILLION 1000000
 
+using namespace std;
+
 enum helpType { hDefaults, hOptions, hExamples, hSyntax };
 
 struct global_vars {
@@ -107,10 +109,11 @@ struct global_vars {
     cxxopts::ParseResult cli;
     bool color;
     bool stats;
-    std::string logDir;
-    std::string confDir;
-    std::string cacheDir;
+    string logDir;
+    string confDir;
+    string cacheDir;
     bool saveErrorSeen;
+    string interruptFilename;
 };
 
 #endif
