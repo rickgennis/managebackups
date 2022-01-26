@@ -330,7 +330,7 @@ void pruneBackups(BackupConfig& config) {
 
                 // delete the file and remove it from all caches
                 if (!unlink(raw_it->second.filename.c_str())) {
-                    NOTQUIET && cout << "removed " << raw_it->second.filename << endl; 
+                    NOTQUIET && cout << "\t• removed " << raw_it->second.filename << endl; 
                     log(config.ifTitle() + " removing " + raw_it->second.filename + 
                         " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")");
 
@@ -456,7 +456,7 @@ void updateLinks(BackupConfig& config) {
                     else {
                         if (!unlink(raw_it->second.filename.c_str())) {
                             if (!link(referenceFile->filename.c_str(), raw_it->second.filename.c_str())) {
-                                cout << "linked " << detail << endl;
+                                NOTQUIET && cout << "\t• linked " << detail << endl;
                                 log(config.ifTitle() + " linked " + detail);
 
                                 config.cache.reStatMD5(md5_it->first);
