@@ -6,6 +6,8 @@ v1.2.4 (1/25/22)	Bug fixes
 		•  Catch interrupts to handle SIGINT & SIGTERM and clean up temp
 		   files.
 
+		•  MD5 bug that manifested under Linux
+
 		•  Cosmetic -0 and -1 output clean up.
 
 

@@ -2,12 +2,12 @@
 
 IDIR =../include
 CC=c++
-CFLAGS=-I../include -I/usr/local/include -I/usr/local/Cellar/openssl@1.1/1.1.1j/include -Wno-c++11-extensions
+CFLAGS=-I../include -I/usr/local/include -I/usr/local/Cellar/openssl@1.1/1.1.1m/include -Wno-c++11-extensions
 
 ODIR=../obj
 LDIR =../lib
 
-LIBS=-lm -L/usr/local/Cellar/pcre++/0.9.5/lib -L/usr/local/Cellar/openssl@1.1/1.1.1j/lib -lpcre++ -lcrypto
+LIBS=-lm -L/usr/local/Cellar/pcre++/0.9.5/lib -L/usr/local/Cellar/openssl@1.1/1.1.1m/lib -lpcre++ -lcrypto
 
 _DEPS = BackupEntry.h BackupCache.h Setting.h BackupConfig.h ConfigManager.h PipeExec.h util_generic.h notify.h globals.h globalsdef.h statistics.h colors.h help.h setup.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))

@@ -132,9 +132,10 @@ string MD5file(string filename, bool quiet) {
         unsigned char md5Result[MD5_DIGEST_LENGTH];
         MD5_Final(md5Result, &md5Context);
 
-        char tempStr[MD5_DIGEST_LENGTH * 2];
+        char tempStr[MD5_DIGEST_LENGTH * 2 + 1];
         for (int i = 0; i < MD5_DIGEST_LENGTH; i++)
             sprintf(tempStr+(2*i), "%02x", md5Result[i]);
+        tempStr[MD5_DIGEST_LENGTH * 2] = 0;
 
         if (!quiet) {
             string back = string(message.length(), '\b');
