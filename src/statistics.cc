@@ -3,6 +3,7 @@
 #include <vector>
 #include <algorithm>
 #include <libgen.h>
+#include <math.h>
 
 #include "statistics.h"
 #include "util_generic.h"

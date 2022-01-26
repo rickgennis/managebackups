@@ -18,6 +18,12 @@ OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 managebackups: $(OBJ)
 	$(CC) -std=c++17 -o ../bin/$@ $^ $(CFLAGS) $(LIBS) $(LFLAGS)
 
+help.base.cc:
+
+help.cc: managebackups.1.md help.base.cc
+	@./addman
+	$(CC) -c -std=c++17 -o $@ $< $(CFLAGS) $(MAKEFLAGS) 
+
 $(ODIR)/%.o: %.cc $(DEPS)
 	$(CC) -c -std=c++17 -o $@ $< $(CFLAGS) $(MAKEFLAGS) 
 

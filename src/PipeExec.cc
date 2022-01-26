@@ -2,6 +2,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <vector>
 #include "pcre++.h"

@@ -1,5 +1,5 @@
 
-v1.2.4 (1/25/22)	Bug fixes
+v1.2.4 - 1/25/22
 		•  Commit cache immediately after a backup + MD5 of that backup.
 		   Improves -0 and -1 performance for concurrent invocations.
 
@@ -11,6 +11,7 @@ v1.2.4 (1/25/22)	Bug fixes
 		•  Cosmetic -0 and -1 output clean up.
 
 
-v1.2.2 (1/24/22)	Initial C++ release
+v1.2.2 - 1/24/22	
+		• Initial C++ release
 
 
