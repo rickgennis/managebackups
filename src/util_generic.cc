@@ -214,7 +214,7 @@ string seconds2hms(unsigned long seconds) {
 }
 
 
-string timeDiff(struct timeval start, struct timeval end, int maxUnits) {
+string timeDiff(struct timeval start, struct timeval end, int maxUnits, int precision) {
     unsigned long totalus = (end.tv_sec * MILLION + end.tv_usec) - (start.tv_sec * MILLION + start.tv_usec);
     unsigned long secs = floor(1.0 * totalus / MILLION);
     unsigned long us = secs ? totalus % (secs * MILLION) : totalus;
@@ -247,7 +247,7 @@ string timeDiff(struct timeval start, struct timeval end, int maxUnits) {
     // are also provided, include them
     if (secs < 60 && us) {
         char ms[10];
-        sprintf(ms, "%.2f", 1.0 * us / MILLION);
+        sprintf(ms, string(string("%.") + to_string(precision) + "f").c_str(), 1.0 * us / MILLION);
 
         string sms = ms;
         if (sms.back() == '0')

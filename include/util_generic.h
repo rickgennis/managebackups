@@ -19,7 +19,7 @@ void log(string message);
 
 struct timeval mktimeval(unsigned long secs);
 
-string timeDiff(struct timeval start, struct timeval end = mktimeval(GLOBALS.startupTime), int maxUnits = 2);
+string timeDiff(struct timeval start, struct timeval end = mktimeval(GLOBALS.startupTime), int maxUnits = 2, int precision = 2);
 
 
 class timer {
@@ -37,9 +37,9 @@ class timer {
             return(r > 0 ? r : 0); 
         }
 
-        string elapsed() {
+        string elapsed(int precision = 2) {
             if (!duration.length()) 
-                duration = timeDiff(startTime, endTime, 3);
+                duration = timeDiff(startTime, endTime, 3, precision);
 
             return(duration);
         }

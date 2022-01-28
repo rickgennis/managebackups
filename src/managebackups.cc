@@ -48,9 +48,8 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
 
     if ((c_dir = opendir(directory.c_str())) != NULL ) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..") ||
-                    tempRE.search(string(c_dirEntry->d_name)))
-                continue;
+            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+               continue;
 
             string fullFilename = addSlash(directory) + string(c_dirEntry->d_name);
 
@@ -66,6 +65,12 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                     // filter for filename if specified
                     if (fnamePattern.length() && !fnameRE.search(string(c_dirEntry->d_name))) {
                         DEBUG(4, "skipping due to name mismatch: " << fullFilename);
+                        continue;
+                    }
+
+                    if (tempRE.search(string(c_dirEntry->d_name))) {
+                        DEBUG(2, "in process file found (" << c_dirEntry->d_name);
+                        cache.inProcess = true;
                         continue;
                     }
 
@@ -769,6 +774,9 @@ void sigTermHandler(int sig) {
 
 
 int main(int argc, char *argv[]) {
+    timer AppTimer;
+    AppTimer.start();
+
     signal(SIGTERM, sigTermHandler);
     signal(SIGINT, sigTermHandler);
 
@@ -906,15 +914,15 @@ int main(int argc, char *argv[]) {
         scanConfigToCache(*currentConfig);
 
     if (GLOBALS.stats) {
-        GLOBALS.cli.count(CLI_STATS1) ? displayStats(configManager) : display1LineStats(configManager);
-        exit(0);
+        GLOBALS.cli.count(CLI_STATS1) ? displayDetailedStatsWrapper(configManager) : displaySummaryStatsWrapper(configManager);
+    }
+    else {
+        pruneBackups(*currentConfig);
+        updateLinks(*currentConfig);
+        performBackup(*currentConfig);
     }
 
-    pruneBackups(*currentConfig);
-    updateLinks(*currentConfig);
-    performBackup(*currentConfig);
-
-    DEBUG(1, "stats: " << GLOBALS.statsCount << ", md5s: " << GLOBALS.md5Count);
-
+    AppTimer.stop();
+    DEBUG(1, "stats: " << GLOBALS.statsCount << ", md5s: " << GLOBALS.md5Count << ", total time: " << AppTimer.elapsed(3));
     return 0;
 }

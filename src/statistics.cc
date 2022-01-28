@@ -27,7 +27,7 @@ struct summaryStats {
 };
 
 
-summaryStats display1LineForConfig(BackupConfig& config) {
+summaryStats _displaySummaryStats(BackupConfig& config) {
     set<unsigned long> countedInode;
     struct summaryStats resultStats;
 
@@ -78,8 +78,11 @@ summaryStats display1LineForConfig(BackupConfig& config) {
             seconds2hms(last_it->second.duration).c_str(),
             rawSize,
             saved,
-            string(BOLDBLUE + string("[") + RESET + timeDiff(mktimeval(first_it->second.name_mtime)) + BOLDBLUE + " -> " + 
-                RESET + timeDiff(mktimeval(last_it->second.mtime)).c_str() + BOLDBLUE + "]" + RESET).c_str());
+            config.cache.inProcess ? 
+                string(BOLDGREEN + string("{") + RESET + timeDiff(mktimeval(first_it->second.name_mtime)) + BOLDGREEN + " -> " + 
+                    RESET + timeDiff(mktimeval(last_it->second.mtime)).c_str() + BOLDGREEN + "}" + RESET).c_str()
+                : string(BOLDBLUE + string("[") + RESET + timeDiff(mktimeval(first_it->second.name_mtime)) + BOLDBLUE + " -> " + 
+                    RESET + timeDiff(mktimeval(last_it->second.mtime)).c_str() + BOLDBLUE + "]" + RESET).c_str());
             cout << result << "\n";
 
             resultStats.duration = last_it->second.duration;
@@ -91,7 +94,58 @@ summaryStats display1LineForConfig(BackupConfig& config) {
 }
 
 
-void displayStatsForConfig(BackupConfig& config) {
+void displaySummaryStatsWrapper(ConfigManager& configManager) {
+    cout << BOLDBLUE << "Most Recent Backup                        Size (Total)     Duration  Num  Saved  Age Range\n" << RESET;
+    if (configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp)
+        _displaySummaryStats(configManager.configs[configManager.activeConfig]);
+    else {
+        struct summaryStats perStats;
+        struct summaryStats totalStats;
+
+        int nonTempConfigs = 0;
+        for (auto cfg_it: configManager.configs) {
+            if (!cfg_it.temp) {
+                ++nonTempConfigs;
+                perStats = _displaySummaryStats(cfg_it);
+                totalStats.lastBackupBytes += perStats.lastBackupBytes;
+                totalStats.totalBytesUsed += perStats.totalBytesUsed;
+                totalStats.totalBytesSaved += perStats.totalBytesSaved;
+                totalStats.numberOfBackups += perStats.numberOfBackups;
+                totalStats.duration += perStats.duration;
+            }
+        }
+
+        if (nonTempConfigs > 1) {
+            //cout << horizontalLine(80) << "\n";
+            char result[1000];
+
+            sprintf(result,
+            // size
+            string(string("%-15s  ") +
+            // duration
+            "%s  " +
+            // number
+            "%-4ld  " +
+            // saved
+            "%3i%%  "+
+            // content age
+            "%s").c_str(),
+
+            (approximate(totalStats.lastBackupBytes) + " (" +
+                approximate(totalStats.totalBytesUsed) + ")").c_str(),
+            seconds2hms(totalStats.duration).c_str(),
+            totalStats.numberOfBackups,
+            int(floor((1 - ((long double)totalStats.totalBytesUsed / ((long double)totalStats.totalBytesUsed + (long double)totalStats.totalBytesSaved))) * 100 + 0.5)),
+            string(string("Would have taken ") + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved)).c_str());
+            cout << BOLDWHITE << "TOTALS                                    " << result << RESET << "\n";
+        }
+    }
+
+    return;
+}
+
+
+void _displayDetailedStats(BackupConfig& config) {
     unsigned long fnameLen = 0;
     double bytesUsed = 0;
     double bytesSaved = 0;
@@ -211,9 +265,9 @@ void displayStatsForConfig(BackupConfig& config) {
 }
 
 
-void displayStats(ConfigManager& configManager) {
+void displayDetailedStatsWrapper(ConfigManager& configManager) {
     if (configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp)
-        displayStatsForConfig(configManager.configs[configManager.activeConfig]);
+        _displayDetailedStats(configManager.configs[configManager.activeConfig]);
     else {
         bool previous = false;
         for (auto cfg_it: configManager.configs) {
@@ -222,65 +276,10 @@ void displayStats(ConfigManager& configManager) {
                 if (previous)
                     cout << "\n\n";
 
-                displayStatsForConfig(cfg_it);
+                _displayDetailedStats(cfg_it);
                 previous = true;
             }
         }
     }
 }
 
-
-void display1LineStats(ConfigManager& configManager) {
-    cout << BOLDBLUE << "Most Recent Backup                        Size (Total)     Duration  Num  Saved  Age Range\n" << RESET;
-    if (configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp)
-        display1LineForConfig(configManager.configs[configManager.activeConfig]);
-    else {
-        struct summaryStats perStats;
-        struct summaryStats totalStats;
-
-        int nonTempConfigs = 0;
-        for (auto cfg_it: configManager.configs) {
-            if (!cfg_it.temp) {
-                ++nonTempConfigs;
-                perStats = display1LineForConfig(cfg_it);
-                totalStats.lastBackupBytes += perStats.lastBackupBytes;
-                totalStats.totalBytesUsed += perStats.totalBytesUsed;
-                totalStats.totalBytesSaved += perStats.totalBytesSaved;
-                totalStats.numberOfBackups += perStats.numberOfBackups;
-                totalStats.duration += perStats.duration;
-            }
-        }
-
-        if (nonTempConfigs > 1) {
-            //cout << horizontalLine(80) << "\n";
-            char result[1000];
-
-            sprintf(result,
-            // size
-            string(string("%-15s  ") +
-            // duration
-            "%s  " +
-            // number
-            "%-4ld  " +
-            // saved
-            "%3i%%  "+
-            // content age
-            "%s").c_str(),
-
-            (approximate(totalStats.lastBackupBytes) + " (" +
-                approximate(totalStats.totalBytesUsed) + ")").c_str(),
-
-            seconds2hms(totalStats.duration).c_str(),
-
-            totalStats.numberOfBackups,
-
-            int(floor((1 - ((long double)totalStats.totalBytesUsed / ((long double)totalStats.totalBytesUsed + (long double)totalStats.totalBytesSaved))) * 100 + 0.5)),
-
-            string(string("Would have taken ") + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved)).c_str());
-
-            cout << BOLDWHITE << "TOTALS                                    " << result << RESET << "\n";
-        }
-    }
-
-    return;
-}

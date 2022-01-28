@@ -188,9 +188,9 @@ writes from that group.
 /usr/local/share/man/man1.
 It\[cq]s designed for a one-time execution as \f[B]sudo managebackups
 \[en]install\f[R] after which root access is no longer required.
-.PP
-\f[B]\[en]installman\f[R] :Only install the man page to
-/usr/local/share/man/man1.
+.TP
+\f[B]\[en]installman\f[R]
+Only install the man page to /usr/local/share/man/man1.
 .TP
 \f[B]-p\f[R], \f[B]\[en]profile\f[R] [\f[I]profile\f[R]]
 Use \f[I]profile\f[R] for the current run.
@@ -250,12 +250,12 @@ Use \f[I]dir\f[R] for all log files.
 Defaults to /var/log if writable by the process, otherwise the
 user\[cq]s home directory.
 .TP
-\f[B]-u\f[R],\f[B]\[en]user\f[R]
+\f[B]-u\f[R], \f[B]\[en]user\f[R]
 Set all three directories (config, cache and log) to use the calling
 user\[cq]s home directory (\[ti]/managebackups/).
 Directory setting precedence from highest to lowest is a specific
 commandline directive (like \f[B]\[en]confdir\f[R]), then
-\f[B]\[en]user\f[R], and finally environment values (shown below).
+\f[B]\[en]user\f[R], and finally environment variables (shown below).
 .SS Take Backups Options
 .TP
 \f[B]\[en]directory\f[R] [\f[I]directory\f[R]]

@@ -5,9 +5,8 @@
 #include "globals.h"
 #include "ConfigManager.h"
 
-//void displayStatsForConfig(BackupConfig& config);
-void displayStats(ConfigManager& configManager);
-void display1LineStats(ConfigManager& configManager);
+void displayDetailedStatsWrapper(ConfigManager& configManager);
+void displaySummaryStatsWrapper(ConfigManager& configManager);
 
 #endif
 

@@ -19,7 +19,7 @@ BackupCache::BackupCache(string filename) {
 }
 
 BackupCache::BackupCache() {
-    scanned = false;
+    scanned = inProcess = false;
 }
 
 BackupCache::~BackupCache() {

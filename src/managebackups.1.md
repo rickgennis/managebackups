@@ -37,7 +37,7 @@ Options are relative to the three functions of **managebackups**.
 : **managebackups** needs write access under /var to store caches of MD5s and under /etc/managebackups to update configs from commandline parameters. It can run entirely as root. But to facilitate a safer setup, it can be configured to run setgid as group "daemon" and the required directories configured to allow writes from that group. **--install** installs the **managebackups** binary in /usr/local/bin (setgid), creates the config and cache directories (writable by "daemon") and installs the man page in /usr/local/share/man/man1. It's designed for a one-time execution as **sudo managebackups --install** after which root access is no longer required.
 
 **--installman**
-:Only install the man page to /usr/local/share/man/man1.
+: Only install the man page to /usr/local/share/man/man1.
 
 **-p**, **--profile** [*profile*]
 : Use *profile* for the current run.  
@@ -81,8 +81,8 @@ Options are relative to the three functions of **managebackups**.
 **--logdir** [*dir*]
 : Use *dir* for all log files. Defaults to /var/log if writable by the process, otherwise the user's home directory.
 
-**-u**,**--user**
-: Set all three directories (config, cache and log) to use the calling user's home directory (~/managebackups/). Directory setting precedence from highest to lowest is a specific commandline directive (like **--confdir**), then **--user**, and finally environment values (shown below).
+**-u**, **--user**
+: Set all three directories (config, cache and log) to use the calling user's home directory (~/managebackups/). Directory setting precedence from highest to lowest is a specific commandline directive (like **--confdir**), then **--user**, and finally environment variables (shown below).
 
 ## Take Backups Options
 
