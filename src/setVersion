@@ -39,6 +39,10 @@ foreach my $sFile (keys %hChanges) {
         close(ORIG);
         unlink($sFile);
         rename("$sFile.new", $sFile);
+
+        if ($sFile =~ /package/) {
+            chmod(0755, $sFile);
+        }
     }
     else {  
         die "cannot read $sFile\n"; 

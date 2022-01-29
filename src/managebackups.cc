@@ -528,10 +528,17 @@ methodStatus sCpBackup(BackupConfig& config, string backupFilename, string subDi
         return methodStatus(false, "\t• SCP: unable to locate 'scp' binary in the PATH");
     }
 
+    string screenMessage = config.ifTitle() + " SCPing to " + sCpParams + "... ";
+    string backspaces = string(screenMessage.length(), '\b');
+    string blankspaces = string(screenMessage.length() , ' ');
+    NOTQUIET && cout << screenMessage << flush;
+
     // execute the scp
     sCpTime.start();
     int result = system(string(sCpBinary + " " + backupFilename + " " + sCpParams).c_str());
+    
     sCpTime.stop();
+    NOTQUIET && cout << backspaces << blankspaces << backspaces << flush;
 
     if (result == -1 || result == 127) {
         log(config.ifTitle() + " error executing " + sCpBinary);
@@ -567,6 +574,11 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
         return methodStatus(false, "\t• SFTP: unable to locate 'sftp' binary in the PATH");
     }
 
+    string screenMessage = config.ifTitle() + " SFTPing via " + sFtpParams + "... ";
+    string backspaces = string(screenMessage.length(), '\b');
+    string blankspaces = string(screenMessage.length() , ' ');
+    NOTQUIET && cout << screenMessage << flush;
+
     // execute the sftp command
     sFtpTime.start();
     sFtp.execute(config.settings[sTitle].value);
@@ -600,6 +612,7 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
     bool success = sFtp.readAndMatch("Uploading");
     sFtp.closeAll();
     sFtpTime.stop();
+    NOTQUIET && cout << backspaces << blankspaces << backspaces << flush;
 
     if (success) {
         log(config.ifTitle() + " " + backupFilename + " sftp'd via " + sFtpParams + " in " + sFtpTime.elapsed());
