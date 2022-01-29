@@ -484,9 +484,9 @@ vector<string> expandWildcardFilespec(string fileSpec) {
         baseDir = ".";
 
     auto fileList = expandWildcardSub(fileSpec, baseDir, 0);
-    for (auto file_it = fileList.begin(); file_it != fileList.end(); ++file_it)
-        if (file_it->length() > 2 && file_it->substr(0, 2) == "./")
-            file_it->erase(0, 2);
+    for (auto file: fileList)
+        if (file.length() > 2 && file.substr(0, 2) == "./")
+            file.erase(0, 2);
 
     return fileList;
 }

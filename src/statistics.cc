@@ -37,15 +37,15 @@ summaryStats _displaySummaryStats(BackupConfig& config) {
     }
 
     // calcuclate stats from the entire list of backups
-    for (auto raw_it = config.cache.rawData.begin(); raw_it != config.cache.rawData.end(); ++raw_it) {
+    for (auto raw: config.cache.rawData) {
 
         // calculate total bytes used and saved
-        if (countedInode.find(raw_it->second.inode) == countedInode.end()) {
-            countedInode.insert(raw_it->second.inode);
-            resultStats.totalBytesUsed += raw_it->second.size;
+        if (countedInode.find(raw.second.inode) == countedInode.end()) {
+            countedInode.insert(raw.second.inode);
+            resultStats.totalBytesUsed += raw.second.size;
         }
         else
-            resultStats.totalBytesSaved += raw_it->second.size;
+            resultStats.totalBytesSaved += raw.second.size;
     }
     resultStats.numberOfBackups = config.cache.rawData.size();
 
@@ -152,18 +152,18 @@ void _displayDetailedStats(BackupConfig& config) {
     set<unsigned long> countedInode;
 
     // calcuclate stats from the entire list of backups
-    for (auto raw_it = config.cache.rawData.begin(); raw_it != config.cache.rawData.end(); ++raw_it) {
+    for (auto raw: config.cache.rawData) {
 
         // track the length of the longest filename for formatting
-        fnameLen = max(fnameLen, raw_it->second.filename.length());
+        fnameLen = max(fnameLen, raw.second.filename.length());
 
         // calculate total bytes used and saved
-        if (countedInode.find(raw_it->second.inode) == countedInode.end()) {
-            countedInode.insert(raw_it->second.inode);
-            bytesUsed += raw_it->second.size;
+        if (countedInode.find(raw.second.inode) == countedInode.end()) {
+            countedInode.insert(raw.second.inode);
+            bytesUsed += raw.second.size;
         }
         else
-            bytesSaved += raw_it->second.size;
+            bytesSaved += raw.second.size;
     }
 
     // calcuclate percentage saved
@@ -188,10 +188,10 @@ void _displayDetailedStats(BackupConfig& config) {
     auto fnameIdx = config.cache.indexByFilename;
 
     // loop through the list of backups via the filename cache
-    for (auto backup_it = fnameIdx.begin(); backup_it != fnameIdx.end(); ++backup_it) {
+    for (auto backup: fnameIdx) {
 
         // lookup the the raw data detail
-        auto raw_it = config.cache.rawData.find(backup_it->second);
+        auto raw_it = config.cache.rawData.find(backup.second);
         if (raw_it != config.cache.rawData.end()) {
             string monthYear = vars2MY(raw_it->second.date_month, raw_it->second.date_year);
 

@@ -113,12 +113,12 @@ void BackupConfig::saveConfig() {
                 // compare the line against each of the config settings until there's a match
                 bool identified = false;
                 if (!reBlank.search(dataLine)) {
-                    for (auto set_it = settings.begin(); set_it != settings.end(); ++set_it) {
-                        if (set_it->regex.search(dataLine) && set_it->regex.matches() > 2) {
-                            usersDelimiter = set_it->regex.get_match(1);
-                            newFile << set_it->regex.get_match(0) << set_it->regex.get_match(1) << set_it->value << 
-                                (set_it->regex.matches() > 3 ? set_it->regex.get_match(3) : "")  << endl;
-                            set_it->seen = identified = true;
+                    for (auto setting: settings) {
+                        if (setting.regex.search(dataLine) && setting.regex.matches() > 2) {
+                            usersDelimiter = setting.regex.get_match(1);
+                            newFile << setting.regex.get_match(0) << setting.regex.get_match(1) << setting.value << 
+                                (setting.regex.matches() > 3 ? setting.regex.get_match(3) : "")  << endl;
+                            setting.seen = identified = true;
                             break;
                         }
                     }
@@ -151,9 +151,9 @@ void BackupConfig::saveConfig() {
     // loop through settings that weren't specified in the existing config;
     // if any of the current values (likely specified via command line parameters on startup)
     // differ from the defaults, write them to the new file.
-    for (auto cfg_it = settings.begin(); cfg_it != settings.end(); ++cfg_it)
-        if (!cfg_it->seen && (cfg_it->value != cfg_it->defaultValue)) {
-            newFile << cfg_it->display_name << usersDelimiter << cfg_it->value << endl;
+    for (auto setting: settings)
+        if (!setting.seen && (setting.value != setting.defaultValue)) {
+            newFile << setting.display_name << usersDelimiter << setting.value << endl;
         }
 
     newFile.close();
@@ -179,12 +179,12 @@ bool BackupConfig::loadConfig(string filename) {
 
                 // compare the line against each of the config settings until there's a match
                 bool identified = false;
-                for (auto cfg_it = settings.begin(); cfg_it != settings.end(); ++cfg_it) {
-                    if (cfg_it->regex.search(dataLine) && cfg_it->regex.matches() > 2) {
-                        cfg_it->value = cfg_it->regex.get_match(2);
+                for (auto setting:  settings) {
+                    if (setting.regex.search(dataLine) && setting.regex.matches() > 2) {
+                        setting.value = setting.regex.get_match(2);
 
-                        if (cfg_it->data_type == INT)
-                            auto ignored = stoi(cfg_it->value);    // will throw on invalid value
+                        if (setting.data_type == INT)
+                            auto ignored = stoi(setting.value);    // will throw on invalid value
 
                             // validate mode -- special case for the only config directive in octal
                             try {
@@ -247,8 +247,8 @@ string BackupConfig::ifTitle() {
 }
 
 void BackupConfig::fullDump() {
-    for (auto set_it = settings.begin(); set_it != settings.end(); ++set_it)
-        cout << "setting " << set_it->display_name << ": " << set_it->value << endl;
+    for (auto setting: settings)
+        cout << "setting " << setting.display_name << ": " << setting.value << endl;
 }
 
 

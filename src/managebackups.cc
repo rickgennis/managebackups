@@ -148,16 +148,17 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     BackupConfig tempConfig(true);
     BackupConfig* currentConf = &tempConfig; 
     bool bSave = GLOBALS.cli.count(CLI_SAVE);
-    bool bTitle = GLOBALS.cli.count(CLI_PROFILE);
+    bool bProfile = GLOBALS.cli.count(CLI_PROFILE);
 
     // if --profile is specified on the command line set the active config
-    if (bTitle) {
+    if (bProfile) {
         if (int configNumber = configManager.config(GLOBALS.cli[CLI_PROFILE].as<string>())) {
             configManager.activeConfig = configNumber - 1;
             currentConf = &configManager.configs[configManager.activeConfig];
         }
-        else if (!bSave && GLOBALS.stats) {
-            SCREENERR("error: profile not found; try -1 or -2 with no profile to see all backups");
+        else if (!bSave) {
+            SCREENERR("error: profile not found; try -0 or -1 with no profile to see all backups\n" <<
+                    "or use --save to create this profile.");
             exit(1);
         }
 
@@ -183,27 +184,27 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
 
     // if any other settings are given on the command line, incorporate them into the selected config.
     // that config will be the one found from --profile above (if any), or a temp config comprised only of defaults
-    for (auto setting_it = currentConf->settings.begin(); setting_it != currentConf->settings.end(); ++setting_it) 
-        if (GLOBALS.cli.count(setting_it->display_name)) {
-            switch (setting_it->data_type) {
+    for (auto setting: currentConf->settings)
+        if (GLOBALS.cli.count(setting.display_name)) {
+            switch (setting.data_type) {
 
                 case INT:  
-                    if (bSave && (setting_it->value != to_string(GLOBALS.cli[setting_it->display_name].as<int>())))
+                    if (bSave && (setting.value != to_string(GLOBALS.cli[setting.display_name].as<int>())))
                         currentConf->modified = 1;
-                    setting_it->value = to_string(GLOBALS.cli[setting_it->display_name].as<int>());
+                    setting.value = to_string(GLOBALS.cli[setting.display_name].as<int>());
                     break; 
 
                 case STRING:
                     default:
-                    if (bSave && (setting_it->value != GLOBALS.cli[setting_it->display_name].as<string>()))
+                    if (bSave && (setting.value != GLOBALS.cli[setting.display_name].as<string>()))
                         currentConf->modified = 1;
-                    setting_it->value = GLOBALS.cli[setting_it->display_name].as<string>();
+                    setting.value = GLOBALS.cli[setting.display_name].as<string>();
                     break;
 
                 case BOOL:
-                    if (bSave && (setting_it->value != to_string(GLOBALS.cli[setting_it->display_name].as<bool>())))
+                    if (bSave && (setting.value != to_string(GLOBALS.cli[setting.display_name].as<bool>())))
                         currentConf->modified = 1;
-                    setting_it->value = to_string(GLOBALS.cli[setting_it->display_name].as<bool>());
+                    setting.value = to_string(GLOBALS.cli[setting.display_name].as<bool>());
                     break;
             }
         }
@@ -232,7 +233,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     }
 
     if (currentConf == &tempConfig) {
-        if (bTitle && bSave) {
+        if (bProfile && bSave) {
             tempConfig.config_filename = addSlash(GLOBALS.confDir) + safeFilename(tempConfig.settings[sTitle].value) + ".conf";
             tempConfig.temp = false;
         }
@@ -271,13 +272,12 @@ void pruneBackups(BackupConfig& config) {
     // failsafe checks
     int fb = config.settings[sFailsafeBackups].ivalue();
     int fd = config.settings[sFailsafeDays].ivalue();
-    auto fnameIdx = config.cache.indexByFilename;
 
     if (fb > 0 && fd > 0) {
         int minValidBackups = 0;
 
-        for (auto fnameIdx_it = fnameIdx.begin(); fnameIdx_it != fnameIdx.end(); ++fnameIdx_it) {
-            auto raw_it = config.cache.rawData.find(fnameIdx_it->second);
+        for (auto fnameIdx: config.cache.indexByFilename) {
+            auto raw_it = config.cache.rawData.find(fnameIdx.second);
 
             if (raw_it != config.cache.rawData.end() && raw_it->second.day_age <= fd) {
                 ++minValidBackups;
@@ -301,8 +301,8 @@ void pruneBackups(BackupConfig& config) {
     DEBUG(4, "weeklies set to dow " << config.settings[sDOW].ivalue());
 
     // loop through the filename index sorted by filename (i.e. all backups by age)
-    for (auto fnameIdx_it = fnameIdx.begin(); fnameIdx_it != fnameIdx.end(); ++fnameIdx_it) {
-        auto raw_it = config.cache.rawData.find(fnameIdx_it->second);
+    for (auto fnameIdx: config.cache.indexByFilename) {
+        auto raw_it = config.cache.rawData.find(fnameIdx.second);
 
         if (raw_it != config.cache.rawData.end()) { 
             int filenameAge = raw_it->second.day_age;
@@ -356,8 +356,8 @@ void pruneBackups(BackupConfig& config) {
     if (!GLOBALS.cli.count(CLI_TEST)) {
         config.removeEmptyDirs();
 
-        for (auto md5_it = changedMD5s.begin(); md5_it != changedMD5s.end(); ++md5_it)
-            config.cache.reStatMD5(*md5_it);
+        for (auto md5: changedMD5s)
+            config.cache.reStatMD5(md5);
     }
 }
 
@@ -380,10 +380,10 @@ void updateLinks(BackupConfig& config) {
         return;
 
     // loop through list of MD5s (the map)
-    for (auto md5_it = config.cache.indexByMD5.begin(); md5_it != config.cache.indexByMD5.end(); ++md5_it) {
+    for (auto md5: config.cache.indexByMD5) {
         
         // only consider md5s with more than one file associated
-        if (md5_it->second.size() < 2)
+        if (md5.second.size() < 2)
             continue;
 
         do {
@@ -400,12 +400,11 @@ void updateLinks(BackupConfig& config) {
             BackupEntry *referenceFile = NULL;
             unsigned int maxLinksFound = 0;
 
-            DEBUG(5, "top of scan for " << md5_it->first);
+            DEBUG(5, "top of scan for " << md5.first);
 
             // 1st time: loop through the list of files (the set)
-            for (auto refFile_it = md5_it->second.begin(); refFile_it != md5_it->second.end(); ++refFile_it) {
-                auto refFileIdx = *refFile_it;
-                auto raw_it = config.cache.rawData.find(refFileIdx);
+            for (auto refFile: md5.second) {
+                auto raw_it = config.cache.rawData.find(refFile);
 
                 DEBUG(5, "considering " << raw_it->second.filename << " (" << raw_it->second.links << ")");
                 if (raw_it != config.cache.rawData.end()) {
@@ -425,14 +424,13 @@ void updateLinks(BackupConfig& config) {
             // the first actionable file (one that's not today's file and doesn't already have links at the maxLinksAllowed level)
             // becomes the reference file.  if there's no reference file there's nothing to do for this md5.  skip to the next one.
             if (referenceFile == NULL) {
-                DEBUG(5, "no reference file found for " << md5_it->first);
+                DEBUG(5, "no reference file found for " << md5.first);
                 continue;
             }
 
             // 2nd time: loop through the list of files (the set)
-            for (auto refFile_it = md5_it->second.begin(); refFile_it != md5_it->second.end(); ++refFile_it) {
-                auto refFileIdx = *refFile_it;
-                auto raw_it = config.cache.rawData.find(refFileIdx);
+            for (auto refFile: md5.second) {
+                auto raw_it = config.cache.rawData.find(refFile);
                 DEBUG(5, "\texamining " << raw_it->second.filename);
 
                 if (raw_it != config.cache.rawData.end()) {
@@ -471,7 +469,7 @@ void updateLinks(BackupConfig& config) {
                                 NOTQUIET && cout << "\t• linked " << detail << endl;
                                 log(config.ifTitle() + " linked " + detail);
 
-                                config.cache.reStatMD5(md5_it->first);
+                                config.cache.reStatMD5(md5.first);
 
                                 if (referenceFile->links >= maxLinksAllowed) {
                                     rescanRequired = true;
@@ -926,9 +924,9 @@ int main(int argc, char *argv[]) {
     // if displaying stats and --profile hasn't been specified (or matched successfully)
     // then rescan all configs;  otherwise just scan the --profile config
     if (GLOBALS.stats && currentConfig->temp) {
-        for (auto cfg_it = configManager.configs.begin(); cfg_it != configManager.configs.end(); ++cfg_it) {
-            scanConfigToCache(*cfg_it);
-            cfg_it->cache.saveCache();
+        for (auto config: configManager.configs) {
+            scanConfigToCache(config);
+            config.cache.saveCache();
         }
     }
     else

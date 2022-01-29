@@ -12,9 +12,9 @@ using namespace pcrepp;
 
 int ConfigManager::config(string title) {
     int index = 0;
-    for (auto cfg_it = configs.begin(); cfg_it != configs.end(); ++cfg_it) {
+    for (auto config: configs) {
         ++index;
-        if ((*cfg_it).settings[sTitle].value == title)   
+        if (config.settings[sTitle].value == title)   
             return index;
     }
 
@@ -50,16 +50,14 @@ ConfigManager::ConfigManager() {
 
 
 void ConfigManager::fullDump() {
-    for (auto c_it = configs.begin(); c_it != configs.end(); ++c_it) {
-        c_it->fullDump();
-    }
+    for (auto config: configs)
+        config.fullDump();
 }
 
 
 void ConfigManager::loadAllConfigCaches() {
-    for (auto c_it = configs.begin(); c_it != configs.end(); ++c_it) {
-        c_it->loadConfigsCache();
-    }
+    for (auto config: configs)
+        config.loadConfigsCache();
 }
 
 
