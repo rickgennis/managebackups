@@ -136,7 +136,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager) {
             seconds2hms(totalStats.duration).c_str(),
             totalStats.numberOfBackups,
             int(floor((1 - ((long double)totalStats.totalBytesUsed / ((long double)totalStats.totalBytesUsed + (long double)totalStats.totalBytesSaved))) * 100 + 0.5)),
-            string(string("Would have taken ") + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved)).c_str());
+            totalStats.totalBytesSaved ? string(string("Would have taken ") + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved)).c_str() : "");
             cout << BOLDWHITE << "TOTALS                                    " << result << RESET << "\n";
         }
     }

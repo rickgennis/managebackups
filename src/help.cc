@@ -32,6 +32,8 @@ void showHelp(enum helpType kind) {
             + "   --cmd [command]     Command to take a backup; the backup result should be written to STDOUT.\n" 
             + "   --file [filename]   The base filename to save the backup to. The date and, optionally, time will automatically be inserted.\n"
             + "   --time              Include the time in the backup filename; also inserts the day into the subdirectory.\n"
+            + "   --mode [mode]       chmod newly created backups to this octatl mode (default 0600).\n"
+            + "   --minsize [size]    Backups less than size-bytes are considered failures and discarded.\n"
             + "   --scp [dest]        SCP the new backup to the destination. Dest can include user@machine:/dir/dirs.\n"
             + "   --sftp [dest]       SFTP the new backup to the destination. Dest can include SCP details plus SFTP flags (like -P for port).\n"
             + "                       SCP & SFTP also support variable interpolation of these strings which will be sustituted with values\n"
@@ -54,7 +56,6 @@ void showHelp(enum helpType kind) {
             + "   --save              Save all the specified settings to the specified profile.\n"
             + "   --notify [contact]  Notify after a backup completes; can be email addresses and/or script names (failures only).\n"
             + "   --nos               Notify on success also.\n"
-            + "   --minsize [size]    Backups less than size-bytes are considered failures and discarded.\n"
             + "   -0                  Provide a summary of backups.\n"
             + "   -1                  Provide detail of backups.\n"
             + "   --install           Install this binary in /usr/local/bin, update directory perms and create the man page.\n"
@@ -217,12 +218,6 @@ The NOTIFICATIONS section below has more detail.
 \f[B]\[en]nos\f[R]
 Notify on successful backups also.
 .TP
-\f[B]\[en]minsize\f[R] [\f[I]minsize\f[R]]
-Use \f[I]minsize\f[R] bytes as the minimum size of a valid backup.
-Backups created by \f[B]\[en]command\f[R] that are less than
-\f[I]minsize\f[R] bytes are considered failures and deleted.
-The default \f[I]minsize\f[R] is 500.
-.TP
 \f[B]\[en]test\f[R]
 Run in test mode.
 No changes are actually made to disk (no backups, pruning or linking).
@@ -275,6 +270,11 @@ Have the command send the backed up data to its STDOUT.
 For example, \f[B]\[en]cmd\f[R] \[lq]tar -cz /mydata\[rq] or
 \f[B]\[en]cmd\f[R] \[lq]/usr/bin/tar -c /opt | /usr/bin/gzip -n\[rq].
 .TP
+\f[B]\[en]mode\f[R] [\f[I]mode\f[R]]
+chmod newly created backups to \f[I]mode\f[R], which is specified in
+octal.
+Defaults to 0600.
+.TP
 \f[B]\[en]time\f[R]
 Include the time in the filename of the newly created backup.
 The day of month will also be included in the subdirectory.
@@ -311,6 +311,12 @@ creation and use of the YEAR/MONTH subdirectory structure on the
 destination server.
 For example, \f[B]\[en]sftp\f[R]
 \[lq]backupuser\[at]vaultserver://data\[rq].
+.TP
+\f[B]\[en]minsize\f[R] [\f[I]minsize\f[R]]
+Use \f[I]minsize\f[R] bytes as the minimum size of a valid backup.
+Backups created by \f[B]\[en]command\f[R] that are less than
+\f[I]minsize\f[R] bytes are considered failures and deleted.
+The default \f[I]minsize\f[R] is 500.
 .TP
 \f[B]\[en]nobackup\f[R]
 Disable performing backups for this run.

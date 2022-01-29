@@ -57,9 +57,6 @@ Options are relative to the three functions of **managebackups**.
 **--nos**
 : Notify on successful backups also.
 
-**--minsize** [*minsize*]
-: Use *minsize* bytes as the minimum size of a valid backup. Backups created by **--command** that are less than *minsize* bytes are considered failures and deleted. The default *minsize* is 500.
-
 **--test**
 : Run in test mode. No changes are actually made to disk (no backups, pruning or linking).
 
@@ -95,6 +92,9 @@ Options are relative to the three functions of **managebackups**.
 **--cmd**, **--command** [*cmd*]
 : Use *cmd* to perform a backup.  *cmd* should be double-quoted and may include as many pipes as desired. Have the command send the backed up data to its STDOUT.  For example, **--cmd** "tar -cz /mydata" or **--cmd** "/usr/bin/tar -c /opt | /usr/bin/gzip -n".
 
+**--mode** [*mode*]
+: chmod newly created backups to *mode*, which is specified in octal. Defaults to 0600.
+
 **--time**
 : Include the time in the filename of the newly created backup.  The day of month will also be included in the subdirectory. Without time included multiple backups on the same day taken with the same settings will overwrite each other resulting in a single backup for the day. With time included each backup is saved separately.
 
@@ -103,6 +103,9 @@ Options are relative to the three functions of **managebackups**.
 
 **--sftp** [*destination*]
 : On completion of a successful backup, SFTP the newly created backup file to *destination*. *destination* can include user@ notation, machine name and/or directory name. SFTP parameters (such as -P and others) can be included as well. Additionally the strings {fulldir}, {subdir} and {filename} can be used; they'll be automatically replaced with the values relative to the newly created backup. By default, a current year and month subdirectory will be created on the destination after connecting and then the file is "put" into that directory. Use a double-slash anywhere in the *destination* to disable creation and use of the YEAR/MONTH subdirectory structure on the destination server.  For example, **--sftp** "backupuser@vaultserver://data".
+
+**--minsize** [*minsize*]
+: Use *minsize* bytes as the minimum size of a valid backup. Backups created by **--command** that are less than *minsize* bytes are considered failures and deleted. The default *minsize* is 500.
 
 **--nobackup**
 : Disable performing backups for this run. To disable permanently moving forward, remove the "command" directive from the profile's config file.
