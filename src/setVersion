@@ -1,0 +1,46 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+my $sVersionRegex = qr/(\d+\.\d+\.\d+)/;
+
+my %hChanges = (
+    "/Users/rennis/managebackups/include/globalsdef.h" => qr/ VERSION\s+\"$sVersionRegex\"/,
+    "/Users/rennis/managebackups/src/managebackups.1.md" => qr/ managebackups $sVersionRegex/,
+    "/Users/rennis/managebackups/src/package.deb/scripts/package" => qr/VERSION=$sVersionRegex/
+);
+
+
+if (!defined $ARGV[0]) {
+    die "version number required";
+}
+my $sTargetVersion = $ARGV[0];
+
+
+foreach my $sFile (keys %hChanges) {
+
+    if (open(ORIG, $sFile)) {
+        if (open(NEW, ">$sFile.new")) {
+
+            while (<ORIG>) {
+                if (/$hChanges{$sFile}/) {
+                    s/$1/$sTargetVersion/;
+                }
+
+                print NEW $_;
+            }
+
+            close(NEW);
+        }
+        else {  
+            die "cannot create $sFile.new\n"; 
+        }
+
+        close(ORIG);
+        unlink($sFile);
+        rename("$sFile.new", $sFile);
+    }
+    else {  
+        die "cannot read $sFile\n"; 
+    }
+}
