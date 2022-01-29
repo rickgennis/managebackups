@@ -2,6 +2,10 @@
 v1.2.4 - 1/25/22
 		•  Added --mode option to specify file mode of new backups
 
+		•  Added in-process messages for SCP/SFTP
+
+		•  Added -0 indicators for an in-process backup
+
 		•  Commit cache immediately after a backup + MD5 of that backup to
 		   improve -0 and -1 performance for concurrent invocations
 
