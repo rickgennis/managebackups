@@ -484,7 +484,7 @@ vector<string> expandWildcardFilespec(string fileSpec) {
         baseDir = ".";
 
     auto fileList = expandWildcardSub(fileSpec, baseDir, 0);
-    for (auto file: fileList)
+    for (auto &file: fileList)
         if (file.length() > 2 && file.substr(0, 2) == "./")
             file.erase(0, 2);
 
@@ -522,8 +522,8 @@ string locateBinary(string app) {
         while (getline(tokenizer, tempStr, ':'))
             parts.push_back(tempStr);
 
-        for (auto it: parts) {
-            string binary = string(it) + "/" + app;
+        for (auto piece: parts) {
+            string binary = string(piece) + "/" + app;
             if (!access(binary.c_str(), X_OK))
                 return binary;
         }

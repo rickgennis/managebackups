@@ -37,7 +37,7 @@ summaryStats _displaySummaryStats(BackupConfig& config) {
     }
 
     // calcuclate stats from the entire list of backups
-    for (auto raw: config.cache.rawData) {
+    for (auto &raw: config.cache.rawData) {
 
         // calculate total bytes used and saved
         if (countedInode.find(raw.second.inode) == countedInode.end()) {
@@ -103,10 +103,10 @@ void displaySummaryStatsWrapper(ConfigManager& configManager) {
         struct summaryStats totalStats;
 
         int nonTempConfigs = 0;
-        for (auto cfg_it: configManager.configs) {
-            if (!cfg_it.temp) {
+        for (auto &config: configManager.configs) {
+            if (!config.temp) {
                 ++nonTempConfigs;
-                perStats = _displaySummaryStats(cfg_it);
+                perStats = _displaySummaryStats(config);
                 totalStats.lastBackupBytes += perStats.lastBackupBytes;
                 totalStats.totalBytesUsed += perStats.totalBytesUsed;
                 totalStats.totalBytesSaved += perStats.totalBytesSaved;
@@ -136,7 +136,8 @@ void displaySummaryStatsWrapper(ConfigManager& configManager) {
             seconds2hms(totalStats.duration).c_str(),
             totalStats.numberOfBackups,
             int(floor((1 - ((long double)totalStats.totalBytesUsed / ((long double)totalStats.totalBytesUsed + (long double)totalStats.totalBytesSaved))) * 100 + 0.5)),
-            totalStats.totalBytesSaved ? string(string("Would have taken ") + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved)).c_str() : "");
+            totalStats.totalBytesSaved ? string(string("Saved ") + approximate(totalStats.totalBytesSaved) + " from " 
+                + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved)).c_str() : "");
             cout << BOLDWHITE << "TOTALS                                    " << result << RESET << "\n";
         }
     }
@@ -152,7 +153,7 @@ void _displayDetailedStats(BackupConfig& config) {
     set<unsigned long> countedInode;
 
     // calcuclate stats from the entire list of backups
-    for (auto raw: config.cache.rawData) {
+    for (auto &raw: config.cache.rawData) {
 
         // track the length of the longest filename for formatting
         fnameLen = max(fnameLen, raw.second.filename.length());
@@ -188,7 +189,7 @@ void _displayDetailedStats(BackupConfig& config) {
     auto fnameIdx = config.cache.indexByFilename;
 
     // loop through the list of backups via the filename cache
-    for (auto backup: fnameIdx) {
+    for (auto &backup: fnameIdx) {
 
         // lookup the the raw data detail
         auto raw_it = config.cache.rawData.find(backup.second);
@@ -270,13 +271,13 @@ void displayDetailedStatsWrapper(ConfigManager& configManager) {
         _displayDetailedStats(configManager.configs[configManager.activeConfig]);
     else {
         bool previous = false;
-        for (auto cfg_it: configManager.configs) {
-            if (!cfg_it.temp) {
+        for (auto &config: configManager.configs) {
+            if (!config.temp) {
 
                 if (previous)
                     cout << "\n\n";
 
-                _displayDetailedStats(cfg_it);
+                _displayDetailedStats(config);
                 previous = true;
             }
         }

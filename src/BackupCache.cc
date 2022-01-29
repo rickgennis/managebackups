@@ -29,7 +29,7 @@ BackupCache::~BackupCache() {
 
 
     void BackupCache::updateAges(time_t refTime) {
-        for (auto raw: rawData)
+        for (auto &raw: rawData)
             raw.second.updateAges(refTime);
     }
 
@@ -45,7 +45,7 @@ BackupCache::~BackupCache() {
             unsigned int count = 0;
 
             // write raw data
-            for (auto raw: rawData) {
+            for (auto &raw: rawData) {
 
                 // files need to be able to fall out of the cache if they disappear from the filesystem.
                 // "current" means the file was seen in the most recent filesystem scan.
@@ -109,7 +109,7 @@ BackupCache::~BackupCache() {
 
         auto md5_it = indexByMD5.find(md5);
         if (md5_it != indexByMD5.end()) {
-            for (auto md5Set: md5_it->second) {
+            for (auto &md5Set: md5_it->second) {
                 auto raw_it = rawData.find(md5Set);
                 if (raw_it != rawData.end()) {
                     result.insert(&raw_it->second);
@@ -242,7 +242,7 @@ BackupCache::~BackupCache() {
 
     string BackupCache::fullDump() {
         string result ("RAW Data\n");
-        for (auto raw: rawData) {
+        for (auto &raw: rawData) {
             result += "\tid:" + to_string(raw.first) + 
                 ", file:" + raw.second.filename + 
                 ", md5:" + raw.second.md5 + 
@@ -257,16 +257,16 @@ BackupCache::~BackupCache() {
         }
 
         result += "\nFilename Index\n";
-        for (auto filename: indexByFilename) {
+        for (auto &filename: indexByFilename) {
             result += "\t" + filename.first + ": " + to_string(filename.second) + "\n";
         }
 
         result += "\nMD5 Index\n";
-        for (auto md5: indexByMD5) {
+        for (auto &md5: indexByMD5) {
             result += "\t" + md5.first + ": ";
 
             string detail;
-            for (auto md5Set: md5.second) {
+            for (auto &md5Set: md5.second) {
                 detail += string(detail.length() > 0 ? ", " : "") + to_string(md5Set);
             }
 
@@ -283,7 +283,7 @@ void BackupCache::reStatMD5(string md5) {
     auto md5_it = indexByMD5.find(md5);
     if (md5_it != indexByMD5.end()) {
 
-        for (auto md5Set: md5_it->second) {
+        for (auto &md5Set: md5_it->second) {
             auto raw_it = rawData.find(md5Set);
 
             if (raw_it != rawData.end()) {

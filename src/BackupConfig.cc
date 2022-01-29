@@ -113,7 +113,7 @@ void BackupConfig::saveConfig() {
                 // compare the line against each of the config settings until there's a match
                 bool identified = false;
                 if (!reBlank.search(dataLine)) {
-                    for (auto setting: settings) {
+                    for (auto &setting: settings) {
                         if (setting.regex.search(dataLine) && setting.regex.matches() > 2) {
                             usersDelimiter = setting.regex.get_match(1);
                             newFile << setting.regex.get_match(0) << setting.regex.get_match(1) << setting.value << 
@@ -151,7 +151,7 @@ void BackupConfig::saveConfig() {
     // loop through settings that weren't specified in the existing config;
     // if any of the current values (likely specified via command line parameters on startup)
     // differ from the defaults, write them to the new file.
-    for (auto setting: settings)
+    for (auto &setting: settings)
         if (!setting.seen && (setting.value != setting.defaultValue)) {
             newFile << setting.display_name << usersDelimiter << setting.value << endl;
         }
@@ -179,7 +179,7 @@ bool BackupConfig::loadConfig(string filename) {
 
                 // compare the line against each of the config settings until there's a match
                 bool identified = false;
-                for (auto setting:  settings) {
+                for (auto &setting: settings) {
                     if (setting.regex.search(dataLine) && setting.regex.matches() > 2) {
                         setting.value = setting.regex.get_match(2);
 
@@ -247,7 +247,7 @@ string BackupConfig::ifTitle() {
 }
 
 void BackupConfig::fullDump() {
-    for (auto setting: settings)
+    for (auto &setting: settings)
         cout << "setting " << setting.display_name << ": " << setting.value << endl;
 }
 

@@ -184,7 +184,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
 
     // if any other settings are given on the command line, incorporate them into the selected config.
     // that config will be the one found from --profile above (if any), or a temp config comprised only of defaults
-    for (auto setting: currentConf->settings)
+    for (auto &setting: currentConf->settings)
         if (GLOBALS.cli.count(setting.display_name)) {
             switch (setting.data_type) {
 
@@ -276,7 +276,7 @@ void pruneBackups(BackupConfig& config) {
     if (fb > 0 && fd > 0) {
         int minValidBackups = 0;
 
-        for (auto fnameIdx: config.cache.indexByFilename) {
+        for (auto &fnameIdx: config.cache.indexByFilename) {
             auto raw_it = config.cache.rawData.find(fnameIdx.second);
 
             if (raw_it != config.cache.rawData.end() && raw_it->second.day_age <= fd) {
@@ -301,7 +301,7 @@ void pruneBackups(BackupConfig& config) {
     DEBUG(4, "weeklies set to dow " << config.settings[sDOW].ivalue());
 
     // loop through the filename index sorted by filename (i.e. all backups by age)
-    for (auto fnameIdx: config.cache.indexByFilename) {
+    for (auto &fnameIdx: config.cache.indexByFilename) {
         auto raw_it = config.cache.rawData.find(fnameIdx.second);
 
         if (raw_it != config.cache.rawData.end()) { 
@@ -356,7 +356,7 @@ void pruneBackups(BackupConfig& config) {
     if (!GLOBALS.cli.count(CLI_TEST)) {
         config.removeEmptyDirs();
 
-        for (auto md5: changedMD5s)
+        for (auto &md5: changedMD5s)
             config.cache.reStatMD5(md5);
     }
 }
@@ -380,7 +380,7 @@ void updateLinks(BackupConfig& config) {
         return;
 
     // loop through list of MD5s (the map)
-    for (auto md5: config.cache.indexByMD5) {
+    for (auto &md5: config.cache.indexByMD5) {
         
         // only consider md5s with more than one file associated
         if (md5.second.size() < 2)
@@ -403,7 +403,7 @@ void updateLinks(BackupConfig& config) {
             DEBUG(5, "top of scan for " << md5.first);
 
             // 1st time: loop through the list of files (the set)
-            for (auto refFile: md5.second) {
+            for (auto &refFile: md5.second) {
                 auto raw_it = config.cache.rawData.find(refFile);
 
                 DEBUG(5, "considering " << raw_it->second.filename << " (" << raw_it->second.links << ")");
@@ -429,7 +429,7 @@ void updateLinks(BackupConfig& config) {
             }
 
             // 2nd time: loop through the list of files (the set)
-            for (auto refFile: md5.second) {
+            for (auto &refFile: md5.second) {
                 auto raw_it = config.cache.rawData.find(refFile);
                 DEBUG(5, "\texamining " << raw_it->second.filename);
 
@@ -924,7 +924,7 @@ int main(int argc, char *argv[]) {
     // if displaying stats and --profile hasn't been specified (or matched successfully)
     // then rescan all configs;  otherwise just scan the --profile config
     if (GLOBALS.stats && currentConfig->temp) {
-        for (auto config: configManager.configs) {
+        for (auto &config: configManager.configs) {
             scanConfigToCache(config);
             config.cache.saveCache();
         }
