@@ -1,14 +1,22 @@
 
 v1.2.4 - 1/25/22
-		•  Commit cache immediately after a backup + MD5 of that backup.
-		   Improves -0 and -1 performance for concurrent invocations.
+		•  Added --mode option to specify file mode of new backups
+
+		•  Commit cache immediately after a backup + MD5 of that backup to
+		   improve -0 and -1 performance for concurrent invocations
 
 		•  Catch interrupts to handle SIGINT & SIGTERM and clean up temp
-		   files.
+		   files
 
-		•  MD5 bug that manifested under Linux
+		•  Handle MD5 failures due to file read perms
 
-		•  Cosmetic -0 and -1 output clean up.
+		•  Apply -q correctly to the pruning process (linking message)
+
+		•  Fixed rounding error in --weeks and --years retention logic
+
+		•  Improved cache file parsing & error handling
+
+		•  Cosmetic -0 and -1 output clean up
 
 
 v1.2.2 - 1/24/22	
