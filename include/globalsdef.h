@@ -64,6 +64,7 @@
 #define CLI_DOW "dow"
 #define CLI_USER "user"
 #define CLI_VERSION "version"
+#define CLI_MODE "mode"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -89,6 +90,7 @@
 #define RE_TIME "(time)"
 #define RE_MINSIZE "(minsize)"
 #define RE_DOW "(dow)"
+#define RE_MODE "(mode)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"

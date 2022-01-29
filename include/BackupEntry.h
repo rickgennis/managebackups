@@ -37,10 +37,10 @@ class BackupEntry {
     BackupEntry();
 
     string class2string();
-    void string2class(string data);
+    bool string2class(string data);
 
     BackupEntry* updateAges(time_t refTime = 0);
-    void calculateMD5();
+    bool calculateMD5();
 };
 
 #endif

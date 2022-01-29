@@ -25,7 +25,7 @@ string BackupEntry::class2string() {
             to_string(size) + "," + to_string(duration));
 }
 
-void BackupEntry::string2class(string data) {
+bool BackupEntry::string2class(string data) {
     Pcre regEx("\\[(.+)\\],([a-f0-9]{32}),(\\d+),(\\d+),(\\d+),(\\d+)");
 
     try {
@@ -36,6 +36,7 @@ void BackupEntry::string2class(string data) {
             mtime = stol(regEx.get_match(3));
             size = stol(regEx.get_match(4));
             duration = stol(regEx.get_match(5));
+            return true;
         }
         else
             log("unable to parse cache line (" + data + ")");
@@ -43,6 +44,8 @@ void BackupEntry::string2class(string data) {
     catch (...) {
         SCREENERR("error: cannot parse config data: " << data);
     }
+
+    return false;
 }
 
 
@@ -87,6 +90,7 @@ BackupEntry* BackupEntry::updateAges(time_t refTime) {
 }
 
 
-void BackupEntry::calculateMD5() {
+bool BackupEntry::calculateMD5() {
     md5 = MD5file(filename, !NOTQUIET);
+    return md5.length();
 }

@@ -80,8 +80,8 @@ BackupCache::~BackupCache() {
             string cacheData;
             while (getline(cacheFile, cacheData)) {
                 BackupEntry entry;
-                entry.string2class(cacheData);
-                addOrUpdate(entry);
+                if (entry.string2class(cacheData))
+                    addOrUpdate(entry);
             }
 
             cacheFile.close();

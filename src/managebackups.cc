@@ -99,14 +99,21 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                     cacheEntry.inode = statData.st_ino;
                     cacheEntry.size = statData.st_size;
                     cacheEntry.updateAges(GLOBALS.startupTime);
-                    cacheEntry.calculateMD5();
-                    ++GLOBALS.md5Count;
 
-                    cache.addOrUpdate(cacheEntry, true);
+                    if (cacheEntry.calculateMD5()) {
+                        ++GLOBALS.md5Count;
+                        cache.addOrUpdate(cacheEntry, true);
+                    }
+                    else {
+                        log("error: unable to read " + fullFilename);
+                        SCREENERR("error: unable to read " << fullFilename);
+                    }
                 }
             }
-            else 
+            else {
                 log("error: unable to stat " + fullFilename);
+                SCREENERR("error: unable to stat " << fullFilename);
+            }
         }
         closedir(c_dir);
     }
@@ -308,7 +315,7 @@ void pruneBackups(BackupConfig& config) {
             }
 
             // weekly
-            if (filenameAge / 7 <= config.settings[sWeeks].ivalue() && filenameDOW == config.settings[sDOW].ivalue()) {
+            if (filenameAge / 7.0 <= config.settings[sWeeks].ivalue() && filenameDOW == config.settings[sDOW].ivalue()) {
                 DEBUG(2, "keep_weekly: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
                 continue;
             }
@@ -322,7 +329,7 @@ void pruneBackups(BackupConfig& config) {
 
             // yearly
             auto yearLimit = config.settings[sYears].ivalue();
-            if (yearLimit && filenameAge / 365 <= yearLimit && raw_it->second.date_month == 1 && raw_it->second.date_day == 1) {
+            if (yearLimit && filenameAge / 365.0 <= yearLimit && raw_it->second.date_month == 1 && raw_it->second.date_day == 1) {
                 DEBUG(2, "\tkeep_yearly: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
                 continue;
             }
@@ -693,6 +700,20 @@ void performBackup(BackupConfig& config) {
                 NOTQUIET && cout << "\t• successfully backed up to " << BOLDBLUE << backupFilename << RESET <<
                     " in " << backupTime.elapsed() << endl;
 
+                try {   // could get an exception converting settings[sMode] to an octal number
+                    int mode = strtol(config.settings[sMode].value.c_str(), NULL, 8);
+
+                    if (chmod(backupFilename.c_str(), mode)) {
+                        SCREENERR("error: unable to chmod " << config.settings[sMode].value << " on " << backupFilename);
+                        log("error: unable to chmod " + config.settings[sMode].value + " on " + backupFilename);
+                    }
+                }
+                catch (...) {
+                    string err = string("error: invalid file mode specified (") + config.settings[sMode].value.c_str() + ")";
+                    SCREENERR(err);
+                    log(err);
+                }
+
                 cacheEntry.filename = backupFilename;         // rename the file in the cache entry
                 config.cache.addOrUpdate(cacheEntry, true);
                 config.cache.reStatMD5(cacheEntry.md5);
@@ -702,8 +723,8 @@ void performBackup(BackupConfig& config) {
                 // running in the background and someone attempts to run -0 or -1 from the commandline.
                 // if they ask for the stats while the backup is still backing up its a temp file and
                 // the file is ignored.  if they do it during the sftp/scp phase (which could take a while
-                // for a large file) they'll have to wait for the md5 to be calculcated even though we did
-                // it above. this save pushes that new md5 to disk and makes it available to other invocations
+                // for a large file) they'll have to wait for the md5 to be calculated even though we did
+                // it above. this save commits that new md5 to disk and makes it available to other invocations
                 // of managebackups during the scp/sftp phase.
                 config.cache.saveCache();
 

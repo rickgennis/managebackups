@@ -51,6 +51,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_MINSIZE, RE_MINSIZE, INT, "500"));
     settings.insert(settings.end(), Setting(CLI_DOW, RE_DOW, INT, "0"));
     settings.insert(settings.end(), Setting(CLI_FS_FP, RE_FS_FP, BOOL, "0"));
+    settings.insert(settings.end(), Setting(CLI_MODE, RE_MODE, STRING, "0600"));
 }
 
 
@@ -181,6 +182,22 @@ bool BackupConfig::loadConfig(string filename) {
                 for (auto cfg_it = settings.begin(); cfg_it != settings.end(); ++cfg_it) {
                     if (cfg_it->regex.search(dataLine) && cfg_it->regex.matches() > 2) {
                         cfg_it->value = cfg_it->regex.get_match(2);
+
+                        if (cfg_it->data_type == INT)
+                            auto ignored = stoi(cfg_it->value);    // will throw on invalid value
+
+                            // validate mode -- special case for the only config directive in octal
+                            try {
+                                int mode = strtol(settings[sMode].value.c_str(), NULL, 8);
+                            }
+                            catch (...) {
+                                configFile.close();
+                                log("error: unable to parse an octal value for the directive on line " + to_string(line) + " of " + filename);
+                                cerr << "error: unable to parse an octal value for the directive on line " << line << " of " << filename << endl;
+                                cerr << "    " << dataLine << endl;
+                                exit(1);
+                            }
+
                         identified = true;
                         break;
                     }
