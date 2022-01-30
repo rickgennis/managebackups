@@ -1,10 +1,17 @@
 
-v1.2.4 - 1/25/22
+v1.2.5 - 1/29/22
 		•  Added --mode option to specify file mode of new backups
 
 		•  Added in-process messages for SCP/SFTP
 
 		•  Added -0 indicators for an in-process backup
+
+		•  -q now additionally disables color (same as --nocolor) so that
+		   cron mail isn't as ugly
+
+		•  stat() errors while scanning the file system are no longer logged
+		   as they're normal when two instances of managebackups are run
+		   concurrently
 
 		•  Commit cache immediately after a backup + MD5 of that backup to
 		   improve -0 and -1 performance for concurrent invocations

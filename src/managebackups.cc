@@ -111,8 +111,15 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                 }
             }
             else {
+                // stat errors can happen if two copies of managebackups are running concurrently
+                // and the other instance deletes the file between our readdir() and stat().  that's
+                // legit and normal. I can't think of a situation where we'd have perms to readdir()
+                // but not to stat(). so that may be the only scenario where we could land in this
+                // block. in which case its not worth reporting. it would just be a distraction.
+                /*
                 log("error: unable to stat " + fullFilename);
                 SCREENERR("error: unable to stat " << fullFilename);
+                */
             }
         }
         closedir(c_dir);
@@ -881,7 +888,7 @@ int main(int argc, char *argv[]) {
     try {
         GLOBALS.cli = options.parse(argc, argv);
         GLOBALS.debugLevel = GLOBALS.cli.count(CLI_VERBOSE);
-        GLOBALS.color = !GLOBALS.cli[CLI_NOCOLOR].as<bool>();
+        GLOBALS.color = !(GLOBALS.cli[CLI_QUIET].as<bool>() || GLOBALS.cli[CLI_NOCOLOR].as<bool>());
         GLOBALS.stats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2);
 
         if (GLOBALS.cli.count(CLI_USER)) 
