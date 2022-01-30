@@ -64,12 +64,12 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                 else {
                     // filter for filename if specified
                     if (fnamePattern.length() && !fnameRE.search(string(c_dirEntry->d_name))) {
-                        DEBUG(4, "skipping due to name mismatch: " << fullFilename);
+                        DEBUG(4, "skip name mismatch: " << fullFilename);
                         continue;
                     }
 
                     if (tempRE.search(string(c_dirEntry->d_name))) {
-                        DEBUG(2, "in process file found (" << c_dirEntry->d_name);
+                        DEBUG(2, "in process file found (" << c_dirEntry->d_name << ")");
                         cache.inProcess = true;
                         continue;
                     }
