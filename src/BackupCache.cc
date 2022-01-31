@@ -109,8 +109,8 @@ BackupCache::~BackupCache() {
 
         auto md5_it = indexByMD5.find(md5);
         if (md5_it != indexByMD5.end()) {
-            for (auto &md5Set: md5_it->second) {
-                auto raw_it = rawData.find(md5Set);
+            for (auto &fileID: md5_it->second) {
+                auto raw_it = rawData.find(fileID);
                 if (raw_it != rawData.end()) {
                     result.insert(&raw_it->second);
                 }
@@ -203,23 +203,25 @@ BackupCache::~BackupCache() {
         if (filename_it != indexByFilename.end()) {
             unsigned int index = filename_it->second;
             indexByFilename.erase(oldEntry.filename);    // and remove it
-            DEBUG(4, ": removed " << oldEntry.filename << " from filename index");
+            DEBUG(4, "removed " << oldEntry.filename << " from filename index");
 
             // find the entry in the raw data
             auto raw_it = rawData.find(index);
             if (raw_it != rawData.end()) {
                 string fileMD5 = raw_it->second.md5;
                 rawData.erase(index);                    // and remove it
-                DEBUG(4, ": removed " << index << " from raw data");
+                DEBUG(4, "removed " << index << " from raw data");
 
                     // find the entry in the md5 index
                     auto md5_it = indexByMD5.find(fileMD5);
                     if (md5_it != indexByMD5.end()) {
                         md5_it->second.erase(index);     // and remove it
-                        DEBUG(4, ": removed " << fileMD5 << " from md5 index");
+                        DEBUG(4, "removed " << fileMD5 << " from md5 index");
 
-                        if (!md5_it->second.size())      // if that was the last/only file with that MD5
-                            indexByMD5.erase(fileMD5);   // then remove that MD5 entirely from the index
+                        if (!md5_it->second.size()) {      // if that was the last/only file with that MD5
+                            indexByMD5.erase(fileMD5);    // then remove that MD5 entirely from the index
+                            DEBUG(4, "removed final reference to " << fileMD5);
+                        }
                     }
             }
         }
@@ -266,8 +268,8 @@ BackupCache::~BackupCache() {
             result += "\t" + md5.first + ": ";
 
             string detail;
-            for (auto &md5Set: md5.second) {
-                detail += string(detail.length() > 0 ? ", " : "") + to_string(md5Set);
+            for (auto &fileID: md5.second) {
+                detail += string(detail.length() > 0 ? ", " : "") + to_string(fileID);
             }
 
             result += detail + "\n";
@@ -283,8 +285,8 @@ void BackupCache::reStatMD5(string md5) {
     auto md5_it = indexByMD5.find(md5);
     if (md5_it != indexByMD5.end()) {
 
-        for (auto &md5Set: md5_it->second) {
-            auto raw_it = rawData.find(md5Set);
+        for (auto &fileID: md5_it->second) {
+            auto raw_it = rawData.find(fileID);
 
             if (raw_it != rawData.end()) {
                 ++GLOBALS.statsCount;

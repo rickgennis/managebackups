@@ -16,6 +16,7 @@
 #include "pcre++.h"
 #include "util_generic.h"
 #include "globals.h"
+#include "PipeExec.h"
 
 
 using namespace pcrepp;
@@ -572,5 +573,15 @@ string horizontalLine(int length) {
 
     return line;
 }
+
+
+void sendEmail(string recipients, string subject, string message) {
+    PipeExec mail(locateBinary("mail") + " -s '" + subject + "' " + recipients);
+
+    mail.execute("internal");
+    mail.writeProc(message.c_str(), message.length());
+    mail.closeWrite();
+}
+
 
 

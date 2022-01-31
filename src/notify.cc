@@ -12,7 +12,7 @@
 using namespace std;
 
 
-void notify(BackupConfig& config, string message, bool currentSuccess) {
+void notify(BackupConfig& config, string message, bool currentSuccess, bool alwaysOverride) {
     if (!config.settings[sNotify].value.length())
         return;
 
@@ -32,7 +32,7 @@ void notify(BackupConfig& config, string message, bool currentSuccess) {
 
             // for email send the notification if it's a failure or
             // if sNos (notify on success) is enabled
-            if (str2bool(config.settings[sNos].value) || !currentSuccess)  {
+            if (alwaysOverride || str2bool(config.settings[sNos].value) || !currentSuccess)  {
 
                 // superfluous check as test mode bombs out long before anything can call notify()
                 // but just in case future logic changes, testing here
@@ -40,11 +40,7 @@ void notify(BackupConfig& config, string message, bool currentSuccess) {
                     cout << YELLOW << config.ifTitle() << " TESTMODE: would have sent email to " << contactMethod << RESET << endl;
                 else {
                     DEBUG(2, "recipient: " << contactMethod << "; sending email");
-                    PipeExec mail(locateBinary("mail") + " -s 'managebackups - " + config.settings[sTitle].value + 
-                        (currentSuccess ? " (success)" : " (failed)") + "' " + contactMethod);
-                    mail.execute(config.settings[sTitle].value);
-                    mail.writeProc(message.c_str(), message.length());
-                    mail.closeWrite();
+                    sendEmail(contactMethod, "managebackups - " + config.settings[sTitle].value + (currentSuccess ? " (success)" : " (failed)"), message);
                 }
             }
         }
@@ -54,12 +50,12 @@ void notify(BackupConfig& config, string message, bool currentSuccess) {
             // i.e. current success != previous success
             bool previousSuccess = config.getPreviousSuccess();
             DEBUG(2, "states change: prev " << previousSuccess << "; current " << currentSuccess);
-            if (currentSuccess != previousSuccess) {
+            if (alwaysOverride || currentSuccess != previousSuccess) {
                 config.setPreviousSuccess(currentSuccess);
 
                 // for scripts execute the notification if it's a failure or
                 // if sNos (notify on success) is enabled
-                if (str2bool(config.settings[sNos].value) || !currentSuccess)  {
+                if (alwaysOverride || str2bool(config.settings[sNos].value) || !currentSuccess)  {
                     // superfluous check as test mode bombs out long before anything can call notify()
                     // but just in case future logic changes, testing here
                     if (GLOBALS.cli.count(CLI_TEST))

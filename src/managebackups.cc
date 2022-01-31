@@ -39,6 +39,21 @@ struct methodStatus {
 };
 
 
+/*******************************************************************************
+ * parseDirToCache(directory, fnamePattern, cache)
+ *
+ * Recursively walk the given directory looking for all files that match the
+ * fnamePattern (all directories are considered, regardless of their name matching
+ * the pattern). For all matching filenames, compare them to the given cache.
+ *
+ *  (a) if a file is already in the cache and its mtime and size on disk match
+ *      the cache, update the cache with its inode number, links and ages
+ *
+ *  (b) if a file is already in the cache but doesn't match mtime or size on disk
+ *      update everything in the cache, most noteably, calcuclate its md5
+ *
+ *  (c) if a file isn't in the cache create the entry and treat it as (b) above
+ *******************************************************************************/
 void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
@@ -127,6 +142,11 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
 }
 
 
+/*******************************************************************************
+ * scanConfigToCache(config)
+ *
+ * Wrapper function for parseDirToCache().
+ *******************************************************************************/
 void scanConfigToCache(BackupConfig& config) {
     string directory = "";
     string fnamePattern = "";
@@ -150,6 +170,13 @@ void scanConfigToCache(BackupConfig& config) {
 }
 
 
+/*******************************************************************************
+ * selectOrSetupConfig(configManager)
+ *
+ * Determine which config/profile the user has selected and load it. If no
+ * profile was selected created a temp one that will be used, but not persisted
+ * to disk. Validate required commandline options.
+ *******************************************************************************/
 BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     string profile;
     BackupConfig tempConfig(true);
@@ -262,6 +289,11 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
 
 
 
+/*******************************************************************************
+ * pruneBackups(config)
+ *
+ * Apply the full rentetion policy inclusive of all safety checks.
+ *******************************************************************************/
 void pruneBackups(BackupConfig& config) {
     if (GLOBALS.cli.count(CLI_NOPRUNE))
         return;
@@ -269,7 +301,7 @@ void pruneBackups(BackupConfig& config) {
     if (!config.settings[sPruneLive].value.length() && !GLOBALS.cli.count(CLI_NOPRUNE) && !GLOBALS.cli.count(CLI_QUIET)) {
         SCREENERR("warning: While a core feature, managebackups doesn't prune old backups" 
             << "until specifically enabled.  Use --prune to enable pruning.  Use --prune"
-            << "and --save to make it the default behavior for this backup configuration."
+            << "and --save to make it the default behavior for this profile."
             << "pruning skipped;  would have used these settings:"
             << "\t--days " << config.settings[sDays].value << " --weeks " << config.settings[sWeeks].value
             << " --months " << config.settings[sMonths].value << " --years " << config.settings[sYears].value);
@@ -308,8 +340,11 @@ void pruneBackups(BackupConfig& config) {
     DEBUG(4, "weeklies set to dow " << config.settings[sDOW].ivalue());
 
     // loop through the filename index sorted by filename (i.e. all backups by age)
-    for (auto &fnameIdx: config.cache.indexByFilename) {
-        auto raw_it = config.cache.rawData.find(fnameIdx.second);
+    for (auto fIdx_it = config.cache.indexByFilename.begin(), next_it = fIdx_it; fIdx_it != config.cache.indexByFilename.end(); fIdx_it = next_it) {
+        ++next_it;
+
+        DEBUG(5, "considering " << fIdx_it->first);
+        auto raw_it = config.cache.rawData.find(fIdx_it->second);
 
         if (raw_it != config.cache.rawData.end()) { 
             int filenameAge = raw_it->second.day_age;
@@ -355,20 +390,31 @@ void pruneBackups(BackupConfig& config) {
 
                     changedMD5s.insert(raw_it->second.md5);
                     config.cache.remove(raw_it->second);
+                    DEBUG(4, "completed removal of file");
                 }
             }
         }
     }
 
+    DEBUG(4, "about to start post-prune cleanup...");
     if (!GLOBALS.cli.count(CLI_TEST)) {
+        DEBUG(4, "removing empty directories");
         config.removeEmptyDirs();
 
-        for (auto &md5: changedMD5s)
+        for (auto &md5: changedMD5s) {
+            DEBUG(4, "re-stating " << md5);
             config.cache.reStatMD5(md5);
+            DEBUG(4, "re-stat complete");
+        }
     }
 }
 
 
+/*******************************************************************************
+ * updateLinks(config)
+ *
+ * Hard link identical backups together to save space.
+ *******************************************************************************/
 void updateLinks(BackupConfig& config) {
     unsigned int maxLinksAllowed = config.settings[sMaxLinks].ivalue();
     bool includeTime = str2bool(config.settings[sIncTime].value);
@@ -396,7 +442,7 @@ void updateLinks(BackupConfig& config) {
         do {
             /* the rescan loop is a special case where we've hit maxLinksAllowed.  there may be more files
              * with that same md5 still to be linked, which would require a new inode.  for that we need a 
-             * new reference file.  setting rescanrequired to true takes up back here to pick a new one.  */
+             * new reference file.  setting rescanrequired to true takes us back here to pick a new one.  */
              
             rescanRequired = false;
 
@@ -410,10 +456,10 @@ void updateLinks(BackupConfig& config) {
             DEBUG(5, "top of scan for " << md5.first);
 
             // 1st time: loop through the list of files (the set)
-            for (auto &refFile: md5.second) {
-                auto raw_it = config.cache.rawData.find(refFile);
+            for (auto &fileID: md5.second) {
+                auto raw_it = config.cache.rawData.find(fileID);
 
-                DEBUG(5, "considering " << raw_it->second.filename << " (" << raw_it->second.links << ")");
+                DEBUG(5, "considering for ref file " << raw_it->second.filename << " (" << raw_it->second.links << ")");
                 if (raw_it != config.cache.rawData.end()) {
 
                     if (raw_it->second.links > maxLinksFound &&            // more links than previous files for this md5
@@ -436,8 +482,8 @@ void updateLinks(BackupConfig& config) {
             }
 
             // 2nd time: loop through the list of files (the set)
-            for (auto &refFile: md5.second) {
-                auto raw_it = config.cache.rawData.find(refFile);
+            for (auto &fileID: md5.second) {
+                auto raw_it = config.cache.rawData.find(fileID);
                 DEBUG(5, "\texamining " << raw_it->second.filename);
 
                 if (raw_it != config.cache.rawData.end()) {
@@ -489,7 +535,7 @@ void updateLinks(BackupConfig& config) {
                             }
                         }
                         else {
-                            SCREENERR("error: unable to remove" << raw_it->second.filename << " in prep to link it (" 
+                            SCREENERR("error: unable to remove " << raw_it->second.filename << " in prep to link it (" 
                                 << strerror(errno) << ")");
                             log(config.ifTitle() + " error: unable to remove " + raw_it->second.filename + 
                                 " in prep to link it (" + strerror(errno) + ")");
@@ -502,6 +548,11 @@ void updateLinks(BackupConfig& config) {
 }
 
 
+/*******************************************************************************
+ * interpolate(command, subDir, fullDirectory, basicFilename)
+ *
+ * Substitute variable values into SCP/SFP commands.
+ *******************************************************************************/
 string interpolate(string command, string subDir, string fullDirectory, string basicFilename) {
     size_t pos;
 
@@ -518,6 +569,11 @@ string interpolate(string command, string subDir, string fullDirectory, string b
 }
  
 
+/*******************************************************************************
+ * sCpBackup(config, backupFilename, subDir, sCpParams)
+ *
+ * SCP the backup to the specified location.
+ *******************************************************************************/
 methodStatus sCpBackup(BackupConfig& config, string backupFilename, string subDir, string sCpParams) {
     string sCpBinary = locateBinary("scp");
     timer sCpTime;
@@ -560,6 +616,11 @@ methodStatus sCpBackup(BackupConfig& config, string backupFilename, string subDi
 }
 
 
+/*******************************************************************************
+ * sFtpBackup(config, backupFilename, subDir, sFtpParams)
+ *
+ * SFTP the backup to the specified destination.
+ *******************************************************************************/
 methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subDir, string sFtpParams) {
     string sFtpBinary = locateBinary("sftp");
     bool makeDirs = sFtpParams.find("//") == string::npos;
@@ -634,6 +695,11 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
 }
 
 
+/*******************************************************************************
+ * performBackup(config)
+ *
+ * Perform a backup, saving it to the configured filename.
+ *******************************************************************************/
 void performBackup(BackupConfig& config) {
     bool incTime = str2bool(config.settings[sIncTime].value);
     string setFname = config.settings[sBackupFilename].value;
@@ -786,6 +852,12 @@ void performBackup(BackupConfig& config) {
 }
 
 
+/*******************************************************************************
+ * setupUserDirectories()
+ *
+ * Configure the 3 primary app directories (config, cache, log) to be relative
+ * to the current user's home directory.
+ *******************************************************************************/
 void setupUserDirectories() {
     struct passwd *pws;
     if ((pws = getpwuid(getuid())) == NULL) {
@@ -800,6 +872,11 @@ void setupUserDirectories() {
 }
 
 
+/*******************************************************************************
+ * sigTermHandler(sig)
+ *
+ * Catch the configured signals and clean up any inprocess backup.
+ *******************************************************************************/
 void sigTermHandler(int sig) {
     if (GLOBALS.interruptFilename.length()) {
         cerr << "\ninterrupt: aborting backup, cleaning up... ";
@@ -812,6 +889,20 @@ void sigTermHandler(int sig) {
 }
 
 
+void checkDiskSpace(BackupConfig& config) {
+
+    notify(config,
+            "",
+            true,
+            true);
+}
+
+
+/*******************************************************************************
+ * main(argc, argv)
+ *
+ * Main entry point -- where all the magic happens.
+ *******************************************************************************/
 int main(int argc, char *argv[]) {
     timer AppTimer;
     AppTimer.start();
@@ -938,11 +1029,13 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
+    DEBUG(2, "about to setup config...");
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager);
 
     // if displaying stats and --profile hasn't been specified (or matched successfully)
     // then rescan all configs;  otherwise just scan the --profile config
+    DEBUG(2, "about to scan directories...");
     if (GLOBALS.stats && currentConfig->temp) {
         for (auto &config: configManager.configs) {
             scanConfigToCache(config);
@@ -956,12 +1049,17 @@ int main(int argc, char *argv[]) {
         GLOBALS.cli.count(CLI_STATS1) ? displayDetailedStatsWrapper(configManager) : displaySummaryStatsWrapper(configManager);
     }
     else {
+        DEBUG(2, "about to prune backups...");
         pruneBackups(*currentConfig);
+        DEBUG(2, "about to update links...");
         updateLinks(*currentConfig);
+        DEBUG(2, "about to perform backup...");
         performBackup(*currentConfig);
+        DEBUG(2, "completed primary tasks");
     }
 
     AppTimer.stop();
     DEBUG(1, "stats: " << GLOBALS.statsCount << ", md5s: " << GLOBALS.md5Count << ", total time: " << AppTimer.elapsed(3));
     return 0;
 }
+
