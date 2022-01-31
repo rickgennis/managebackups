@@ -341,6 +341,11 @@ void pruneBackups(BackupConfig& config) {
 
     // loop through the filename index sorted by filename (i.e. all backups by age)
     for (auto fIdx_it = config.cache.indexByFilename.begin(), next_it = fIdx_it; fIdx_it != config.cache.indexByFilename.end(); fIdx_it = next_it) {
+
+        // the second iterator (next_it) is necessary because a function called within 
+        // this loop (config.cache.remove()) calls erase() on our primary iterator. while
+        // that appears to be handled on darwin it crashes under linux. next_it allows 
+        // the loop to track the next value for the iterator without dereferencing a deleted pointer.
         ++next_it;
 
         DEBUG(5, "considering " << fIdx_it->first);
