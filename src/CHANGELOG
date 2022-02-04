@@ -2,6 +2,13 @@
 v1.2.5 - 1/29/22
 		•  Added --mode option to specify file mode of new backups
 
+		•  Added --minspace and --minsftpspace
+
+		•  Added suffix support for --minsize, --minspace and --minsftpspace
+		   (i.e. 100G)
+
+		•  Added hostname to notifications
+
 		•  Added in-process messages for SCP/SFTP
 
 		•  Added -0 indicators for an in-process backup
