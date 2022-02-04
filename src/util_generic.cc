@@ -617,4 +617,18 @@ void sendEmail(string recipients, string subject, string message) {
 }
 
 
+string todayString() {
+    char text[100];
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
 
+    strftime(text, sizeof(text)-1, "%c", t);
+    return(text);
+}
+
+
+string blockp(string data, int width) {
+    char cstr[2000];
+    sprintf(cstr, string(string("%") + to_string(width) + "s").c_str(), data.c_str());
+    return(cstr);
+}

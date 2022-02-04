@@ -43,14 +43,14 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_FS_DAYS, RE_FSDAYS, INT, "0"));
     settings.insert(settings.end(), Setting(CLI_SCPTO, RE_SCP, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_SFTPTO, RE_SFTP, STRING, ""));
-    settings.insert(settings.end(), Setting(CLI_PRUNE, RE_PRUNE, BOOL, "0"));
+    settings.insert(settings.end(), Setting(CLI_PRUNE, RE_PRUNE, BOOL, "false"));
     settings.insert(settings.end(), Setting(CLI_NOTIFY, RE_NOTIFY, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_MAXLINKS, RE_MAXLINKS, INT, "20"));
-    settings.insert(settings.end(), Setting(CLI_TIME, RE_TIME, BOOL, "0"));
-    settings.insert(settings.end(), Setting(CLI_NOS, RE_NOS, BOOL, "0"));
+    settings.insert(settings.end(), Setting(CLI_TIME, RE_TIME, BOOL, "false"));
+    settings.insert(settings.end(), Setting(CLI_NOS, RE_NOS, BOOL, "false"));
     settings.insert(settings.end(), Setting(CLI_MINSIZE, RE_MINSIZE, SIZE, "500"));
     settings.insert(settings.end(), Setting(CLI_DOW, RE_DOW, INT, "0"));
-    settings.insert(settings.end(), Setting(CLI_FS_FP, RE_FS_FP, BOOL, "0"));
+    settings.insert(settings.end(), Setting(CLI_FS_FP, RE_FS_FP, BOOL, "false"));
     settings.insert(settings.end(), Setting(CLI_MODE, RE_MODE, OCTAL, "0600"));
     settings.insert(settings.end(), Setting(CLI_MINSPACE, RE_MINSPACE, SIZE, "0"));
     settings.insert(settings.end(), Setting(CLI_MINSFTPSPACE, RE_MINSFTPSPACE, SIZE, "0"));
@@ -118,7 +118,8 @@ void BackupConfig::saveConfig() {
                     for (auto &setting: settings) {
                         if (setting.regex.search(dataLine) && setting.regex.matches() > 2) {
                             usersDelimiter = setting.regex.get_match(1);
-                            newFile << setting.regex.get_match(0) << setting.regex.get_match(1) << setting.value << 
+                            newFile << setting.regex.get_match(0) << setting.regex.get_match(1) << 
+                                (setting.data_type == BOOL ? (str2bool(setting.value) ? "true" : "false") : setting.value) << 
                                 (setting.regex.matches() > 3 ? setting.regex.get_match(3) : "")  << endl;
                             setting.seen = identified = true;
                             break;
@@ -127,7 +128,7 @@ void BackupConfig::saveConfig() {
 
                     // comment out unrecognized settings
                     if (!identified) { 
-                        newFile << "// " << dataLine << "       # unknown setting?" << endl; 
+                        newFile << "# " << dataLine << "       # unknown setting?" << endl; 
                         continue;
                     }
                 }
@@ -148,15 +149,45 @@ void BackupConfig::saveConfig() {
         }
 
         oldFile.close();
+
+        // loop through settings that weren't specified in the existing config;
+        // if any of the current values (likely specified via command line parameters on startup)
+        // differ from the defaults, write them to the new file.
+        for (auto &setting: settings)
+            if (!setting.seen && (setting.value != setting.defaultValue)) {
+                newFile << setting.display_name << usersDelimiter << setting.value << endl;
+            }
+    }
+    else {
+        // completely new config, first time being written
+        string commentLine = "#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#\n";
+        newFile << commentLine << "# Profile created on " << todayString() << "\n" << commentLine;
+        newFile << blockp("profile:", -17) << settings[sTitle].value << "\n\n\n";
+        newFile << commentLine << "# Backing up\n" << commentLine << "\n";
+
+        newFile << settings[sDirectory].confPrint("/home/myuser");
+        newFile << settings[sBackupFilename].confPrint("myuser.tgz");
+        newFile << settings[sBackupCommand].confPrint("myuser.tgz");
+        newFile << settings[sNotify].confPrint("me@zmail.com, marvin@ymail.com");
+        newFile << settings[sSFTPTo].confPrint("myremotebox:/backups");
+        newFile << settings[sSCPTo].confPrint("myremotebox:/backups/{subdir}/{file}");
+        newFile << settings[sMode].confPrint();
+        newFile << settings[sIncTime].confPrint();
+        newFile << settings[sMinSpace].confPrint("2G") << "\n\n";
+
+        newFile << commentLine << "# Pruning\n" << commentLine << "\n";
+        newFile << settings[sPruneLive].confPrint();
+        newFile << settings[sDays].confPrint();
+        newFile << settings[sWeeks].confPrint();
+        newFile << settings[sMonths].confPrint();
+        newFile << settings[sYears].confPrint();
+        newFile << settings[sFailsafeBackups].confPrint();
+        newFile << settings[sFailsafeDays].confPrint() << "\n\n";
+
+        newFile << commentLine << "# Linking\n" << commentLine << "\n";
+        newFile << settings[sMaxLinks].confPrint();
     }
 
-    // loop through settings that weren't specified in the existing config;
-    // if any of the current values (likely specified via command line parameters on startup)
-    // differ from the defaults, write them to the new file.
-    for (auto &setting: settings)
-        if (!setting.seen && (setting.value != setting.defaultValue)) {
-            newFile << setting.display_name << usersDelimiter << setting.value << endl;
-        }
 
     newFile.close();
     remove(config_filename.c_str());

@@ -51,12 +51,6 @@ Options are relative to the three functions of **managebackups**.
 **-1**
 : Provide detail of backups.
 
-**--notify** [contact1, contact2, ...]
-: Notify after a backup completes. By default, only failed backups trigger notifications (see **--nos**). A contact can be an email address or the full path to a script to execute. Double-quote the contact string if it contains any spaces. The NOTIFICATIONS section below has more detail.
-
-**--nos**
-: Notify on successful backups also.
-
 **--test**
 : Run in test mode. No changes are actually made to disk (no backups, pruning or linking).
 
@@ -97,6 +91,12 @@ Options are relative to the three functions of **managebackups**.
 
 **--time**
 : Include the time in the filename of the newly created backup.  The day of month will also be included in the subdirectory. Without time included multiple backups on the same day taken with the same settings will overwrite each other resulting in a single backup for the day. With time included each backup is saved separately.
+
+**--notify** [*contact1*, *contact2*, ...]
+: Notify after a backup completes. By default, only failed backups/SFTP/SCP trigger notifications (see **--nos**). A contact can be an email address or the full path to a script to execute. Double-quote the contact string if it contains any spaces. The NOTIFICATIONS section below has more detail.
+
+**--nos**
+: Notify on successful backups also.
 
 **--scp** [*destination*]
 : On completion of a successful backup, SCP the newly created backup file to *destination*.  *destination* can include user@ notation and an optional hardcoded filename.  If filename is omitted the newly created date-based filename is used, the same as with a standard cp command. Additionally the strings {fulldir}, {subdir} and {filename} can be used; they'll be automatically replaced with the values relative to the newly created backup.
@@ -158,22 +158,22 @@ Notification scripts are passed a single parameter, which is a message describin
 Rather than specifying the two settings individually, there's also a Failsafe Paranoid option (**--fp**) which sets backups to 1 and days to 2. In other words, there has to be a valid backup within the last two days before pruning is allowed.
 
 # PROFILE CONFIG FILES
-Profile configuration files are managed by **managebackups** though they can be edited by hand if that's easier than lengthy commandline arguments. Each profile equates to a .conf file under /etc/managebackups. Commandline arguments are automatically persisted to a configuration file when both a profile name (**--profile**) and **-save** are specified. Comments (// and #) are supported.
+Profile configuration files are managed by **managebackups** though they can be edited by hand if that's easier than lengthy commandline arguments. Each profile equates to a .conf file under /etc/managebackups. Commandline arguments are automatically persisted to a configuration file when both a profile name (**--profile**) and **-save** are specified. Comments (#) are supported.
 
 # EXAMPLES
-**managebackups --profile homedirs --directory /var/backups --file homedirs.tgz --cmd "tar -cz /home" --weekly 2 --notify me@zmail.com --save**
+**managebackups --profile homedirs --directory /var/backups --file homedirs.tgz --cmd "tar -cz /home" --weekly 2 --notify me@zmail.com --prune --save**
 : Create a gzipped backup of /home and store it in /var/backups/YYYY/MM/homedirs-YYYYMMDD.tgz. Override the weekly retention to 2 while keeping the daily, monthly and yearly settings at their defaults. This performs pruning and linking with their default settings and emails on failure. Because **--save** is include, all of the settings are associated with the homedirs profile, allowing the same command to be run again (or cron'd) simply as **managebackups -p homedirs**.
 
 **managebackups -p mymac --directory /opt/backups --file mymac.tgz --cmd "tar -cz /Users /var" --scp archiver@vaultserver:/mydata --time --notify "me@zmail.com, /usr/local/bin/push_alert_to_phone.sh" --save**
-: Create a gzipped backup of /Users and /var in /opt/backups/YYYY/MM/DD/mymac-YYYYMMDD-HH:MM:SS.tgz. Upon success copy the file to the vaultserver's /mydata directory. Upon failure notify me with via and a script that pushes an alert to my phone.
+: Create a gzipped backup of /Users and /var in /opt/backups/YYYY/MM/DD/mymac-YYYYMMDD-HH:MM:SS.tgz. Upon success copy the file to the vaultserver's /mydata directory. Upon failure notify me with email and via a script that pushes an alert to my phone.
 
-**managebackups -p mymac --daily 10 --fp**
+**managebackups -p mymac --daily 10 --prune --fp**
 : Re-run the mymac profile that was saved in the previous example with all of its options, but override the daily retention quota, effectively having **managebackups** delete dailies that are older than 10 days. Also include the Failsafe Paranoid check to make certain a recent backup was taken before removing any older files.  Because **--save** was not specified the **--daily 10** (and paranoid setting) is only for this run and doesn't become part of the mymac profile moving forward.
 
-**managebackups --directory /opt/backups --file pegasus.tgz --cmd "ssh pegasus tar -czf - /home" --scp me@remoteserver:/var/backups/{subdir}/{file} --fp**
+**managebackups --directory /opt/backups --file pegasus.tgz --cmd "ssh pegasus tar -czf - /home" --scp me@remoteserver:/var/backups/{subdir}/{file} --prune --fp**
 : Tar up /home from the pegasus server and store it in /opt/backups/YYYY/MM/pegasus-YYYYMMDD.tgz. Prune and link with default settings, though only prune if there's a recent backup (failsafe paranoid setting). On success SCP the backup to remoteserver.
 
-**managebackups --directory /my/backups**
+**managebackups --directory /my/backups --prune**
 : Prune (via default thresholds) and update links on all backups found in /my/backups. Without **--file** or **--command** no new backup is performed/taken. This can be used to manage backups that are performed by another tool entirely. Note: There may be profiles defined with different retention thresholds for a subset of files in /my/backups (i.e. files that match the **--files** setting); those retention thresholds would be ignored for this run because no **--profile** is specified.
 
 **managebackups -1**

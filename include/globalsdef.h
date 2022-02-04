@@ -68,8 +68,8 @@
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
-#define RE_COMMENT "((?:\\s*#|//).*)*$"
-#define RE_BLANK "^((?:\\s*#|//).*)*$"
+#define RE_COMMENT "((?:\\s*#).*)*$"
+#define RE_BLANK "^((?:\\s*#).*)*$"
 #define RE_PROFILE "(profile)"
 #define RE_DIR "(dir|directory)"
 #define RE_FILE "(file|filename)"

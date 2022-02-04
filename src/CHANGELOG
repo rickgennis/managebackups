@@ -7,6 +7,11 @@ v1.2.5 - 1/29/22
 		•  Added suffix support for --minsize, --minspace and --minsftpspace
 		   (i.e. 100G)
 
+		•  Added size to backup logging and output
+
+		•  On initial creation of a config file make it pretty (default
+		   values, comments, examples)
+
 		•  Added hostname to notifications
 
 		•  Added in-process messages for SCP/SFTP

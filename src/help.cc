@@ -40,6 +40,8 @@ void showHelp(enum helpType kind) {
             + "                       relative to the newly created backup: {fulldir}, {subdir}, {filename}.\n"
             + "   --minspace [size]   Minimum local free space required before taking a backup\n"          
             + "   --minsftpspace [sz] Minimum free space required on the remote SFTP server before transfering a backup\n"          
+            + "   --notify [contact]  Notify after a backup completes; can be email addresses and/or script names (failures only).\n"
+            + "   --nos               Notify on success also.\n"
             + "\n" + string(BOLDBLUE) + "PRUNING\n" + RESET
             + "   --days [x]          Keep x daily backups\n"
             + "   --weeks [x]         Keep x weekly backups\n"
@@ -56,8 +58,6 @@ void showHelp(enum helpType kind) {
             + "\n" + string(BOLDBLUE) + "GENERAL\n" + RESET
             + "   --profile [name]    Use the specified profile for the current run.\n"
             + "   --save              Save all the specified settings to the specified profile.\n"
-            + "   --notify [contact]  Notify after a backup completes; can be email addresses and/or script names (failures only).\n"
-            + "   --nos               Notify on success also.\n"
             + "   -0                  Provide a summary of backups.\n"
             + "   -1                  Provide detail of backups.\n"
             + "   --install           Install this binary in /usr/local/bin, update directory perms and create the man page.\n"
@@ -208,18 +208,6 @@ Provide a summary of backups.
 \f[B]-1\f[R]
 Provide detail of backups.
 .TP
-\f[B]\[en]notify\f[R] [contact1, contact2, \&...]
-Notify after a backup completes.
-By default, only failed backups trigger notifications (see
-\f[B]\[en]nos\f[R]).
-A contact can be an email address or the full path to a script to
-execute.
-Double-quote the contact string if it contains any spaces.
-The NOTIFICATIONS section below has more detail.
-.TP
-\f[B]\[en]nos\f[R]
-Notify on successful backups also.
-.TP
 \f[B]\[en]test\f[R]
 Run in test mode.
 No changes are actually made to disk (no backups, pruning or linking).
@@ -284,6 +272,18 @@ Without time included multiple backups on the same day taken with the
 same settings will overwrite each other resulting in a single backup for
 the day.
 With time included each backup is saved separately.
+.TP
+\f[B]\[en]notify\f[R] [\f[I]contact1\f[R], \f[I]contact2\f[R], \&...]
+Notify after a backup completes.
+By default, only failed backups/SFTP/SCP trigger notifications (see
+\f[B]\[en]nos\f[R]).
+A contact can be an email address or the full path to a script to
+execute.
+Double-quote the contact string if it contains any spaces.
+The NOTIFICATIONS section below has more detail.
+.TP
+\f[B]\[en]nos\f[R]
+Notify on successful backups also.
 .TP
 \f[B]\[en]scp\f[R] [\f[I]destination\f[R]]
 On completion of a successful backup, SCP the newly created backup file
@@ -435,10 +435,10 @@ Each profile equates to a .conf file under /etc/managebackups.
 Commandline arguments are automatically persisted to a configuration
 file when both a profile name (\f[B]\[en]profile\f[R]) and
 \f[B]-save\f[R] are specified.
-Comments (// and #) are supported.
+Comments (#) are supported.
 .SH EXAMPLES
 .TP
-\f[B]managebackups \[en]profile homedirs \[en]directory /var/backups \[en]file homedirs.tgz \[en]cmd \[lq]tar -cz /home\[rq] \[en]weekly 2 \[en]notify me\[at]zmail.com \[en]save\f[R]
+\f[B]managebackups \[en]profile homedirs \[en]directory /var/backups \[en]file homedirs.tgz \[en]cmd \[lq]tar -cz /home\[rq] \[en]weekly 2 \[en]notify me\[at]zmail.com \[en]prune \[en]save\f[R]
 Create a gzipped backup of /home and store it in
 /var/backups/YYYY/MM/homedirs-YYYYMMDD.tgz.
 Override the weekly retention to 2 while keeping the daily, monthly and
@@ -453,10 +453,10 @@ run again (or cron\[cq]d) simply as \f[B]managebackups -p homedirs\f[R].
 Create a gzipped backup of /Users and /var in
 /opt/backups/YYYY/MM/DD/mymac-YYYYMMDD-HH:MM:SS.tgz.
 Upon success copy the file to the vaultserver\[cq]s /mydata directory.
-Upon failure notify me with via and a script that pushes an alert to my
-phone.
+Upon failure notify me with email and via a script that pushes an alert
+to my phone.
 .TP
-\f[B]managebackups -p mymac \[en]daily 10 \[en]fp\f[R]
+\f[B]managebackups -p mymac \[en]daily 10 \[en]prune \[en]fp\f[R]
 Re-run the mymac profile that was saved in the previous example with all
 of its options, but override the daily retention quota, effectively
 having \f[B]managebackups\f[R] delete dailies that are older than 10
@@ -467,14 +467,14 @@ Because \f[B]\[en]save\f[R] was not specified the \f[B]\[en]daily
 10\f[R] (and paranoid setting) is only for this run and doesn\[cq]t
 become part of the mymac profile moving forward.
 .TP
-\f[B]managebackups \[en]directory /opt/backups \[en]file pegasus.tgz \[en]cmd \[lq]ssh pegasus tar -czf - /home\[rq] \[en]scp me\[at]remoteserver:/var/backups/{subdir}/{file} \[en]fp\f[R]
+\f[B]managebackups \[en]directory /opt/backups \[en]file pegasus.tgz \[en]cmd \[lq]ssh pegasus tar -czf - /home\[rq] \[en]scp me\[at]remoteserver:/var/backups/{subdir}/{file} \[en]prune \[en]fp\f[R]
 Tar up /home from the pegasus server and store it in
 /opt/backups/YYYY/MM/pegasus-YYYYMMDD.tgz.
 Prune and link with default settings, though only prune if there\[cq]s a
 recent backup (failsafe paranoid setting).
 On success SCP the backup to remoteserver.
 .TP
-\f[B]managebackups \[en]directory /my/backups\f[R]
+\f[B]managebackups \[en]directory /my/backups \[en]prune\f[R]
 Prune (via default thresholds) and update links on all backups found in
 /my/backups.
 Without \f[B]\[en]file\f[R] or \f[B]\[en]command\f[R] no new backup is

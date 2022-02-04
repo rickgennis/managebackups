@@ -40,6 +40,8 @@ void showHelp(enum helpType kind) {
             + "                       relative to the newly created backup: {fulldir}, {subdir}, {filename}.\n"
             + "   --minspace [size]   Minimum local free space required before taking a backup\n"          
             + "   --minsftpspace [sz] Minimum free space required on the remote SFTP server before transfering a backup\n"          
+            + "   --notify [contact]  Notify after a backup completes; can be email addresses and/or script names (failures only).\n"
+            + "   --nos               Notify on success also.\n"
             + "\n" + string(BOLDBLUE) + "PRUNING\n" + RESET
             + "   --days [x]          Keep x daily backups\n"
             + "   --weeks [x]         Keep x weekly backups\n"
@@ -56,8 +58,6 @@ void showHelp(enum helpType kind) {
             + "\n" + string(BOLDBLUE) + "GENERAL\n" + RESET
             + "   --profile [name]    Use the specified profile for the current run.\n"
             + "   --save              Save all the specified settings to the specified profile.\n"
-            + "   --notify [contact]  Notify after a backup completes; can be email addresses and/or script names (failures only).\n"
-            + "   --nos               Notify on success also.\n"
             + "   -0                  Provide a summary of backups.\n"
             + "   -1                  Provide detail of backups.\n"
             + "   --install           Install this binary in /usr/local/bin, update directory perms and create the man page.\n"

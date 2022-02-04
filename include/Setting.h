@@ -4,6 +4,7 @@
 
 #include <string>
 #include <pcre++.h>
+#include <util_generic.h>
 
 using namespace std;
 using namespace pcrepp;
@@ -22,6 +23,7 @@ class Setting {
         bool seen;
 
         int ivalue() { return stoi(value); }
+        string confPrint(string sample = "");
         Setting(string name, string pattern, enum SetType setType, string defaultVal);
 };
 

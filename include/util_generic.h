@@ -97,5 +97,9 @@ void sendEmail(string recipients, string subject, string message);
 
 unsigned long approx2bytes(string approx);
 
+string todayString();
+
+string blockp(string data, int width);
+
 #endif
 

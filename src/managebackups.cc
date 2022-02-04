@@ -745,7 +745,7 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
     command = "put " + backupFilename + "\n";
     sFtp.writeProc(command.c_str(), command.length());
 
-    command = string("quit") + "\n";
+    command = string("quit\n");
     sFtp.writeProc(command.c_str(), command.length());
 
     bool success = sFtp.readAndMatch("Uploading");
@@ -851,9 +851,11 @@ void performBackup(BackupConfig& config) {
 
             // rename the file
             if (!rename(string(backupFilename + tempExtension).c_str(), backupFilename.c_str())) {
-                log(config.ifTitle() + " completed backup to " + backupFilename + " in " + backupTime.elapsed());
+                auto size = approximate(cacheEntry.size);
+
+                log(config.ifTitle() + " completed backup to " + backupFilename + " (" + size + ") in " + backupTime.elapsed());
                 NOTQUIET && cout << "\t• successfully backed up to " << BOLDBLUE << backupFilename << RESET <<
-                    " in " << backupTime.elapsed() << endl;
+                    " (" << size << ") in " << backupTime.elapsed() << endl;
 
                 try {   // could get an exception converting settings[sMode] to an octal number
                     int mode = strtol(config.settings[sMode].value.c_str(), NULL, 8);
@@ -884,7 +886,7 @@ void performBackup(BackupConfig& config) {
                 config.cache.saveCache();
 
                 bool overallSuccess = true;
-                string notifyMessage = "\t• completed backup of " + backupFilename + " in " + backupTime.elapsed() + "\n";
+                string notifyMessage = "\t• completed backup of " + backupFilename + " (" + size + ") in " + backupTime.elapsed() + "\n";
 
                 if (config.settings[sSFTPTo].value.length()) {
                     string sFtpParams = interpolate(config.settings[sSFTPTo].value, subDir, fullDirectory, basicFilename);

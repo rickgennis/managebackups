@@ -11,6 +11,16 @@ Setting::Setting(string name, string pattern, enum SetType setType, string defau
     seen = false;
 }
 
+
+string Setting::confPrint(string sample) {
+    bool isDef = value == defaultValue;
+
+    return(blockp((isDef ? "#" : "") + display_name + ":", -17) +
+        (isDef && sample.length() ? blockp(sample, -25) + "  # example" : 
+         (blockp(data_type == BOOL ? (str2bool(value) ? "true" : "false") : value, -25) + (isDef ? "  # default" : ""))) + "\n");
+}
+
+
 /*
 string Setting::getValue(bool getDefault) {
     string result;
