@@ -203,24 +203,24 @@ BackupCache::~BackupCache() {
         if (filename_it != indexByFilename.end()) {
             unsigned int index = filename_it->second;
             indexByFilename.erase(oldEntry.filename);    // and remove it
-            DEBUG(4, "removed " << oldEntry.filename << " from filename index");
+            DEBUG(5, "removed " << oldEntry.filename << " from filename index");
 
             // find the entry in the raw data
             auto raw_it = rawData.find(index);
             if (raw_it != rawData.end()) {
                 string fileMD5 = raw_it->second.md5;
                 rawData.erase(index);                    // and remove it
-                DEBUG(4, "removed " << index << " from raw data");
+                DEBUG(5, "removed " << index << " from raw data");
 
                     // find the entry in the md5 index
                     auto md5_it = indexByMD5.find(fileMD5);
                     if (md5_it != indexByMD5.end()) {
                         md5_it->second.erase(index);     // and remove it
-                        DEBUG(4, "removed " << fileMD5 << " from md5 index");
+                        DEBUG(5, "removed " << fileMD5 << " from md5 index");
 
                         if (!md5_it->second.size()) {      // if that was the last/only file with that MD5
                             indexByMD5.erase(fileMD5);    // then remove that MD5 entirely from the index
-                            DEBUG(4, "removed final reference to " << fileMD5);
+                            DEBUG(5, "removed final reference to " << fileMD5);
                         }
                     }
             }

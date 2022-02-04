@@ -271,5 +271,24 @@ ssize_t PipeExec::writeProc(const void *buf, size_t count) {
 }
 
 
+string PipeExec::statefulReadAndMatchRegex(string regex, int buffSize) {
+    char buffer[buffSize];
+    Pcre reg(regex);
+    int bytesRead;
 
+    while ((bytesRead = readProc(buffer, sizeof(buffer)))) {
+        string tempStateBuffer(buffer, bytesRead);
+        stateBuffer += tempStateBuffer;
+
+        if (reg.search(stateBuffer) && reg.matches()) {
+            auto pos = reg.get_match_end(0);
+            string match = reg.get_match(0);
+             
+            stateBuffer.erase(0, pos);
+            return match;
+        }
+    }
+
+    return ""; 
+}
 

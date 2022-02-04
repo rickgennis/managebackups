@@ -8,7 +8,6 @@
 #include <openssl/md5.h>
 #include <algorithm>
 #include <sys/stat.h>
-#include "pcre++.h"
 #include "math.h"
 #include <sys/types.h>
 #include <pwd.h>
@@ -38,7 +37,7 @@ string cppgetenv(string variable) {
 
 
 void log(string message) {
-#ifdef ON_MAC
+#ifdef __APPLE__
     if (!GLOBALS.logDir.length()) {  
         string defaultDir = "/var/log";
 
@@ -188,6 +187,40 @@ string approximate(double size) {
     return(string(buffer) + unit[index]);
 }
 
+
+unsigned long approx2bytes(string approx) {
+    vector<string> units = { "B", "K", "M", "G", "T", "P", "E", "Z", "Y" };
+    Pcre reg("^((?:\\d|\\.)+)\\s*(?:(\\w)(?:[Bb]$|$)|$)");
+
+    if (reg.search(approx)) {
+
+        // was a numeric value and a unit specified?
+        if (reg.matches() > 1) {
+
+            // save the two pieces
+            auto numericVal = stof(reg.get_match(0));
+            string unit = reg.get_match(1);
+
+            // capitalize the units to match the lookup in the vector
+            for (auto &c: unit) c = toupper(c);
+
+            // lookup the supplied unit in the vector
+            auto it = find(units.begin(), units.end(), unit);
+
+            if (it != units.end()) {
+                // determine its index and calculate the result
+                int index = it - units.begin();
+                return floor(pow(1024, index) * numericVal);
+            }
+        }
+        // was just a numeric value specified?
+        else if (reg.matches() > 0) {
+            return floor(stof(reg.get_match(0)));
+        }
+    }
+
+    throw std::runtime_error("error parsing size from " + approx);
+}
 
 
 string seconds2hms(unsigned long seconds) {

@@ -33,11 +33,13 @@ void showHelp(enum helpType kind) {
             + "   --file [filename]   The base filename to save the backup to. The date and, optionally, time will automatically be inserted.\n"
             + "   --time              Include the time in the backup filename; also inserts the day into the subdirectory.\n"
             + "   --mode [mode]       chmod newly created backups to this octatl mode (default 0600).\n"
-            + "   --minsize [size]    Backups less than size-bytes are considered failures and discarded.\n"
+            + "   --minsize [size]    Backups less than this size are considered failures and discarded.\n"
             + "   --scp [dest]        SCP the new backup to the destination. Dest can include user@machine:/dir/dirs.\n"
             + "   --sftp [dest]       SFTP the new backup to the destination. Dest can include SCP details plus SFTP flags (like -P for port).\n"
             + "                       SCP & SFTP also support variable interpolation of these strings which will be sustituted with values\n"
             + "                       relative to the newly created backup: {fulldir}, {subdir}, {filename}.\n"
+            + "   --minspace [size]   Minimum local free space required before taking a backup\n"          
+            + "   --minsftpspace [sz] Minimum free space required on the remote SFTP server before transfering a backup\n"          
             + "\n" + string(BOLDBLUE) + "PRUNING\n" + RESET
             + "   --days [x]          Keep x daily backups\n"
             + "   --weeks [x]         Keep x weekly backups\n"
@@ -313,10 +315,24 @@ For example, \f[B]\[en]sftp\f[R]
 \[lq]backupuser\[at]vaultserver://data\[rq].
 .TP
 \f[B]\[en]minsize\f[R] [\f[I]minsize\f[R]]
-Use \f[I]minsize\f[R] bytes as the minimum size of a valid backup.
+Use \f[I]minsize\f[R] as the minimum size of a valid backup.
 Backups created by \f[B]\[en]command\f[R] that are less than
-\f[I]minsize\f[R] bytes are considered failures and deleted.
+\f[I]minsize\f[R] are considered failures and deleted.
+\f[I]minsize\f[R] is assumed to be in bytes unless a suffix is specified
+(K, M, G, T, P, E, Z, Y).
 The default \f[I]minsize\f[R] is 500.
+.TP
+\f[B]\[en]minspace\f[R] [\f[I]minspace\f[R]]
+Require \f[I]minspace\f[R] free space on the local disk (under
+\f[B]\[en]directory\f[R]) before beginning a backup.
+\f[I]minspace\f[R] is assumed to be in bytes unless a suffix is
+specified (K, M, G, T, P, E, Z, Y).
+.TP
+\f[B]\[en]minsftpspace\f[R] [\f[I]minsftpspace\f[R]]
+Require \f[I]minsftpspace\f[R] free space on the remote SFTP server
+before SFTPing a file.
+\f[I]minsftpspace\f[R] is assumed to be in bytes unless a suffix is
+specified (K, M, G, T, P, E, Z, Y).
 .TP
 \f[B]\[en]nobackup\f[R]
 Disable performing backups for this run.

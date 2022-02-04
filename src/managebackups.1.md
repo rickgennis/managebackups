@@ -105,7 +105,13 @@ Options are relative to the three functions of **managebackups**.
 : On completion of a successful backup, SFTP the newly created backup file to *destination*. *destination* can include user@ notation, machine name and/or directory name. SFTP parameters (such as -P and others) can be included as well. Additionally the strings {fulldir}, {subdir} and {filename} can be used; they'll be automatically replaced with the values relative to the newly created backup. By default, a current year and month subdirectory will be created on the destination after connecting and then the file is "put" into that directory. Use a double-slash anywhere in the *destination* to disable creation and use of the YEAR/MONTH subdirectory structure on the destination server.  For example, **--sftp** "backupuser@vaultserver://data".
 
 **--minsize** [*minsize*]
-: Use *minsize* bytes as the minimum size of a valid backup. Backups created by **--command** that are less than *minsize* bytes are considered failures and deleted. The default *minsize* is 500.
+: Use *minsize* as the minimum size of a valid backup. Backups created by **--command** that are less than *minsize* are considered failures and deleted. *minsize* is assumed to be in bytes unless a suffix is specified (K, M, G, T, P, E, Z, Y). The default *minsize* is 500.
+
+**--minspace** [*minspace*]
+: Require *minspace* free space on the local disk (under **--directory**) before beginning a backup. *minspace* is assumed to be in bytes unless a suffix is specified (K, M, G, T, P, E, Z, Y).
+
+**--minsftpspace** [*minsftpspace*]
+: Require *minsftpspace* free space on the remote SFTP server before SFTPing a file. *minsftpspace* is assumed to be in bytes unless a suffix is specified (K, M, G, T, P, E, Z, Y).
 
 **--nobackup**
 : Disable performing backups for this run. To disable permanently moving forward, remove the "command" directive from the profile's config file.

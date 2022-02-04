@@ -95,5 +95,7 @@ string horizontalLine(int length);
 
 void sendEmail(string recipients, string subject, string message);
 
+unsigned long approx2bytes(string approx);
+
 #endif
 

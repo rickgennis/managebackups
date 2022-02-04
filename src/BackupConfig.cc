@@ -48,10 +48,12 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_MAXLINKS, RE_MAXLINKS, INT, "20"));
     settings.insert(settings.end(), Setting(CLI_TIME, RE_TIME, BOOL, "0"));
     settings.insert(settings.end(), Setting(CLI_NOS, RE_NOS, BOOL, "0"));
-    settings.insert(settings.end(), Setting(CLI_MINSIZE, RE_MINSIZE, INT, "500"));
+    settings.insert(settings.end(), Setting(CLI_MINSIZE, RE_MINSIZE, SIZE, "500"));
     settings.insert(settings.end(), Setting(CLI_DOW, RE_DOW, INT, "0"));
     settings.insert(settings.end(), Setting(CLI_FS_FP, RE_FS_FP, BOOL, "0"));
-    settings.insert(settings.end(), Setting(CLI_MODE, RE_MODE, STRING, "0600"));
+    settings.insert(settings.end(), Setting(CLI_MODE, RE_MODE, OCTAL, "0600"));
+    settings.insert(settings.end(), Setting(CLI_MINSPACE, RE_MINSPACE, SIZE, "0"));
+    settings.insert(settings.end(), Setting(CLI_MINSFTPSPACE, RE_MINSFTPSPACE, SIZE, "0"));
 }
 
 
@@ -185,18 +187,32 @@ bool BackupConfig::loadConfig(string filename) {
 
                         if (setting.data_type == INT)
                             auto ignored = stoi(setting.value);    // will throw on invalid value
-
-                            // validate mode -- special case for the only config directive in octal
-                            try {
-                                int mode = strtol(settings[sMode].value.c_str(), NULL, 8);
-                            }
-                            catch (...) {
-                                configFile.close();
-                                log("error: unable to parse an octal value for the directive on line " + to_string(line) + " of " + filename);
-                                cerr << "error: unable to parse an octal value for the directive on line " << line << " of " << filename << endl;
-                                cerr << "    " << dataLine << endl;
-                                exit(1);
-                            }
+                        else 
+                            if (setting.data_type == OCTAL)
+                                try {
+                                    // validate mode -- will throw on invalid value
+                                    int ignored = stol(setting.value, NULL, 8);
+                                }
+                                catch (...) {
+                                    configFile.close();
+                                    log("error: unable to parse an octal value for the directive on line " + to_string(line) + " of " + filename);
+                                    cerr << "error: unable to parse an octal value for the directive on line " << line << " of " << filename << endl;
+                                    cerr << "    " << dataLine << endl;
+                                    exit(1);
+                                }
+                        else
+                            if (setting.data_type == SIZE)
+                                try {
+                                    // validate size -- will throw on invalid value
+                                    auto ignored = approx2bytes(setting.value);
+                                }
+                                catch (...) {
+                                    configFile.close();
+                                    log("error: unable to parse a valid size (e.g. 25K) for the directive on line " + to_string(line) + " of " + filename);
+                                    cerr << "error: unable to parse a valid size for the directive on line " << line << " of " << filename << endl;
+                                    cerr << "    " << dataLine << endl;
+                                    exit(1);
+                                }
 
                         identified = true;
                         break;

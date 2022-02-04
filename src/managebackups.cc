@@ -12,6 +12,13 @@
 #include <sys/types.h>
 #include <pwd.h>
 
+#ifdef __APPLE__
+    #include <sys/param.h>
+    #include <sys/mount.h>
+#else
+    #include <sys/statfs.h>
+#endif
+
 #include "BackupEntry.h"
 #include "BackupCache.h"
 #include "BackupConfig.h"
@@ -220,6 +227,8 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     // that config will be the one found from --profile above (if any), or a temp config comprised only of defaults
     for (auto &setting: currentConf->settings)
         if (GLOBALS.cli.count(setting.display_name)) {
+            DEBUG(5, "command line param: " << setting.display_name << " (" << setting.data_type << ")");
+
             switch (setting.data_type) {
 
                 case INT:  
@@ -233,6 +242,36 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
                     if (bSave && (setting.value != GLOBALS.cli[setting.display_name].as<string>()))
                         currentConf->modified = 1;
                     setting.value = GLOBALS.cli[setting.display_name].as<string>();
+                    break;
+
+                case OCTAL:
+                    if (bSave && (setting.value != GLOBALS.cli[setting.display_name].as<string>()))
+                        currentConf->modified = 1;
+                    try {
+                        setting.value = GLOBALS.cli[setting.display_name].as<string>();
+                        auto ignored = stol(setting.value, NULL, 8);  // throws on error
+                    }
+                    catch (...) {
+                        log("error: invalid octal value specified for --" + setting.display_name + " (" + setting.value + ")");
+                        SCREENERR("error: invalid octal value specified for option" <<
+                                "\n\t--" << setting.display_name << " " << setting.value);
+                        exit(1);
+                    }
+                    break;
+
+                case SIZE:
+                    if (bSave && (setting.value != GLOBALS.cli[setting.display_name].as<string>()))
+                        currentConf->modified = 1;
+                    try {
+                        setting.value = GLOBALS.cli[setting.display_name].as<string>();
+                        auto ignored = approx2bytes(setting.value);  // throws on error
+                    }
+                    catch (...) {
+                        log("error: invalid size value specified for --" + setting.display_name + " (" + setting.value + ")");
+                        SCREENERR("error: invalid size value specified for option" << 
+                                "\n\t--" << setting.display_name << " " << setting.value);
+                        exit(1);
+                    }
                     break;
 
                 case BOOL:
@@ -586,7 +625,7 @@ methodStatus sCpBackup(BackupConfig& config, string backupFilename, string subDi
     // superfluous check as test mode bombs out of performBackup() long before it ever calls sCpBackup().
     // but just in case future logic changes, testing here
     if (GLOBALS.cli.count(CLI_TEST)) {
-        cout << YELLOW << config.ifTitle() + " TESTMODE: would have SCP'd " +  backupFilename +
+        cout << YELLOW << config.ifTitle() + " TESTMODE: would have SCPd " +  backupFilename +
             " to " << sCpParams << RESET << endl;
         return methodStatus(true, "");
     }
@@ -615,8 +654,8 @@ methodStatus sCpBackup(BackupConfig& config, string backupFilename, string subDi
     }
     else {
         log(config.ifTitle() + " " + backupFilename + " scp'd to " + sCpParams + " in " + sCpTime.elapsed());
-        NOTQUIET && cout << "\t• SCP'd " << backupFilename << " to " << sCpParams << " in " << sCpTime.elapsed() << endl;
-        return methodStatus(true, "\t• SCP'd " + backupFilename + " to " + sCpParams + " in " + sCpTime.elapsed());
+        NOTQUIET && cout << "\t• SCPd " << backupFilename << " to " << sCpParams << " in " << sCpTime.elapsed() << endl;
+        return methodStatus(true, "\t• SCPd " + backupFilename + " to " + sCpParams + " in " + sCpTime.elapsed());
     }
 }
 
@@ -637,7 +676,7 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
     // superfluous check as test mode bombs out of performBackup() long before it ever calls sFtpBackup().
     // but just in case future logic changes, testing here
     if (GLOBALS.cli.count(CLI_TEST)) {
-        cout << YELLOW << config.ifTitle() + " TESTMODE: would have SFTP'd via '" + sFtpParams + 
+        cout << YELLOW << config.ifTitle() + " TESTMODE: would have SFTPd via '" + sFtpParams + 
             "' and uploaded " + subDir + "/" + backupFilename << RESET << endl;
         return methodStatus(true, "");
     }
@@ -675,6 +714,33 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
         sFtp.writeProc(command.c_str(), command.length());
     }
 
+    // check disk space
+    auto requiredSpace = approx2bytes(config.settings[sMinSFTPSpace].value);
+    if (requiredSpace) {
+        command = "df .\n";
+        sFtp.writeProc(command.c_str(), command.length());
+        auto freeSpace = sFtp.statefulReadAndMatchRegex("Avail.*%Capacity\n\\s*\\d+\\s+\\d+\\s+(\\d+)\\s+\\d+\\s+\\d+%");
+
+        if (freeSpace.length()) {
+            auto availSpace = approx2bytes(freeSpace + "K");
+
+            if (availSpace < requiredSpace) {
+                NOTQUIET && cout << backspaces << blankspaces << backspaces << flush;
+                string msg = " SFTP aborted due to insufficient disk space (" + approximate(availSpace) + ") on the remote server, " +
+                        approximate(requiredSpace) + " required";
+                log(config.ifTitle() + msg);
+                SCREENERR("\t•" + msg);
+                return methodStatus(false, "\t•" + msg);
+            }
+            else { 
+                NOTQUIET && cout << backspaces << blankspaces << backspaces << flush;
+                DEBUG(2, "SFTP space check passed (avail " << approximate(availSpace) << ", required " << approximate(requiredSpace) << ")");
+            }
+        }
+        else
+            log(config.ifTitle() + " unable to check free space (df) on the SFTP server; continuing");
+    }
+
     // upload the backup file
     command = "put " + backupFilename + "\n";
     sFtp.writeProc(command.c_str(), command.length());
@@ -689,13 +755,13 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
 
     if (success) {
         log(config.ifTitle() + " " + backupFilename + " sftp'd via " + sFtpParams + " in " + sFtpTime.elapsed());
-        NOTQUIET && cout << "\t• SFTP'd " << backupFilename << " via " << sFtpParams << " in " << sFtpTime.elapsed() << endl;
-        return methodStatus(true, "\t• SFTP'd " + backupFilename + " via " + sFtpParams + " in " + sFtpTime.elapsed());
+        NOTQUIET && cout << "\t• SFTPd " << backupFilename << " via " << sFtpParams << " in " << sFtpTime.elapsed() << endl;
+        return methodStatus(true, "\t• SFTPd " + backupFilename + " via " + sFtpParams + " in " + sFtpTime.elapsed());
     }
     else {
         log(config.ifTitle() + " failed to sftp " + backupFilename + " via " + sFtpParams + "; see " + string(TMP_OUTPUT_DIR));
         SCREENERR("\t• SFTP failed for " << backupFilename << " via " << sFtpParams);
-        return methodStatus(false, "\t• SFTP failed for " + backupFilename + " via " + sFtpParams + "; see " + string(TMP_OUTPUT_DIR));
+        return methodStatus(false, "\t• SFTP failed for " + backupFilename + " via " + sFtpParams + ", see " + string(TMP_OUTPUT_DIR));
     }
 }
 
@@ -768,7 +834,7 @@ void performBackup(BackupConfig& config) {
     // determine results
     struct stat statData;
     if (!stat(string(backupFilename + tempExtension).c_str(), &statData)) {
-        if (statData.st_size >= config.settings[sMinSize].ivalue()) {
+        if (statData.st_size >= approx2bytes(config.settings[sMinSize].value)) {
 
             // calculate the md5 while its still a temp file so that its ignored by other
             // invocations of managebackups (i.e. someone running -0 while a backup is still
@@ -818,20 +884,20 @@ void performBackup(BackupConfig& config) {
                 config.cache.saveCache();
 
                 bool overallSuccess = true;
-                string notifyMessage = config.ifTitle() + "\n\t• completed backup of " + backupFilename + " in " + backupTime.elapsed() + "\n\n";
+                string notifyMessage = "\t• completed backup of " + backupFilename + " in " + backupTime.elapsed() + "\n";
 
                 if (config.settings[sSFTPTo].value.length()) {
                     string sFtpParams = interpolate(config.settings[sSFTPTo].value, subDir, fullDirectory, basicFilename);
                     auto sFTPStatus = sFtpBackup(config, backupFilename, subDir, sFtpParams);
                     overallSuccess &= sFTPStatus.success;
-                    notifyMessage += sFTPStatus.detail + "\n";
+                    notifyMessage += "\n" + sFTPStatus.detail + "\n";
                 }
 
                 if (config.settings[sSCPTo].value.length()) {
                     string sCpParams = interpolate(config.settings[sSCPTo].value, subDir, fullDirectory, basicFilename);
                     auto sCPStatus = sCpBackup(config, backupFilename, subDir, sCpParams);
                     overallSuccess &= sCPStatus.success;
-                    notifyMessage += sCPStatus.detail + "\n";
+                    notifyMessage += "\n" + sCPStatus.detail + "\n";
                 }
 
                 notify(config, notifyMessage, overallSuccess);
@@ -839,19 +905,19 @@ void performBackup(BackupConfig& config) {
             else {
                 log(config.ifTitle() + " backup failed, unable to rename temp file to " + backupFilename);
                 unlink(string(backupFilename + tempExtension).c_str());
-                notify(config, config.ifTitle() + "\nFailed to backup to " + backupFilename + "\nUnable to rename temp file.\n", false);
+                notify(config, "Failed to backup to " + backupFilename + "\nUnable to rename temp file.\n", false);
                 SCREENERR("\t• backup failed to " << backupFilename);
             }
         }
         else {
             log(config.ifTitle() + " backup failed to " + backupFilename + " (insufficient output/size)");
-            notify(config, config.ifTitle() + "\nFailed to backup to " + backupFilename + "\nInsufficient output.\n", false);
+            notify(config, "Failed to backup to " + backupFilename + "\nInsufficient output.\n", false);
             SCREENERR("\t• backup failed to " << backupFilename << " (insufficient output/size)");
         }
     }
     else {
         log(config.ifTitle() + " backup command failed to generate any output");
-        notify(config, config.ifTitle() + "\nFailed to backup to " + backupFilename + "\nNo output generated by backup command.\n", false);
+        notify(config, "Failed to backup to " + backupFilename + "\nNo output generated by backup command.\n", false);
         SCREENERR("\t• backup failed to generate any output");
     }
 }
@@ -894,12 +960,35 @@ void sigTermHandler(int sig) {
 }
 
 
-void checkDiskSpace(BackupConfig& config) {
+bool enoughLocalSpace(BackupConfig& config) {
+    auto requiredSpace = approx2bytes(config.settings[sMinSpace].value);
 
-    notify(config,
-            "",
-            true,
-            true);
+    DEBUG(1, "required for backup: " << requiredSpace);
+    if (!requiredSpace)
+        return true;
+
+    struct statfs fs;
+    if (!statfs(config.settings[sDirectory].value.c_str(), &fs)) {
+        auto availableSpace = fs.f_bsize * fs.f_bavail;
+
+        DEBUG(1, config.settings[sDirectory].value << ": available=" << availableSpace << " (" << approximate(availableSpace) << "), required=" << requiredSpace
+                << " (" << approximate(requiredSpace) << ")");
+
+        if (availableSpace < requiredSpace) {
+            string msg = "error: insufficient space (" + approximate(availableSpace) + ") to start a new backup; " + 
+                approximate(requiredSpace) + " required.";
+            notify(config, msg, true);
+            log(config.ifTitle() + " " + msg);
+            SCREENERR(msg);
+            return false;
+        }
+    }
+    else {
+        log("error: unable to statvfs() the filesystem that " + config.settings[sDirectory].value + " is on (errno " + to_string(errno) + ")");
+        SCREENERR("error: unable to statvfs() the filesystem that " << config.settings[sDirectory].value << " is on (errno " << errno << ")");
+    }
+
+    return true;
 }
 
 
@@ -978,6 +1067,9 @@ int main(int argc, char *argv[]) {
         (CLI_LOGDIR, "Log directory", cxxopts::value<std::string>())
         (CLI_DOW, "Day of week for weeklies", cxxopts::value<int>())
         (CLI_VERSION, "Version", cxxopts::value<bool>()->default_value("false"))
+        (CLI_MODE, "File mode", cxxopts::value<std::string>())
+        (CLI_MINSPACE, "Minimum local space", cxxopts::value<std::string>())
+        (CLI_MINSFTPSPACE, "Minimum SFTP space", cxxopts::value<std::string>())
         (CLI_INSTALLMAN, "Install man", cxxopts::value<bool>()->default_value("false"))
         (CLI_INSTALL, "Install", cxxopts::value<bool>()->default_value("false"));
 
@@ -1056,10 +1148,15 @@ int main(int argc, char *argv[]) {
     else {
         DEBUG(2, "about to prune backups...");
         pruneBackups(*currentConfig);
+
         DEBUG(2, "about to update links...");
         updateLinks(*currentConfig);
-        DEBUG(2, "about to perform backup...");
-        performBackup(*currentConfig);
+
+        if (enoughLocalSpace(*currentConfig)) {
+            DEBUG(2, "about to perform backup...");
+            performBackup(*currentConfig);
+        }
+
         DEBUG(2, "completed primary tasks");
     }
 

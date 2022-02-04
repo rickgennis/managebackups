@@ -2,8 +2,6 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define ON_MAC 1
-
 #define VERSION "1.2.5"
 
 #include "cxxopts.hpp"
@@ -55,6 +53,8 @@
 #define CLI_TIME "time"
 #define CLI_NOBACKUP "nobackup"
 #define CLI_MINSIZE "minsize"
+#define CLI_MINSPACE "minspace"
+#define CLI_MINSFTPSPACE "minsftpspace"
 #define CLI_INSTALL "install"
 #define CLI_INSTALLMAN "installman"
 #define CLI_HELP "help"
@@ -89,6 +89,8 @@
 #define RE_MAXLINKS "(maxlinks)"
 #define RE_TIME "(time)"
 #define RE_MINSIZE "(minsize)"
+#define RE_MINSPACE "(minspace)"
+#define RE_MINSFTPSPACE "(minsftpspace)"
 #define RE_DOW "(dow)"
 #define RE_MODE "(mode)"
 

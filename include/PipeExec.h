@@ -54,6 +54,7 @@ class PipeExec {
     string origCommand;
     vector<procDetail> procs;
     int numProcs;
+    string stateBuffer;
 
     public:
         PipeExec(string cmd);
@@ -79,6 +80,7 @@ class PipeExec {
 
         void readAndTrash();
         bool readAndMatch(string matchStr);
+        string statefulReadAndMatchRegex(string regex, int buffSize = 1024 * 2);
         
         int closeWrite();
         int closeRead();
