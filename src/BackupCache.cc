@@ -19,11 +19,11 @@ BackupCache::BackupCache(string filename) {
 }
 
 BackupCache::BackupCache() {
-    scanned = inProcess = false;
+    newMD5 = inProcess = false;
 }
 
 BackupCache::~BackupCache() {
-    if (scanned && cacheFilename.length())
+    if (newMD5 && cacheFilename.length())
         saveCache();
 }
 
@@ -119,9 +119,12 @@ BackupCache::~BackupCache() {
         return result;
     }
 
-    void BackupCache::addOrUpdate(BackupEntry updatedEntry, bool markCurrent) {
+    void BackupCache::addOrUpdate(BackupEntry updatedEntry, bool markCurrent, bool md5Updated) {
         auto filename_it = indexByFilename.find(updatedEntry.filename);
         updatedEntry.current = markCurrent;
+
+        if (md5Updated)
+            newMD5 = true;
 
         // filename doesn't exist
         if (filename_it == indexByFilename.end()) {

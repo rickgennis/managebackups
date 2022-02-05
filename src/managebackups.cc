@@ -123,8 +123,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                     cacheEntry.updateAges(GLOBALS.startupTime);
 
                     if (cacheEntry.calculateMD5()) {
-                        ++GLOBALS.md5Count;
-                        cache.addOrUpdate(cacheEntry, true);
+                        cache.addOrUpdate(cacheEntry, true, true);
                     }
                     else {
                         log("error: unable to read " + fullFilename);
@@ -172,7 +171,6 @@ void scanConfigToCache(BackupConfig& config) {
     else 
         fnamePattern = DATE_REGEX;
 
-    config.cache.scanned = true;
     parseDirToCache(directory, fnamePattern, config.cache);
 }
 
@@ -872,18 +870,14 @@ void performBackup(BackupConfig& config) {
                 }
 
                 cacheEntry.filename = backupFilename;         // rename the file in the cache entry
-                config.cache.addOrUpdate(cacheEntry, true);
+                config.cache.addOrUpdate(cacheEntry, true, true);
                 config.cache.reStatMD5(cacheEntry.md5);
 
-                // this is a redundant save as the cache gets written out to disk by the destructor anyway.
-                // we do it an extra time here to provide a better user experience for when a backup is
-                // running in the background and someone attempts to run -0 or -1 from the commandline.
-                // if they ask for the stats while the backup is still backing up its a temp file and
-                // the file is ignored.  if they do it during the sftp/scp phase (which could take a while
-                // for a large file) they'll have to wait for the md5 to be calculated even though we did
-                // it above. this save commits that new md5 to disk and makes it available to other invocations
-                // of managebackups during the scp/sftp phase.
+                // let's commit the cache to disk now instead of via the destructor so that anyone running
+                // a -0 or -1 while we're still finishing our SCP/SFTP in the background won't have to recalculate
+                // the MD5 of the backup we just took.
                 config.cache.saveCache();
+                config.cache.newMD5 = false;    // this disables the now redundant save in the destructor
 
                 bool overallSuccess = true;
                 string notifyMessage = "\t• completed backup of " + backupFilename + " (" + size + ") in " + backupTime.elapsed() + "\n";
@@ -1138,7 +1132,6 @@ int main(int argc, char *argv[]) {
     if (GLOBALS.stats && currentConfig->temp) {
         for (auto &config: configManager.configs) {
             scanConfigToCache(config);
-            config.cache.saveCache();
         }
     }
     else
@@ -1161,7 +1154,7 @@ int main(int argc, char *argv[]) {
 
         DEBUG(2, "completed primary tasks");
     }
-
+    
     AppTimer.stop();
     DEBUG(1, "stats: " << GLOBALS.statsCount << ", md5s: " << GLOBALS.md5Count << ", total time: " << AppTimer.elapsed(3));
     return 0;

@@ -15,13 +15,13 @@ class BackupCache {
         map<unsigned int, BackupEntry> rawData;
         map<string, set<unsigned int> > indexByMD5;
         map<string, unsigned int> indexByFilename;
-        bool scanned;
+        bool newMD5;
         bool inProcess;
         string cacheFilename;
 
         BackupEntry* getByFilename(string filename);
         set<BackupEntry*> getByMD5(string md5);
-        void addOrUpdate(BackupEntry updatedEntry, bool markCurrent = 0);
+        void addOrUpdate(BackupEntry updatedEntry, bool markCurrent = false, bool md5Updated = false);
         void updateAges(time_t refTime = 0);
         void reStatMD5(string md5);
         void remove(BackupEntry oldEntry);
