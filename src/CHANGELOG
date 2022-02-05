@@ -1,6 +1,8 @@
 
 v1.2.5 - 1/29/22
-		•  Added --mode option to specify file mode of new backups
+		•  Added --all
+
+		•  Added --mode to specify file mode of new backups
 
 		•  Added --minspace and --minsftpspace
 

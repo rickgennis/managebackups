@@ -215,7 +215,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
             exit(1);
         }
 
-        if (GLOBALS.stats)
+        if (GLOBALS.stats || GLOBALS.cli.count(CLI_ALL))
             configManager.loadAllConfigCaches();
         else
             currentConf->loadConfigsCache();
@@ -315,7 +315,15 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
         currentConf = &configManager.configs[configManager.activeConfig];
     }
 
-    if (!GLOBALS.stats && !currentConf->settings[sDirectory].value.length()) {
+    // user doesn't want to show stats
+    if (!GLOBALS.stats && 
+
+            // the current profile (either via -p or full config spelled out in CLI) doesn't have a dir specified
+            !currentConf->settings[sDirectory].value.length() &&
+
+            // user hasn't selected --all and there's a dir configured in at least one (first) profile
+            !(GLOBALS.cli.count(CLI_ALL) && configManager.configs.size() && configManager.configs[0].settings[sDirectory].value.length())) {
+
         SCREENERR("error: --directory is required");
         exit(1);
     }
@@ -355,6 +363,7 @@ void pruneBackups(BackupConfig& config) {
         for (auto &fnameIdx: config.cache.indexByFilename) {
             auto raw_it = config.cache.rawData.find(fnameIdx.second);
 
+            DEBUG(5, "fs: " << raw_it->second.filename << " (" << raw_it->second.day_age << ")");
             if (raw_it != config.cache.rawData.end() && raw_it->second.day_age <= fd) {
                 ++minValidBackups;
             }
@@ -365,7 +374,7 @@ void pruneBackups(BackupConfig& config) {
 
         if (minValidBackups < fb) {
             string message = "skipping pruning due to failsafe check; only " + to_string(minValidBackups) +
-                    " backup" + s(minValidBackups) + " within the last " + to_string(fd) + " day" + s(fd);
+                    " backup" + s(minValidBackups) + " within the last " + to_string(fd) + " day" + s(fd) + "; " + to_string(fb) + " required";
             
             SCREENERR("warning: " << message);
             log(config.ifTitle() + " " + message);
@@ -1040,6 +1049,7 @@ int main(int argc, char *argv[]) {
         (string("q,") + CLI_QUIET, "No output", cxxopts::value<bool>()->default_value("false"))
         (string("l,") + CLI_MAXLINKS, "Max hard links", cxxopts::value<int>())
         (string("u,") + CLI_USER, "User", cxxopts::value<bool>()->default_value("false"))
+        (string("a,") + CLI_ALL, "All", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))
         (CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))
         (CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())
@@ -1122,6 +1132,11 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
+    if (GLOBALS.cli.count(CLI_ALL) && GLOBALS.cli.count(CLI_PROFILE)) {
+        SCREENERR("error: all and profile are mutually-exclusive options");
+        exit(1);
+    }
+
     DEBUG(2, "about to setup config...");
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager);
@@ -1129,27 +1144,44 @@ int main(int argc, char *argv[]) {
     // if displaying stats and --profile hasn't been specified (or matched successfully)
     // then rescan all configs;  otherwise just scan the --profile config
     DEBUG(2, "about to scan directories...");
-    if (GLOBALS.stats && currentConfig->temp) {
-        for (auto &config: configManager.configs) {
-            scanConfigToCache(config);
-        }
-    }
-    else
-        scanConfigToCache(*currentConfig);
 
+    /* SHOW STATS
+     * ****************************/
     if (GLOBALS.stats) {
+        if (!currentConfig->temp)
+            scanConfigToCache(*currentConfig);
+        else
+            for (auto &config: configManager.configs) 
+                scanConfigToCache(config);
+
         GLOBALS.cli.count(CLI_STATS1) ? displayDetailedStatsWrapper(configManager) : displaySummaryStatsWrapper(configManager);
     }
     else {
-        DEBUG(2, "about to prune backups...");
-        pruneBackups(*currentConfig);
-
-        DEBUG(2, "about to update links...");
-        updateLinks(*currentConfig);
-
-        if (enoughLocalSpace(*currentConfig)) {
-            DEBUG(2, "about to perform backup...");
-            performBackup(*currentConfig);
+        /* ALL RUN (prune, link, backup)
+         * for all profiles
+         * ****************************/
+        if (GLOBALS.cli.count(CLI_ALL)) {
+            for (auto &config: configManager.configs) {
+                if (!config.temp) {
+                    scanConfigToCache(config);
+                    NOTQUIET && cout << BOLDBLUE << "[" << config.settings[sTitle].value << "]" << RESET << "\n";
+                    pruneBackups(config);
+                    updateLinks(config);
+                    if (enoughLocalSpace(config)) {
+                        performBackup(config);
+                    }
+                }
+            }
+        }
+        /* NORMAL RUN (prune, link, backup)
+         * ****************************/
+        else {
+            scanConfigToCache(*currentConfig);
+            pruneBackups(*currentConfig);
+            updateLinks(*currentConfig);
+            if (enoughLocalSpace(*currentConfig)) {
+                performBackup(*currentConfig);
+            }
         }
 
         DEBUG(2, "completed primary tasks");

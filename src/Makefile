@@ -1,4 +1,5 @@
 
+MAKEFLAGS := -j3
 
 IDIR =../include
 CC=c++

@@ -65,6 +65,7 @@
 #define CLI_USER "user"
 #define CLI_VERSION "version"
 #define CLI_MODE "mode"
+#define CLI_ALL "all"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
