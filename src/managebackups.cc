@@ -145,8 +145,10 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
         }
         closedir(c_dir);
     }
-    else
+    else {
         SCREENERR("error: unable to read " << directory);
+        log("error: unable to read " + directory);
+    }
 }
 
 
