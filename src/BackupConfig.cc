@@ -277,14 +277,16 @@ bool BackupConfig::loadConfig(string filename) {
 
 
 void BackupConfig::loadConfigsCache() {
-    cache.cacheFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value);
-    struct stat statBuf;
+    if (settings[sDirectory].value.length() && settings[sBackupFilename].value.length()) {
+        cache.cacheFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value);
+        struct stat statBuf;
 
-    if (!stat(cache.cacheFilename.c_str(), &statBuf)) {
-        cache.restoreCache();
-    }
-    else {
-        mkdirp(GLOBALS.cacheDir);
+        if (!stat(cache.cacheFilename.c_str(), &statBuf)) {
+            cache.restoreCache();
+        }
+        else {
+            mkdirp(GLOBALS.cacheDir);
+        }
     }
 }
 

@@ -145,6 +145,8 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
         }
         closedir(c_dir);
     }
+    else
+        SCREENERR("error: unable to read " << directory);
 }
 
 
@@ -217,7 +219,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
 
         if (GLOBALS.stats || GLOBALS.cli.count(CLI_ALL))
             configManager.loadAllConfigCaches();
-        else
+        else 
             currentConf->loadConfigsCache();
     }
 
@@ -447,7 +449,6 @@ void pruneBackups(BackupConfig& config) {
         }
     }
 
-    DEBUG(4, "about to start post-prune cleanup...");
     if (!GLOBALS.cli.count(CLI_TEST)) {
         DEBUG(4, "removing empty directories");
         config.removeEmptyDirs();
@@ -739,10 +740,8 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
                 SCREENERR("\t•" + msg);
                 return methodStatus(false, "\t•" + msg);
             }
-            else { 
-                NOTQUIET && cout << backspaces << blankspaces << backspaces << flush;
-                DEBUG(2, "SFTP space check passed (avail " << approximate(availSpace) << ", required " << approximate(requiredSpace) << ")");
-            }
+            else 
+                DEBUG(2, "\nSFTP space check passed (avail " << approximate(availSpace) << ", required " << approximate(requiredSpace) << ")");
         }
         else
             log(config.ifTitle() + " unable to check free space (df) on the SFTP server; continuing");
@@ -761,13 +760,13 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
     NOTQUIET && cout << backspaces << blankspaces << backspaces << flush;
 
     if (success) {
-        log(config.ifTitle() + " " + backupFilename + " sftp'd via " + sFtpParams + " in " + sFtpTime.elapsed());
         NOTQUIET && cout << "\t• SFTPd " << backupFilename << " via " << sFtpParams << " in " << sFtpTime.elapsed() << endl;
+        log(config.ifTitle() + " " + backupFilename + " sftp'd via " + sFtpParams + " in " + sFtpTime.elapsed());
         return methodStatus(true, "\t• SFTPd " + backupFilename + " via " + sFtpParams + " in " + sFtpTime.elapsed());
     }
     else {
-        log(config.ifTitle() + " failed to sftp " + backupFilename + " via " + sFtpParams + "; see " + string(TMP_OUTPUT_DIR));
         SCREENERR("\t• SFTP failed for " << backupFilename << " via " << sFtpParams);
+        log(config.ifTitle() + " failed to sftp " + backupFilename + " via " + sFtpParams + "; see " + string(TMP_OUTPUT_DIR));
         return methodStatus(false, "\t• SFTP failed for " + backupFilename + " via " + sFtpParams + ", see " + string(TMP_OUTPUT_DIR));
     }
 }
@@ -1152,7 +1151,8 @@ int main(int argc, char *argv[]) {
             scanConfigToCache(*currentConfig);
         else
             for (auto &config: configManager.configs) 
-                scanConfigToCache(config);
+                if (!config.temp)
+                    scanConfigToCache(config);
 
         GLOBALS.cli.count(CLI_STATS1) ? displayDetailedStatsWrapper(configManager) : displaySummaryStatsWrapper(configManager);
     }
