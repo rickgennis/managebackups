@@ -48,6 +48,9 @@ Options are relative to the three functions of **managebackups**.
 **-a**, **--all**
 : Execute all profiles sequentially. Can be specified by itself to prune, link, and execute backups (whatever's configured) for all profiles.  Or can be combined with limiting options like **--nobackup**, **--noprune**.
 
+**-A**, **--All**
+: Execute all profiles in parallel. Can be specified by itself to prune, link, and execute backups (whatever's configured) for all profiles.  Or can be combined with limiting options like **--nobackup**, **--noprune**.
+
 **-0**
 : Provide a summary of backups.
 

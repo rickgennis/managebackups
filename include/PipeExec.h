@@ -55,6 +55,7 @@ class PipeExec {
     vector<procDetail> procs;
     int numProcs;
     string stateBuffer;
+    bool bypassDestructor;
 
     public:
         PipeExec(string cmd);
@@ -72,7 +73,8 @@ class PipeExec {
          * including the main executable terminating, then wait(NULL) should be called if the sub-process
          * (like "less") will need time to finish.
          */
-        void execute(string procName = "", bool leaveOutput = 0);    // procName is used to make a unique subdir under /tmp for STDERR output
+        // procName is used to make a unique subdir under /tmp for STDERR output
+        int execute(string procName = "", bool leaveOutput = false, bool noDestruct = false);    
         bool execute2file(string toFile, string procName);
 
         ssize_t readProc(void *buf, size_t count);

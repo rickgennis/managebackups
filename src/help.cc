@@ -229,6 +229,13 @@ Can be specified by itself to prune, link, and execute backups
 Or can be combined with limiting options like \f[B]\[en]nobackup\f[R],
 \f[B]\[en]noprune\f[R].
 .TP
+\f[B]-A\f[R], \f[B]\[en]All\f[R]
+Execute all profiles in parallel.
+Can be specified by itself to prune, link, and execute backups
+(whatever\[cq]s configured) for all profiles.
+Or can be combined with limiting options like \f[B]\[en]nobackup\f[R],
+\f[B]\[en]noprune\f[R].
+.TP
 \f[B]-0\f[R]
 Provide a summary of backups.
 .TP

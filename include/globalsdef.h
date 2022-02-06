@@ -12,8 +12,9 @@
 #define TMP_OUTPUT_DIR "/tmp/managebackups_output"
 
 
-#define DEBUG(x,y) (GLOBALS.cli.count(CLI_VERBOSE) >= x) && cout << GREEN << __FUNCTION__ << "\t" << y << RESET << endl
+#define DEBUG(x,y) (GLOBALS.debugLevel >= x) && cout << GREEN << __FUNCTION__ << "\t" << y << RESET << endl
 #define NOTQUIET (!GLOBALS.cli.count(CLI_QUIET))
+#define ANIMATE (!GLOBALS.cli.count(CLI_ZERO))
 #define SCREENERR(x) cerr << RED << x << RESET << endl;
 
 #define DATE_REGEX "-(20\\d{2})[-.]*(\\d{2})[-.]*(\\d{2})[-.]"
@@ -41,6 +42,7 @@
 #define CLI_NOS "nos"
 #define CLI_SAVE "save"
 #define CLI_VERBOSE "verbose"
+#define CLI_VERBOSEMAX "vv"
 #define CLI_NOCOLOR "nocolor"
 #define CLI_STATS1 "1"
 #define CLI_STATS2 "0"
@@ -65,7 +67,10 @@
 #define CLI_USER "user"
 #define CLI_VERSION "version"
 #define CLI_MODE "mode"
-#define CLI_ALL "all"
+#define CLI_ALLSEQ "all"
+#define CLI_ALLPAR "All"
+#define CLI_NICE "nice"
+#define CLI_ZERO "zero"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -94,6 +99,7 @@
 #define RE_MINSFTPSPACE "(minsftpspace)"
 #define RE_DOW "(dow)"
 #define RE_MODE "(mode)"
+#define RE_NICE "(nice)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"

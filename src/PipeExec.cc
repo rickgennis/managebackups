@@ -33,6 +33,7 @@ bool operator==(const struct ProcDetail& A, const struct ProcDetail& B) {
 
 PipeExec::PipeExec(string fullCommand) {
     origCommand = fullCommand;
+    bypassDestructor = false;
     char *data;
 
     data = (char*)malloc(fullCommand.length() + 1);
@@ -51,10 +52,12 @@ PipeExec::PipeExec(string fullCommand) {
 
 
 PipeExec::~PipeExec() {
-    closeAll();
+    if (!bypassDestructor) {
+        closeAll();
 
-    while (numProcs--)
-        waitpid(-1, NULL, WNOHANG);
+        while (numProcs--)
+            waitpid(-1, NULL, WNOHANG);
+    }
 }
 
 
@@ -99,7 +102,8 @@ void PipeExec::dump() {
 }
 
 
-void PipeExec::execute(string procName, bool leaveOutput) {
+int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
+    bypassDestructor = noDestruct;
     procs.insert(procs.begin(), procDetail("head"));
 
     string errorFilename = string(TMP_OUTPUT_DIR) + "/" + safeFilename(procName) + "/";
@@ -188,7 +192,7 @@ void PipeExec::execute(string procName, bool leaveOutput) {
                 // PARENT - first parent
                 close(proc_it->fd[READ_END]);
                 close(proc_it->readfd[WRITE_END]);
-                return;
+                return(proc_it->childPID);
             }
         }
         

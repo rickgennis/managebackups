@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <time.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <pwd.h>
 
 #ifdef __APPLE__
@@ -219,7 +220,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
             exit(1);
         }
 
-        if (GLOBALS.stats || GLOBALS.cli.count(CLI_ALL))
+        if (GLOBALS.stats || GLOBALS.cli.count(CLI_ALLSEQ))
             configManager.loadAllConfigCaches();
         else 
             currentConf->loadConfigsCache();
@@ -325,8 +326,9 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
             // the current profile (either via -p or full config spelled out in CLI) doesn't have a dir specified
             !currentConf->settings[sDirectory].value.length() &&
 
-            // user hasn't selected --all and there's a dir configured in at least one (first) profile
-            !(GLOBALS.cli.count(CLI_ALL) && configManager.configs.size() && configManager.configs[0].settings[sDirectory].value.length())) {
+            // user hasn't selected --all/--All where there's a dir configured in at least one (first) profile
+            !((GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR)) 
+                && configManager.configs.size() && configManager.configs[0].settings[sDirectory].value.length())) {
 
         SCREENERR("error: --directory is required");
         exit(1);
@@ -623,6 +625,15 @@ string interpolate(string command, string subDir, string fullDirectory, string b
 }
  
 
+// convenience function to consolidate printing screen errors, logging and returning
+// to the notify() function
+string errorcom(string profile, string message) {
+    SCREENERR("\t• " << profile << " " << message);
+    log(profile + " " + message);
+    return("\t• " + message);
+}
+
+
 /*******************************************************************************
  * sCpBackup(config, backupFilename, subDir, sCpParams)
  *
@@ -641,32 +652,33 @@ methodStatus sCpBackup(BackupConfig& config, string backupFilename, string subDi
     }
 
     if (!sCpBinary.length()) {
-        SCREENERR("\t• SCP skipped (unable to locate 'scp' binary in the PATH)");
+        SCREENERR("\t• " << config.ifTitle() << " SCP skipped (unable to locate 'scp' binary in the PATH)");
         return methodStatus(false, "\t• SCP: unable to locate 'scp' binary in the PATH");
     }
 
     string screenMessage = config.ifTitle() + " SCPing to " + sCpParams + "... ";
     string backspaces = string(screenMessage.length(), '\b');
     string blankspaces = string(screenMessage.length() , ' ');
-    NOTQUIET && cout << screenMessage << flush;
+    NOTQUIET && ANIMATE && cout << screenMessage << flush;
 
     // execute the scp
     sCpTime.start();
     int result = system(string(sCpBinary + " " + backupFilename + " " + sCpParams).c_str());
     
     sCpTime.stop();
-    NOTQUIET && cout << backspaces << blankspaces << backspaces << flush;
+    NOTQUIET && ANIMATE && cout << backspaces << blankspaces << backspaces << flush;
 
-    if (result == -1 || result == 127) {
-        log(config.ifTitle() + " error executing " + sCpBinary);
-        SCREENERR("\t• SCP failed for " << backupFilename << " to " << sCpParams);
-        return methodStatus(false, "\t• SCP: error executing " + sCpBinary);
-    }
-    else {
-        log(config.ifTitle() + " " + backupFilename + " scp'd to " + sCpParams + " in " + sCpTime.elapsed());
-        NOTQUIET && cout << "\t• SCPd " << backupFilename << " to " << sCpParams << " in " << sCpTime.elapsed() << endl;
-        return methodStatus(true, "\t• SCPd " + backupFilename + " to " + sCpParams + " in " + sCpTime.elapsed());
-    }
+    if (result == -1 || result == 127) 
+        return methodStatus(false, errorcom(config.ifTitle(), "SCP failed for " + backupFilename + ", error executing " + sCpBinary));
+    else 
+        if (result != 0) 
+            return methodStatus(false, errorcom(config.ifTitle(), "SCP failed for " + backupFilename + " via " + sCpParams));
+        else {
+            string message = "SCP completed for " + backupFilename + " in " + sCpTime.elapsed();
+            log(config.ifTitle() + " " + message);
+            NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message << endl;
+            return methodStatus(true, "\t• " + message);
+        }
 }
 
 
@@ -691,15 +703,13 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
         return methodStatus(true, "");
     }
 
-    if (!sFtpBinary.length()) {
-        SCREENERR("\t• SFTP skipped (unable to locate 'sftp' binary in the PATH");
-        return methodStatus(false, "\t• SFTP: unable to locate 'sftp' binary in the PATH");
-    }
+    if (!sFtpBinary.length()) 
+        return methodStatus(false, errorcom(config.ifTitle(), "SFTP skipped (unable to locate 'sftp' binary in the PATH)"));
 
     string screenMessage = config.ifTitle() + " SFTPing via " + sFtpParams + "... ";
     string backspaces = string(screenMessage.length(), '\b');
     string blankspaces = string(screenMessage.length() , ' ');
-    NOTQUIET && cout << screenMessage << flush;
+    NOTQUIET && ANIMATE && cout << screenMessage << flush;
 
     // execute the sftp command
     sFtpTime.start();
@@ -735,11 +745,11 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
             auto availSpace = approx2bytes(freeSpace + "K");
 
             if (availSpace < requiredSpace) {
-                NOTQUIET && cout << backspaces << blankspaces << backspaces << flush;
+                NOTQUIET && ANIMATE && cout << backspaces << blankspaces << backspaces << flush;
                 string msg = " SFTP aborted due to insufficient disk space (" + approximate(availSpace) + ") on the remote server, " +
                         approximate(requiredSpace) + " required";
                 log(config.ifTitle() + msg);
-                SCREENERR("\t•" + msg);
+                SCREENERR("\t• " + config.ifTitle() + msg);
                 return methodStatus(false, "\t•" + msg);
             }
             else 
@@ -759,18 +769,17 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
     bool success = sFtp.readAndMatch("Uploading");
     sFtp.closeAll();
     sFtpTime.stop();
-    NOTQUIET && cout << backspaces << blankspaces << backspaces << flush;
+    NOTQUIET && ANIMATE && cout << backspaces << blankspaces << backspaces << flush;
 
     if (success) {
-        NOTQUIET && cout << "\t• SFTPd " << backupFilename << " via " << sFtpParams << " in " << sFtpTime.elapsed() << endl;
-        log(config.ifTitle() + " " + backupFilename + " sftp'd via " + sFtpParams + " in " + sFtpTime.elapsed());
-        return methodStatus(true, "\t• SFTPd " + backupFilename + " via " + sFtpParams + " in " + sFtpTime.elapsed());
+        string message = "SFTP completed for " + backupFilename + " in " + sFtpTime.elapsed();
+        NOTQUIET && cout << "\t• " << config.ifTitle() + " " + message << endl;
+        log(config.ifTitle() + " " + message);
+        return methodStatus(true, "\t• " + message);
     }
-    else {
-        SCREENERR("\t• SFTP failed for " << backupFilename << " via " << sFtpParams);
-        log(config.ifTitle() + " failed to sftp " + backupFilename + " via " + sFtpParams + "; see " + string(TMP_OUTPUT_DIR));
-        return methodStatus(false, "\t• SFTP failed for " + backupFilename + " via " + sFtpParams + ", see " + string(TMP_OUTPUT_DIR));
-    }
+    else 
+        return methodStatus(false, errorcom(config.ifTitle(),
+            "SFTP failed for " + backupFilename + " via " + sFtpParams+ ", see " + string(TMP_OUTPUT_DIR)));
 }
 
 
@@ -823,7 +832,7 @@ void performBackup(BackupConfig& config) {
     string screenMessage = config.ifTitle() + " backing up to temp file " + backupFilename + tempExtension + "... ";
     string backspaces = string(screenMessage.length(), '\b');
     string blankspaces = string(screenMessage.length() , ' ');
-    NOTQUIET && cout << screenMessage << flush;
+    NOTQUIET && ANIMATE && cout << screenMessage << flush;
 
     // note start time
     timer backupTime;
@@ -837,7 +846,7 @@ void performBackup(BackupConfig& config) {
 
     // note finish time
     backupTime.stop();
-    NOTQUIET && cout << backspaces << blankspaces << backspaces << flush;
+    NOTQUIET && ANIMATE && cout << backspaces << blankspaces << backspaces << flush;
 
     // determine results
     struct stat statData;
@@ -861,9 +870,9 @@ void performBackup(BackupConfig& config) {
             if (!rename(string(backupFilename + tempExtension).c_str(), backupFilename.c_str())) {
                 auto size = approximate(cacheEntry.size);
 
-                log(config.ifTitle() + " completed backup to " + backupFilename + " (" + size + ") in " + backupTime.elapsed());
-                NOTQUIET && cout << "\t• successfully backed up to " << BOLDBLUE << backupFilename << RESET <<
-                    " (" << size << ") in " << backupTime.elapsed() << endl;
+                string message = config.ifTitle() + " backup completed to " + backupFilename  + " (" + size + ") in " + backupTime.elapsed();
+                log(message);
+                NOTQUIET && cout << "\t• " << message << endl;
 
                 try {   // could get an exception converting settings[sMode] to an octal number
                     int mode = strtol(config.settings[sMode].value.c_str(), NULL, 8);
@@ -890,7 +899,7 @@ void performBackup(BackupConfig& config) {
                 config.cache.newMD5 = false;    // this disables the now redundant save in the destructor
 
                 bool overallSuccess = true;
-                string notifyMessage = "\t• completed backup of " + backupFilename + " (" + size + ") in " + backupTime.elapsed() + "\n";
+                string notifyMessage = "\t• " + message + "\n";
 
                 if (config.settings[sSFTPTo].value.length()) {
                     string sFtpParams = interpolate(config.settings[sSFTPTo].value, subDir, fullDirectory, basicFilename);
@@ -909,23 +918,15 @@ void performBackup(BackupConfig& config) {
                 notify(config, notifyMessage, overallSuccess);
             }
             else {
-                log(config.ifTitle() + " backup failed, unable to rename temp file to " + backupFilename);
                 unlink(string(backupFilename + tempExtension).c_str());
-                notify(config, "Failed to backup to " + backupFilename + "\nUnable to rename temp file.\n", false);
-                SCREENERR("\t• backup failed to " << backupFilename);
+                notify(config, errorcom(config.ifTitle(), "backup failed, unable to rename temp file to " + backupFilename) + "\n", false);
             }
         }
-        else {
-            log(config.ifTitle() + " backup failed to " + backupFilename + " (insufficient output/size)");
-            notify(config, "Failed to backup to " + backupFilename + "\nInsufficient output.\n", false);
-            SCREENERR("\t• backup failed to " << backupFilename << " (insufficient output/size)");
-        }
+        else 
+            notify(config, errorcom(config.ifTitle(), "backup failed to " + backupFilename + " (insufficient output/size)") + "\n", false);
     }
-    else {
-        log(config.ifTitle() + " backup command failed to generate any output");
-        notify(config, "Failed to backup to " + backupFilename + "\nNo output generated by backup command.\n", false);
-        SCREENERR("\t• backup failed to generate any output");
-    }
+    else 
+        notify(config, errorcom(config.ifTitle(), "backup command failed to generate any output") + "\n", false);
 }
 
 
@@ -939,6 +940,7 @@ void setupUserDirectories() {
     struct passwd *pws;
     if ((pws = getpwuid(getuid())) == NULL) {
         SCREENERR("error: unable to lookup current user");
+        log("error: unable to lookup current user via getpwuid()");
         exit(1);
     }
     
@@ -977,15 +979,12 @@ bool enoughLocalSpace(BackupConfig& config) {
     if (!statfs(config.settings[sDirectory].value.c_str(), &fs)) {
         auto availableSpace = fs.f_bsize * fs.f_bavail;
 
-        DEBUG(1, config.settings[sDirectory].value << ": available=" << availableSpace << " (" << approximate(availableSpace) << "), required=" << requiredSpace
-                << " (" << approximate(requiredSpace) << ")");
+        DEBUG(1, config.settings[sDirectory].value << ": available=" << availableSpace << " (" << approximate(availableSpace) << 
+                "), required=" << requiredSpace << " (" << approximate(requiredSpace) << ")");
 
         if (availableSpace < requiredSpace) {
-            string msg = "error: insufficient space (" + approximate(availableSpace) + ") to start a new backup; " + 
-                approximate(requiredSpace) + " required.";
-            notify(config, msg, true);
-            log(config.ifTitle() + " " + msg);
-            SCREENERR(msg);
+            notify(config, errorcom(config.ifTitle(), "error: insufficient space (" + approximate(availableSpace) + ") to start a new backup, " +
+                approximate(requiredSpace) + " required."), true);
             return false;
         }
     }
@@ -1047,10 +1046,15 @@ int main(int argc, char *argv[]) {
         (string("c,") + CLI_COMMAND, "Command", cxxopts::value<std::string>())
         (string("n,") + CLI_NOTIFY, "Notify", cxxopts::value<std::string>())
         (string("v,") + CLI_VERBOSE, "Verbose output", cxxopts::value<bool>()->default_value("false"))
+        (string("V,") + CLI_VERSION, "Version", cxxopts::value<bool>()->default_value("false"))
         (string("q,") + CLI_QUIET, "No output", cxxopts::value<bool>()->default_value("false"))
         (string("l,") + CLI_MAXLINKS, "Max hard links", cxxopts::value<int>())
         (string("u,") + CLI_USER, "User", cxxopts::value<bool>()->default_value("false"))
-        (string("a,") + CLI_ALL, "All", cxxopts::value<bool>()->default_value("false"))
+        (string("a,") + CLI_ALLSEQ, "All sequential", cxxopts::value<bool>()->default_value("false"))
+        (string("A,") + CLI_ALLPAR, "All parallel", cxxopts::value<bool>()->default_value("false"))
+        (string("z,") + CLI_ZERO, "No animation (internal)", cxxopts::value<bool>()->default_value("false"))
+        (string("t,") + CLI_TEST, "Test only mode", cxxopts::value<bool>()->default_value("false"))
+        (CLI_VERBOSEMAX, "Max verbosity", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))
         (CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))
         (CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())
@@ -1063,7 +1067,6 @@ int main(int argc, char *argv[]) {
         (CLI_STATS2, "Stats detail", cxxopts::value<bool>()->default_value("false"))
         (CLI_PRUNE, "Enable pruning", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOPRUNE, "Disable pruning", cxxopts::value<bool>()->default_value("false"))
-        (CLI_TEST, "Test only mode", cxxopts::value<bool>()->default_value("false"))
         (CLI_DEFAULTS, "Show defaults", cxxopts::value<bool>()->default_value("false"))
         (CLI_TIME, "Include time", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOBACKUP, "Don't backup", cxxopts::value<bool>()->default_value("false"))
@@ -1073,7 +1076,6 @@ int main(int argc, char *argv[]) {
         (CLI_CACHEDIR, "Cache directory", cxxopts::value<std::string>())
         (CLI_LOGDIR, "Log directory", cxxopts::value<std::string>())
         (CLI_DOW, "Day of week for weeklies", cxxopts::value<int>())
-        (CLI_VERSION, "Version", cxxopts::value<bool>()->default_value("false"))
         (CLI_MODE, "File mode", cxxopts::value<std::string>())
         (CLI_MINSPACE, "Minimum local space", cxxopts::value<std::string>())
         (CLI_MINSFTPSPACE, "Minimum SFTP space", cxxopts::value<std::string>())
@@ -1082,7 +1084,7 @@ int main(int argc, char *argv[]) {
 
     try {
         GLOBALS.cli = options.parse(argc, argv);
-        GLOBALS.debugLevel = GLOBALS.cli.count(CLI_VERBOSE);
+        GLOBALS.debugLevel = GLOBALS.cli.count(CLI_VERBOSEMAX) ? 1000 : GLOBALS.cli.count(CLI_VERBOSE);
         GLOBALS.color = !(GLOBALS.cli[CLI_QUIET].as<bool>() || GLOBALS.cli[CLI_NOCOLOR].as<bool>());
         GLOBALS.stats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2);
 
@@ -1133,7 +1135,7 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    if (GLOBALS.cli.count(CLI_ALL) && GLOBALS.cli.count(CLI_PROFILE)) {
+    if ((GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR)) && GLOBALS.cli.count(CLI_PROFILE)) {
         SCREENERR("error: all and profile are mutually-exclusive options");
         exit(1);
     }
@@ -1159,25 +1161,75 @@ int main(int argc, char *argv[]) {
         GLOBALS.cli.count(CLI_STATS1) ? displayDetailedStatsWrapper(configManager) : displaySummaryStatsWrapper(configManager);
     }
     else {
-        /* ALL RUN (prune, link, backup)
+        string commonSwitches = string(NOTQUIET ? "" : " -q") + (GLOBALS.cli.count(CLI_TEST) ? " -t" : "") +
+            (GLOBALS.cli.count(CLI_NOBACKUP) ? " --nobackup" : "") + (GLOBALS.cli.count(CLI_NOPRUNE) ? " --noprune" : "");
+        
+        /* ALL SEQUENTIAL RUN (prune, link, backup)
          * for all profiles
          * ****************************/
-        if (GLOBALS.cli.count(CLI_ALL)) {
+        if (GLOBALS.cli.count(CLI_ALLSEQ)) {
+            timer allRun;
+            allRun.start();
+            log("[ALL] starting sequential processing of all profiles");
+            NOTQUIET && cout << "starting sequential processing of all profiles" << endl;
+
             for (auto &config: configManager.configs) {
                 if (!config.temp) {
-                    scanConfigToCache(config);
-                    NOTQUIET && cout << BOLDBLUE << "[" << config.settings[sTitle].value << "]" << RESET << "\n";
-                    pruneBackups(config);
-                    updateLinks(config);
-                    if (enoughLocalSpace(config)) {
-                        performBackup(config);
-                    }
+                    NOTQUIET && cout << "\n" << BOLDBLUE << "[" << config.settings[sTitle].value << "]" << RESET << "\n";
+                    PipeExec miniMe(string(argv[0]) + " -p " + config.settings[sTitle].value + commonSwitches);
+                    auto childPID = miniMe.execute("", true);
+                    miniMe.closeAll();
+                    wait(NULL);
                 }
             }
+
+            allRun.stop();
+            NOTQUIET && cout << "\ncompleted sequential processing of all profiles in " << allRun.elapsed() << endl;
+            log("[ALL] completed sequential processing of all profiles in " + allRun.elapsed());
         }
+
+        /* ALL PARALLEL RUN (prune, link, backup)
+         * ****************************/
+        else if (GLOBALS.cli.count(CLI_ALLPAR)) {
+            timer allRun;
+
+            allRun.start();
+            log("[ALL] starting parallel processing of all profiles");
+            NOTQUIET && cout << "starting parallel processing of all profiles" << endl;
+
+            map<int, PipeExec> childProcMap; 
+            for (auto &config: configManager.configs) 
+                if (!config.temp) {
+
+                    // launch each profile in a separate child
+                    PipeExec miniMe(string(argv[0]) + " -p " + config.settings[sTitle].value + commonSwitches + " -z");
+                    auto childPID = miniMe.execute("", true, true);
+                    miniMe.closeAll();
+
+                    // save the child PID and pipe object in our map
+                    childProcMap.insert(childProcMap.end(), pair<int, PipeExec>(childPID, miniMe));
+                }
+
+            // wait while all child procs finish
+            while (childProcMap.size()) {
+                int pid = wait(NULL);
+
+                if (pid > 0 && childProcMap.find(pid) != childProcMap.end())
+                    childProcMap.erase(pid);
+            }
+
+            allRun.stop();
+            NOTQUIET && cout << "completed parallel processing of all profiles in " << allRun.elapsed() << endl;
+            log("[ALL] completed parallel processing of all profiles in " + allRun.elapsed());
+        } 
+
         /* NORMAL RUN (prune, link, backup)
          * ****************************/
         else {
+            int n = nice(0);
+            if (currentConfig->settings[sNice].ivalue() - n > 0)
+                nice(currentConfig->settings[sNice].ivalue() - n);
+
             scanConfigToCache(*currentConfig);
             pruneBackups(*currentConfig);
             updateLinks(*currentConfig);
