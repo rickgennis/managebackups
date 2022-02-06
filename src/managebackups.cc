@@ -1140,6 +1140,17 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    if ((GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR)) && 
+            (GLOBALS.cli.count(CLI_FILE) ||
+            GLOBALS.cli.count(CLI_COMMAND) ||
+            GLOBALS.cli.count(CLI_SAVE) ||
+            GLOBALS.cli.count(CLI_DIR) ||
+            GLOBALS.cli.count(CLI_SCPTO) ||
+            GLOBALS.cli.count(CLI_SFTPTO))) {
+        SCREENERR("error: --file, --command, --save, --directory, --scp and --sftp are incompatible with --all/--All");
+        exit(1);
+    } 
+
     DEBUG(2, "about to setup config...");
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager);
@@ -1161,8 +1172,36 @@ int main(int argc, char *argv[]) {
         GLOBALS.cli.count(CLI_STATS1) ? displayDetailedStatsWrapper(configManager) : displaySummaryStatsWrapper(configManager);
     }
     else {
-        string commonSwitches = string(NOTQUIET ? "" : " -q") + (GLOBALS.cli.count(CLI_TEST) ? " -t" : "") +
-            (GLOBALS.cli.count(CLI_NOBACKUP) ? " --nobackup" : "") + (GLOBALS.cli.count(CLI_NOPRUNE) ? " --noprune" : "");
+        #define paramIfSpecified(x) (GLOBALS.cli.count(x) ? string(" --") + x : "")
+        string commonSwitches = 
+            string(NOTQUIET ? "" : " -q") + 
+            paramIfSpecified(CLI_TEST) + 
+            paramIfSpecified(CLI_TEST) +
+            paramIfSpecified(CLI_NOBACKUP) +
+            paramIfSpecified(CLI_NOPRUNE) +
+            paramIfSpecified(CLI_PRUNE) +
+            paramIfSpecified(CLI_CONFDIR) +
+            paramIfSpecified(CLI_CACHEDIR) +
+            paramIfSpecified(CLI_LOGDIR) +
+            paramIfSpecified(CLI_FS_FP) +
+            paramIfSpecified(CLI_FS_BACKUPS) +
+            paramIfSpecified(CLI_FS_DAYS) +
+            paramIfSpecified(CLI_TIME) +
+            paramIfSpecified(CLI_MODE) +
+            paramIfSpecified(CLI_MINSPACE) +
+            paramIfSpecified(CLI_MINSFTPSPACE) +
+            paramIfSpecified(CLI_DOW) +
+            paramIfSpecified(CLI_NOCOLOR) +
+            paramIfSpecified(CLI_NOTIFY) +
+            paramIfSpecified(CLI_NOS) +
+            paramIfSpecified(CLI_DAYS) +
+            paramIfSpecified(CLI_WEEKS) +
+            paramIfSpecified(CLI_MONTHS) +
+            paramIfSpecified(CLI_YEARS) +
+            paramIfSpecified(CLI_MAXLINKS);
+
+        for (int i = 0; i < GLOBALS.cli.count(CLI_VERBOSE); ++i)
+            commonSwitches += " -v";
         
         /* ALL SEQUENTIAL RUN (prune, link, backup)
          * for all profiles
