@@ -58,6 +58,7 @@ void showHelp(enum helpType kind) {
             + "\n" + string(BOLDBLUE) + "GENERAL\n" + RESET
             + "   --profile [name]    Use the specified profile for the current run.\n"
             + "   --save              Save all the specified settings to the specified profile.\n"
+            + "   --recreate          Delete any existing .conf file for this profile and recreate it in the standard format\n"
             + "   --all               Execute all profiles sequentially\n"
             + "   -0                  Provide a summary of backups.\n"
             + "   -1                  Provide detail of backups.\n"
@@ -69,9 +70,10 @@ void showHelp(enum helpType kind) {
             + "   --user              Set directories (config, cache and log) to the calling user's home directory (~/managebackups/).\n"
             + "   --nocolor           Disable color output.\n"
             + "   --test              Run in test mode. No changes are persisted to disk except for caches.\n"
-            + "   -q                  Quit mode -- limit output, for use in scripts.\n"
+            + "   -q                  Quiet mode -- limit output, for use in scripts.\n"
             + "   -v                  Verbose output for debugging (can be specified multiple times)\n"
             + "   --defaults          Display the default settings for all profiles.\n"
+            + "   -x, --lock          Lock the current profile for the duraiton of the run so only one copy can run at a time.\n"
             + "\nSee 'man managebackups' for more detail.\n";
 
             /*
@@ -222,6 +224,11 @@ Use \f[I]profile\f[R] for the current run.
 Save the currently specified settings (everything on the command line)
 with the specified profile name.
 .TP
+\f[B]\[en]recreate\f[R]
+Delete any existing .conf file for this profile and recreate it in the
+standard format.
+Loses any comments or other existing formatting.
+.TP
 \f[B]-a\f[R], \f[B]\[en]all\f[R]
 Execute all profiles sequentially.
 Can be specified by itself to prune, link, and execute backups
@@ -275,6 +282,18 @@ user\[cq]s home directory (\[ti]/managebackups/).
 Directory setting precedence from highest to lowest is a specific
 commandline directive (like \f[B]\[en]confdir\f[R]), then
 \f[B]\[en]user\f[R], and finally environment variables (shown below).
+.TP
+\f[B]-x\f[R], \f[B]\[en]lock\f[R]
+Lock the specified profile (or all profiles if \f[B]-a\f[R] or
+\f[B]-A\f[R]) for the duration of this run.
+All subsequent attempts to run this profile while the first one is still
+running will be skipped.
+The profile is automatically unlocked when the first invocation
+finishes.
+Locks are respected on every run but only taken out when \f[B]-x\f[R] or
+\f[B]\[en]lock\f[R] is specified.
+i.e.\ a \f[B]-x\f[R] run will successfully lock the profile even for
+other invocations that fail to specify \f[B]-x\f[R].
 .SS Take Backups Options
 .TP
 \f[B]\[en]directory\f[R] [\f[I]directory\f[R]]
@@ -537,6 +556,12 @@ Note: There may be profiles defined with different retention thresholds
 for a subset of files in /my/backups (i.e.\ files that match the
 \f[B]\[en]files\f[R] setting); those retention thresholds would be
 ignored for this run because no \f[B]\[en]profile\f[R] is specified.
+.TP
+\f[B]managebackups -p mymac \[en]recreate \[en]test\f[R]
+Recreate the mymac config file using the standard format.
+Previously existing comments and formatting is thrown away.
+The \f[B]-test\f[R] option skips all primary functions (no backups,
+pruning or linking is done) so only the config file update is done.
 .TP
 \f[B]managebackups -1\f[R]
 Show details of all backups taken that are associated with a profile.

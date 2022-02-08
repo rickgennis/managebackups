@@ -85,6 +85,9 @@ void BackupConfig::saveConfig() {
         }
     }
 
+    if (GLOBALS.cli.count(CLI_RECREATE))
+        unlink(config_filename.c_str());
+
     // open existing and new config files
     string temp_filename = config_filename + ".tmp." + to_string(GLOBALS.pid);
     oldFile.open(config_filename);
@@ -183,7 +186,8 @@ void BackupConfig::saveConfig() {
         newFile << settings[sMonths].confPrint();
         newFile << settings[sYears].confPrint();
         newFile << settings[sFailsafeBackups].confPrint();
-        newFile << settings[sFailsafeDays].confPrint() << "\n\n";
+        newFile << settings[sFailsafeDays].confPrint();
+        newFile << settings[sFP].confPrint() << "\n\n";
 
         newFile << commentLine << "# Linking\n" << commentLine << "\n";
         newFile << settings[sMaxLinks].confPrint();
@@ -341,6 +345,44 @@ unsigned int BackupConfig::removeEmptyDirs(string directory) {
 }
 
 
+unsigned int BackupConfig::getLockPID() {
+    string lockFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".lock";
+    unsigned int pid = 0;
+
+    ifstream lockFile;
+    lockFile.open(lockFilename);
+
+    if (lockFile.is_open()) {
+        string temp;
+        lockFile >> temp;
+        pid = stoi(temp);
+        lockFile.close();
+    }
+
+    return pid;
+}
+
+
+string BackupConfig::setLockPID(unsigned int pid) {
+    string lockFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".lock";
+    mkdirp(GLOBALS.cacheDir);
+
+    ofstream lockFile;
+    lockFile.open(lockFilename);
+
+    if (lockFile.is_open()) {
+        lockFile << to_string(pid) << endl;
+        lockFile.close();
+        return lockFilename;
+    }
+
+    log("unable to save lock to " + lockFilename + " (directory not writable?)");
+    SCREENERR("error: unable to create " << lockFilename);
+
+    return "";
+}
+
+
 bool BackupConfig::getPreviousSuccess() {
     string stateFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".state";
     bool previousSuccess = true;
@@ -370,7 +412,9 @@ void BackupConfig::setPreviousSuccess(bool state) {
         stateFile << to_string(state) << endl;
         stateFile.close();
     }
-    else
+    else {
         log("unable to save state for notifications to " + stateFilename + " (directory not writable?)");
+        SCREENERR("error: unable to create " << stateFilename);
+    }
 }
 

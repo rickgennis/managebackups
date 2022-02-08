@@ -1,6 +1,10 @@
 
 v1.2.5 - 1/29/22
-		•  Added --all
+		•  Added --all and --All
+
+		•  Added -x for locking
+
+		•  Added --recreate
 
 		•  Added --mode to specify file mode of new backups
 

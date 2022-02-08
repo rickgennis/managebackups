@@ -42,7 +42,10 @@ $(ODIR)/%.o: %.cc $(DEPS)
 clean:
 	rm -f $(ODIR)/*.o *~ core $(INCDIR)/*~ help.cc
 
-tight: CFLAGS += -fno-stack-protector -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-math-errno -fno-unroll-loops -fmerge-all-constants -fno-ident
-tight: managebackups
-tight: 
-	strip ../bin/managebackups
+both:
+	make clean
+	tar -C /Users/rennis -czf /tmp/managebackups.tgz managebackups
+	scp /tmp/managebackups.tgz fw:/tmp
+	ssh fw "sudo /home/ennis/managebackups/src/package.deb/scripts/prep" &
+	make
+	

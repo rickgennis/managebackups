@@ -45,6 +45,9 @@ Options are relative to the three functions of **managebackups**.
 **--save**
 : Save the currently specified settings (everything on the command line) with the specified profile name.
 
+**--recreate**
+: Delete any existing .conf file for this profile and recreate it in the standard format. Loses any comments or other existing formatting.
+
 **-a**, **--all**
 : Execute all profiles sequentially. Can be specified by itself to prune, link, and execute backups (whatever's configured) for all profiles.  Or can be combined with limiting options like **--nobackup**, **--noprune**.
 
@@ -80,6 +83,9 @@ Options are relative to the three functions of **managebackups**.
 
 **-u**, **--user**
 : Set all three directories (config, cache and log) to use the calling user's home directory (~/managebackups/). Directory setting precedence from highest to lowest is a specific commandline directive (like **--confdir**), then **--user**, and finally environment variables (shown below).
+
+**-x**, **--lock**
+: Lock the specified profile (or all profiles if **-a** or **-A**) for the duration of this run.  All subsequent attempts to run this profile while the first one is still running will be skipped.  The profile is automatically unlocked when the first invocation finishes. Locks are respected on every run but only taken out when **-x** or **--lock** is specified.  i.e. a **-x** run will successfully lock the profile even for other invocations that fail to specify **-x**.
 
 ## Take Backups Options
 
@@ -190,6 +196,9 @@ Profile configuration files are managed by **managebackups** though they can be 
 
 **managebackups --directory /my/backups --prune**
 : Prune (via default thresholds) and update links on all backups found in /my/backups. Without **--file** or **--command** no new backup is performed/taken. This can be used to manage backups that are performed by another tool entirely. Note: There may be profiles defined with different retention thresholds for a subset of files in /my/backups (i.e. files that match the **--files** setting); those retention thresholds would be ignored for this run because no **--profile** is specified.
+
+**managebackups -p mymac --recreate --test**
+: Recreate the mymac config file using the standard format. Previously existing comments and formatting is thrown away. The **-test** option skips all primary functions (no backups, pruning or linking is done) so only the config file update is done.
 
 **managebackups -1**
 : Show details of all backups taken that are associated with a profile.

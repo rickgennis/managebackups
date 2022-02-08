@@ -285,6 +285,9 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
             }
         }
 
+    if (GLOBALS.cli.count(CLI_RECREATE))
+        currentConf->modified = 1;
+
     // apply fp from the config file, if set
     if (str2bool(currentConf->settings[sFP].value)) {
         currentConf->settings[sFailsafeDays].value = "2";
@@ -958,12 +961,17 @@ void setupUserDirectories() {
  *******************************************************************************/
 void sigTermHandler(int sig) {
     if (GLOBALS.interruptFilename.length()) {
-        cerr << "\ninterrupt: aborting backup, cleaning up... ";
+        cerr << "\ninterrupt: aborting backup, cleaning up " << GLOBALS.interruptFilename << "... ";
         unlink(GLOBALS.interruptFilename.c_str());
         cerr << "done." << endl;
+        log("error: operation aborted on signal " + to_string(sig) + " (" + GLOBALS.interruptFilename + ")");
     }
+    else
+        log("error: operation aborted on signal");
 
-    log("error: operation aborted on signal " + to_string(sig));
+    if (GLOBALS.interruptLock.length())
+        unlink(GLOBALS.interruptLock.c_str());
+
     exit(1);
 }
 
@@ -1054,6 +1062,8 @@ int main(int argc, char *argv[]) {
         (string("A,") + CLI_ALLPAR, "All parallel", cxxopts::value<bool>()->default_value("false"))
         (string("z,") + CLI_ZERO, "No animation (internal)", cxxopts::value<bool>()->default_value("false"))
         (string("t,") + CLI_TEST, "Test only mode", cxxopts::value<bool>()->default_value("false"))
+        (string("x,") + CLI_LOCK, "Lock profile", cxxopts::value<bool>()->default_value("false"))
+        (string("k,") + CLI_CRON, "Cron", cxxopts::value<bool>()->default_value("false"))
         (CLI_VERBOSEMAX, "Max verbosity", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))
         (CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))
@@ -1079,6 +1089,7 @@ int main(int argc, char *argv[]) {
         (CLI_MODE, "File mode", cxxopts::value<std::string>())
         (CLI_MINSPACE, "Minimum local space", cxxopts::value<std::string>())
         (CLI_MINSFTPSPACE, "Minimum SFTP space", cxxopts::value<std::string>())
+        (CLI_RECREATE, "Recreate config", cxxopts::value<bool>()->default_value("false"))
         (CLI_INSTALLMAN, "Install man", cxxopts::value<bool>()->default_value("false"))
         (CLI_INSTALL, "Install", cxxopts::value<bool>()->default_value("false"));
 
@@ -1171,7 +1182,28 @@ int main(int argc, char *argv[]) {
 
         GLOBALS.cli.count(CLI_STATS1) ? displayDetailedStatsWrapper(configManager) : displaySummaryStatsWrapper(configManager);
     }
-    else {
+    else {  // "all" profiles locking is handled here; individual profile locking is handled further down in the NORMAL RUN
+        if (GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR)) {
+            currentConfig->settings[sDirectory].value = "/";
+            currentConfig->settings[sBackupFilename].value = "all";
+
+            auto pid = currentConfig->getLockPID();
+            if (pid) {
+                if (!kill(pid, 0)) {
+                    NOTQUIET && cerr << "[ALL] profile is locked while previous invocation is still running (pid " 
+                        << pid << "); skipping this run." << endl;
+                    log("[ALL] skipped run due to profile lock while previous invocation is still running (pid " + to_string(pid) + ")");
+                    exit(1);
+                }
+
+                log("[ALL] abandoning previous lock because pid " + to_string(pid) + " has vanished");
+            }
+
+            // locking requested
+            if (GLOBALS.cli.count(CLI_LOCK))
+                GLOBALS.interruptLock = currentConfig->setLockPID(GLOBALS.pid);
+        }
+
         #define paramIfSpecified(x) (GLOBALS.cli.count(x) ? string(" --") + x : "")
         string commonSwitches = 
             string(NOTQUIET ? "" : " -q") + 
@@ -1198,6 +1230,7 @@ int main(int argc, char *argv[]) {
             paramIfSpecified(CLI_WEEKS) +
             paramIfSpecified(CLI_MONTHS) +
             paramIfSpecified(CLI_YEARS) +
+            paramIfSpecified(CLI_LOCK) +
             paramIfSpecified(CLI_MAXLINKS);
 
         for (int i = 0; i < GLOBALS.cli.count(CLI_VERBOSE); ++i)
@@ -1265,6 +1298,21 @@ int main(int argc, char *argv[]) {
         /* NORMAL RUN (prune, link, backup)
          * ****************************/
         else {
+            auto pid = currentConfig->getLockPID();
+            if (pid) {
+                if (!kill(pid, 0)) {
+                    NOTQUIET && cerr << currentConfig->ifTitle() + " profile is locked while previous invocation is still running (pid " 
+                        << pid << "); skipping this run." << endl;
+                    log(currentConfig->ifTitle() + " skipped run due to profile lock while previous invocation is still running (pid " + to_string(pid) + ")");
+                    exit(1);
+                }
+
+                log(currentConfig->ifTitle() + " abandoning previous lock because pid " + to_string(pid) + " has vanished");
+            }
+
+            if (GLOBALS.cli.count(CLI_LOCK)) 
+                GLOBALS.interruptLock = currentConfig->setLockPID(GLOBALS.pid);
+
             int n = nice(0);
             if (currentConfig->settings[sNice].ivalue() - n > 0)
                 nice(currentConfig->settings[sNice].ivalue() - n);
@@ -1278,6 +1326,10 @@ int main(int argc, char *argv[]) {
         }
 
         DEBUG(2, "completed primary tasks");
+
+        // remove lock
+        if (GLOBALS.cli.count(CLI_LOCK)) 
+            GLOBALS.interruptLock = currentConfig->setLockPID(0);
     }
     
     AppTimer.stop();

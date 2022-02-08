@@ -58,6 +58,7 @@ void showHelp(enum helpType kind) {
             + "\n" + string(BOLDBLUE) + "GENERAL\n" + RESET
             + "   --profile [name]    Use the specified profile for the current run.\n"
             + "   --save              Save all the specified settings to the specified profile.\n"
+            + "   --recreate          Delete any existing .conf file for this profile and recreate it in the standard format\n"
             + "   --all               Execute all profiles sequentially\n"
             + "   -0                  Provide a summary of backups.\n"
             + "   -1                  Provide detail of backups.\n"
@@ -69,9 +70,10 @@ void showHelp(enum helpType kind) {
             + "   --user              Set directories (config, cache and log) to the calling user's home directory (~/managebackups/).\n"
             + "   --nocolor           Disable color output.\n"
             + "   --test              Run in test mode. No changes are persisted to disk except for caches.\n"
-            + "   -q                  Quit mode -- limit output, for use in scripts.\n"
+            + "   -q                  Quiet mode -- limit output, for use in scripts.\n"
             + "   -v                  Verbose output for debugging (can be specified multiple times)\n"
             + "   --defaults          Display the default settings for all profiles.\n"
+            + "   -x, --lock          Lock the current profile for the duraiton of the run so only one copy can run at a time.\n"
             + "\nSee 'man managebackups' for more detail.\n";
 
             /*

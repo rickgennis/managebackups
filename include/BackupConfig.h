@@ -35,6 +35,9 @@ class BackupConfig {
         void setPreviousSuccess(bool state);
         bool getPreviousSuccess();
 
+        string setLockPID(unsigned int pid);
+        unsigned int getLockPID();
+
         string ifTitle();
         unsigned int removeEmptyDirs(string dir = "");
 

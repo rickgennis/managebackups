@@ -71,6 +71,9 @@
 #define CLI_ALLPAR "All"
 #define CLI_NICE "nice"
 #define CLI_ZERO "zero"
+#define CLI_LOCK "lock"
+#define CLI_CRON "cron"
+#define CLI_RECREATE "recreate"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -125,6 +128,7 @@ struct global_vars {
     string cacheDir;
     bool saveErrorSeen;
     string interruptFilename;
+    string interruptLock;
 };
 
 #endif
