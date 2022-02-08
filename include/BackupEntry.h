@@ -27,7 +27,6 @@ class BackupEntry {
            share the same inode and same single mtime entry.  mtime won't show when they were taken. */
 
         unsigned long   day_age;
-        unsigned int    month_age;
         int             dow;
         int             date_month;
         int             date_day;

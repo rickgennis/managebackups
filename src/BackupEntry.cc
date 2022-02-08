@@ -6,9 +6,8 @@
 #include <pcre++.h>
 #include "util_generic.h"
 #include "colors.h"
+#include "globals.h"
 
-#define SECS_PER_DAY (60*60*24)
-#define DAYS_PER_MONTH 30.43
 
 using namespace pcrepp;
 using namespace std;
@@ -17,7 +16,7 @@ using namespace std;
 BackupEntry::BackupEntry() {
     dateRE = Pcre(DATE_REGEX);
     md5 = filename = "";
-    links = mtime = size = inode = day_age = month_age = dow = date_day = duration = current = name_mtime = 0;
+    links = mtime = size = inode = day_age = dow = date_day = duration = current = name_mtime = 0;
 }
 
 string BackupEntry::class2string() {
@@ -80,7 +79,6 @@ BackupEntry* BackupEntry::updateAges(time_t refTime) {
 
     name_mtime = fileMTime;
     day_age = floor((refTime - fileMTime) / SECS_PER_DAY);
-    month_age = floor(day_age / DAYS_PER_MONTH);
 
     auto pFileTime = localtime(&fileMTime);
     dow = pFileTime->tm_wday;

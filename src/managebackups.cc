@@ -411,20 +411,20 @@ void pruneBackups(BackupConfig& config) {
             int filenameDOW = raw_it->second.dow;
 
             // daily
-            if (filenameAge <= config.settings[sDays].ivalue()) {
+            if (config.settings[sDays].ivalue() && filenameAge <= config.settings[sDays].ivalue()) {
                 DEBUG(2, "keep_daily: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
                 continue;
             }
 
             // weekly
-            if (filenameAge / 7.0 <= config.settings[sWeeks].ivalue() && filenameDOW == config.settings[sDOW].ivalue()) {
+            if (config.settings[sWeeks].ivalue() && filenameAge / 7.0 <= config.settings[sWeeks].ivalue() && filenameDOW == config.settings[sDOW].ivalue()) {
                 DEBUG(2, "keep_weekly: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
                 continue;
             }
 
             // monthly
             auto monthLimit = config.settings[sMonths].ivalue();
-            if (monthLimit && raw_it->second.month_age <= monthLimit && raw_it->second.date_day == 1) {
+            if (monthLimit && filenameAge / DAYS_PER_MONTH <= monthLimit && raw_it->second.date_day == 1) {
                 DEBUG(2, "keep_monthly: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
                 continue;
             }

@@ -48,4 +48,4 @@ both:
 	scp /tmp/managebackups.tgz fw:/tmp
 	ssh fw "sudo /home/ennis/managebackups/src/package.deb/scripts/prep" &
 	make
-	
+	fg

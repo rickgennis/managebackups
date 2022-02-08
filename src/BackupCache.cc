@@ -254,7 +254,6 @@ BackupCache::~BackupCache() {
                 ", size:" + to_string(raw.second.size) + 
                 ", inod:" + to_string(raw.second.inode) + 
                 ", dage:" + to_string(raw.second.day_age) + 
-                ", mage:" + to_string(raw.second.month_age) + 
                 ", dow:" + dw(raw.second.dow) + 
                 ", day:" + to_string(raw.second.date_day) + 
                 ", lnks:" + to_string(raw.second.links) + 

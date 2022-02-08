@@ -198,7 +198,7 @@ Profile configuration files are managed by **managebackups** though they can be 
 : Prune (via default thresholds) and update links on all backups found in /my/backups. Without **--file** or **--command** no new backup is performed/taken. This can be used to manage backups that are performed by another tool entirely. Note: There may be profiles defined with different retention thresholds for a subset of files in /my/backups (i.e. files that match the **--files** setting); those retention thresholds would be ignored for this run because no **--profile** is specified.
 
 **managebackups -p mymac --recreate --test**
-: Recreate the mymac config file using the standard format. Previously existing comments and formatting is thrown away. The **-test** option skips all primary functions (no backups, pruning or linking is done) so only the config file update is done.
+: Recreate the mymac config file using the standard format. Previously existing comments and formatting is thrown away. The **-test** option skips all primary functions (no backups, pruning or linking is done) so only the config file is updated.
 
 **managebackups -1**
 : Show details of all backups taken that are associated with a profile.

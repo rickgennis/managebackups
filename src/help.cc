@@ -561,7 +561,7 @@ ignored for this run because no \f[B]\[en]profile\f[R] is specified.
 Recreate the mymac config file using the standard format.
 Previously existing comments and formatting is thrown away.
 The \f[B]-test\f[R] option skips all primary functions (no backups,
-pruning or linking is done) so only the config file update is done.
+pruning or linking is done) so only the config file is updated.
 .TP
 \f[B]managebackups -1\f[R]
 Show details of all backups taken that are associated with a profile.
