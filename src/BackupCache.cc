@@ -19,11 +19,11 @@ BackupCache::BackupCache(string filename) {
 }
 
 BackupCache::BackupCache() {
-    newMD5 = inProcess = false;
+    updated = inProcess = false;
 }
 
 BackupCache::~BackupCache() {
-    if (newMD5 && cacheFilename.length())
+    if (updated && cacheFilename.length())
         saveCache();
 }
 
@@ -50,6 +50,7 @@ BackupCache::~BackupCache() {
                 // files need to be able to fall out of the cache if they disappear from the filesystem.
                 // "current" means the file was seen in the most recent filesystem scan.
                 if (raw.second.current) {
+                    DEBUG(8, cacheFilename << ": writing cache entry " << raw.second.class2string());
                     cacheFile << raw.second.class2string() << endl;
                     ++count;
                 }
@@ -124,7 +125,7 @@ BackupCache::~BackupCache() {
         updatedEntry.current = markCurrent;
 
         if (md5Updated)
-            newMD5 = true;
+            updated = true;
 
         // filename doesn't exist
         if (filename_it == indexByFilename.end()) {

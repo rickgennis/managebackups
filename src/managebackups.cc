@@ -450,6 +450,7 @@ void pruneBackups(BackupConfig& config) {
 
                     changedMD5s.insert(raw_it->second.md5);
                     config.cache.remove(raw_it->second);
+                    config.cache.updated = true;   // updated causes the cache to get saved in the BackupCache destructor
                     DEBUG(4, "completed removal of file");
                 }
             }
@@ -899,7 +900,7 @@ void performBackup(BackupConfig& config) {
                 // a -0 or -1 while we're still finishing our SCP/SFTP in the background won't have to recalculate
                 // the MD5 of the backup we just took.
                 config.cache.saveCache();
-                config.cache.newMD5 = false;    // this disables the now redundant save in the destructor
+                config.cache.updated = false;    // this disables the now redundant save in the destructor
 
                 bool overallSuccess = true;
                 string notifyMessage = "\t• " + message + "\n";
