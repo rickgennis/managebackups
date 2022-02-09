@@ -466,6 +466,9 @@ void pruneBackups(BackupConfig& config) {
             config.cache.reStatMD5(md5);
             DEBUG(4, "re-stat complete");
         }
+
+        if (changedMD5s.size())
+            config.cache.saveAtEnd();
     }
 }
 
@@ -493,6 +496,7 @@ void updateLinks(BackupConfig& config) {
         return;
 
     // loop through list of MD5s (the map)
+    set<string> changedMD5s;
     for (auto &md5: config.cache.indexByMD5) {
         
         // only consider md5s with more than one file associated
@@ -582,7 +586,7 @@ void updateLinks(BackupConfig& config) {
                                 NOTQUIET && cout << "\t• linked " << detail << endl;
                                 log(config.ifTitle() + " linked " + detail);
 
-                                config.cache.reStatMD5(md5.first);
+                                changedMD5s.insert(md5.first);
 
                                 if (referenceFile->links >= maxLinksAllowed) {
                                     rescanRequired = true;
@@ -605,6 +609,15 @@ void updateLinks(BackupConfig& config) {
             }
         } while (rescanRequired);    
     }    
+
+    for (auto &md5: changedMD5s) {
+        DEBUG(4, "re-stating " << md5);
+        config.cache.reStatMD5(md5);
+        DEBUG(4, "re-stat complete");
+    }
+
+    if (changedMD5s.size())
+        config.cache.saveAtEnd();
 }
 
 

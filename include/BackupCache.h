@@ -32,6 +32,7 @@ class BackupCache {
 
         void saveCache();
         void restoreCache();
+        void saveAtEnd(bool shouldSave = 1) { updated = shouldSave; }
 
         BackupCache(string filename);
         BackupCache();
