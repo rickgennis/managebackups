@@ -93,7 +93,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
 
                     if (tempRE.search(string(c_dirEntry->d_name))) {
                         DEBUG(2, "in process file found (" << c_dirEntry->d_name << ")");
-                        cache.inProcess = true;
+                        cache.inProcess = fullFilename;
                         continue;
                     }
 

@@ -525,7 +525,7 @@ Re-run the mymac profile with its last saved configuration
 (i.e.\ what\[cq]s in example #2, not #3).
 Quiet mode disables all screen output except for errors.
 .TP
-\f[B]managebackups -a\f[R]
+\f[B]managebackups -a -x\f[R]
 Execute all currently defined profiles.
 If the above three examples had been run previously two profiles
 (homedirs & mymac) would have been defined, each with the associated
@@ -533,6 +533,9 @@ parameters on their respective \f[B]\[en]save\f[R] runs.
 This \f[B]-a\f[R] invocation would run through each of those profiles
 sequentially performing the configured pruning, hard linking and
 backups.
+\f[B]-x\f[R] locks each profile as it runs (including \[lq]all\[rq]) so
+that the same profile can\[cq]t be kicked off again until this run has
+finished.
 .TP
 \f[B]managebackups -a \[en]nobackup\f[R]
 Execute all currently defined profiles but don\[cq]t perform backups

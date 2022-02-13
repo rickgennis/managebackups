@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <libgen.h>
 #include <math.h>
+#include <sys/stat.h>
 
 #include "statistics.h"
 #include "util_generic.h"
@@ -59,6 +60,11 @@ summaryStats _displaySummaryStats(BackupConfig& config) {
     auto first_it = config.cache.rawData.find(firstEntry->second);
     auto last_it = config.cache.rawData.find(lastEntry->second);
     if (last_it != config.cache.rawData.end() && first_it != config.cache.rawData.end()) {
+        string processAge;
+        struct stat statBuf;
+        if (config.cache.inProcess.length() && !stat(config.cache.inProcess.c_str(), &statBuf))
+            processAge = seconds2hms(GLOBALS.startupTime - statBuf.st_birthtime) + " in";
+
         char result[1000];
         sprintf(result,
             // filename
@@ -78,9 +84,9 @@ summaryStats _displaySummaryStats(BackupConfig& config) {
             seconds2hms(last_it->second.duration).c_str(),
             rawSize,
             saved,
-            config.cache.inProcess ? 
+            config.cache.inProcess.length() ? 
                 string(BOLDGREEN + string("{") + RESET + timeDiff(mktimeval(first_it->second.name_mtime)) + BOLDGREEN + " -> " + 
-                    RESET + timeDiff(mktimeval(last_it->second.mtime)).c_str() + BOLDGREEN + "}" + RESET).c_str()
+                    RESET + timeDiff(mktimeval(last_it->second.mtime)).c_str() + BOLDGREEN + "} " + processAge + RESET).c_str()
                 : string(BOLDBLUE + string("[") + RESET + timeDiff(mktimeval(first_it->second.name_mtime)) + BOLDBLUE + " -> " + 
                     RESET + timeDiff(mktimeval(last_it->second.mtime)).c_str() + BOLDBLUE + "]" + RESET).c_str());
             cout << result << "\n";

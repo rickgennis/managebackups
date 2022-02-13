@@ -72,7 +72,7 @@ void log(string message) {
     logFile.open(GLOBALS.logDir + "/managebackups.log", ios::app);
 
     if (logFile.is_open()) {
-        logFile << string(timeStamp) << message << endl;
+        logFile << string(timeStamp) << "[" << to_string(GLOBALS.pid) << "] " << message << endl;
         logFile.close();
     }
 #else
@@ -228,6 +228,9 @@ string seconds2hms(unsigned long seconds) {
     int unit[] = {3600, 60, 1};
     bool dataAdded = false;
 
+    if (seconds >= 60*60*100)
+        return(string("> ") + to_string(int(seconds / (60 * 60 * 24))) + " days");
+
     for (int index = 0; index < sizeof(unit) / sizeof(unit[0]); ++index) {
         if (seconds >= unit[index]) {
             double value = floor(seconds / unit[index]);
@@ -240,7 +243,8 @@ string seconds2hms(unsigned long seconds) {
             dataAdded = true;
         }
         else {
-            result += dataAdded ? ":00" : index == (sizeof(unit) / sizeof(unit[0])) - 1 ? "  " : "   ";
+            //result += dataAdded ? ":00" : index == (sizeof(unit) / sizeof(unit[0])) - 1 ? "  " : "   ";
+            result += index == (sizeof(unit) / sizeof(unit[0])) - 1 ? "00" : "00:";
         }
     }
 

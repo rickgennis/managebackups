@@ -16,7 +16,7 @@ class BackupCache {
         map<string, set<unsigned int> > indexByMD5;
         map<string, unsigned int> indexByFilename;
         bool updated;
-        bool inProcess;
+        string inProcess;
         string cacheFilename;
 
         BackupEntry* getByFilename(string filename);

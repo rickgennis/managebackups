@@ -19,7 +19,8 @@ BackupCache::BackupCache(string filename) {
 }
 
 BackupCache::BackupCache() {
-    updated = inProcess = false;
+    updated = false;
+    inProcess = "";
 }
 
 BackupCache::~BackupCache() {

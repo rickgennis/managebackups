@@ -185,8 +185,8 @@ Profile configuration files are managed by **managebackups** though they can be 
 **managebackups -p mymac -q**
 : Re-run the mymac profile with its last saved configuration (i.e. what's in example #2, not #3). Quiet mode disables all screen output except for errors.
 
-**managebackups -a**
-: Execute all currently defined profiles.  If the above three examples had been run previously two profiles (homedirs & mymac) would have been defined, each with the associated parameters on their respective **--save** runs.  This **-a** invocation would run through each of those profiles sequentially performing the configured pruning, hard linking and backups.
+**managebackups -a -x**
+: Execute all currently defined profiles.  If the above three examples had been run previously two profiles (homedirs & mymac) would have been defined, each with the associated parameters on their respective **--save** runs.  This **-a** invocation would run through each of those profiles sequentially performing the configured pruning, hard linking and backups. **-x** locks each profile as it runs (including "all") so that the same profile can't be kicked off again until this run has finished.
 
 **managebackups -a --nobackup**
 : Execute all currently defined profiles but don't perform backups -- only pruning and linking as configured within each profile.
