@@ -20,6 +20,7 @@
 
 using namespace pcrepp;
 
+
 string s(int number) {
     return(number == 1 ? "" : "s");
 }

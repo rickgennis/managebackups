@@ -28,7 +28,7 @@ struct summaryStats {
 };
 
 
-summaryStats _displaySummaryStats(BackupConfig& config) {
+summaryStats _displaySummaryStats(BackupConfig& config, int maxFileLen = 0, int maxProfLen = 0) {
     set<unsigned long> countedInode;
     struct summaryStats resultStats;
 
@@ -62,13 +62,24 @@ summaryStats _displaySummaryStats(BackupConfig& config) {
     if (last_it != config.cache.rawData.end() && first_it != config.cache.rawData.end()) {
         string processAge;
         struct stat statBuf;
+
+ #ifdef __APPLE__
         if (config.cache.inProcess.length() && !stat(config.cache.inProcess.c_str(), &statBuf))
-            processAge = seconds2hms(GLOBALS.startupTime - statBuf.st_birthtime) + " in";
+            processAge = seconds2hms(GLOBALS.startupTime - statBuf.st_birthtime);
+#endif
+
+        auto t = localtime(&last_it->second.mtime);
+        char fileTime[20];
+        strftime(fileTime, sizeof(fileTime), "%X", t);
 
         char result[1000];
         sprintf(result,
+            // profile
+            string(string("%-") + to_string(maxProfLen) + "s  " +
             // filename
-            string(string("%-") + to_string(40) + "s  " +
+            string("%-") + to_string(maxFileLen) + "s  " +
+            // time
+            string("%s  ") +
             // size
             "%-15s  " +
             // duration
@@ -79,8 +90,10 @@ summaryStats _displaySummaryStats(BackupConfig& config) {
             "%3i%%  "+
             // content age
             "%s").c_str(),
-            pathSplit(last_it->second.filename).file.c_str(), (approximate(last_it->second.size) + " (" +
-            approximate(resultStats.totalBytesUsed) + ")").c_str(),
+            config.settings[sTitle].value.c_str(),
+            pathSplit(last_it->second.filename).file.c_str(), 
+            fileTime,    
+            (approximate(last_it->second.size) + " (" + approximate(resultStats.totalBytesUsed) + ")").c_str(),
             seconds2hms(last_it->second.duration).c_str(),
             rawSize,
             saved,
@@ -101,28 +114,62 @@ summaryStats _displaySummaryStats(BackupConfig& config) {
 
 
 void displaySummaryStatsWrapper(ConfigManager& configManager) {
-    cout << BOLDBLUE << "Most Recent Backup                        Size (Total)     Duration  Num  Saved  Age Range\n" << RESET;
-    if (configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp)
-        _displaySummaryStats(configManager.configs[configManager.activeConfig]);
+    int maxFileLen = 0;
+    int maxProfLen = 0;
+
+    if (configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp) {
+        auto config = configManager.configs[configManager.activeConfig];
+        auto last_it = config.cache.rawData.find((--config.cache.indexByFilename.end())->second);
+        if (last_it != config.cache.rawData.end())
+            maxFileLen = max(pathSplit(last_it->second.filename).file.length(), 18);
+        maxProfLen = max(config.settings[sTitle].value.length(), 7);
+
+        string spacesA(maxProfLen - 7, ' ');
+        string spacesB(maxFileLen - 18, ' ');
+        cout << BOLDBLUE << "Profile" << spacesA << "  Most Recent Backup" << spacesB << "  Time      Size (Total)     Duration  Num  Saved  Age Range\n" << RESET;
+        _displaySummaryStats(configManager.configs[configManager.activeConfig], maxFileLen, maxProfLen);
+    }
     else {
+        // first pass to find longest filename length
+        for (auto &config: configManager.configs) 
+            if (!config.temp) {
+                auto last_it = config.cache.rawData.find((--config.cache.indexByFilename.end())->second);
+
+                if (last_it != config.cache.rawData.end()) {
+                    auto len = pathSplit(last_it->second.filename).file.length();
+
+                    if (len > maxFileLen)
+                        maxFileLen = len;
+
+                    if (config.settings[sTitle].value.length() > maxProfLen)
+                        maxProfLen = config.settings[sTitle].value.length();
+                }
+            }
+
+        maxFileLen = max(maxFileLen, 18);
+        maxProfLen = max(maxProfLen, 7);
+
+        string spacesA(maxProfLen - 7, ' ');
+        string spacesB(maxFileLen - 18, ' ');
+        cout << BOLDBLUE << "Profile" << spacesA << "  Most Recent Backup" << spacesB << "  Time      Size (Total)     Duration  Num  Saved  Age Range\n" << RESET;
+
         struct summaryStats perStats;
         struct summaryStats totalStats;
 
+        // second pass to actually print the stats
         int nonTempConfigs = 0;
-        for (auto &config: configManager.configs) {
+        for (auto &config: configManager.configs) 
             if (!config.temp) {
                 ++nonTempConfigs;
-                perStats = _displaySummaryStats(config);
+                perStats = _displaySummaryStats(config, maxFileLen, maxProfLen);
                 totalStats.lastBackupBytes += perStats.lastBackupBytes;
                 totalStats.totalBytesUsed += perStats.totalBytesUsed;
                 totalStats.totalBytesSaved += perStats.totalBytesSaved;
                 totalStats.numberOfBackups += perStats.numberOfBackups;
                 totalStats.duration += perStats.duration;
             }
-        }
 
         if (nonTempConfigs > 1) {
-            //cout << horizontalLine(80) << "\n";
             char result[1000];
 
             sprintf(result,
@@ -144,7 +191,9 @@ void displaySummaryStatsWrapper(ConfigManager& configManager) {
             int(floor((1 - ((long double)totalStats.totalBytesUsed / ((long double)totalStats.totalBytesUsed + (long double)totalStats.totalBytesSaved))) * 100 + 0.5)),
             totalStats.totalBytesSaved ? string(string("Saved ") + approximate(totalStats.totalBytesSaved) + " from " 
                 + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved)).c_str() : "");
-            cout << BOLDWHITE << "TOTALS                                    " << result << RESET << "\n";
+
+            string spaces(maxFileLen + maxProfLen + 8, ' ');
+            cout << BOLDWHITE << "TOTALS" << spaces << result << RESET << "\n";
         }
     }
 
