@@ -74,7 +74,7 @@ string MD5string(string data);
 
 string onevarsprintf(string format, string data);
 
-string approximate(double size);
+string approximate(double size, int maxUnits = -1, bool commas = false);
 
 string seconds2hms(unsigned long seconds);
 

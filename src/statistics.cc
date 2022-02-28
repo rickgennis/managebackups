@@ -28,9 +28,10 @@ struct summaryStats {
 };
 
 
-summaryStats _displaySummaryStats(BackupConfig& config, int maxFileLen = 0, int maxProfLen = 0) {
+summaryStats _displaySummaryStats(BackupConfig& config, int statDetail = 0, int maxFileLen = 0, int maxProfLen = 0) {
     set<unsigned long> countedInode;
     struct summaryStats resultStats;
+    int precisionLevel = statDetail > 1 ? 1 : -1;
 
     unsigned long rawSize = config.cache.rawData.size();
     if (rawSize < 1) {
@@ -81,7 +82,7 @@ summaryStats _displaySummaryStats(BackupConfig& config, int maxFileLen = 0, int 
             // time
             string("%s  ") +
             // size
-            "%-15s  " +
+            (statDetail > 2 ? "%-26s  " : statDetail > 1 ? "%-22s  " : "%-15s  ") +
             // duration
             "%s  " +
             // number 
@@ -93,7 +94,7 @@ summaryStats _displaySummaryStats(BackupConfig& config, int maxFileLen = 0, int 
             config.settings[sTitle].value.c_str(),
             pathSplit(last_it->second.filename).file.c_str(), 
             fileTime,    
-            (approximate(last_it->second.size) + " (" + approximate(resultStats.totalBytesUsed) + ")").c_str(),
+            (approximate(last_it->second.size, precisionLevel, statDetail == 3) + " (" + approximate(resultStats.totalBytesUsed, precisionLevel, statDetail == 3) + ")").c_str(),
             seconds2hms(last_it->second.duration).c_str(),
             rawSize,
             saved,
@@ -113,9 +114,10 @@ summaryStats _displaySummaryStats(BackupConfig& config, int maxFileLen = 0, int 
 }
 
 
-void displaySummaryStatsWrapper(ConfigManager& configManager) {
+void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
     int maxFileLen = 0;
     int maxProfLen = 0;
+    int precisionLevel = statDetail > 1 ? 1 : -1;
 
     if (configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp) {
         auto config = configManager.configs[configManager.activeConfig];
@@ -126,8 +128,9 @@ void displaySummaryStatsWrapper(ConfigManager& configManager) {
 
         string spacesA(maxProfLen - 7, ' ');
         string spacesB(maxFileLen - 18, ' ');
-        cout << BOLDBLUE << "Profile" << spacesA << "  Most Recent Backup" << spacesB << "  Time      Size (Total)     Duration  Num  Saved  Age Range\n" << RESET;
-        _displaySummaryStats(configManager.configs[configManager.activeConfig], maxFileLen, maxProfLen);
+        cout << BOLDBLUE << "Profile" << spacesA << "  Most Recent Backup" << spacesB << "  Finished  Size (Total)     " << 
+            (statDetail > 2 ? "           " : statDetail > 1 ? "       " : "") << "Duration  Num  Saved  Age Range\n" << RESET;
+        _displaySummaryStats(configManager.configs[configManager.activeConfig], statDetail, maxFileLen, maxProfLen);
     }
     else {
         // first pass to find longest filename length
@@ -151,7 +154,8 @@ void displaySummaryStatsWrapper(ConfigManager& configManager) {
 
         string spacesA(maxProfLen - 7, ' ');
         string spacesB(maxFileLen - 18, ' ');
-        cout << BOLDBLUE << "Profile" << spacesA << "  Most Recent Backup" << spacesB << "  Time      Size (Total)     Duration  Num  Saved  Age Range\n" << RESET;
+        cout << BOLDBLUE << "Profile" << spacesA << "  Most Recent Backup" << spacesB << "  Finished  Size (Total)     " << 
+            (statDetail > 2 ? "           " : statDetail > 1 ? "       " : "") << "Duration  Num  Saved  Age Range\n" << RESET;
 
         struct summaryStats perStats;
         struct summaryStats totalStats;
@@ -161,7 +165,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager) {
         for (auto &config: configManager.configs) 
             if (!config.temp) {
                 ++nonTempConfigs;
-                perStats = _displaySummaryStats(config, maxFileLen, maxProfLen);
+                perStats = _displaySummaryStats(config, statDetail, maxFileLen, maxProfLen);
                 totalStats.lastBackupBytes += perStats.lastBackupBytes;
                 totalStats.totalBytesUsed += perStats.totalBytesUsed;
                 totalStats.totalBytesSaved += perStats.totalBytesSaved;
@@ -174,7 +178,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager) {
 
             sprintf(result,
             // size
-            string(string("%-15s  ") +
+            string(string(statDetail > 2 ? "%-26s  " :statDetail > 1 ? "%-22s  " : "%-15s  ") +
             // duration
             "%s  " +
             // number
@@ -184,13 +188,13 @@ void displaySummaryStatsWrapper(ConfigManager& configManager) {
             // content age
             "%s").c_str(),
 
-            (approximate(totalStats.lastBackupBytes) + " (" +
-                approximate(totalStats.totalBytesUsed) + ")").c_str(),
+            (approximate(totalStats.lastBackupBytes, precisionLevel, statDetail == 3) + " (" +
+                approximate(totalStats.totalBytesUsed, precisionLevel, statDetail == 3) + ")").c_str(),
             seconds2hms(totalStats.duration).c_str(),
             totalStats.numberOfBackups,
             int(floor((1 - ((long double)totalStats.totalBytesUsed / ((long double)totalStats.totalBytesUsed + (long double)totalStats.totalBytesSaved))) * 100 + 0.5)),
-            totalStats.totalBytesSaved ? string(string("Saved ") + approximate(totalStats.totalBytesSaved) + " from " 
-                + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved)).c_str() : "");
+            totalStats.totalBytesSaved ? string(string("Saved ") + approximate(totalStats.totalBytesSaved, precisionLevel, statDetail == 3) + " from " 
+                + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved, precisionLevel, statDetail == 3)).c_str() : "");
 
             string spaces(maxFileLen + maxProfLen + 8, ' ');
             cout << BOLDWHITE << "TOTALS" << spaces << result << RESET << "\n";

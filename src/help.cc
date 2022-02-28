@@ -59,7 +59,10 @@ void showHelp(enum helpType kind) {
             + "   --profile [name]    Use the specified profile for the current run.\n"
             + "   --save              Save all the specified settings to the specified profile.\n"
             + "   --recreate          Delete any existing .conf file for this profile and recreate it in the standard format\n"
-            + "   --all               Execute all profiles sequentially\n"
+            + "   -a, --all           Execute all profiles sequentially\n"
+            + "   -A, --All           Execute all profiles in parallel\n"
+            + "   -k, --cron          Execute all profiles sequentially for cron (equivalent to '-a -x -q')\n"
+            + "   -K, --Cron          Execute all profiles in parallel for cron (equivalent to '-A -x -q')\n"
             + "   -0                  Provide a summary of backups.\n"
             + "   -1                  Provide detail of backups.\n"
             + "   --install           Install this binary in /usr/local/bin, update directory perms and create the man page.\n"
@@ -243,8 +246,18 @@ Can be specified by itself to prune, link, and execute backups
 Or can be combined with limiting options like \f[B]\[en]nobackup\f[R],
 \f[B]\[en]noprune\f[R].
 .TP
+\f[B]-k\f[R], \f[B]\[en]cron\f[R]
+Sequential cron execution.
+Equivalent to \[lq]-a -x -q\[rq].
+.TP
+\f[B]-K\f[R], \f[B]\[en]Cron\f[R]
+Parallel cron execution.
+Equivalent to \[lq]-A -x -q\[rq].
+.TP
 \f[B]-0\f[R]
 Provide a summary of backups.
+\f[B]-0\f[R] can be specified up to 3 times for different formatting of
+sizes.
 .TP
 \f[B]-1\f[R]
 Provide detail of backups.
@@ -594,6 +607,30 @@ Directory to use for logging.
 See also \f[B]\[en]logdir\f[R].
 Defaults to /var/log if writable by the process, otherwise the
 user\[cq]s home directory.
+.SH STATS OUTPUT
+.PP
+Example output from \f[B]managebackups -0\f[R]
+.IP
+.nf
+\f[C]
+Profile        Most Recent Backup           Finished  Size (Total)     Duration  Num  Saved  Age Range
+desktop        desktop-20220222.tgz         05:54:03  196M (2.7G)      00:00:33  20     30%  [2 months, 3 weeks -> 2 hours, 5 minutes]
+firewall_logs  firewall-logs-20220222.tbz2  06:07:18  267M (3.0G)      00:13:48  15      0%  [5 months, 3 weeks -> 1 hour, 52 minutes]
+firewall_main  firewall-main-20220222.tgz   05:54:14  115M (1.5G)      00:00:44  27     31%  [9 months, 3 weeks -> 2 hours, 5 minutes]
+icloud         icloud-drive-20220222.tbz2   06:20:39  2.3G (11.3G)     00:27:10  6      17%  [2 months, 3 weeks -> 1 hour, 39 minutes]
+laptop         laptop-details-20220222.tgz  05:53:34  8M (129M)        00:00:06  23     25%  [5 months, 3 weeks -> 2 hours, 6 minutes]
+TOTALS                                                2.8G (18.6G)     00:42:21  91     18%  Saved 4.1G from 22.7G
+
+196G is the size of the most recent backup of the desktop profile.
+2.7G is the disk space used for all desktop profile backups.
+30% is the percentage saved in desktop profile backups due to hard linking.
+
+2.8G is the total used for the most recent backup of all profiles (i.e. one of each).
+18.6G is the total used for all data together (all data managed by managebackups).
+22.7G is the total that would be used if there were no hard linking.
+All size/space numbers are actual used (thanks to hard linking), except for the 22.7G number.
+\f[R]
+.fi
 .SH AUTHORS
 Rick Ennis.
 )END"); }

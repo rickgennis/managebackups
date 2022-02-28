@@ -175,17 +175,37 @@ string onevarsprintf(string format, string data) {
 }
 
 
-string approximate(double size) {
+string approximate(double size, int maxUnits, bool commas) {
     int index = 0;
     char unit[] = {'B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'};
 
-    while (size >= 1024 && index++ <= sizeof(unit)) {
+    while (size >= 1024 && 
+            (maxUnits < 0 || index < maxUnits) &&
+            index++ <= sizeof(unit)) { 
         size /= 1024;
     }
 
     char buffer[150];
     sprintf(buffer, index > 2 ? "%.01f" : "%.0f", index > 2 ? size : floor(size));
-    return(string(buffer) + unit[index]);
+    string unitSuffix(1, unit[index]);
+    string result = string(buffer);
+
+    if (commas) {
+        string finalResult;
+        auto numLen = result.length();
+        auto commaOffset = numLen % 3;
+
+        for (auto i = 0; i < numLen; ++i) {
+            if (i % 3 == commaOffset && i)
+                finalResult += ',';
+
+            finalResult += result[i];
+        }
+
+        result = finalResult;
+    }
+
+    return(result + (index ? unitSuffix : ""));
 }
 
 
@@ -245,7 +265,7 @@ string seconds2hms(unsigned long seconds) {
         }
         else {
             //result += dataAdded ? ":00" : index == (sizeof(unit) / sizeof(unit[0])) - 1 ? "  " : "   ";
-            result += index == (sizeof(unit) / sizeof(unit[0])) - 1 ? "00" : "00:";
+            result += dataAdded ? ":00" : index == (sizeof(unit) / sizeof(unit[0])) - 1 ? "00" : "00:";
         }
     }
 

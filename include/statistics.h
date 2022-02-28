@@ -6,7 +6,7 @@
 #include "ConfigManager.h"
 
 void displayDetailedStatsWrapper(ConfigManager& configManager);
-void displaySummaryStatsWrapper(ConfigManager& configManager);
+void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail);
 
 #endif
 

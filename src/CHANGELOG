@@ -1,5 +1,9 @@
 
 v1.2.5 - 1/29/22
+		•  Added multiple -0 (up to 3 times) formatting options
+
+		•  Added -k and -K
+
 		•  Added --all and --All
 
 		•  Added -x for locking

@@ -92,8 +92,15 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                     }
 
                     if (tempRE.search(string(c_dirEntry->d_name))) {
-                        DEBUG(2, "in process file found (" << c_dirEntry->d_name << ")");
-                        cache.inProcess = fullFilename;
+                        DEBUG(2, "in-process file found (" << c_dirEntry->d_name << ")");
+
+                        if (GLOBALS.startupTime - statData.st_mtime > 3600 * 5) {
+                            DEBUG(2, "removing abandoned in-process file (" << c_dirEntry->d_name << ")");
+                            unlink(fullFilename.c_str());
+                        }
+                        else 
+                            cache.inProcess = fullFilename;
+
                         continue;
                     }
 
@@ -220,7 +227,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
             exit(1);
         }
 
-        if (GLOBALS.stats || GLOBALS.cli.count(CLI_ALLSEQ))
+        if (GLOBALS.stats || GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_CRONS))
             configManager.loadAllConfigCaches();
         else 
             currentConf->loadConfigsCache();
@@ -330,7 +337,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
             !currentConf->settings[sDirectory].value.length() &&
 
             // user hasn't selected --all/--All where there's a dir configured in at least one (first) profile
-            !((GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR)) 
+            !((GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP))
                 && configManager.configs.size() && configManager.configs[0].settings[sDirectory].value.length())) {
 
         SCREENERR("error: --directory is required");
@@ -887,9 +894,9 @@ void performBackup(BackupConfig& config) {
             if (!rename(string(backupFilename + tempExtension).c_str(), backupFilename.c_str())) {
                 auto size = approximate(cacheEntry.size);
 
-                string message = config.ifTitle() + " backup completed to " + backupFilename  + " (" + size + ") in " + backupTime.elapsed();
-                log(message);
-                NOTQUIET && cout << "\t• " << message << endl;
+                string message = "backup completed to " + backupFilename  + " (" + size + ") in " + backupTime.elapsed();
+                log(config.ifTitle() + " " + message);
+                NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message << endl;
 
                 try {   // could get an exception converting settings[sMode] to an octal number
                     int mode = strtol(config.settings[sMode].value.c_str(), NULL, 8);
@@ -913,7 +920,7 @@ void performBackup(BackupConfig& config) {
                 // a -0 or -1 while we're still finishing our SCP/SFTP in the background won't have to recalculate
                 // the MD5 of the backup we just took.
                 config.cache.saveCache();
-                config.cache.updated = false;    // this disables the now redundant save in the destructor
+                config.cache.updated = false;    // disable the now redundant save in the destructor
 
                 bool overallSuccess = true;
                 string notifyMessage = "\t• " + message + "\n";
@@ -939,8 +946,10 @@ void performBackup(BackupConfig& config) {
                 notify(config, errorcom(config.ifTitle(), "backup failed, unable to rename temp file to " + backupFilename) + "\n", false);
             }
         }
-        else 
+        else {
+            unlink(string(backupFilename + tempExtension).c_str());
             notify(config, errorcom(config.ifTitle(), "backup failed to " + backupFilename + " (insufficient output/size)") + "\n", false);
+        }
     }
     else 
         notify(config, errorcom(config.ifTitle(), "backup command failed to generate any output") + "\n", false);
@@ -1077,7 +1086,8 @@ int main(int argc, char *argv[]) {
         (string("z,") + CLI_ZERO, "No animation (internal)", cxxopts::value<bool>()->default_value("false"))
         (string("t,") + CLI_TEST, "Test only mode", cxxopts::value<bool>()->default_value("false"))
         (string("x,") + CLI_LOCK, "Lock profile", cxxopts::value<bool>()->default_value("false"))
-        (string("k,") + CLI_CRON, "Cron", cxxopts::value<bool>()->default_value("false"))
+        (string("k,") + CLI_CRONS, "Cron", cxxopts::value<bool>()->default_value("false"))
+        (string("K,") + CLI_CRONP, "Cron", cxxopts::value<bool>()->default_value("false"))
         (CLI_VERBOSEMAX, "Max verbosity", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))
         (CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))
@@ -1160,19 +1170,20 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    if ((GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR)) && GLOBALS.cli.count(CLI_PROFILE)) {
-        SCREENERR("error: all and profile are mutually-exclusive options");
+    if ((GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)) 
+            && GLOBALS.cli.count(CLI_PROFILE)) {
+        SCREENERR("error: all, cron and profile are mutually-exclusive options");
         exit(1);
     }
 
-    if ((GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR)) && 
+    if ((GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)) && 
             (GLOBALS.cli.count(CLI_FILE) ||
             GLOBALS.cli.count(CLI_COMMAND) ||
             GLOBALS.cli.count(CLI_SAVE) ||
             GLOBALS.cli.count(CLI_DIR) ||
             GLOBALS.cli.count(CLI_SCPTO) ||
             GLOBALS.cli.count(CLI_SFTPTO))) {
-        SCREENERR("error: --file, --command, --save, --directory, --scp and --sftp are incompatible with --all/--All");
+        SCREENERR("error: --file, --command, --save, --directory, --scp and --sftp are incompatible with --all/--All and --cron/--Cron");
         exit(1);
     } 
 
@@ -1194,10 +1205,10 @@ int main(int argc, char *argv[]) {
                 if (!config.temp)
                     scanConfigToCache(config);
 
-        GLOBALS.cli.count(CLI_STATS1) ? displayDetailedStatsWrapper(configManager) : displaySummaryStatsWrapper(configManager);
+        GLOBALS.cli.count(CLI_STATS1) ? displayDetailedStatsWrapper(configManager) : displaySummaryStatsWrapper(configManager, GLOBALS.cli.count(CLI_STATS2));
     }
     else {  // "all" profiles locking is handled here; individual profile locking is handled further down in the NORMAL RUN
-        if (GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR)) {
+        if (GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)) {
             currentConfig->settings[sDirectory].value = "/";
             currentConfig->settings[sBackupFilename].value = "all";
 
@@ -1214,7 +1225,7 @@ int main(int argc, char *argv[]) {
             }
 
             // locking requested
-            if (GLOBALS.cli.count(CLI_LOCK))
+            if (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP))
                 GLOBALS.interruptLock = currentConfig->setLockPID(GLOBALS.pid);
         }
 
@@ -1244,7 +1255,7 @@ int main(int argc, char *argv[]) {
             paramIfSpecified(CLI_WEEKS) +
             paramIfSpecified(CLI_MONTHS) +
             paramIfSpecified(CLI_YEARS) +
-            paramIfSpecified(CLI_LOCK) +
+            (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ? " -x" : "") +
             paramIfSpecified(CLI_MAXLINKS);
 
         for (int i = 0; i < GLOBALS.cli.count(CLI_VERBOSE); ++i)
@@ -1253,7 +1264,7 @@ int main(int argc, char *argv[]) {
         /* ALL SEQUENTIAL RUN (prune, link, backup)
          * for all profiles
          * ****************************/
-        if (GLOBALS.cli.count(CLI_ALLSEQ)) {
+        if (GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_CRONS)) {
             timer allRun;
             allRun.start();
             log("[ALL] starting sequential processing of all profiles");
@@ -1276,7 +1287,7 @@ int main(int argc, char *argv[]) {
 
         /* ALL PARALLEL RUN (prune, link, backup)
          * ****************************/
-        else if (GLOBALS.cli.count(CLI_ALLPAR)) {
+        else if (GLOBALS.cli.count(CLI_ALLPAR) || GLOBALS.cli.count(CLI_CRONP)) {
             timer allRun;
 
             allRun.start();
@@ -1324,7 +1335,7 @@ int main(int argc, char *argv[]) {
                 log(currentConfig->ifTitle() + " abandoning previous lock because pid " + to_string(pid) + " has vanished");
             }
 
-            if (GLOBALS.cli.count(CLI_LOCK)) 
+            if (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)) 
                 GLOBALS.interruptLock = currentConfig->setLockPID(GLOBALS.pid);
 
             int n = nice(0);
@@ -1342,7 +1353,7 @@ int main(int argc, char *argv[]) {
         DEBUG(2, "completed primary tasks");
 
         // remove lock
-        if (GLOBALS.cli.count(CLI_LOCK)) 
+        if (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)) 
             GLOBALS.interruptLock = currentConfig->setLockPID(0);
     }
     

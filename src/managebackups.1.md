@@ -54,8 +54,14 @@ Options are relative to the three functions of **managebackups**.
 **-A**, **--All**
 : Execute all profiles in parallel. Can be specified by itself to prune, link, and execute backups (whatever's configured) for all profiles.  Or can be combined with limiting options like **--nobackup**, **--noprune**.
 
+**-k**, **--cron**
+: Sequential cron execution.  Equivalent to "-a -x -q".
+
+**-K**, **--Cron**
+: Parallel cron execution.  Equivalent to "-A -x -q".
+
 **-0**
-: Provide a summary of backups.
+: Provide a summary of backups. **-0** can be specified up to 3 times for different formatting of sizes.
 
 **-1**
 : Provide detail of backups.
@@ -217,4 +223,26 @@ Environment variables are overriden by **--user**, **--confdir**, **--cachedir**
 
 **MB_LOGDIR**
 : Directory to use for logging. See also **--logdir**. Defaults to /var/log if writable by the process, otherwise the user's home directory. 
+
+# STATS OUTPUT
+Example output from **managebackups -0**
+
+~~~~
+Profile        Most Recent Backup           Finished  Size (Total)     Duration  Num  Saved  Age Range
+desktop        desktop-20220222.tgz         05:54:03  196M (2.7G)      00:00:33  20     30%  [2 months, 3 weeks -> 2 hours, 5 minutes]
+firewall_logs  firewall-logs-20220222.tbz2  06:07:18  267M (3.0G)      00:13:48  15      0%  [5 months, 3 weeks -> 1 hour, 52 minutes]
+firewall_main  firewall-main-20220222.tgz   05:54:14  115M (1.5G)      00:00:44  27     31%  [9 months, 3 weeks -> 2 hours, 5 minutes]
+icloud         icloud-drive-20220222.tbz2   06:20:39  2.3G (11.3G)     00:27:10  6      17%  [2 months, 3 weeks -> 1 hour, 39 minutes]
+laptop         laptop-details-20220222.tgz  05:53:34  8M (129M)        00:00:06  23     25%  [5 months, 3 weeks -> 2 hours, 6 minutes]
+TOTALS                                                2.8G (18.6G)     00:42:21  91     18%  Saved 4.1G from 22.7G
+
+196G is the size of the most recent backup of the desktop profile.
+2.7G is the disk space used for all desktop profile backups.
+30% is the percentage saved in desktop profile backups due to hard linking.
+
+2.8G is the total used for the most recent backup of all profiles (i.e. one of each).
+18.6G is the total used for all data together (all data managed by managebackups).
+22.7G is the total that would be used if there were no hard linking.
+All size/space numbers are actual used (thanks to hard linking), except for the 22.7G number.
+~~~~
 

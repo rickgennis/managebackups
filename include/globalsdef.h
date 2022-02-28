@@ -13,7 +13,7 @@
 
 
 #define DEBUG(x,y) (GLOBALS.debugLevel >= x) && cout << GREEN << __FUNCTION__ << "\t" << y << RESET << endl
-#define NOTQUIET (!GLOBALS.cli.count(CLI_QUIET))
+#define NOTQUIET (!(GLOBALS.cli.count(CLI_QUIET) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)))
 #define ANIMATE (!GLOBALS.cli.count(CLI_ZERO))
 #define SCREENERR(x) cerr << RED << x << RESET << endl;
 
@@ -74,7 +74,8 @@
 #define CLI_NICE "nice"
 #define CLI_ZERO "zero"
 #define CLI_LOCK "lock"
-#define CLI_CRON "cron"
+#define CLI_CRONS "cron"
+#define CLI_CRONP "Cron"
 #define CLI_RECREATE "recreate"
 
 // conf file regexes
