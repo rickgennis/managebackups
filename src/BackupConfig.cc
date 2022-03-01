@@ -328,10 +328,15 @@ unsigned int BackupConfig::removeEmptyDirs(string directory) {
                 // recurse into subdirectories
                 if ((statData.st_mode & S_IFMT) == S_IFDIR) {
                     if (!removeEmptyDirs(fullFilename)) {
-                        NOTQUIET && cout << "[" << settings[sTitle].value + "] removing empty directory " << fullFilename << endl;
-                        log("[" + settings[sTitle].value + "] removing empty directory " + fullFilename);
-                        rmdir(fullFilename.c_str());    // remove empty subdirectory
-                        --entryCount;
+                        if (!rmdir(fullFilename.c_str())) {    // remove empty subdirectory
+                            NOTQUIET && cout << ifTitle() << " removing empty directory " << fullFilename << endl;
+                            log(ifTitle() + " removing empty directory " + fullFilename);
+                            --entryCount;
+                        }
+                        else {
+                            SCREENERR("error: unable to remove empty directory " << fullFilename);
+                            log(ifTitle() + " error: unable to remove empty directory " + fullFilename);
+                        }
                     }
                 }
             }
