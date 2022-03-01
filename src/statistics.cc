@@ -11,18 +11,22 @@
 #include "globals.h"
 #include "colors.h"
 
+#define NUMSTATDETAILS        10 
+
 using namespace std;
 
 struct summaryStats {
     bool success;
+    bool inProcess;
     unsigned long lastBackupBytes;
     unsigned long totalBytesUsed;
     unsigned long totalBytesSaved;
     long numberOfBackups;
     unsigned long duration;
+    string stringOutput[NUMSTATDETAILS];
 
     summaryStats() {
-        success = false;
+        success = inProcess = false;
         lastBackupBytes = totalBytesUsed = totalBytesSaved = numberOfBackups = duration = 0;
     }
 };
@@ -73,40 +77,24 @@ summaryStats _displaySummaryStats(BackupConfig& config, int statDetail = 0, int 
         char fileTime[20];
         strftime(fileTime, sizeof(fileTime), "%X", t);
 
-        char result[1000];
-        sprintf(result,
-            // profile
-            string(string("%-") + to_string(maxProfLen) + "s  " +
-            // filename
-            string("%-") + to_string(maxFileLen) + "s  " +
-            // time
-            string("%s  ") +
-            // size
-            (statDetail > 2 ? "%-26s  " : statDetail > 1 ? "%-22s  " : "%-15s  ") +
-            // duration
-            "%s  " +
-            // number 
-            "%-4u  " +
-            // saved
-            "%3i%%  "+
-            // content age
-            "%s").c_str(),
-            config.settings[sTitle].value.c_str(),
-            pathSplit(last_it->second.filename).file.c_str(), 
+        string soutput[NUMSTATDETAILS] = { 
+            config.settings[sTitle].value,
+            pathSplit(last_it->second.filename).file,
             fileTime,    
-            (approximate(last_it->second.size, precisionLevel, statDetail == 3) + " (" + approximate(resultStats.totalBytesUsed, precisionLevel, statDetail == 3) + ")").c_str(),
-            seconds2hms(last_it->second.duration).c_str(),
-            rawSize,
-            saved,
-            config.cache.inProcess.length() ? 
-                string(BOLDGREEN + string("{") + RESET + timeDiff(mktimeval(first_it->second.name_mtime)) + BOLDGREEN + " -> " + 
-                    RESET + timeDiff(mktimeval(last_it->second.mtime)).c_str() + BOLDGREEN + "} " + processAge + RESET).c_str()
-                : string(BOLDBLUE + string("[") + RESET + timeDiff(mktimeval(first_it->second.name_mtime)) + BOLDBLUE + " -> " + 
-                    RESET + timeDiff(mktimeval(last_it->second.mtime)).c_str() + BOLDBLUE + "]" + RESET).c_str());
-            cout << result << "\n";
+            (approximate(last_it->second.size, precisionLevel, statDetail > 2) + " (" + approximate(resultStats.totalBytesUsed, precisionLevel, statDetail == 3) + ")"),
+            seconds2hms(last_it->second.duration),
+            to_string(rawSize),
+            to_string(saved) + "%",
+            timeDiff(mktimeval(first_it->second.name_mtime)),
+            timeDiff(mktimeval(last_it->second.mtime)),
+            processAge };
+            
+        for (int i = 0; i < NUMSTATDETAILS; ++i)
+            resultStats.stringOutput[i] = soutput[i];
 
-            resultStats.duration = last_it->second.duration;
-            resultStats.lastBackupBytes = last_it->second.size;
+        resultStats.inProcess = config.cache.inProcess.length();
+        resultStats.duration = last_it->second.duration;
+        resultStats.lastBackupBytes = last_it->second.size;
     }
 
     resultStats.success = true;
@@ -117,51 +105,23 @@ summaryStats _displaySummaryStats(BackupConfig& config, int statDetail = 0, int 
 void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
     int maxFileLen = 0;
     int maxProfLen = 0;
+    int nonTempConfigs = 0;
     int precisionLevel = statDetail > 1 ? 1 : -1;
+    struct summaryStats perStats;
+    struct summaryStats totalStats;
+    vector<string> statStrings;
+    vector<bool> profileInProcess;
+    bool singleConfig = configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp;
 
-    if (configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp) {
-        auto config = configManager.configs[configManager.activeConfig];
-        auto last_it = config.cache.rawData.find((--config.cache.indexByFilename.end())->second);
-        if (last_it != config.cache.rawData.end())
-            maxFileLen = max(pathSplit(last_it->second.filename).file.length(), 18);
-        maxProfLen = max(config.settings[sTitle].value.length(), 7);
+    // calculate totals
+    if (singleConfig) {
+        perStats = _displaySummaryStats(configManager.configs[configManager.activeConfig], statDetail, maxFileLen, maxProfLen);
+        profileInProcess.insert(profileInProcess.end(), perStats.inProcess);
 
-        string spacesA(maxProfLen - 7, ' ');
-        string spacesB(maxFileLen - 18, ' ');
-        cout << BOLDBLUE << "Profile" << spacesA << "  Most Recent Backup" << spacesB << "  Finished  Size (Total)     " << 
-            (statDetail > 2 ? "           " : statDetail > 1 ? "       " : "") << "Duration  Num  Saved  Age Range\n" << RESET;
-        _displaySummaryStats(configManager.configs[configManager.activeConfig], statDetail, maxFileLen, maxProfLen);
+        for (int i = 0; i < NUMSTATDETAILS; ++i) 
+            statStrings.insert(statStrings.end(), perStats.stringOutput[i]);
     }
     else {
-        // first pass to find longest filename length
-        for (auto &config: configManager.configs) 
-            if (!config.temp) {
-                auto last_it = config.cache.rawData.find((--config.cache.indexByFilename.end())->second);
-
-                if (last_it != config.cache.rawData.end()) {
-                    auto len = pathSplit(last_it->second.filename).file.length();
-
-                    if (len > maxFileLen)
-                        maxFileLen = len;
-
-                    if (config.settings[sTitle].value.length() > maxProfLen)
-                        maxProfLen = config.settings[sTitle].value.length();
-                }
-            }
-
-        maxFileLen = max(maxFileLen, 18);
-        maxProfLen = max(maxProfLen, 7);
-
-        string spacesA(maxProfLen - 7, ' ');
-        string spacesB(maxFileLen - 18, ' ');
-        cout << BOLDBLUE << "Profile" << spacesA << "  Most Recent Backup" << spacesB << "  Finished  Size (Total)     " << 
-            (statDetail > 2 ? "           " : statDetail > 1 ? "       " : "") << "Duration  Num  Saved  Age Range\n" << RESET;
-
-        struct summaryStats perStats;
-        struct summaryStats totalStats;
-
-        // second pass to actually print the stats
-        int nonTempConfigs = 0;
         for (auto &config: configManager.configs) 
             if (!config.temp) {
                 ++nonTempConfigs;
@@ -171,35 +131,99 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
                 totalStats.totalBytesSaved += perStats.totalBytesSaved;
                 totalStats.numberOfBackups += perStats.numberOfBackups;
                 totalStats.duration += perStats.duration;
+
+                profileInProcess.insert(profileInProcess.end(), perStats.inProcess);
+
+                for (int i = 0; i < NUMSTATDETAILS; ++i) 
+                    statStrings.insert(statStrings.end(), perStats.stringOutput[i]);
             }
+    }
 
-        if (nonTempConfigs > 1) {
-            char result[1000];
+        // add totals into string collection
+        if (!singleConfig) {
+            statStrings.insert(statStrings.end(), "");
+            statStrings.insert(statStrings.end(), "");
+            statStrings.insert(statStrings.end(), "");
+            statStrings.insert(statStrings.end(), approximate(totalStats.lastBackupBytes, precisionLevel, statDetail > 2) + " (" +
+                approximate(totalStats.totalBytesUsed, precisionLevel, statDetail > 2) + ")");
+            statStrings.insert(statStrings.end(), seconds2hms(totalStats.duration));
+            statStrings.insert(statStrings.end(), to_string(totalStats.numberOfBackups));
+            statStrings.insert(statStrings.end(), to_string(int(floor((1 - ((long double)totalStats.totalBytesUsed / ((long double)totalStats.totalBytesUsed + (long double)totalStats.totalBytesSaved))) * 100 + 0.5))) + "%");
+            statStrings.insert(statStrings.end(), totalStats.totalBytesSaved ? string(string("Saved ") + approximate(totalStats.totalBytesSaved, precisionLevel, statDetail > 2) + " from "
+                + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved, precisionLevel, statDetail > 2)) : "");
+        }
 
-            sprintf(result,
-            // size
-            string(string(statDetail > 2 ? "%-26s  " :statDetail > 1 ? "%-22s  " : "%-15s  ") +
-            // duration
-            "%s  " +
-            // number
-            "%-4ld  " +
-            // saved
-            "%3i%%  "+
-            // content age
-            "%s").c_str(),
+        // determine the longest length entry of each column
+        int colLen[NUMSTATDETAILS] = {};
+        int numberStatStrings = statStrings.size();
+        for (int column = 0; column < NUMSTATDETAILS; ++column) {
+            int pos = 0;
 
-            (approximate(totalStats.lastBackupBytes, precisionLevel, statDetail == 3) + " (" +
-                approximate(totalStats.totalBytesUsed, precisionLevel, statDetail == 3) + ")").c_str(),
-            seconds2hms(totalStats.duration).c_str(),
-            totalStats.numberOfBackups,
-            int(floor((1 - ((long double)totalStats.totalBytesUsed / ((long double)totalStats.totalBytesUsed + (long double)totalStats.totalBytesSaved))) * 100 + 0.5)),
-            totalStats.totalBytesSaved ? string(string("Saved ") + approximate(totalStats.totalBytesSaved, precisionLevel, statDetail == 3) + " from " 
-                + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved, precisionLevel, statDetail == 3)).c_str() : "");
+            while (NUMSTATDETAILS * pos + column < numberStatStrings)
+                colLen[column] = max(colLen[column], statStrings[NUMSTATDETAILS * pos++ + column].length());
+        }
 
-            string spaces(maxFileLen + maxProfLen + 8, ' ');
+        // print the header row
+        string headers[] = { "Profile", "Most Recent Backup", "Finished", "Size (Total)", "Duration", "Num", "Saved", "Age Range", "" };
+        cout << BOLDBLUE;
+
+        for (int x = 0; x < NUMSTATDETAILS - 1; ++x) {
+            cout << headers[x] << "  ";
+
+            if (colLen[x] > headers[x].length()) {
+                string spaces(colLen[x] - headers[x].length(), ' ');
+                cout << spaces;
+            }
+        }
+        cout << RESET << "\n";
+
+        // setup line formatting
+        string lineFormat;
+        for (int x = 0; x < NUMSTATDETAILS - 1; ++x)
+            lineFormat += "%" + string(x == 6 ? "" : "-") + to_string(max(headers[x].length(), colLen[x])) + "s  ";   // 6th column is right-justified
+
+        // print results
+        char result[1000];
+        int line = 0;
+        while (line * NUMSTATDETAILS < numberStatStrings - (singleConfig ? 0 : NUMSTATDETAILS)) {
+            string HIGHLIGHT = profileInProcess[line] ? BOLDGREEN : BOLDBLUE;
+            string BRACKETO = profileInProcess[line] ? "{" : "[";
+            string BRACKETC = profileInProcess[line] ? "}" : "]";
+
+            sprintf(result, lineFormat.c_str(), 
+                    statStrings[line * NUMSTATDETAILS].c_str(),
+                    statStrings[line * NUMSTATDETAILS + 1].c_str(),
+                    statStrings[line * NUMSTATDETAILS + 2].c_str(),
+                    statStrings[line * NUMSTATDETAILS + 3].c_str(),
+                    statStrings[line * NUMSTATDETAILS + 4].c_str(),
+                    statStrings[line * NUMSTATDETAILS + 5].c_str(),
+                    statStrings[line * NUMSTATDETAILS + 6].c_str(),
+                    string(HIGHLIGHT + BRACKETO + RESET + statStrings[line * NUMSTATDETAILS + 7] +
+                        HIGHLIGHT + string(" -> ") + RESET + statStrings[line * NUMSTATDETAILS + 8] + 
+                        HIGHLIGHT + BRACKETC).c_str(),
+                    string(statStrings[line * NUMSTATDETAILS + 9] + RESET).c_str());
+            cout << result << "\n";
+            ++line;
+        }
+
+        // totals
+        if (!singleConfig && nonTempConfigs > 1) {
+            sprintf(result, string(
+                    "%-" + to_string(max(headers[3].length(), colLen[3])) + "s  " +
+                    "%-" + to_string(max(headers[4].length(), colLen[4])) + "s  " +
+                    "%-" + to_string(max(headers[5].length(), colLen[5])) + "s  " +
+                    "%"  + to_string(max(headers[6].length(), colLen[6])) + "s  " +
+                    "%-" + to_string(colLen[7]) + "s").c_str(),
+                    statStrings[line * NUMSTATDETAILS + 3].c_str(),
+                    statStrings[line * NUMSTATDETAILS + 4].c_str(),
+                    statStrings[line * NUMSTATDETAILS + 5].c_str(),
+                    statStrings[line * NUMSTATDETAILS + 6].c_str(),
+                    statStrings[line * NUMSTATDETAILS + 7].c_str(),
+                    statStrings[line * NUMSTATDETAILS + 8].c_str());
+
+            string spaces(max(headers[0].length(), colLen[0]) + max(headers[1].length(), colLen[1]) + colLen[2], ' ');
             cout << BOLDWHITE << "TOTALS" << spaces << result << RESET << "\n";
         }
-    }
 
     return;
 }

@@ -1,6 +1,7 @@
 
 v1.2.5 - 1/29/22
-		•  Added multiple -0 (up to 3 times) formatting options
+		•  Added multiple -0 (up to 3 times) formatting options;
+		   Formatting now handles all sizes correctly
 
 		•  Added -k and -K
 
