@@ -18,7 +18,6 @@
 #define SCREENERR(x) cerr << RED << x << RESET << endl;
 
 #define SECS_PER_DAY (60*60*24)
-#define DAYS_PER_MONTH 30.43
 #define DATE_REGEX "-(20\\d{2})[-.]*(\\d{2})[-.]*(\\d{2})[-.]"
 
 /* CLI_ and RE_

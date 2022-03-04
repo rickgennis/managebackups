@@ -430,16 +430,19 @@ void pruneBackups(BackupConfig& config) {
             }
 
             // monthly
+            struct tm *now = localtime(&GLOBALS.startupTime);
             auto monthLimit = config.settings[sMonths].ivalue();
-            if (monthLimit && filenameAge / DAYS_PER_MONTH <= monthLimit && raw_it->second.date_day == 1) {
-                DEBUG(2, "keep_monthly: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
+            auto monthAge = (now->tm_year + 1900) * 12 + now->tm_mon + 1 - (raw_it->second.date_year * 12 + raw_it->second.date_month);
+            if (monthLimit && monthAge <= monthLimit && raw_it->second.date_day == 1) {
+                DEBUG(2, "keep_monthly: " << raw_it->second.filename << " (month_age=" << monthAge << ", dow=" << dw(filenameDOW) << ")");
                 continue;
             }
 
             // yearly
             auto yearLimit = config.settings[sYears].ivalue();
-            if (yearLimit && filenameAge / 365.0 <= yearLimit && raw_it->second.date_month == 1 && raw_it->second.date_day == 1) {
-                DEBUG(2, "\tkeep_yearly: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
+            auto yearAge = now->tm_year + 1900 - raw_it->second.date_year;
+            if (yearLimit && yearAge <= yearLimit && raw_it->second.date_month == 1 && raw_it->second.date_day == 1) {
+                DEBUG(2, "keep_yearly: " << raw_it->second.filename << " (year_age=" << yearAge << ", dow=" << dw(filenameDOW) << ")");
                 continue;
             }
 
@@ -452,7 +455,7 @@ void pruneBackups(BackupConfig& config) {
                 // delete the file and remove it from all caches
                 if (!unlink(raw_it->second.filename.c_str())) {
                     NOTQUIET && cout << "\t• removed " << raw_it->second.filename << endl; 
-                    log(config.ifTitle() + " removing " + raw_it->second.filename + 
+                    log(config.ifTitle() + " removed " + raw_it->second.filename + 
                         " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")");
 
                     changedMD5s.insert(raw_it->second.md5);
