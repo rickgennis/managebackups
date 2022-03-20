@@ -570,7 +570,7 @@ This can be used to manage backups that are performed by another tool
 entirely.
 Note: There may be profiles defined with different retention thresholds
 for a subset of files in /my/backups (i.e.\ files that match the
-\f[B]\[en]files\f[R] setting); those retention thresholds would be
+\f[B]\[en]file\f[R] setting); those retention thresholds would be
 ignored for this run because no \f[B]\[en]profile\f[R] is specified.
 .TP
 \f[B]managebackups -p mymac \[en]recreate \[en]test\f[R]
