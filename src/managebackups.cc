@@ -48,6 +48,29 @@ struct methodStatus {
 
 
 /*******************************************************************************
+ * verifyTripwireParams(param)
+ *
+ * Verify that the tripwire string is a valid syntax of colon delimited filename
+ * and MD5 pairs.
+ *******************************************************************************/
+void verifyTripwireParams(string param) {
+    if (param.length()) {
+        auto tripPairs = perlSplit("\\s*,\\s*", param);
+
+        for (string tripPair: tripPairs) {
+            auto tripItem = perlSplit("\\s*:\\s*", tripPair);
+
+            if ((tripItem.size() != 2) || !tripItem[0].length() || !tripItem[1].length()) {
+                SCREENERR("--" << CLI_TRIPWIRE << " item '" << tripPair << "' isn't a colon delimited filename and MD5. e.g.\n" <<
+                        "/etc/testfile: 341990f48d4466bb64a82bdca01ef128");
+                exit(1);
+            }
+        }
+    }
+}
+
+
+/*******************************************************************************
  * parseDirToCache(directory, fnamePattern, cache)
  *
  * Recursively walk the given directory looking for all files that match the
@@ -252,6 +275,8 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
                     if (bSave && (setting.value != GLOBALS.cli[setting.display_name].as<string>()))
                         currentConf->modified = 1;
                     setting.value = GLOBALS.cli[setting.display_name].as<string>();
+                    if (setting.display_name == CLI_TRIPWIRE)
+                        verifyTripwireParams(setting.value);
                     break;
 
                 case OCTAL:
@@ -811,6 +836,55 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
 
 
 /*******************************************************************************
+ * performTripwireCheck(config)
+ *
+ * Verify the tripwire file, if defined
+ *******************************************************************************/
+bool performTripwire(BackupConfig& config) {
+    struct stat statData;
+
+    if (config.settings[sTripwire].value.length()) {
+        auto tripPairs = perlSplit("\\s*,\\s*", config.settings[sTripwire].value);
+
+        for (string tripPair: tripPairs) {
+            auto tripItem = perlSplit("\\s*:\\s*", tripPair);
+
+            if (!stat(tripItem[0].c_str(), &statData)) {
+                string md5 = MD5file(tripItem[0].c_str(), true);
+                
+                if (!md5.length()) {
+                    DEBUG(2, "FAIL - unable to MD5 tripwire file " << tripItem[0]);
+                    log(config.ifTitle() + " unable to MD5 tripwire file " + tripItem[0]);
+                    notify(config, "\t• Unable to MD5 tripwire file (" + tripItem[0] + ")\n", false);
+                    return false;
+                }
+                else
+                    if (md5 != tripItem[1]) {
+                        DEBUG(2, "FAIL - MD5 mismatch for tripwire file " << tripItem[0]);
+                        log(config.ifTitle() + " tripwire file MD5 mismatch for " + tripItem[0]);
+                        notify(config, "\t• Tripwire file MD5 mismatch (" + tripItem[0] + ")\n", false);
+                        return false;
+                    }
+                    else {
+                        DEBUG(2, "MD5 verified for tripwire file " << tripItem[0]);
+                        log(config.ifTitle() + " MD5 verified for tripwire file " + tripItem[0]);
+                    }
+            }
+            else {
+                DEBUG(2, "FAIL - unable to locate tripwire file " << tripItem[0]);
+                log(config.ifTitle() + " unable to locate tripwire file " + tripItem[0]);
+                notify(config, "\t• Unable to locate tripwire file to MD5 (" + tripItem[0] + ")\n", false);
+                return false;
+            }
+
+        }
+    }
+
+    return true;
+}
+
+
+/*******************************************************************************
  * performBackup(config)
  *
  * Perform a backup, saving it to the configured filename.
@@ -1118,7 +1192,8 @@ int main(int argc, char *argv[]) {
         (CLI_MINSFTPSPACE, "Minimum SFTP space", cxxopts::value<std::string>())
         (CLI_RECREATE, "Recreate config", cxxopts::value<bool>()->default_value("false"))
         (CLI_INSTALLMAN, "Install man", cxxopts::value<bool>()->default_value("false"))
-        (CLI_INSTALL, "Install", cxxopts::value<bool>()->default_value("false"));
+        (CLI_INSTALL, "Install", cxxopts::value<bool>()->default_value("false"))
+        (CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
 
     try {
         GLOBALS.cli = options.parse(argc, argv);
@@ -1257,6 +1332,7 @@ int main(int argc, char *argv[]) {
             paramIfSpecified(CLI_DAYS) +
             paramIfSpecified(CLI_WEEKS) +
             paramIfSpecified(CLI_MONTHS) +
+            paramIfSpecified(CLI_TRIPWIRE) +
             paramIfSpecified(CLI_YEARS) +
             (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ? " -x" : "") +
             paramIfSpecified(CLI_MAXLINKS);
@@ -1346,10 +1422,12 @@ int main(int argc, char *argv[]) {
                 nice(currentConfig->settings[sNice].ivalue() - n);
 
             scanConfigToCache(*currentConfig);
-            pruneBackups(*currentConfig);
-            updateLinks(*currentConfig);
-            if (enoughLocalSpace(*currentConfig)) {
-                performBackup(*currentConfig);
+            if (performTripwire(*currentConfig)) {
+                pruneBackups(*currentConfig);
+                updateLinks(*currentConfig);
+                if (enoughLocalSpace(*currentConfig)) {
+                    performBackup(*currentConfig);
+                }
             }
         }
 

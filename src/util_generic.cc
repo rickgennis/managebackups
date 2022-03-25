@@ -11,6 +11,7 @@
 #include "math.h"
 #include <sys/types.h>
 #include <pwd.h>
+#include <vector>
 
 #include "pcre++.h"
 #include "util_generic.h"
@@ -34,6 +35,28 @@ string cppgetenv(string variable) {
         return "";
     else
         return c;
+}
+
+
+vector<string> perlSplit(string regex, string haystack) {
+    Pcre theRE("(" + regex + ")", "g");
+    vector<string> result;
+
+    size_t pos = 0;
+    size_t dataStart = 0;
+    size_t dataEnd = 0;
+
+    while (pos <= haystack.length() && theRE.search(haystack, pos)) {
+        pos = theRE.get_match_end(0);
+        string delimiter = theRE.get_match(0);
+
+        dataEnd = ++pos - delimiter.length() + 1;
+        result.insert(result.end(), string(haystack, dataStart, dataEnd - dataStart - 1));
+        dataStart = pos; 
+    }
+
+    result.insert(result.end(), string(haystack, dataStart, string::npos));
+    return result;
 }
 
 

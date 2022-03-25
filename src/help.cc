@@ -77,6 +77,7 @@ void showHelp(enum helpType kind) {
             + "   -v                  Verbose output for debugging (can be specified multiple times)\n"
             + "   --defaults          Display the default settings for all profiles.\n"
             + "   -x, --lock          Lock the current profile for the duraiton of the run so only one copy can run at a time.\n"
+            + "   --tripwire [string] Define tripwire files of the form 'filename: md5, filename: md5'.\n"
             + "\nSee 'man managebackups' for more detail.\n";
 
             /*
@@ -307,6 +308,23 @@ Locks are respected on every run but only taken out when \f[B]-x\f[R] or
 \f[B]\[en]lock\f[R] is specified.
 i.e.\ a \f[B]-x\f[R] run will successfully lock the profile even for
 other invocations that fail to specify \f[B]-x\f[R].
+.TP
+\f[B]\[en]tripwire\f[R] [\f[I]string\f[R]]
+The tripwire setting can be used as a rudimentary guard against
+ransonmare or other encryption attacks.
+It can\[cq]t protect your local backups but will both alert you
+immediately and stop processing (no pruning, linking or backing up) if
+the tripwire check fails.
+The check is defined as a filename (or list of filenames) and their MD5
+values.
+If any of the MD5s change, the check fails and the alert is triggered.
+For example, if you\[cq]re backing up /etc you can create a bogus test
+file such as /etc/tripdata.txt and then configure
+\f[B]managebackups\f[R] with \f[B]\[en]tripwire \[lq]/etc/tripdata.txt:
+xxx\[rq]\f[R] where xxx is the correct MD5 of the file.
+Multiple entries can be separated with commas (\[lq]/etc/foo: xxx,
+/etc/fish: yyy, /usr/local/foo: zzz\[rq]).
+Only local computer tripwire files are supported at this time.
 .SS Take Backups Options
 .TP
 \f[B]\[en]directory\f[R] [\f[I]directory\f[R]]

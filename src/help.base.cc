@@ -77,6 +77,7 @@ void showHelp(enum helpType kind) {
             + "   -v                  Verbose output for debugging (can be specified multiple times)\n"
             + "   --defaults          Display the default settings for all profiles.\n"
             + "   -x, --lock          Lock the current profile for the duraiton of the run so only one copy can run at a time.\n"
+            + "   --tripwire [string] Define tripwire files of the form 'filename: md5, filename: md5'.\n"
             + "\nSee 'man managebackups' for more detail.\n";
 
             /*

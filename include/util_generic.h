@@ -32,6 +32,7 @@ struct timeval mktimeval(unsigned long secs);
 
 string timeDiff(struct timeval start, struct timeval end = mktimeval(GLOBALS.startupTime), int maxUnits = 2, int precision = 2);
 
+vector<string> perlSplit(string regex, string haystack);
 
 class timer {
     string duration;

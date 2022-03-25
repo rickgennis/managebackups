@@ -55,6 +55,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_MINSPACE, RE_MINSPACE, SIZE, "0"));
     settings.insert(settings.end(), Setting(CLI_MINSFTPSPACE, RE_MINSFTPSPACE, SIZE, "0"));
     settings.insert(settings.end(), Setting(CLI_NICE, RE_NICE, INT, "10"));
+    settings.insert(settings.end(), Setting(CLI_TRIPWIRE, RE_TRIPWIRE, STRING, ""));
 }
 
 
@@ -372,18 +373,21 @@ string BackupConfig::setLockPID(unsigned int pid) {
     string lockFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".lock";
     mkdirp(GLOBALS.cacheDir);
 
-    ofstream lockFile;
-    lockFile.open(lockFilename);
+    if (pid) {
+        ofstream lockFile;
+        lockFile.open(lockFilename);
 
-    if (lockFile.is_open()) {
-        lockFile << to_string(pid) << endl;
-        lockFile.close();
-        return lockFilename;
+        if (lockFile.is_open()) {
+            lockFile << to_string(pid) << endl;
+            lockFile.close();
+            return lockFilename;
+        }
+
+        log("unable to save lock to " + lockFilename + " (directory not writable?)");
+        SCREENERR("error: unable to create " << lockFilename);
     }
 
-    log("unable to save lock to " + lockFilename + " (directory not writable?)");
-    SCREENERR("error: unable to create " << lockFilename);
-
+    unlink(lockFilename.c_str());
     return "";
 }
 

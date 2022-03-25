@@ -134,12 +134,12 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
 
                 profileInProcess.insert(profileInProcess.end(), perStats.inProcess);
 
-                for (int i = 0; i < NUMSTATDETAILS; ++i) 
+                for (int i = 0; i < NUMSTATDETAILS; ++i)
                     statStrings.insert(statStrings.end(), perStats.stringOutput[i]);
             }
     }
 
-        // add totals into string collection
+        // add totals into totalStats
         if (!singleConfig) {
             statStrings.insert(statStrings.end(), "");
             statStrings.insert(statStrings.end(), "");
@@ -151,25 +151,40 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
             statStrings.insert(statStrings.end(), to_string(int(floor((1 - ((long double)totalStats.totalBytesUsed / ((long double)totalStats.totalBytesUsed + (long double)totalStats.totalBytesSaved))) * 100 + 0.5))) + "%");
             statStrings.insert(statStrings.end(), totalStats.totalBytesSaved ? string(string("Saved ") + approximate(totalStats.totalBytesSaved, precisionLevel, statDetail > 2) + " from "
                 + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved, precisionLevel, statDetail > 2)) : "");
+            statStrings.insert(statStrings.end(), "");
+            statStrings.insert(statStrings.end(), "");
         }
 
-        // determine the longest length entry of each column
+        // determine the longest length entry of each column to allow consistent horizontal formatting
         int colLen[NUMSTATDETAILS] = {};
         int numberStatStrings = statStrings.size();
-        for (int column = 0; column < NUMSTATDETAILS; ++column) {
-            int pos = 0;
+        for (int column = 0; column < NUMSTATDETAILS - 1; ++column) {
+            int line = 0;
 
-            while (NUMSTATDETAILS * pos + column < numberStatStrings)
-                colLen[column] = max(colLen[column], statStrings[NUMSTATDETAILS * pos++ + column].length());
+            while (NUMSTATDETAILS * line + column < numberStatStrings) {
+                if (column == 7)  // cols 7 and 8 get combined
+                    colLen[column] = max(colLen[column],
+                            statStrings[NUMSTATDETAILS * line + column].length() +
+                            statStrings[NUMSTATDETAILS * line + column+1].length() + 6);
+                else if (column > 7)
+                    colLen[column] = max(colLen[column], statStrings[NUMSTATDETAILS * line + column+1].length());
+                else
+                    colLen[column] = max(colLen[column], statStrings[NUMSTATDETAILS * line + column].length());
+
+                ++line;
+            }
         }
 
         // print the header row
+        // the blank at the end isn't just for termination; it's used for "in process" status
         string headers[] = { "Profile", "Most Recent Backup", "Finished", "Size (Total)", "Duration", "Num", "Saved", "Age Range", "" };
         cout << BOLDBLUE;
 
-        for (int x = 0; x < NUMSTATDETAILS - 1; ++x) {
-            cout << headers[x] << "  ";
+        int x = -1;
+        while (headers[++x].length()) {
+            cout << (x == 0 ? "" : "  ") << headers[x];
 
+            // pad the headers to line up with the longest item in each column
             if (colLen[x] > headers[x].length()) {
                 string spaces(colLen[x] - headers[x].length(), ' ');
                 cout << spaces;
@@ -180,9 +195,10 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
         // setup line formatting
         string lineFormat;
         for (int x = 0; x < NUMSTATDETAILS - 1; ++x)
-            lineFormat += "%" + string(x == 6 ? "" : "-") + to_string(max(headers[x].length(), colLen[x])) + "s  ";   // 6th column is right-justified
+            if (max(headers[x].length(), colLen[x]))
+                lineFormat += (lineFormat.length() ? "  " : "") + string("%") + string(x == 6 ? "" : "-") + to_string(max(headers[x].length(), colLen[x])) + "s";   // 6th column is right-justified
 
-        // print results
+        // print line by line results
         char result[1000];
         int line = 0;
         while (line * NUMSTATDETAILS < numberStatStrings - (singleConfig ? 0 : NUMSTATDETAILS)) {
@@ -201,12 +217,12 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
                     string(HIGHLIGHT + BRACKETO + RESET + statStrings[line * NUMSTATDETAILS + 7] +
                         HIGHLIGHT + string(" -> ") + RESET + statStrings[line * NUMSTATDETAILS + 8] + 
                         HIGHLIGHT + BRACKETC).c_str(),
-                    string(statStrings[line * NUMSTATDETAILS + 9] + RESET).c_str());
-            cout << result << "\n";
+                    string(statStrings[line * NUMSTATDETAILS + 9]).c_str());
+            cout << result << RESET << "\n";
             ++line;
         }
 
-        // totals
+        // print the totals line
         if (!singleConfig && nonTempConfigs > 1) {
             sprintf(result, string(
                     "%-" + to_string(max(headers[3].length(), colLen[3])) + "s  " +
