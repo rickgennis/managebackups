@@ -311,7 +311,7 @@ other invocations that fail to specify \f[B]-x\f[R].
 .TP
 \f[B]\[en]tripwire\f[R] [\f[I]string\f[R]]
 The tripwire setting can be used as a rudimentary guard against
-ransonmare or other encryption attacks.
+ransomware or other encryption attacks.
 It can\[cq]t protect your local backups but will both alert you
 immediately and stop processing (no pruning, linking or backing up) if
 the tripwire check fails.
@@ -365,6 +365,11 @@ A contact can be an email address or the full path to a script to
 execute.
 Double-quote the contact string if it contains any spaces.
 The NOTIFICATIONS section below has more detail.
+.TP
+\f[B]\[en]notifyevery\f[R] [\f[I]count\f[R]]
+For script notifications, in addition to the initial failure, notify
+every \f[I]count\f[R] failures as well.
+See the NOTIFICATIONS section.
 .TP
 \f[B]\[en]nos\f[R]
 Notify on successful backups also.
@@ -479,8 +484,8 @@ Notifications are only sent on successes if Notify On Success
 (\f[B]\[en]nos\f[R]) is also specified.
 .SS Script Notifications
 .PP
-Notification scripts configured for the current profile are only
-considered on a state change.
+By default notification scripts configured for the current profile are
+only considered on a state change.
 A state change is defined as a backup succeeding or failing when it did
 the opposite in its previous run.
 On a state change, all notification scripts for the profile will be
@@ -489,6 +494,12 @@ State changes that change to success are only notified if Notify On
 Success (\f[B]\[en]nos\f[R]) is also specified.
 In effect, this means the script(s) will only be called for the first in
 a string of failures or, with \f[B]\[en]nos\f[R], a string of successes.
+When \f[B]\[en]notifyevery\f[R] is set to a non-zero number
+(\f[I]count\f[R]) a string of successive failures will execute the
+notify script on every \f[I]count\f[R] failure.
+i.e.\ if \f[I]count\f[R] is 5 and there\[cq]s a contiuous succession of
+failures, every 5th one will run the script (in addition to the first
+failure).
 .PP
 Notification scripts are passed a single parameter, which is a message
 describing details of the backup event.

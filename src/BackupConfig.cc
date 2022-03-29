@@ -56,6 +56,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_MINSFTPSPACE, RE_MINSFTPSPACE, SIZE, "0"));
     settings.insert(settings.end(), Setting(CLI_NICE, RE_NICE, INT, "10"));
     settings.insert(settings.end(), Setting(CLI_TRIPWIRE, RE_TRIPWIRE, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_NOTIFYEVERY, RE_NOTIFYEVERY, INT, "0"));
 }
 
 
@@ -392,9 +393,9 @@ string BackupConfig::setLockPID(unsigned int pid) {
 }
 
 
-bool BackupConfig::getPreviousSuccess() {
+unsigned int BackupConfig::getPreviousFailures() {
     string stateFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".state";
-    bool previousSuccess = true;
+    unsigned int count = 0;
 
     ifstream stateFile;
     stateFile.open(stateFilename);
@@ -402,15 +403,15 @@ bool BackupConfig::getPreviousSuccess() {
     if (stateFile.is_open()) {
         string temp;
         stateFile >> temp;
-        previousSuccess = str2bool(temp);
+        count = stoi(temp);
         stateFile.close();
     }
 
-    return previousSuccess;
+    return count;
 }
 
 
-void BackupConfig::setPreviousSuccess(bool state) {
+void BackupConfig::setPreviousFailures(unsigned int count) {
     string stateFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".state";
     mkdirp(GLOBALS.cacheDir);
 
@@ -418,7 +419,7 @@ void BackupConfig::setPreviousSuccess(bool state) {
     stateFile.open(stateFilename);
 
     if (stateFile.is_open()) {
-        stateFile << to_string(state) << endl;
+        stateFile << to_string(count) << endl;
         stateFile.close();
     }
     else {

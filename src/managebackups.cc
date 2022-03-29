@@ -1193,6 +1193,7 @@ int main(int argc, char *argv[]) {
         (CLI_RECREATE, "Recreate config", cxxopts::value<bool>()->default_value("false"))
         (CLI_INSTALLMAN, "Install man", cxxopts::value<bool>()->default_value("false"))
         (CLI_INSTALL, "Install", cxxopts::value<bool>()->default_value("false"))
+        (CLI_NOTIFYEVERY, "Notify every", cxxopts::value<int>())
         (CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
 
     try {
@@ -1333,6 +1334,7 @@ int main(int argc, char *argv[]) {
             paramIfSpecified(CLI_WEEKS) +
             paramIfSpecified(CLI_MONTHS) +
             paramIfSpecified(CLI_TRIPWIRE) +
+            paramIfSpecified(CLI_NOTIFYEVERY) +
             paramIfSpecified(CLI_YEARS) +
             (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ? " -x" : "") +
             paramIfSpecified(CLI_MAXLINKS);

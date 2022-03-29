@@ -77,6 +77,7 @@
 #define CLI_CRONP "Cron"
 #define CLI_RECREATE "recreate"
 #define CLI_TRIPWIRE "tripwire"
+#define CLI_NOTIFYEVERY "notifyevery"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -107,6 +108,7 @@
 #define RE_MODE "(mode)"
 #define RE_NICE "(nice)"
 #define RE_TRIPWIRE "(tw|tripwire)"
+#define RE_NOTIFYEVERY "(notifyevery|every)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"

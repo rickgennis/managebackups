@@ -32,8 +32,8 @@ class BackupConfig {
         bool loadConfig(string filename);
         void loadConfigsCache();
 
-        void setPreviousSuccess(bool state);
-        bool getPreviousSuccess();
+        void setPreviousFailures(unsigned int count);
+        unsigned int getPreviousFailures();
 
         string setLockPID(unsigned int pid);
         unsigned int getLockPID();

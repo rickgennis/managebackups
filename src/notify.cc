@@ -32,6 +32,8 @@ void notify(BackupConfig& config, string message, bool currentSuccess, bool alwa
     if (!config.settings[sNotify].value.length())
         return;
 
+    auto notifyInterval = config.settings[sNotifyEvery].ivalue();
+
     stringstream tokenizer(config.settings[sNotify].value);
     vector<string> parts;
     string prefix = "[" + config.settings[sTitle].value + "@" + hostname() + "]";
@@ -61,12 +63,13 @@ void notify(BackupConfig& config, string message, bool currentSuccess, bool alwa
         }
         // if there's no at-sign treat it as a script to execute
         else {
-            // for script notifications  only execute if there's a state change
+            // for script notifications only execute if there's a state change
             // i.e. current success != previous success
-            bool previousSuccess = config.getPreviousSuccess();
-            DEBUG(2, "states change: prev " << previousSuccess << "; current " << currentSuccess);
-            if (alwaysOverride || currentSuccess != previousSuccess) {
-                config.setPreviousSuccess(currentSuccess);
+            auto previousFailures = config.getPreviousFailures();
+            config.setPreviousFailures(currentSuccess ? 0 : ++previousFailures);
+            DEBUG(2, "states change: prev " << previousFailures << "; current " << currentSuccess << "; " << (currentSuccess != !(previousFailures-1)));
+            if (alwaysOverride || currentSuccess != !(previousFailures-1) ||
+                    (notifyInterval && !(previousFailures % notifyInterval))) {
 
                 // for scripts execute the notification if it's a failure or
                 // if sNos (notify on success) is enabled
