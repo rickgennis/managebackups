@@ -79,15 +79,17 @@ BackupCache::~BackupCache() {
         cacheFile.open(cacheFilename);
         if (cacheFile.is_open()) {
 
+            unsigned int count = 0;
             string cacheData;
             while (getline(cacheFile, cacheData)) {
+                ++count;
                 BackupEntry entry;
                 if (entry.string2class(cacheData))
                     addOrUpdate(entry);
             }
 
             cacheFile.close();
-            DEBUG(2, "loaded cache from " << cacheFilename);
+            DEBUG(2, "loaded " << count << " cache entries from " << cacheFilename);
         }
         else
             log("unable to read cache file " + cacheFilename);

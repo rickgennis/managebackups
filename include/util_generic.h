@@ -105,7 +105,7 @@ bool mtimesAreSameDay(time_t m1, time_t m2);
 
 string horizontalLine(int length);
 
-void sendEmail(string recipients, string subject, string message);
+void sendEmail(string from, string recipients, string subject, string message);
 
 unsigned long approx2bytes(string approx);
 

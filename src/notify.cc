@@ -33,6 +33,7 @@ void notify(BackupConfig& config, string message, bool currentSuccess, bool alwa
         return;
 
     auto notifyInterval = config.settings[sNotifyEvery].ivalue();
+    string sender = config.settings[sMailFrom].value.length() ? config.settings[sMailFrom].value : "managebackups";
 
     stringstream tokenizer(config.settings[sNotify].value);
     vector<string> parts;
@@ -57,7 +58,7 @@ void notify(BackupConfig& config, string message, bool currentSuccess, bool alwa
                     cout << YELLOW << config.ifTitle() << " TESTMODE: would have sent email to " << contactMethod << RESET << endl;
                 else {
                     DEBUG(2, "recipient: " << contactMethod << "; sending email");
-                    sendEmail(contactMethod, "managebackups - " + prefix + (currentSuccess ? " (success)" : " (failed)"), message);
+                    sendEmail(sender, contactMethod, "managebackups - " + prefix + (currentSuccess ? " (success)" : " (failed)"), message);
                 }
             }
         }

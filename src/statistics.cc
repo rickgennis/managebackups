@@ -14,11 +14,14 @@
 #define NUMSTATDETAILS        10 
 
 using namespace std;
+string oldMessage = ">24H old";
+
 
 struct summaryStats {
     bool success;
     bool inProcess;
     unsigned long lastBackupBytes;
+    time_t lastBackupTime;
     unsigned long totalBytesUsed;
     unsigned long totalBytesSaved;
     long numberOfBackups;
@@ -68,7 +71,7 @@ summaryStats _displaySummaryStats(BackupConfig& config, int statDetail = 0, int 
         string processAge;
         struct stat statBuf;
 
- #ifdef __APPLE__
+#ifdef __APPLE__
         if (config.cache.inProcess.length() && !stat(config.cache.inProcess.c_str(), &statBuf))
             processAge = seconds2hms(GLOBALS.startupTime - statBuf.st_birthtime);
 #endif
@@ -87,7 +90,7 @@ summaryStats _displaySummaryStats(BackupConfig& config, int statDetail = 0, int 
             to_string(saved) + "%",
             timeDiff(mktimeval(first_it->second.name_mtime)),
             timeDiff(mktimeval(last_it->second.mtime)),
-            processAge };
+            processAge.length() ? processAge : GLOBALS.startupTime - last_it->second.mtime > 60*60*24 ? oldMessage : ""};
             
         for (int i = 0; i < NUMSTATDETAILS; ++i)
             resultStats.stringOutput[i] = soutput[i];
@@ -95,6 +98,7 @@ summaryStats _displaySummaryStats(BackupConfig& config, int statDetail = 0, int 
         resultStats.inProcess = config.cache.inProcess.length();
         resultStats.duration = last_it->second.duration;
         resultStats.lastBackupBytes = last_it->second.size;
+        resultStats.lastBackupTime = last_it->second.mtime;
     }
 
     resultStats.success = true;
@@ -196,7 +200,8 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
         string lineFormat;
         for (int x = 0; x < NUMSTATDETAILS - 1; ++x)
             if (max(headers[x].length(), colLen[x]))
-                lineFormat += (lineFormat.length() ? "  " : "") + string("%") + string(x == 6 ? "" : "-") + to_string(max(headers[x].length(), colLen[x])) + "s";   // 6th column is right-justified
+                lineFormat += (lineFormat.length() ? "  " : "") + string("%") + string(x == 6 ? "" : "-") + 
+                    to_string(max(headers[x].length(), colLen[x])) + "s";   // 6th column is right-justified
 
         // print line by line results
         char result[1000];
@@ -205,6 +210,8 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
             string HIGHLIGHT = profileInProcess[line] ? BOLDGREEN : BOLDBLUE;
             string BRACKETO = profileInProcess[line] ? "{" : "[";
             string BRACKETC = profileInProcess[line] ? "}" : "]";
+            string msg = statStrings[line * NUMSTATDETAILS + 9];
+            bool is_old = msg == oldMessage;
 
             sprintf(result, lineFormat.c_str(), 
                     statStrings[line * NUMSTATDETAILS].c_str(),
@@ -217,7 +224,8 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
                     string(HIGHLIGHT + BRACKETO + RESET + statStrings[line * NUMSTATDETAILS + 7] +
                         HIGHLIGHT + string(" -> ") + RESET + statStrings[line * NUMSTATDETAILS + 8] + 
                         HIGHLIGHT + BRACKETC).c_str(),
-                    string(statStrings[line * NUMSTATDETAILS + 9]).c_str());
+                    string(is_old ? string(BOLDRED) + msg : msg).c_str());
+                    //string(statStrings[line * NUMSTATDETAILS + 9]).c_str());
             cout << result << RESET << "\n";
             ++line;
         }

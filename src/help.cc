@@ -41,13 +41,15 @@ void showHelp(enum helpType kind) {
             + "   --minspace [size]   Minimum local free space required before taking a backup\n"          
             + "   --minsftpspace [sz] Minimum free space required on the remote SFTP server before transfering a backup\n"          
             + "   --notify [contact]  Notify after a backup completes; can be email addresses and/or script names (failures only).\n"
+            + "   --notifyevery [x]   Notify on every x failure (plus the first one).\n"
             + "   --nos               Notify on success also.\n"
+            + "   --mailfrom [addr]   Use addr as the sending/from address for outgoing notify emails.\n"
             + "\n" + string(BOLDBLUE) + "PRUNING\n" + RESET
             + "   --days [x]          Keep x daily backups\n"
             + "   --weeks [x]         Keep x weekly backups\n"
             + "   --months [x]        Keep x monthly backups\n"
             + "   --years [x]         Keep x yearly backups\n"
-            + "   --dow [x]           Day of week to save for weeklies (0=Sunday, 1=Monday, etc). defaults to Sunday.\n"
+            + "   --dow [x]           Day of week to save for weeklies (0=Sunday, 1=Monday, etc); defaults to Sunday.\n"
             + "   --fs_backups [b]    FAILSAFE: Require b backups before pruning\n"
             + "   --fs_days [d]       FAILSAFE: within the last d days.\n"
             + "   --fp                FAILSAFE: Paranoid mode; sets --fb=1, --fd=2\n"
@@ -76,7 +78,7 @@ void showHelp(enum helpType kind) {
             + "   -q                  Quiet mode -- limit output, for use in scripts.\n"
             + "   -v                  Verbose output for debugging (can be specified multiple times)\n"
             + "   --defaults          Display the default settings for all profiles.\n"
-            + "   -x, --lock          Lock the current profile for the duraiton of the run so only one copy can run at a time.\n"
+            + "   -x, --lock          Lock the current profile for the duration of the run so only one copy can run at a time.\n"
             + "   --tripwire [string] Define tripwire files of the form 'filename: md5, filename: md5'.\n"
             + "\nSee 'man managebackups' for more detail.\n";
 
@@ -373,6 +375,10 @@ See the NOTIFICATIONS section.
 .TP
 \f[B]\[en]nos\f[R]
 Notify on successful backups also.
+.TP
+\f[B]\[en]mailfrom\f[R] [\f[I]address\f[R]]
+Use \f[I]address\f[R] as the sending (i.e.\ \[lq]From\[rq]) address for
+outgoing notify email.
 .TP
 \f[B]\[en]scp\f[R] [\f[I]destination\f[R]]
 On completion of a successful backup, SCP the newly created backup file

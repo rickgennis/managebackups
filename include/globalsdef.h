@@ -78,6 +78,7 @@
 #define CLI_RECREATE "recreate"
 #define CLI_TRIPWIRE "tripwire"
 #define CLI_NOTIFYEVERY "notifyevery"
+#define CLI_MAILFROM "from"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -109,6 +110,7 @@
 #define RE_NICE "(nice)"
 #define RE_TRIPWIRE "(tw|tripwire)"
 #define RE_NOTIFYEVERY "(notifyevery|every)"
+#define RE_MAILFROM "(mailfrom|from)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"

@@ -122,6 +122,9 @@ Options are relative to the three functions of **managebackups**.
 **--nos**
 : Notify on successful backups also.
 
+**--mailfrom** [*address*]
+: Use *address* as the sending (i.e. "From") address for outgoing notify email. 
+
 **--scp** [*destination*]
 : On completion of a successful backup, SCP the newly created backup file to *destination*.  *destination* can include user@ notation and an optional hardcoded filename.  If filename is omitted the newly created date-based filename is used, the same as with a standard cp command. Additionally the strings {fulldir}, {subdir} and {filename} can be used; they'll be automatically replaced with the values relative to the newly created backup.
 

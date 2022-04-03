@@ -597,23 +597,34 @@ void strReplaceAll(string& s, string const& toReplace, string const& replaceWith
 string locateBinary(string app) {
     string tempStr;
     string path = cppgetenv("PATH");
-    stringstream tokenizer(path);
     vector<string> parts;
 
-    if (app.find("/") == string::npos) {
-        while (getline(tokenizer, tempStr, ':'))
-            parts.push_back(tempStr);
-
-        for (auto piece: parts) {
-            string binary = string(piece) + "/" + app;
-            if (!access(binary.c_str(), X_OK))
-                return binary;
-        }
-    }
-    else
+    // if a path is specified try it
+    if (app.find("/") != string::npos) {
         if (!access(app.c_str(), X_OK))
             return(app);
+    }
 
+    // grab the binary name as the last delimited element given
+    vector<string> appParts;
+    stringstream appTokenizer(app);
+    while (getline(appTokenizer, tempStr, '/'))
+        appParts.push_back(tempStr);
+    auto appBinary = appParts.back();
+
+    // parse the PATH
+    stringstream pathTokenizer(path);
+    while (getline(pathTokenizer, tempStr, ':'))
+        parts.push_back(tempStr);
+        
+    // try to find the binary in each component of the path
+    for (auto piece: parts) {
+        string binary = string(piece) + "/" + appBinary;
+        if (!access(binary.c_str(), X_OK))
+        return binary;
+    }
+
+    // give up
     log("unable to locate/execute '" + app + "' command");
     return "";
 }
@@ -656,10 +667,12 @@ string horizontalLine(int length) {
 }
 
 
-void sendEmail(string recipients, string subject, string message) {
-    PipeExec mail(locateBinary("mail") + " -s '" + subject + "' " + recipients);
+void sendEmail(string from, string recipients, string subject, string message) {
+    PipeExec mail(locateBinary("/usr/sbin/sendmail") + " -f " + from + " " + recipients);
+    string headers = "X-Mailer: Apple Sendmail\nContent-Type: text/plain\nReturn-Path: " + from + "\nSubject: " + subject + "\n\n";
 
     mail.execute("internal");
+    mail.writeProc(headers.c_str(), headers.length());
     mail.writeProc(message.c_str(), message.length());
     mail.closeWrite();
 }
