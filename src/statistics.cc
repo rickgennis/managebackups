@@ -25,12 +25,13 @@ struct summaryStats {
     unsigned long totalBytesUsed;
     unsigned long totalBytesSaved;
     long numberOfBackups;
+    long uniqueBackups;
     unsigned long duration;
     string stringOutput[NUMSTATDETAILS];
 
     summaryStats() {
         success = inProcess = false;
-        lastBackupBytes = totalBytesUsed = totalBytesSaved = numberOfBackups = duration = 0;
+        lastBackupBytes = totalBytesUsed = totalBytesSaved = numberOfBackups = uniqueBackups = duration = 0;
     }
 };
 
@@ -40,8 +41,8 @@ summaryStats _displaySummaryStats(BackupConfig& config, int statDetail = 0, int 
     struct summaryStats resultStats;
     int precisionLevel = statDetail > 1 ? 1 : -1;
 
-    unsigned long rawSize = config.cache.rawData.size();
-    if (rawSize < 1) {
+    resultStats.numberOfBackups = config.cache.rawData.size();
+    if (resultStats.numberOfBackups < 1) {
         return resultStats;
     }
 
@@ -56,7 +57,7 @@ summaryStats _displaySummaryStats(BackupConfig& config, int statDetail = 0, int 
         else
             resultStats.totalBytesSaved += raw.second.size;
     }
-    resultStats.numberOfBackups = config.cache.rawData.size();
+    resultStats.uniqueBackups = config.cache.indexByMD5.size();
 
     // calcuclate percentage saved
     int saved = floor((1 - ((long double)resultStats.totalBytesUsed / ((long double)resultStats.totalBytesUsed + (long double)resultStats.totalBytesSaved))) * 100 + 0.5);
@@ -86,7 +87,7 @@ summaryStats _displaySummaryStats(BackupConfig& config, int statDetail = 0, int 
             fileTime,    
             (approximate(last_it->second.size, precisionLevel, statDetail > 2) + " (" + approximate(resultStats.totalBytesUsed, precisionLevel, statDetail == 3) + ")"),
             seconds2hms(last_it->second.duration),
-            to_string(rawSize),
+            (to_string(resultStats.uniqueBackups) + " (" + to_string(resultStats.numberOfBackups) + ")"),
             to_string(saved) + "%",
             timeDiff(mktimeval(first_it->second.name_mtime)),
             timeDiff(mktimeval(last_it->second.mtime)),
@@ -134,6 +135,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
                 totalStats.totalBytesUsed += perStats.totalBytesUsed;
                 totalStats.totalBytesSaved += perStats.totalBytesSaved;
                 totalStats.numberOfBackups += perStats.numberOfBackups;
+                totalStats.uniqueBackups += perStats.uniqueBackups;
                 totalStats.duration += perStats.duration;
 
                 profileInProcess.insert(profileInProcess.end(), perStats.inProcess);
@@ -151,7 +153,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
             statStrings.insert(statStrings.end(), approximate(totalStats.lastBackupBytes, precisionLevel, statDetail > 2) + " (" +
                 approximate(totalStats.totalBytesUsed, precisionLevel, statDetail > 2) + ")");
             statStrings.insert(statStrings.end(), seconds2hms(totalStats.duration));
-            statStrings.insert(statStrings.end(), to_string(totalStats.numberOfBackups));
+            statStrings.insert(statStrings.end(), to_string(totalStats.uniqueBackups) + " (" + to_string(totalStats.numberOfBackups) + ")");
             statStrings.insert(statStrings.end(), to_string(int(floor((1 - ((long double)totalStats.totalBytesUsed / ((long double)totalStats.totalBytesUsed + (long double)totalStats.totalBytesSaved))) * 100 + 0.5))) + "%");
             statStrings.insert(statStrings.end(), totalStats.totalBytesSaved ? string(string("Saved ") + approximate(totalStats.totalBytesSaved, precisionLevel, statDetail > 2) + " from "
                 + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved, precisionLevel, statDetail > 2)) : "");
@@ -181,7 +183,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
 
         // print the header row
         // the blank at the end isn't just for termination; it's used for "in process" status
-        string headers[] = { "Profile", "Most Recent Backup", "Finished", "Size (Total)", "Duration", "Num", "Saved", "Age Range", "" };
+        string headers[] = { "Profile", "Most Recent Backup", "Finished", "Size (Total)", "Duration", "Uniq (T)", "Saved", "Age Range", "" };
         cout << BOLDBLUE;
 
         int x = -1;
