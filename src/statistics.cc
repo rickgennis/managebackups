@@ -85,8 +85,8 @@ summaryStats _displaySummaryStats(BackupConfig& config, int statDetail = 0, int 
             config.settings[sTitle].value,
             pathSplit(last_it->second.filename).file,
             fileTime,    
-            (approximate(last_it->second.size, precisionLevel, statDetail > 2) + " (" + approximate(resultStats.totalBytesUsed, precisionLevel, statDetail == 3) + ")"),
             seconds2hms(last_it->second.duration),
+            (approximate(last_it->second.size, precisionLevel, statDetail > 2) + " (" + approximate(resultStats.totalBytesUsed, precisionLevel, statDetail == 3) + ")"),
             (to_string(resultStats.uniqueBackups) + " (" + to_string(resultStats.numberOfBackups) + ")"),
             to_string(saved) + "%",
             timeDiff(mktimeval(first_it->second.name_mtime)),
@@ -150,9 +150,9 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
             statStrings.insert(statStrings.end(), "");
             statStrings.insert(statStrings.end(), "");
             statStrings.insert(statStrings.end(), "");
+            statStrings.insert(statStrings.end(), seconds2hms(totalStats.duration));
             statStrings.insert(statStrings.end(), approximate(totalStats.lastBackupBytes, precisionLevel, statDetail > 2) + " (" +
                 approximate(totalStats.totalBytesUsed, precisionLevel, statDetail > 2) + ")");
-            statStrings.insert(statStrings.end(), seconds2hms(totalStats.duration));
             statStrings.insert(statStrings.end(), to_string(totalStats.uniqueBackups) + " (" + to_string(totalStats.numberOfBackups) + ")");
             statStrings.insert(statStrings.end(), to_string(int(floor((1 - ((long double)totalStats.totalBytesUsed / ((long double)totalStats.totalBytesUsed + (long double)totalStats.totalBytesSaved))) * 100 + 0.5))) + "%");
             statStrings.insert(statStrings.end(), totalStats.totalBytesSaved ? string(string("Saved ") + approximate(totalStats.totalBytesSaved, precisionLevel, statDetail > 2) + " from "
@@ -183,7 +183,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
 
         // print the header row
         // the blank at the end isn't just for termination; it's used for "in process" status
-        string headers[] = { "Profile", "Most Recent Backup", "Finished", "Size (Total)", "Duration", "Uniq (T)", "Saved", "Age Range", "" };
+        string headers[] = { "Profile", "Most Recent Backup", "Finish@", "Duration", "Size (Total)", "Uniq (T)", "Saved", "Age Range", "" };
         cout << BOLDBLUE;
 
         int x = -1;

@@ -648,22 +648,24 @@ Example output from \f[B]managebackups -0\f[R]
 .IP
 .nf
 \f[C]
-Profile        Most Recent Backup           Finished  Size (Total)     Duration  Num  Saved  Age Range
-desktop        desktop-20220222.tgz         05:54:03  196M (2.7G)      00:00:33  20     30%  [2 months, 3 weeks -> 2 hours, 5 minutes]
-firewall_logs  firewall-logs-20220222.tbz2  06:07:18  267M (3.0G)      00:13:48  15      0%  [5 months, 3 weeks -> 1 hour, 52 minutes]
-firewall_main  firewall-main-20220222.tgz   05:54:14  115M (1.5G)      00:00:44  27     31%  [9 months, 3 weeks -> 2 hours, 5 minutes]
-icloud         icloud-drive-20220222.tbz2   06:20:39  2.3G (11.3G)     00:27:10  6      17%  [2 months, 3 weeks -> 1 hour, 39 minutes]
-laptop         laptop-details-20220222.tgz  05:53:34  8M (129M)        00:00:06  23     25%  [5 months, 3 weeks -> 2 hours, 6 minutes]
-TOTALS                                                2.8G (18.6G)     00:42:21  91     18%  Saved 4.1G from 22.7G
+Profile        Most Recent Backup           Finish\[at]   Duration  Size (Total)  Uniq (T)  Saved  Age Range
+desktop        desktop-20220403.tgz         08:46:19  00:00:50  199M (2.3G)   11 (21)     43%  [4 months, 3 days -> 33 minutes, 13 seconds]
+firewall_logs  firewall-logs-20220403.tbz2  08:58:39  00:13:11  268M (3.5G)   16 (16)      0%  [6 months, 4 days -> 20 minutes, 53 seconds]
+firewall_main  firewall-main-20220403.tgz   08:46:14  00:00:45  118M (1.7G)   21 (28)     29%  [11 months, 1 week -> 33 minutes, 18 seconds]
+icloud         icloud-drive-20220403.tbz2   02:51:29  00:26:40  2.3G (15.9G)  6 (7)        0%  {3 months, 2 days -> 6 hours, 28 minutes}  00:34:03
+laptop         laptop-details-20220403.tgz  08:45:39  00:00:10  8M (96M)      12 (16)     21%  [6 months, 4 days -> 33 minutes, 53 seconds]
+TOTALS                                                00:41:36  2.9G (23.4G)  66 (88)      9%  Saved 2.5G from 25.9G
 
-196G is the size of the most recent backup of the desktop profile.
-2.7G is the disk space used for all desktop profile backups.
-30% is the percentage saved in desktop profile backups due to hard linking.
+199G is the size of the most recent backup of the desktop profile.
+2.3G is the disk space used for all desktop profile backups.
+43% is the percentage saved in desktop profile backups due to hard linking.
+11 is the number of unique desktop profile backups.
+21 is the total number of desktop profile backups (meaning there are 10 dupes).
 
-2.8G is the total used for the most recent backup of all profiles (i.e. one of each).
-18.6G is the total used for all data together (all data managed by managebackups).
-22.7G is the total that would be used if there were no hard linking.
-All size/space numbers are actual used (thanks to hard linking), except for the 22.7G number.
+2.9G is the total used for the most recent backup of all profiles (i.e. one of each).
+23.4G is the total used for all data together (all data managed by managebackups).
+25.9G is the total that would be used if there were no hard linking.
+All size/space numbers are actual used (thanks to hard linking), except for the 25.9G number.
 \f[R]
 .fi
 .SH AUTHORS
