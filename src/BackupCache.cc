@@ -10,6 +10,8 @@
 #include "util_generic.h"
 #include "globals.h"
 #include "colors.h"
+#include "debug.h"
+
 
 using namespace std;
 
@@ -51,14 +53,14 @@ BackupCache::~BackupCache() {
                 // files need to be able to fall out of the cache if they disappear from the filesystem.
                 // "current" means the file was seen in the most recent filesystem scan.
                 if (raw.second.current) {
-                    DEBUG(8, cacheFilename << ": writing cache entry " << raw.second.class2string());
+                    DEBUG(D_cache) DFMT(cacheFilename << ": writing cache entry " << raw.second.class2string());
                     cacheFile << raw.second.class2string() << endl;
                     ++count;
                 }
             }
 
             cacheFile.close();
-            DEBUG(2, "cache saved to " << cacheFilename << " (" << count << " entries)");
+            DEBUG(D_cache) DFMT("cache saved to " << cacheFilename << " (" << count << " entries)");
         }
         else {
             log("unable to save cache to " + cacheFilename);
@@ -89,7 +91,7 @@ BackupCache::~BackupCache() {
             }
 
             cacheFile.close();
-            DEBUG(2, "loaded " << count << " cache entries from " << cacheFilename);
+            DEBUG(D_cache) DFMT("loaded " << count << " cache entries from " << cacheFilename);
         }
         else
             log("unable to read cache file " + cacheFilename);
@@ -165,7 +167,7 @@ BackupCache::~BackupCache() {
 
                 // update the rawData entry
                 raw_it->second = updatedEntry;
-                DEBUG(4, "updated raw data for " << backupEntry.filename);
+                DEBUG(D_cache) DFMT("updated raw data for " << backupEntry.filename);
 
                 // if the md5 changed...
                 if (updatedEntry.md5 != oldMD5) {
@@ -174,11 +176,11 @@ BackupCache::~BackupCache() {
                     // if the old one is in the index, remove it
                     if (md5_it != indexByMD5.end()) {
                         md5_it->second.erase(index);
-                        DEBUG(4, "(" << markCurrent << ") removed reference from old md5 (" << oldMD5 << ") to " << backupEntry.filename);
+                        DEBUG(D_cache) DFMT("(" << markCurrent << ") removed reference from old md5 (" << oldMD5 << ") to " << backupEntry.filename);
 
                         if (!md5_it->second.size()) {
                             indexByMD5.erase(oldMD5);
-                            DEBUG(4, "(" << markCurrent << ") dropping old md5 " << oldMD5 << ",  as " << backupEntry.filename << " was the last reference");
+                            DEBUG(D_cache) DFMT("(" << markCurrent << ") dropping old md5 " << oldMD5 << ",  as " << backupEntry.filename << " was the last reference");
                         }
                     }
 
@@ -210,24 +212,24 @@ BackupCache::~BackupCache() {
         if (filename_it != indexByFilename.end()) {
             unsigned int index = filename_it->second;
             indexByFilename.erase(oldEntry.filename);    // and remove it
-            DEBUG(5, "removed " << oldEntry.filename << " from filename index");
+            DEBUG(D_cache) DFMT("removed " << oldEntry.filename << " from filename index");
 
             // find the entry in the raw data
             auto raw_it = rawData.find(index);
             if (raw_it != rawData.end()) {
                 string fileMD5 = raw_it->second.md5;
                 rawData.erase(index);                    // and remove it
-                DEBUG(5, "removed " << index << " from raw data");
+                DEBUG(D_cache) DFMT("removed " << index << " from raw data");
 
                     // find the entry in the md5 index
                     auto md5_it = indexByMD5.find(fileMD5);
                     if (md5_it != indexByMD5.end()) {
                         md5_it->second.erase(index);     // and remove it
-                        DEBUG(5, "removed " << fileMD5 << " from md5 index");
+                        DEBUG(D_cache) DFMT("removed " << fileMD5 << " from md5 index");
 
                         if (!md5_it->second.size()) {      // if that was the last/only file with that MD5
                             indexByMD5.erase(fileMD5);    // then remove that MD5 entirely from the index
-                            DEBUG(5, "removed final reference to " << fileMD5);
+                            DEBUG(D_cache) DFMT("removed final reference to " << fileMD5);
                         }
                     }
             }
@@ -300,7 +302,7 @@ void BackupCache::reStatMD5(string md5) {
                     raw_it->second.links = statBuf.st_nlink;
                     raw_it->second.mtime = statBuf.st_mtime;
                     raw_it->second.inode = statBuf.st_ino;
-                    DEBUG(5, "restat: " << raw_it->second.filename << " (links " << raw_it->second.links << ")");
+                    DEBUG(D_cache) DFMT("restat: " << raw_it->second.filename << " (links " << raw_it->second.links << ")");
                 }
             }
         }

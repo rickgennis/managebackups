@@ -4,13 +4,15 @@
 #include <variant>
 #include <unistd.h>
 #include <dirent.h>
+#include <pcre++.h>
 
 #include "BackupConfig.h"
 #include "Setting.h"
 #include "util_generic.h"
 #include "globals.h"
 #include "colors.h"
-#include <pcre++.h>
+#include "debug.h"
+
 
 using namespace pcrepp;
 
@@ -275,7 +277,7 @@ bool BackupConfig::loadConfig(string filename) {
         }
             
         configFile.close();
-        DEBUG(1, "successfully parsed [" << settings[sTitle].value << "] config from " << filename);
+        DEBUG(D_config) DFMT("successfully parsed [" << settings[sTitle].value << "] config from " << filename);
 
         return 1;
     }    

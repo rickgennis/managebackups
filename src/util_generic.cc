@@ -668,11 +668,22 @@ string horizontalLine(int length) {
 
 
 void sendEmail(string from, string recipients, string subject, string message) {
-    PipeExec mail(locateBinary("/usr/sbin/sendmail") + " -f " + from + " " + recipients);
     string headers = "X-Mailer: Apple Sendmail\nContent-Type: text/plain\nReturn-Path: " + from + "\nSubject: " + subject + "\n\n";
+    string bin = locateBinary("/usr/sbin/sendmail");
 
+    if (bin.length())
+        bin += " -f " + from + " " + recipients;
+    else {
+        bin = locateBinary("mail") + " -s \"" + subject + "\" " + recipients;
+        headers = "";
+    }
+
+    PipeExec mail(bin);
     mail.execute("internal");
-    mail.writeProc(headers.c_str(), headers.length());
+
+    if (headers.length())
+        mail.writeProc(headers.c_str(), headers.length());
+
     mail.writeProc(message.c_str(), message.length());
     mail.closeWrite();
 }

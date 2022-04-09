@@ -10,6 +10,8 @@
 #include "colors.h"
 #include "globals.h"
 #include "PipeExec.h"
+#include "debug.h"
+
 
 #define READ_END STDIN_FILENO
 #define WRITE_END STDOUT_FILENO
@@ -109,7 +111,7 @@ int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
     string errorFilename = string(TMP_OUTPUT_DIR) + "/" + safeFilename(procName) + "/";
     mkdirp(errorFilename);
 
-    DEBUG(3, "preparing full command [" << origCommand << "]");
+    DEBUG(D_exec) DFMT("preparing full command [" << origCommand << "]");
 
     int commandIdx = -1;
     for (auto proc_it = procs.begin(); proc_it != procs.end(); ++proc_it) {
@@ -119,7 +121,7 @@ int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
 
         // last loop
         if (*proc_it == procs[procs.size() - 1]) {
-            DEBUG(3, "executing final command [" << proc_it->command << "]");
+            DEBUG(D_exec) DFMT("executing final command [" << proc_it->command << "]");
 
             // redirect stderr to a file
             if (procName.length()) {
@@ -157,7 +159,7 @@ int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
 
                 // PARENT - all subsequent parents
                 if (*proc_it != procs[0]) {
-                    DEBUG(3, "executing mid command [" << proc_it->command << "] with pipes " << proc_it->fd[0] << " & " << proc_it->fd[1]);
+                    DEBUG(D_exec) DFMT("executing mid command [" << proc_it->command << "] with pipes " << proc_it->fd[0] << " & " << proc_it->fd[1]);
 
                     // redirect stderr to a file
                     if (procName.length()) {
@@ -215,7 +217,7 @@ bool PipeExec::execute2file(string toFile, string procName) {
     bool success = false;
     char data[16 * 1024];
 
-    DEBUG(3, "toFile=" << toFile << "; procName=" << procName);
+    DEBUG(D_exec) DFMT("toFile=" << toFile << "; procName=" << procName);
 
     if ((outFile = open(toFile.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR)) > 0) {
         execute(procName);

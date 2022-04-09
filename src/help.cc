@@ -76,7 +76,7 @@ void showHelp(enum helpType kind) {
             + "   --nocolor           Disable color output.\n"
             + "   --test              Run in test mode. No changes are persisted to disk except for caches.\n"
             + "   -q                  Quiet mode -- limit output, for use in scripts.\n"
-            + "   -v                  Verbose output for debugging (can be specified multiple times)\n"
+            + "   -v[options]         Verbose debugging output. See 'man managebackups' for details.\n"
             + "   --defaults          Display the default settings for all profiles.\n"
             + "   -x, --lock          Lock the current profile for the duration of the run so only one copy can run at a time.\n"
             + "   --tripwire [string] Define tripwire files of the form 'filename: md5, filename: md5'.\n"
@@ -191,14 +191,40 @@ option is also given.
 .SH OPTIONS
 .PP
 Options are relative to the three functions of \f[B]managebackups\f[R].
-.SS General Options
+.SS 0. General Options
 .TP
 \f[B]\[en]help\f[R]
 Displays help text.
 .TP
-\f[B]-v\f[R]
-Provide more verbose output (can be specified several times for
-debug-level detail).
+\f[B]-v\f[R][\f[I]options\f[R]]
+Provide verbose debugging output.
+Brilliant (albeit overkill in this context) debugging logic borrowed
+from Philip Hazel\[cq]s Exim Mail Transport Agent.
+\f[B]-v\f[R] by itself enables the default list of debugging contexts.
+Contexts can be added or subtracted by name.
+For example, \f[B]-v+cache\f[R] provides the default set plus caching
+whereas \f[B]-v-all+cache\f[R] provides only caching.
+\f[B]-v+all\f[R] gives everything or longer combinations can be strung
+togerher (\f[B]-v-all+cache+prune\f[R]).
+Note spaces are not supported in the -v string.
+Valid contexts are:
+.RS
+.IP
+.nf
+\f[C]
+* backup (default)
+* cache
+* config
+* exec
+* link (default)
+* notify
+* prune (default)
+* scan (default)
+* transfer
+* tripwire
+\f[R]
+.fi
+.RE
 .TP
 \f[B]\[en]install\f[R]
 \f[B]managebackups\f[R] needs write access under /var to store caches of
@@ -327,7 +353,7 @@ xxx\[rq]\f[R] where xxx is the correct MD5 of the file.
 Multiple entries can be separated with commas (\[lq]/etc/foo: xxx,
 /etc/fish: yyy, /usr/local/foo: zzz\[rq]).
 Only local computer tripwire files are supported at this time.
-.SS Take Backups Options
+.SS 1. Take Backups Options
 .TP
 \f[B]\[en]directory\f[R] [\f[I]directory\f[R]]
 Store and look for backups in \f[I]directory\f[R].
@@ -433,7 +459,7 @@ specified (K, M, G, T, P, E, Z, Y).
 Disable performing backups for this run.
 To disable permanently moving forward, remove the \[lq]command\[rq]
 directive from the profile\[cq]s config file.
-.SS Pruning Options
+.SS 2. Pruning Options
 .TP
 \f[B]\[en]prune\f[R]
 By default, \f[B]managebackups\f[R] doesn\[cq]t prune.
@@ -462,7 +488,7 @@ Defaults to 6.
 \f[B]-y\f[R], \f[B]\[en]years\f[R], \f[B]\[en]yearly\f[R]
 Specify the number of yearly backups to keep.
 Defaults to 2.
-.SS Linking Options
+.SS 3. Linking Options
 .TP
 \f[B]-l\f[R], \f[B]\[en]maxlinks\f[R] [\f[I]links\f[R]]
 Use \f[I]links\f[R] as the maximum number of links for a backup.
@@ -504,8 +530,8 @@ When \f[B]\[en]notifyevery\f[R] is set to a non-zero number
 (\f[I]count\f[R]) a string of successive failures will execute the
 notify script on every \f[I]count\f[R] failure.
 i.e.\ if \f[I]count\f[R] is 5 and there\[cq]s a contiuous succession of
-failures, every 5th one will run the script (in addition to the first
-failure).
+failures, every 5th one will run the script, in addition to the first
+failure.
 .PP
 Notification scripts are passed a single parameter, which is a message
 describing details of the backup event.
@@ -565,8 +591,8 @@ days.
 Also include the Failsafe Paranoid check to make certain a recent backup
 was taken before removing any older files.
 Because \f[B]\[en]save\f[R] was not specified the \f[B]\[en]daily
-10\f[R] (and paranoid setting) is only for this run and doesn\[cq]t
-become part of the mymac profile moving forward.
+10\f[R] and paranoid setting are only for this run and don\[cq]t become
+part of the mymac profile moving forward.
 .TP
 \f[B]managebackups -p mymac -q\f[R]
 Re-run the mymac profile with its last saved configuration
@@ -575,9 +601,9 @@ Quiet mode disables all screen output except for errors.
 .TP
 \f[B]managebackups -a -x\f[R]
 Execute all currently defined profiles.
-If the above three examples had been run previously two profiles
-(homedirs & mymac) would have been defined, each with the associated
-parameters on their respective \f[B]\[en]save\f[R] runs.
+If the above examples had been run previously two profiles (homedirs &
+mymac) would have been defined, each with the associated parameters on
+their respective \f[B]\[en]save\f[R] runs.
 This \f[B]-a\f[R] invocation would run through each of those profiles
 sequentially performing the configured pruning, hard linking and
 backups.
@@ -615,7 +641,9 @@ The \f[B]-test\f[R] option skips all primary functions (no backups,
 pruning or linking is done) so only the config file is updated.
 .TP
 \f[B]managebackups -1\f[R]
-Show details of all backups taken that are associated with a profile.
+Show details of all backups taken that are associated with each profile.
+Additionally \f[B]-p\f[R] [\f[I]profile\f[R]] could be specified to
+limit the output to a single profile.
 .TP
 \f[B]managebackups -0\f[R]
 Show a one-line summary for each backup profile.
@@ -652,7 +680,7 @@ Profile        Most Recent Backup           Finish\[at]   Duration  Size (Total)
 desktop        desktop-20220403.tgz         08:46:19  00:00:50  199M (2.3G)   11 (21)     43%  [4 months, 3 days -> 33 minutes, 13 seconds]
 firewall_logs  firewall-logs-20220403.tbz2  08:58:39  00:13:11  268M (3.5G)   16 (16)      0%  [6 months, 4 days -> 20 minutes, 53 seconds]
 firewall_main  firewall-main-20220403.tgz   08:46:14  00:00:45  118M (1.7G)   21 (28)     29%  [11 months, 1 week -> 33 minutes, 18 seconds]
-icloud         icloud-drive-20220403.tbz2   02:51:29  00:26:40  2.3G (15.9G)  6 (7)        0%  {3 months, 2 days -> 6 hours, 28 minutes}  00:34:03
+icloud         icloud-drive-20220403.tbz2   02:51:29  00:26:40  2.3G (15.9G)  6 (7)        0%  [3 months, 2 days -> 6 hours, 28 minutes]
 laptop         laptop-details-20220403.tgz  08:45:39  00:00:10  8M (96M)      12 (16)     21%  [6 months, 4 days -> 33 minutes, 53 seconds]
 TOTALS                                                00:41:36  2.9G (23.4G)  66 (88)      9%  Saved 2.5G from 25.9G
 

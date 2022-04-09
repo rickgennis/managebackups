@@ -33,6 +33,7 @@
 #include "help.h"
 #include "PipeExec.h"
 #include "setup.h"
+#include "debug.h"
 
 
 using namespace pcrepp;
@@ -110,15 +111,15 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                 else {
                     // filter for filename if specified
                     if (fnamePattern.length() && !fnameRE.search(string(c_dirEntry->d_name))) {
-                        DEBUG(4, "skip name mismatch: " << fullFilename);
+                        DEBUG(D_scan) DFMT("skip name mismatch: " << fullFilename);
                         continue;
                     }
 
                     if (tempRE.search(string(c_dirEntry->d_name))) {
-                        DEBUG(2, "in-process file found (" << c_dirEntry->d_name << ")");
+                        DEBUG(D_scan) DFMT("in-process file found (" << c_dirEntry->d_name << ")");
 
                         if (GLOBALS.startupTime - statData.st_mtime > 3600 * 5) {
-                            DEBUG(2, "removing abandoned in-process file (" << c_dirEntry->d_name << ")");
+                            DEBUG(D_scan) DFMT("removing abandoned in-process file (" << c_dirEntry->d_name << ")");
                             unlink(fullFilename.c_str());
                         }
                         else 
@@ -260,7 +261,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
     // that config will be the one found from --profile above (if any), or a temp config comprised only of defaults
     for (auto &setting: currentConf->settings)
         if (GLOBALS.cli.count(setting.display_name)) {
-            DEBUG(5, "command line param: " << setting.display_name << " (" << setting.data_type << ")");
+            DEBUG(D_config) DFMT("command line param: " << setting.display_name << " (" << setting.data_type << ")");
 
             switch (setting.data_type) {
 
@@ -404,7 +405,7 @@ void pruneBackups(BackupConfig& config) {
         for (auto &fnameIdx: config.cache.indexByFilename) {
             auto raw_it = config.cache.rawData.find(fnameIdx.second);
 
-            DEBUG(5, "fs: " << raw_it->second.filename << " (" << raw_it->second.day_age << ")");
+            DEBUG(D_prune) DFMT("fs: " << raw_it->second.filename << " (" << raw_it->second.day_age << ")");
             if (raw_it != config.cache.rawData.end() && raw_it->second.day_age <= fd) {
                 ++minValidBackups;
             }
@@ -424,7 +425,7 @@ void pruneBackups(BackupConfig& config) {
     }
 
     set<string> changedMD5s;
-    DEBUG(4, "weeklies set to dow " << config.settings[sDOW].ivalue());
+    DEBUG(D_prune) DFMT("weeklies set to dow " << config.settings[sDOW].ivalue());
 
     // loop through the filename index sorted by filename (i.e. all backups by age)
     for (auto fIdx_it = config.cache.indexByFilename.begin(), next_it = fIdx_it; fIdx_it != config.cache.indexByFilename.end(); fIdx_it = next_it) {
@@ -435,7 +436,7 @@ void pruneBackups(BackupConfig& config) {
         // the loop to track the next value for the iterator without dereferencing a deleted pointer.
         ++next_it;
 
-        DEBUG(5, "considering " << fIdx_it->first);
+        DEBUG(D_prune) DFMT("considering " << fIdx_it->first);
         auto raw_it = config.cache.rawData.find(fIdx_it->second);
 
         if (raw_it != config.cache.rawData.end()) { 
@@ -444,13 +445,13 @@ void pruneBackups(BackupConfig& config) {
 
             // daily
             if (config.settings[sDays].ivalue() && filenameAge <= config.settings[sDays].ivalue()) {
-                DEBUG(2, "keep_daily: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
+                DEBUG(D_prune) DFMT("keep_daily: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
                 continue;
             }
 
             // weekly
             if (config.settings[sWeeks].ivalue() && filenameAge / 7.0 <= config.settings[sWeeks].ivalue() && filenameDOW == config.settings[sDOW].ivalue()) {
-                DEBUG(2, "keep_weekly: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
+                DEBUG(D_prune) DFMT("keep_weekly: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
                 continue;
             }
 
@@ -459,7 +460,7 @@ void pruneBackups(BackupConfig& config) {
             auto monthLimit = config.settings[sMonths].ivalue();
             auto monthAge = (now->tm_year + 1900) * 12 + now->tm_mon + 1 - (raw_it->second.date_year * 12 + raw_it->second.date_month);
             if (monthLimit && monthAge <= monthLimit && raw_it->second.date_day == 1) {
-                DEBUG(2, "keep_monthly: " << raw_it->second.filename << " (month_age=" << monthAge << ", dow=" << dw(filenameDOW) << ")");
+                DEBUG(D_prune) DFMT("keep_monthly: " << raw_it->second.filename << " (month_age=" << monthAge << ", dow=" << dw(filenameDOW) << ")");
                 continue;
             }
 
@@ -467,7 +468,7 @@ void pruneBackups(BackupConfig& config) {
             auto yearLimit = config.settings[sYears].ivalue();
             auto yearAge = now->tm_year + 1900 - raw_it->second.date_year;
             if (yearLimit && yearAge <= yearLimit && raw_it->second.date_month == 1 && raw_it->second.date_day == 1) {
-                DEBUG(2, "keep_yearly: " << raw_it->second.filename << " (year_age=" << yearAge << ", dow=" << dw(filenameDOW) << ")");
+                DEBUG(D_prune) DFMT("keep_yearly: " << raw_it->second.filename << " (year_age=" << yearAge << ", dow=" << dw(filenameDOW) << ")");
                 continue;
             }
 
@@ -486,20 +487,20 @@ void pruneBackups(BackupConfig& config) {
                     changedMD5s.insert(raw_it->second.md5);
                     config.cache.remove(raw_it->second);
                     config.cache.updated = true;   // updated causes the cache to get saved in the BackupCache destructor
-                    DEBUG(4, "completed removal of file");
+                    DEBUG(D_prune) DFMT("completed removal of file");
                 }
             }
         }
     }
 
     if (!GLOBALS.cli.count(CLI_TEST)) {
-        DEBUG(4, "removing empty directories");
+        DEBUG(D_prune) DFMT("removing empty directories");
         config.removeEmptyDirs();
 
         for (auto &md5: changedMD5s) {
-            DEBUG(4, "re-stating " << md5);
+            DEBUG(D_prune) DFMT("re-stating " << md5);
             config.cache.reStatMD5(md5);
-            DEBUG(4, "re-stat complete");
+            DEBUG(D_prune) DFMT("re-stat complete");
         }
 
         if (changedMD5s.size())
@@ -552,13 +553,13 @@ void updateLinks(BackupConfig& config) {
             BackupEntry *referenceFile = NULL;
             unsigned int maxLinksFound = 0;
 
-            DEBUG(5, "top of scan for " << md5.first);
+            DEBUG(D_link) DFMT("top of scan for " << md5.first);
 
             // 1st time: loop through the list of files (the set)
             for (auto &fileID: md5.second) {
                 auto raw_it = config.cache.rawData.find(fileID);
 
-                DEBUG(5, "considering for ref file " << raw_it->second.filename << " (" << raw_it->second.links << ")");
+                DEBUG(D_link) DFMT("considering for ref file " << raw_it->second.filename << " (" << raw_it->second.links << ")");
                 if (raw_it != config.cache.rawData.end()) {
 
                     if (raw_it->second.links > maxLinksFound &&            // more links than previous files for this md5
@@ -568,7 +569,7 @@ void updateLinks(BackupConfig& config) {
                         referenceFile = &raw_it->second;
                         maxLinksFound = raw_it->second.links;
 
-                        DEBUG(5, "new ref file " << referenceFile->md5 << " " << referenceFile->filename << "; links=" << maxLinksFound);
+                        DEBUG(D_link) DFMT("new ref file " << referenceFile->md5 << " " << referenceFile->filename << "; links=" << maxLinksFound);
                     }
                 }
             }
@@ -576,38 +577,38 @@ void updateLinks(BackupConfig& config) {
             // the first actionable file (one that's not today's file and doesn't already have links at the maxLinksAllowed level)
             // becomes the reference file.  if there's no reference file there's nothing to do for this md5.  skip to the next one.
             if (referenceFile == NULL) {
-                DEBUG(5, "no reference file found for " << md5.first);
+                DEBUG(D_link) DFMT("no reference file found for " << md5.first);
                 continue;
             }
 
             // 2nd time: loop through the list of files (the set)
             for (auto &fileID: md5.second) {
                 auto raw_it = config.cache.rawData.find(fileID);
-                DEBUG(5, "\texamining " << raw_it->second.filename);
+                DEBUG(D_link) DFMT("\texamining " << raw_it->second.filename);
 
                 if (raw_it != config.cache.rawData.end()) {
 
                     // skip the reference file; can't relink it to itself
                     if (referenceFile == &raw_it->second) {
-                        DEBUG(5, "\t\treference file itself");
+                        DEBUG(D_link) DFMT("\t\treference file itself");
                         continue;
                     }
 
                     // skip files that are already linked
                     if (referenceFile->inode == raw_it->second.inode) {
-                        DEBUG(5, "\t\talready linked");
+                        DEBUG(D_link) DFMT("\t\talready linked");
                         continue;
                     }
 
                     // skip today's file as it could still be being updated
                     if (!raw_it->second.day_age && !includeTime) {
-                        DEBUG(5, "\t\ttoday's file");
+                        DEBUG(D_link) DFMT("\t\ttoday's file");
                         continue;            
                     }
 
                     // skip if this file already has the max links
                     if (raw_it->second.links >= maxLinksAllowed) {
-                        DEBUG(5, "\t\tfile links already maxed out");
+                        DEBUG(D_link) DFMT("\t\tfile links already maxed out");
                         continue;            
                     }
 
@@ -646,9 +647,9 @@ void updateLinks(BackupConfig& config) {
     }    
 
     for (auto &md5: changedMD5s) {
-        DEBUG(4, "re-stating " << md5);
+        DEBUG(D_link) DFMT("re-stating " << md5);
         config.cache.reStatMD5(md5);
-        DEBUG(4, "re-stat complete");
+        DEBUG(D_link) DFMT("re-stat complete");
     }
 
     if (changedMD5s.size())
@@ -805,7 +806,7 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
                 return methodStatus(false, "\t•" + msg);
             }
             else 
-                DEBUG(2, "\nSFTP space check passed (avail " << approximate(availSpace) << ", required " << approximate(requiredSpace) << ")");
+                DEBUG(D_transfer) DFMT("\nSFTP space check passed (avail " << approximate(availSpace) << ", required " << approximate(requiredSpace) << ")");
         }
         else
             log(config.ifTitle() + " unable to check free space (df) on the SFTP server; continuing");
@@ -853,25 +854,25 @@ bool performTripwire(BackupConfig& config) {
                 string md5 = MD5file(tripItem[0].c_str(), true);
                 
                 if (!md5.length()) {
-                    DEBUG(2, "FAIL - unable to MD5 tripwire file " << tripItem[0]);
+                    DEBUG(D_tripwire) DFMT("FAIL - unable to MD5 tripwire file " << tripItem[0]);
                     log(config.ifTitle() + " unable to MD5 tripwire file " + tripItem[0]);
                     notify(config, "\t• Unable to MD5 tripwire file (" + tripItem[0] + ")\n", false);
                     return false;
                 }
                 else
                     if (md5 != tripItem[1]) {
-                        DEBUG(2, "FAIL - MD5 mismatch for tripwire file " << tripItem[0]);
+                        DEBUG(D_tripwire) DFMT("FAIL - MD5 mismatch for tripwire file " << tripItem[0]);
                         log(config.ifTitle() + " tripwire file MD5 mismatch for " + tripItem[0]);
                         notify(config, "\t• Tripwire file MD5 mismatch (" + tripItem[0] + ")\n", false);
                         return false;
                     }
                     else {
-                        DEBUG(2, "MD5 verified for tripwire file " << tripItem[0]);
+                        DEBUG(D_tripwire) DFMT("MD5 verified for tripwire file " << tripItem[0]);
                         log(config.ifTitle() + " MD5 verified for tripwire file " + tripItem[0]);
                     }
             }
             else {
-                DEBUG(2, "FAIL - unable to locate tripwire file " << tripItem[0]);
+                DEBUG(D_tripwire) DFMT("FAIL - unable to locate tripwire file " << tripItem[0]);
                 log(config.ifTitle() + " unable to locate tripwire file " + tripItem[0]);
                 notify(config, "\t• Unable to locate tripwire file to MD5 (" + tripItem[0] + ")\n", false);
                 return false;
@@ -1079,7 +1080,7 @@ void sigTermHandler(int sig) {
 bool enoughLocalSpace(BackupConfig& config) {
     auto requiredSpace = approx2bytes(config.settings[sMinSpace].value);
 
-    DEBUG(1, "required for backup: " << requiredSpace);
+    DEBUG(D_backup) DFMT("required for backup: " << requiredSpace);
     if (!requiredSpace)
         return true;
 
@@ -1087,7 +1088,7 @@ bool enoughLocalSpace(BackupConfig& config) {
     if (!statfs(config.settings[sDirectory].value.c_str(), &fs)) {
         auto availableSpace = fs.f_bsize * fs.f_bavail;
 
-        DEBUG(1, config.settings[sDirectory].value << ": available=" << availableSpace << " (" << approximate(availableSpace) << 
+        DEBUG(D_backup) DFMT(config.settings[sDirectory].value << ": available=" << availableSpace << " (" << approximate(availableSpace) << 
                 "), required=" << requiredSpace << " (" << approximate(requiredSpace) << ")");
 
         if (availableSpace < requiredSpace) {
@@ -1153,7 +1154,7 @@ int main(int argc, char *argv[]) {
         (string("f,") + CLI_FILE, "Filename", cxxopts::value<std::string>())
         (string("c,") + CLI_COMMAND, "Command", cxxopts::value<std::string>())
         (string("n,") + CLI_NOTIFY, "Notify", cxxopts::value<std::string>())
-        (string("v,") + CLI_VERBOSE, "Verbose output", cxxopts::value<bool>()->default_value("false"))
+        //(string("v,") + CLI_VERBOSE, "Verbose output", cxxopts::value<string>())
         (string("V,") + CLI_VERSION, "Version", cxxopts::value<bool>()->default_value("false"))
         (string("q,") + CLI_QUIET, "No output", cxxopts::value<bool>()->default_value("false"))
         (string("l,") + CLI_MAXLINKS, "Max hard links", cxxopts::value<int>())
@@ -1165,7 +1166,7 @@ int main(int argc, char *argv[]) {
         (string("x,") + CLI_LOCK, "Lock profile", cxxopts::value<bool>()->default_value("false"))
         (string("k,") + CLI_CRONS, "Cron", cxxopts::value<bool>()->default_value("false"))
         (string("K,") + CLI_CRONP, "Cron", cxxopts::value<bool>()->default_value("false"))
-        (CLI_VERBOSEMAX, "Max verbosity", cxxopts::value<bool>()->default_value("false"))
+        //(CLI_VERBOSEMAX, "Max verbosity", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))
         (CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))
         (CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())
@@ -1197,8 +1198,9 @@ int main(int argc, char *argv[]) {
         (CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
 
     try {
+        options.allow_unrecognised_options();
         GLOBALS.cli = options.parse(argc, argv);
-        GLOBALS.debugLevel = GLOBALS.cli.count(CLI_VERBOSEMAX) ? 1000 : GLOBALS.cli.count(CLI_VERBOSE);
+        //GLOBALS.debugLevel = GLOBALS.cli.count(CLI_VERBOSEMAX) ? 1000 : GLOBALS.cli.count(CLI_VERBOSE);
         GLOBALS.color = !(GLOBALS.cli[CLI_QUIET].as<bool>() || GLOBALS.cli[CLI_NOCOLOR].as<bool>());
         GLOBALS.stats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2);
 
@@ -1213,6 +1215,27 @@ int main(int argc, char *argv[]) {
 
         if (GLOBALS.cli.count(CLI_LOGDIR))
             GLOBALS.logDir = GLOBALS.cli[CLI_LOGDIR].as<string>();
+
+        GLOBALS.debugSelector = 0;
+
+        for (auto uarg: GLOBALS.cli.unmatched()) {
+            if (uarg == "-vv")
+                GLOBALS.debugSelector = D_all;
+            else 
+                if (uarg.length() > 2) {
+                    string op = uarg.substr(2, 1);
+
+                    if (uarg.substr(0, 2) == "-v" && (op == "=" | op == "-" | op == "+")) {
+                        unsigned int selector = D_default;
+                        uschar *usc = (uschar*)uarg.substr(2, string::npos).c_str();
+                        decode_bits(&selector, 1, debug_notall, usc, debug_options, ndebug_options);
+                        GLOBALS.debugSelector = selector;
+                    }
+                }
+                else
+                    if (uarg == "-v")
+                        GLOBALS.debugSelector = D_default;
+        }
     }
     catch (cxxopts::OptionParseException& e) {
         cerr << "managebackups: " << e.what() << endl;
@@ -1245,7 +1268,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (GLOBALS.cli.count(CLI_VERSION)) {
-        cout << "managebackups " << VERSION << endl;
+        cout << "managebackups " << VERSION << "\n";
+        cout << "2022 released under GPLv2." << endl;
         exit(0);
     }
 
@@ -1266,13 +1290,13 @@ int main(int argc, char *argv[]) {
         exit(1);
     } 
 
-    DEBUG(2, "about to setup config...");
+    DEBUG(D_any) DFMT("about to setup config...");
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager);
 
     // if displaying stats and --profile hasn't been specified (or matched successfully)
     // then rescan all configs;  otherwise just scan the --profile config
-    DEBUG(2, "about to scan directories...");
+    DEBUG(D_any) DFMT("about to scan directories...");
 
     /* SHOW STATS
      * ****************************/
@@ -1433,7 +1457,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        DEBUG(2, "completed primary tasks");
+        DEBUG(D_any) DFMT("completed primary tasks");
 
         // remove lock
         if (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)) 
@@ -1441,7 +1465,7 @@ int main(int argc, char *argv[]) {
     }
     
     AppTimer.stop();
-    DEBUG(1, "stats: " << GLOBALS.statsCount << ", md5s: " << GLOBALS.md5Count << ", total time: " << AppTimer.elapsed(3));
+    DEBUG(D_any) DFMT("stats: " << GLOBALS.statsCount << ", md5s: " << GLOBALS.md5Count << ", total time: " << AppTimer.elapsed(3));
     return 0;
 }
 

@@ -76,7 +76,7 @@ void showHelp(enum helpType kind) {
             + "   --nocolor           Disable color output.\n"
             + "   --test              Run in test mode. No changes are persisted to disk except for caches.\n"
             + "   -q                  Quiet mode -- limit output, for use in scripts.\n"
-            + "   -v                  Verbose output for debugging (can be specified multiple times)\n"
+            + "   -v[options]         Verbose debugging output. See 'man managebackups' for details.\n"
             + "   --defaults          Display the default settings for all profiles.\n"
             + "   -x, --lock          Lock the current profile for the duration of the run so only one copy can run at a time.\n"
             + "   --tripwire [string] Define tripwire files of the form 'filename: md5, filename: md5'.\n"

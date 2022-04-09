@@ -26,12 +26,24 @@ Backup profiles are a collection of settings describing a backup set -- its dire
 # OPTIONS
 Options are relative to the three functions of **managebackups**.
 
-## General Options
+## 0. General Options
 **--help**
 : Displays help text.
 
-**-v**
-: Provide more verbose output (can be specified several times for debug-level detail).
+**-v**[*options*]
+: Provide verbose debugging output. Brilliant (albeit overkill in this context) debugging logic borrowed from Philip Hazel's Exim Mail Transport Agent. **-v** by itself enables the default list of debugging contexts.  Contexts can be added or subtracted by name. For example, **-v+cache** provides the default set plus caching whereas **-v-all+cache** provides only caching. **-v+all** gives everything or longer combinations can be strung togerher (**-v-all+cache+prune**). Note spaces are not supported in the -v string. Valid contexts are:
+
+        * backup (default)
+        * cache
+        * config
+        * exec
+        * link (default)
+        * notify
+        * prune (default)
+        * scan (default)
+        * transfer
+        * tripwire
+
 
 **--install**
 : **managebackups** needs write access under /var to store caches of MD5s and under /etc/managebackups to update configs from commandline parameters. It can run entirely as root. But to facilitate a safer setup, it can be configured to run setgid as group "daemon" and the required directories configured to allow writes from that group. **--install** installs the **managebackups** binary in /usr/local/bin (setgid), creates the config and cache directories (writable by "daemon") and installs the man page in /usr/local/share/man/man1. It's designed for a one-time execution as **sudo managebackups --install** after which root access is no longer required. Alternatively, all files (config, cache, log) can be written under the calling user's home directory via the **--user** option.  But for that setup **--user** must be specified on every invocation.  See **--user** for more detail.
@@ -96,7 +108,7 @@ Options are relative to the three functions of **managebackups**.
 **--tripwire** [*string*]
 : The tripwire setting can be used as a rudimentary guard against ransomware or other encryption attacks. It can't protect your local backups but will both alert you immediately and stop processing (no pruning, linking or backing up) if the tripwire check fails.  The check is defined as a filename (or list of filenames) and their MD5 values. If any of the MD5s change, the check fails and the alert is triggered.  For example, if you're backing up /etc you can create a bogus test file such as /etc/tripdata.txt and then configure **managebackups** with **--tripwire "/etc/tripdata.txt: xxx"** where xxx is the correct MD5 of the file. Multiple entries can be separated with commas ("/etc/foo: xxx, /etc/fish: yyy, /usr/local/foo: zzz"). Only local computer tripwire files are supported at this time.
 
-## Take Backups Options
+## 1. Take Backups Options
 
 **--directory** [*directory*]
 : Store and look for backups in *directory*.
@@ -143,7 +155,7 @@ Options are relative to the three functions of **managebackups**.
 **--nobackup**
 : Disable performing backups for this run. To disable permanently moving forward, remove the "command" directive from the profile's config file.
 
-## Pruning Options
+## 2. Pruning Options
 
 **--prune**
 : By default, **managebackups** doesn't prune. Pruning can be enabled with this option or via the config file. To enable pruning moving forward use **-p**, **--save**, and **-prune** together. Then future runs of that profile will include pruning.
@@ -163,7 +175,7 @@ Options are relative to the three functions of **managebackups**.
 **-y**, **--years**, **--yearly**
 : Specify the number of yearly backups to keep. Defaults to 2.
 
-## Linking Options
+## 3. Linking Options
 
 **-l**, **--maxlinks** [*links*]
 : Use *links* as the maximum number of links for a backup. For example, if the max is set to 10 and there are 25 identical content backups on disk, the first 10 all share inodes (i.e. there's only one copy of that data on disk for those 10 backups), the next 10 share another set of inodes, and the final 5 share another set of inodes.  From a disk space and allocation perspective those 25 identical copies of data are taking up the space of 3 copies, not 25.  In effect, increasing **--maxlinks** saves disk space. But an accidental mis-edit to one of those files could damage more backups with a higher number. Set **--maxlinks** to 0 or 1 to disable linking. Defaults to 20. 
@@ -175,7 +187,7 @@ Options are relative to the three functions of **managebackups**.
 Notifications are sent to all email addresses configured for the current profile on every failure.  Notifications are only sent on successes if Notify On Success (**--nos**) is also specified.
 
 ## Script Notifications
-By default notification scripts configured for the current profile are only considered on a state change. A state change is defined as a backup succeeding or failing when it did the opposite in its previous run. On a state change, all notification scripts for the profile will be executed if the backup failed.  State changes that change to success are only notified if Notify On Success (**--nos**) is also specified. In effect, this means the script(s) will only be called for the first in a string of failures or, with **--nos**, a string of successes. When **--notifyevery** is set to a non-zero number (*count*) a string of successive failures will execute the notify script on every *count* failure. i.e. if *count* is 5 and there's a contiuous succession of failures, every 5th one will run the script (in addition to the first failure).
+By default notification scripts configured for the current profile are only considered on a state change. A state change is defined as a backup succeeding or failing when it did the opposite in its previous run. On a state change, all notification scripts for the profile will be executed if the backup failed.  State changes that change to success are only notified if Notify On Success (**--nos**) is also specified. In effect, this means the script(s) will only be called for the first in a string of failures or, with **--nos**, a string of successes. When **--notifyevery** is set to a non-zero number (*count*) a string of successive failures will execute the notify script on every *count* failure. i.e. if *count* is 5 and there's a contiuous succession of failures, every 5th one will run the script, in addition to the first failure.
 
 Notification scripts are passed a single parameter, which is a message describing details of the backup event.
 
@@ -195,13 +207,13 @@ Profile configuration files are managed by **managebackups** though they can be 
 : Create a gzipped backup of /Users and /var in /opt/backups/YYYY/MM/DD/mymac-YYYYMMDD-HH:MM:SS.tgz. Upon success copy the file to the vaultserver's /mydata directory. Upon failure notify me with email and via a script that pushes an alert to my phone.
 
 **managebackups -p mymac --daily 10 --prune --fp**
-: Re-run the mymac profile that was saved in the previous example with all of its options, but override the daily retention quota, effectively having **managebackups** delete dailies that are older than 10 days. Also include the Failsafe Paranoid check to make certain a recent backup was taken before removing any older files.  Because **--save** was not specified the **--daily 10** (and paranoid setting) is only for this run and doesn't become part of the mymac profile moving forward.
+: Re-run the mymac profile that was saved in the previous example with all of its options, but override the daily retention quota, effectively having **managebackups** delete dailies that are older than 10 days. Also include the Failsafe Paranoid check to make certain a recent backup was taken before removing any older files.  Because **--save** was not specified the **--daily 10** and paranoid setting are only for this run and don't become part of the mymac profile moving forward.
 
 **managebackups -p mymac -q**
 : Re-run the mymac profile with its last saved configuration (i.e. what's in example #2, not #3). Quiet mode disables all screen output except for errors.
 
 **managebackups -a -x**
-: Execute all currently defined profiles.  If the above three examples had been run previously two profiles (homedirs & mymac) would have been defined, each with the associated parameters on their respective **--save** runs.  This **-a** invocation would run through each of those profiles sequentially performing the configured pruning, hard linking and backups. **-x** locks each profile as it runs (including "all") so that the same profile can't be kicked off again until this run has finished.
+: Execute all currently defined profiles.  If the above examples had been run previously two profiles (homedirs & mymac) would have been defined, each with the associated parameters on their respective **--save** runs.  This **-a** invocation would run through each of those profiles sequentially performing the configured pruning, hard linking and backups. **-x** locks each profile as it runs (including "all") so that the same profile can't be kicked off again until this run has finished.
 
 **managebackups -a --nobackup**
 : Execute all currently defined profiles but don't perform backups -- only pruning and linking as configured within each profile.
@@ -216,7 +228,7 @@ Profile configuration files are managed by **managebackups** though they can be 
 : Recreate the mymac config file using the standard format. Previously existing comments and formatting is thrown away. The **-test** option skips all primary functions (no backups, pruning or linking is done) so only the config file is updated.
 
 **managebackups -1**
-: Show details of all backups taken that are associated with a profile.
+: Show details of all backups taken that are associated with each profile. Additionally **-p** [*profile*] could be specified to limit the output to a single profile.
 
 **managebackups -0**
 : Show a one-line summary for each backup profile. The summary includes detail on the most recent backup as well as the number of backups, age ranges and total disk space.
@@ -241,7 +253,7 @@ Example output from **managebackups -0**
     desktop        desktop-20220403.tgz         08:46:19  00:00:50  199M (2.3G)   11 (21)     43%  [4 months, 3 days -> 33 minutes, 13 seconds]
     firewall_logs  firewall-logs-20220403.tbz2  08:58:39  00:13:11  268M (3.5G)   16 (16)      0%  [6 months, 4 days -> 20 minutes, 53 seconds]
     firewall_main  firewall-main-20220403.tgz   08:46:14  00:00:45  118M (1.7G)   21 (28)     29%  [11 months, 1 week -> 33 minutes, 18 seconds]
-    icloud         icloud-drive-20220403.tbz2   02:51:29  00:26:40  2.3G (15.9G)  6 (7)        0%  {3 months, 2 days -> 6 hours, 28 minutes}  00:34:03
+    icloud         icloud-drive-20220403.tbz2   02:51:29  00:26:40  2.3G (15.9G)  6 (7)        0%  [3 months, 2 days -> 6 hours, 28 minutes]
     laptop         laptop-details-20220403.tgz  08:45:39  00:00:10  8M (96M)      12 (16)     21%  [6 months, 4 days -> 33 minutes, 53 seconds]
     TOTALS                                                00:41:36  2.9G (23.4G)  66 (88)      9%  Saved 2.5G from 25.9G
 

@@ -12,7 +12,7 @@
 #define TMP_OUTPUT_DIR "/tmp/managebackups_output"
 
 
-#define DEBUG(x,y) (GLOBALS.debugLevel >= x) && cout << GREEN << __FUNCTION__ << "\t" << y << RESET << endl
+#define DFMT(x) cout << BOLDGREEN << __FUNCTION__ << ": " << RESET << GREEN << x << RESET << endl
 #define NOTQUIET (!(GLOBALS.cli.count(CLI_QUIET) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)))
 #define ANIMATE (!GLOBALS.cli.count(CLI_ZERO))
 #define SCREENERR(x) cerr << RED << x << RESET << endl;
@@ -123,7 +123,7 @@ using namespace std;
 enum helpType { hDefaults, hOptions, hExamples, hSyntax };
 
 struct global_vars {
-    unsigned int debugLevel;
+    unsigned int debugSelector;
     time_t startupTime;
     unsigned long statsCount;
     unsigned long md5Count;

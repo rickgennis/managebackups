@@ -9,6 +9,8 @@
 #include "util_generic.h"
 #include "BackupConfig.h"
 #include "PipeExec.h"
+#include "debug.h"
+
 
 using namespace std;
 
@@ -45,7 +47,7 @@ void notify(BackupConfig& config, string message, bool currentSuccess, bool alwa
         parts.push_back(trimSpace(tempStr));
 
     for (auto contactMethod: parts) {
-        DEBUG(2, "method: " << contactMethod);
+        DEBUG(D_notify) DFMT("method: " << contactMethod);
 
         // if there's an at-sign treat it as an email address
         if (contactMethod.find("@") != string::npos) {
@@ -57,7 +59,7 @@ void notify(BackupConfig& config, string message, bool currentSuccess, bool alwa
                 if (GLOBALS.cli.count(CLI_TEST))
                     cout << YELLOW << config.ifTitle() << " TESTMODE: would have sent email to " << contactMethod << RESET << endl;
                 else {
-                    DEBUG(2, "recipient: " << contactMethod << "; sending email");
+                    DEBUG(D_notify) DFMT("recipient: " << contactMethod << "; sending email");
                     sendEmail(sender, contactMethod, "managebackups - " + prefix + (currentSuccess ? " (success)" : " (failed)"), message);
                 }
             }
@@ -68,7 +70,7 @@ void notify(BackupConfig& config, string message, bool currentSuccess, bool alwa
             // i.e. current success != previous success
             auto previousFailures = config.getPreviousFailures();
             config.setPreviousFailures(currentSuccess ? 0 : ++previousFailures);
-            DEBUG(2, "states change: prev " << previousFailures << "; current " << currentSuccess << "; " << (currentSuccess != !(previousFailures-1)));
+            DEBUG(D_notify) DFMT("states change: prev " << previousFailures << "; current " << currentSuccess << "; " << (currentSuccess != !(previousFailures-1)));
             if (alwaysOverride || currentSuccess != !(previousFailures-1) ||
                     (notifyInterval && !(previousFailures % notifyInterval))) {
 
@@ -79,7 +81,7 @@ void notify(BackupConfig& config, string message, bool currentSuccess, bool alwa
                     if (GLOBALS.cli.count(CLI_TEST))
                         cout << YELLOW << config.ifTitle() << " TESTMODE: would have executed notify script " << contactMethod << RESET << endl;
                     else {
-                        DEBUG(2, "script: " << contactMethod << "; executing");
+                        DEBUG(D_notify) DFMT("script: " << contactMethod << "; executing");
                         if (system(string(contactMethod + " '" + prefix + "\n\n" + message + "'").c_str()))
                             log("unable to notify via " + contactMethod + " (cannot execute)");            
                     }
