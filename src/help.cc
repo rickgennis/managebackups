@@ -204,8 +204,10 @@ from Philip Hazel\[cq]s Exim Mail Transport Agent.
 Contexts can be added or subtracted by name.
 For example, \f[B]-v+cache\f[R] provides the default set plus caching
 whereas \f[B]-v-all+cache\f[R] provides only caching.
-\f[B]-v+all\f[R] gives everything or longer combinations can be strung
-togerher (\f[B]-v-all+cache+prune\f[R]).
+\f[B]-v+all\f[R] gives everything (\f[B]\[en]vv\f[R], two dashes, two
+v\[cq]s, is a synonym for all).
+Longer combinations can be strung together as well
+(\f[B]-v-all+cache+prune+scan\f[R]).
 Note spaces are not supported in the -v string.
 Valid contexts are:
 .RS

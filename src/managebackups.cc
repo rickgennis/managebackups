@@ -1219,8 +1219,9 @@ int main(int argc, char *argv[]) {
         GLOBALS.debugSelector = 0;
 
         for (auto uarg: GLOBALS.cli.unmatched()) {
-            if (uarg == "-vv")
+            if (uarg == "--vv") {
                 GLOBALS.debugSelector = D_all;
+            }
             else 
                 if (uarg.length() > 2) {
                     string op = uarg.substr(2, 1);

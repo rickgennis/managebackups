@@ -31,7 +31,7 @@ Options are relative to the three functions of **managebackups**.
 : Displays help text.
 
 **-v**[*options*]
-: Provide verbose debugging output. Brilliant (albeit overkill in this context) debugging logic borrowed from Philip Hazel's Exim Mail Transport Agent. **-v** by itself enables the default list of debugging contexts.  Contexts can be added or subtracted by name. For example, **-v+cache** provides the default set plus caching whereas **-v-all+cache** provides only caching. **-v+all** gives everything or longer combinations can be strung togerher (**-v-all+cache+prune**). Note spaces are not supported in the -v string. Valid contexts are:
+: Provide verbose debugging output. Brilliant (albeit overkill in this context) debugging logic borrowed from Philip Hazel's Exim Mail Transport Agent. **-v** by itself enables the default list of debugging contexts.  Contexts can be added or subtracted by name. For example, **-v+cache** provides the default set plus caching whereas **-v-all+cache** provides only caching. **-v+all** gives everything (**--vv**, two dashes, two v's, is a synonym for all). Longer combinations can be strung together as well (**-v-all+cache+prune+scan**). Note spaces are not supported in the -v string. Valid contexts are:
 
         * backup (default)
         * cache
