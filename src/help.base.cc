@@ -75,6 +75,7 @@ void showHelp(enum helpType kind) {
             + "   --user              Set directories (config, cache and log) to the calling user's home directory (~/managebackups/).\n"
             + "   --nocolor           Disable color output.\n"
             + "   --test              Run in test mode. No changes are persisted to disk except for caches.\n"
+            + "   --leaveoutput       Leave command (backups, SFTP, etc) output in /tmp/managebackups_output.\n"
             + "   -q                  Quiet mode -- limit output, for use in scripts.\n"
             + "   -v[options]         Verbose debugging output. See 'man managebackups' for details.\n"
             + "   --defaults          Display the default settings for all profiles.\n"

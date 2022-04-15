@@ -402,13 +402,17 @@ void pruneBackups(BackupConfig& config) {
     if (fb > 0 && fd > 0) {
         int minValidBackups = 0;
 
+        string descrip;
         for (auto &fnameIdx: config.cache.indexByFilename) {
             auto raw_it = config.cache.rawData.find(fnameIdx.second);
 
-            DEBUG(D_prune) DFMT("fs: " << raw_it->second.filename << " (" << raw_it->second.day_age << ")");
+            descrip = "";
             if (raw_it != config.cache.rawData.end() && raw_it->second.day_age <= fd) {
                 ++minValidBackups;
+                descrip = " [valid for fs]";
             }
+
+            DEBUG(D_prune) DFMT("failsafe: " << raw_it->second.filename << " (age=" << raw_it->second.day_age << ")" << descrip);
 
             if (minValidBackups >= fb)
                 break;
@@ -422,6 +426,7 @@ void pruneBackups(BackupConfig& config) {
             log(config.ifTitle() + " " + message);
             return;
         }
+        DEBUG(D_prune) DFMT("failsafe passed with " << minValidBackups << " backup" << s(minValidBackups) << " (" << fb << " required) in the last " << fd << " day" << s(fd));
     }
 
     set<string> changedMD5s;
@@ -436,7 +441,6 @@ void pruneBackups(BackupConfig& config) {
         // the loop to track the next value for the iterator without dereferencing a deleted pointer.
         ++next_it;
 
-        DEBUG(D_prune) DFMT("considering " << fIdx_it->first);
         auto raw_it = config.cache.rawData.find(fIdx_it->second);
 
         if (raw_it != config.cache.rawData.end()) { 
@@ -559,7 +563,7 @@ void updateLinks(BackupConfig& config) {
             for (auto &fileID: md5.second) {
                 auto raw_it = config.cache.rawData.find(fileID);
 
-                DEBUG(D_link) DFMT("considering for ref file " << raw_it->second.filename << " (" << raw_it->second.links << ")");
+                DEBUG(D_link) DFMT("ref loop - considering for ref file " << raw_it->second.filename << " (links=" << raw_it->second.links << ")");
                 if (raw_it != config.cache.rawData.end()) {
 
                     if (raw_it->second.links > maxLinksFound &&            // more links than previous files for this md5
@@ -569,7 +573,7 @@ void updateLinks(BackupConfig& config) {
                         referenceFile = &raw_it->second;
                         maxLinksFound = raw_it->second.links;
 
-                        DEBUG(D_link) DFMT("new ref file " << referenceFile->md5 << " " << referenceFile->filename << "; links=" << maxLinksFound);
+                        DEBUG(D_link) DFMT("ref loop - new ref file selected " << referenceFile->md5 << " " << referenceFile->filename << "; links=" << maxLinksFound);
                     }
                 }
             }
@@ -584,7 +588,7 @@ void updateLinks(BackupConfig& config) {
             // 2nd time: loop through the list of files (the set)
             for (auto &fileID: md5.second) {
                 auto raw_it = config.cache.rawData.find(fileID);
-                DEBUG(D_link) DFMT("\texamining " << raw_it->second.filename);
+                DEBUG(D_link) DFMT("\tlink loop - examining " << raw_it->second.filename);
 
                 if (raw_it != config.cache.rawData.end()) {
 
@@ -766,7 +770,7 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
 
     // execute the sftp command
     sFtpTime.start();
-    sFtp.execute(config.settings[sTitle].value);
+    sFtp.execute(GLOBALS.cli.count(CLI_LEAVEOUTPUT) ? config.settings[sTitle].value : "");
 
     if (makeDirs) {
         char data[1500];
@@ -799,17 +803,16 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
 
             if (availSpace < requiredSpace) {
                 NOTQUIET && ANIMATE && cout << backspaces << blankspaces << backspaces << flush;
-                string msg = " SFTP aborted due to insufficient disk space (" + approximate(availSpace) + ") on the remote server, " +
-                        approximate(requiredSpace) + " required";
-                log(config.ifTitle() + msg);
-                SCREENERR("\t• " + config.ifTitle() + msg);
-                return methodStatus(false, "\t•" + msg);
+                return methodStatus(false, errorcom(config.ifTitle(), " SFTP aborted due to insufficient disk space (" + approximate(availSpace) + ") on the remote server, " +
+                        approximate(requiredSpace) + " required"));
             }
             else 
                 DEBUG(D_transfer) DFMT("\nSFTP space check passed (avail " << approximate(availSpace) << ", required " << approximate(requiredSpace) << ")");
         }
-        else
-            log(config.ifTitle() + " unable to check free space (df) on the SFTP server; continuing");
+        else {
+            NOTQUIET && ANIMATE && cout << backspaces << blankspaces << backspaces << flush;
+            return methodStatus(false, errorcom(config.ifTitle(), " SFTP aborted - unable to check free space (df) on the remote server: " + sFtp.errorOutput()));
+        }
     }
 
     // upload the backup file
@@ -832,7 +835,7 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
     }
     else 
         return methodStatus(false, errorcom(config.ifTitle(),
-            "SFTP failed for " + backupFilename + " via " + sFtpParams+ ", see " + string(TMP_OUTPUT_DIR)));
+            "SFTP failed for " + backupFilename + " via " + sFtpParams + sFtp.errorOutput()));
 }
 
 
@@ -941,9 +944,9 @@ void performBackup(BackupConfig& config) {
     backupTime.start();
 
     // begin backing up
-    PipeExec proc(setCommand);
+    PipeExec backup(setCommand);
     GLOBALS.interruptFilename = backupFilename + tempExtension;
-    proc.execute2file(GLOBALS.interruptFilename, safeFilename(config.settings[sTitle].value));
+    backup.execute2file(GLOBALS.interruptFilename, GLOBALS.cli.count(CLI_LEAVEOUTPUT) ? config.settings[sTitle].value : "");
     GLOBALS.interruptFilename = "";  // interruptFilename gets cleaned up on SIGINT & SIGTERM
 
     // note finish time
@@ -954,6 +957,7 @@ void performBackup(BackupConfig& config) {
     struct stat statData;
     if (!stat(string(backupFilename + tempExtension).c_str(), &statData)) {
         if (statData.st_size >= approx2bytes(config.settings[sMinSize].value)) {
+            backup.flushErrors();
 
             // calculate the md5 while its still a temp file so that its ignored by other
             // invocations of managebackups (i.e. someone running -0 while a backup is still
@@ -1195,12 +1199,12 @@ int main(int argc, char *argv[]) {
         (CLI_INSTALLMAN, "Install man", cxxopts::value<bool>()->default_value("false"))
         (CLI_INSTALL, "Install", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOTIFYEVERY, "Notify every", cxxopts::value<int>())
+        (CLI_LEAVEOUTPUT, "Leave output", cxxopts::value<bool>()->default_value("false"))
         (CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
 
     try {
         options.allow_unrecognised_options();
         GLOBALS.cli = options.parse(argc, argv);
-        //GLOBALS.debugLevel = GLOBALS.cli.count(CLI_VERBOSEMAX) ? 1000 : GLOBALS.cli.count(CLI_VERBOSE);
         GLOBALS.color = !(GLOBALS.cli[CLI_QUIET].as<bool>() || GLOBALS.cli[CLI_NOCOLOR].as<bool>());
         GLOBALS.stats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2);
 
@@ -1216,8 +1220,10 @@ int main(int argc, char *argv[]) {
         if (GLOBALS.cli.count(CLI_LOGDIR))
             GLOBALS.logDir = GLOBALS.cli[CLI_LOGDIR].as<string>();
 
+        /* Enable selective debugging
+         * (code taken from Exim MTA - Philip Hazel)
+         */
         GLOBALS.debugSelector = 0;
-
         for (auto uarg: GLOBALS.cli.unmatched()) {
             if (uarg == "--vv") {
                 GLOBALS.debugSelector = D_all;
@@ -1364,8 +1370,8 @@ int main(int argc, char *argv[]) {
             (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ? " -x" : "") +
             paramIfSpecified(CLI_MAXLINKS);
 
-        for (int i = 0; i < GLOBALS.cli.count(CLI_VERBOSE); ++i)
-            commonSwitches += " -v";
+            if (GLOBALS.debugSelector)
+                commonSwitches += " -v=" + to_string(GLOBALS.debugSelector);
         
         /* ALL SEQUENTIAL RUN (prune, link, backup)
          * for all profiles

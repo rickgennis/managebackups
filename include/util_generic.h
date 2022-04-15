@@ -113,5 +113,9 @@ string todayString();
 
 string blockp(string data, int width);
 
+string catdir(string dir);
+
+void rmrfdir(string dir);
+
 #endif
 

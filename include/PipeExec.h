@@ -56,6 +56,7 @@ class PipeExec {
     int numProcs;
     string stateBuffer;
     bool bypassDestructor;
+    string errorDir;
 
     public:
         PipeExec(string cmd);
@@ -72,10 +73,13 @@ class PipeExec {
          * calling "less" and piping text to it, set leaveOutput to true. If the PipeExec class goes out of scope,
          * including the main executable terminating, then wait(NULL) should be called if the sub-process
          * (like "less") will need time to finish.
+         *
+         * procName is used to make a unique subdir under /tmp for STDERR output.
+         * noDestruct is to avoid calling the destructor which does a wait() on each child proc.
          */
-        // procName is used to make a unique subdir under /tmp for STDERR output
+
         int execute(string procName = "", bool leaveOutput = false, bool noDestruct = false);    
-        bool execute2file(string toFile, string procName);
+        bool execute2file(string toFile, string procName = "");
 
         ssize_t readProc(void *buf, size_t count);
         ssize_t writeProc(const void *buf, size_t count);
@@ -84,6 +88,9 @@ class PipeExec {
         bool readAndMatch(string matchStr);
         string statefulReadAndMatchRegex(string regex, int buffSize = 1024 * 2);
         
+        string errorOutput();
+        void flushErrors();
+
         int closeWrite();
         int closeRead();
         int closeAll();

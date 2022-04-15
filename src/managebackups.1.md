@@ -155,6 +155,9 @@ Options are relative to the three functions of **managebackups**.
 **--nobackup**
 : Disable performing backups for this run. To disable permanently moving forward, remove the "command" directive from the profile's config file.
 
+**--leaveoutput**
+: Leave the output from any commands that are run to create a backup or SFTP one in a file under /tmp/managebackups_output. This can help facilitate diagnosing authentication errors.
+
 ## 2. Pruning Options
 
 **--prune**

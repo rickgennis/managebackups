@@ -428,7 +428,7 @@ int varexec(string fullCommand) {
                 // and has shell wildcards
                 (match.find("*") != string::npos || match.find("?") != string::npos)) {
                 
-            // then replace the parameter will a wildcard expansion of the maching files
+            // then replace the parameter with a wildcard expansion of the matching files
             auto files = expandWildcardFilespec(trimQuotes(match));
 
             for (auto entry: files) {
@@ -679,7 +679,7 @@ void sendEmail(string from, string recipients, string subject, string message) {
     }
 
     PipeExec mail(bin);
-    mail.execute("internal");
+    mail.execute();
 
     if (headers.length())
         mail.writeProc(headers.c_str(), headers.length());
@@ -704,3 +704,75 @@ string blockp(string data, int width) {
     sprintf(cstr, string(string("%") + to_string(width) + "s").c_str(), data.c_str());
     return(cstr);
 }
+
+
+
+string catdir(string dir) {
+    string result;
+    DIR *c_dir;
+    struct dirent *c_dirEntry;
+
+    if ((c_dir = opendir(dir.c_str())) != NULL) {
+        while ((c_dirEntry = readdir(c_dir)) != NULL) {
+            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+                continue;
+
+            ifstream aFile;
+            aFile.open(dir + "/" + c_dirEntry->d_name);
+
+            if (aFile.is_open()) {
+                string data;
+
+                while (getline(aFile, data)) 
+                    result += data + "\n";
+
+                aFile.close();
+            }
+
+        }
+        closedir(c_dir);
+    }
+
+    size_t p;
+    while ((p = result.find("\r\n")) != string::npos)
+        result.erase(p, 1);
+
+    while ((p = result.find("\n\n")) != string::npos)
+        result.erase(p, 1);
+
+    if (result.back() == '\n')
+        result.pop_back();
+
+    return(result);
+}
+
+
+// delete an absolute directory (rm -rf).
+// wildcards are not interpreted in the directory name.
+void rmrfdir(string dir) {
+    DIR *c_dir;
+    struct dirent *c_dirEntry;
+
+    if ((c_dir = opendir(dir.c_str())) != NULL) {
+        while ((c_dirEntry = readdir(c_dir)) != NULL) {
+            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+                continue;
+
+            struct stat statData;
+            string filename = addSlash(dir) + c_dirEntry->d_name; 
+            if (!stat(filename.c_str(), &statData)) {
+
+                // recurse into subdirectories
+                if ((statData.st_mode & S_IFMT) == S_IFDIR) 
+                    rmrfdir(filename);
+                else
+                    unlink(filename.c_str());
+            }
+        }
+
+        closedir(c_dir);
+        rmdir(dir.c_str());
+    }
+}
+
+

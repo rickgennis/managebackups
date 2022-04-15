@@ -75,6 +75,7 @@ void showHelp(enum helpType kind) {
             + "   --user              Set directories (config, cache and log) to the calling user's home directory (~/managebackups/).\n"
             + "   --nocolor           Disable color output.\n"
             + "   --test              Run in test mode. No changes are persisted to disk except for caches.\n"
+            + "   --leaveoutput       Leave command (backups, SFTP, etc) output in /tmp/managebackups_output.\n"
             + "   -q                  Quiet mode -- limit output, for use in scripts.\n"
             + "   -v[options]         Verbose debugging output. See 'man managebackups' for details.\n"
             + "   --defaults          Display the default settings for all profiles.\n"
@@ -461,6 +462,11 @@ specified (K, M, G, T, P, E, Z, Y).
 Disable performing backups for this run.
 To disable permanently moving forward, remove the \[lq]command\[rq]
 directive from the profile\[cq]s config file.
+.TP
+\f[B]\[en]leaveoutput\f[R]
+Leave the output from any commands that are run to create a backup or
+SFTP one in a file under /tmp/managebackups_output.
+This can help facilitate diagnosing authentication errors.
 .SS 2. Pruning Options
 .TP
 \f[B]\[en]prune\f[R]

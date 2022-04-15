@@ -34,6 +34,7 @@ bool operator==(const struct ProcDetail& A, const struct ProcDetail& B) {
 
 
 PipeExec::PipeExec(string fullCommand) {
+    errorDir = "";
     origCommand = fullCommand;
     bypassDestructor = false;
     char *data;
@@ -60,6 +61,14 @@ PipeExec::~PipeExec() {
         while (numProcs--)
             waitpid(-1, NULL, WNOHANG);
     }
+
+    flushErrors();
+}
+
+
+void PipeExec::flushErrors() {
+    if (errorDir.length())
+        rmrfdir(errorDir);
 }
 
 
@@ -108,8 +117,8 @@ int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
     bypassDestructor = noDestruct;
     procs.insert(procs.begin(), procDetail("head"));
 
-    string errorFilename = string(TMP_OUTPUT_DIR) + "/" + safeFilename(procName) + "/";
-    mkdirp(errorFilename);
+    errorDir = string(TMP_OUTPUT_DIR) + "/" + (procName.length() ? safeFilename(procName) : "pid_" + to_string(getpid())) + "/";
+    mkdirp(errorDir);
 
     DEBUG(D_exec) DFMT("preparing full command [" << origCommand << "]");
 
@@ -117,22 +126,20 @@ int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
     for (auto proc_it = procs.begin(); proc_it != procs.end(); ++proc_it) {
         ++commandIdx;
         string commandPrefix = proc_it->command.substr(0, proc_it->command.find(" "));
-        string stderrFname = errorFilename + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stderr";
+        string stderrFname = errorDir + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stderr";
 
         // last loop
         if (*proc_it == procs[procs.size() - 1]) {
             DEBUG(D_exec) DFMT("executing final command [" << proc_it->command << "]");
 
             // redirect stderr to a file
-            if (procName.length()) {
-                int errorFd = open(stderrFname.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-                if (errorFd > 0) 
-                    DUP2(errorFd, 2);
-                else { 
-                    string msg = "warning: unable to redirect STDERR of subprocess because " + stderrFname + " isn't writable";
-                    SCREENERR("\n" << msg);
-                    log(msg);
-                }
+            int errorFd = open(stderrFname.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+            if (errorFd > 0) 
+                DUP2(errorFd, 2);
+            else { 
+                string msg = "warning: unable to redirect STDERR of subprocess because " + stderrFname + " isn't writable";
+                SCREENERR("\n" << msg);
+                log(msg);
             }
 
             // dup and close remaining fds
@@ -162,15 +169,13 @@ int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
                     DEBUG(D_exec) DFMT("executing mid command [" << proc_it->command << "] with pipes " << proc_it->fd[0] << " & " << proc_it->fd[1]);
 
                     // redirect stderr to a file
-                    if (procName.length()) {
-                        int errorFd = open(stderrFname.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-                        if (errorFd > 0) 
-                            DUP2(errorFd, 2);
-                        else {
-                            string msg = "warning: unable to redirect STDERR of subprocess because " + stderrFname + " isn't writable";
-                            SCREENERR("\n" << msg);
-                            log(msg);
-                        }
+                    int errorFd = open(stderrFname.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+                    if (errorFd > 0) 
+                        DUP2(errorFd, 2);
+                    else {
+                        string msg = "warning: unable to redirect STDERR of subprocess because " + stderrFname + " isn't writable";
+                        SCREENERR("\n" << msg);
+                        log(msg);
                     }
 
                     // close fds from two procs back
@@ -194,6 +199,8 @@ int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
                 // PARENT - first parent
                 close(proc_it->fd[READ_END]);
                 close(proc_it->readfd[WRITE_END]);
+                if (procName.length())
+                    errorDir = "";  // reset errorDir so that we don't clean up stderr files for a named proc
                 return(proc_it->childPID);
             }
         }
@@ -296,5 +303,10 @@ string PipeExec::statefulReadAndMatchRegex(string regex, int buffSize) {
     }
 
     return ""; 
+}
+
+
+string PipeExec::errorOutput() {
+    return catdir(errorDir);
 }
 
