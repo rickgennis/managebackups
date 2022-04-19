@@ -2,6 +2,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <vector>
@@ -31,6 +32,8 @@ bool operator==(const struct ProcDetail& A, const struct ProcDetail& B) {
     return !(A != B);
 }
  
+
+string firstAvailIDForDir(string dir);
 
 
 PipeExec::PipeExec(string fullCommand) {
@@ -119,6 +122,7 @@ int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
 
     errorDir = string(TMP_OUTPUT_DIR) + "/" + (procName.length() ? safeFilename(procName) : "pid_" + to_string(getpid())) + "/";
     mkdirp(errorDir);
+    string commandID = firstAvailIDForDir(errorDir);
 
     DEBUG(D_exec) DFMT("preparing full command [" << origCommand << "]");
 
@@ -126,7 +130,7 @@ int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
     for (auto proc_it = procs.begin(); proc_it != procs.end(); ++proc_it) {
         ++commandIdx;
         string commandPrefix = proc_it->command.substr(0, proc_it->command.find(" "));
-        string stderrFname = errorDir + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stderr";
+        string stderrFname = errorDir + commandID + ":" + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stderr";
 
         // last loop
         if (*proc_it == procs[procs.size() - 1]) {
@@ -309,4 +313,45 @@ string PipeExec::statefulReadAndMatchRegex(string regex, int buffSize) {
 string PipeExec::errorOutput() {
     return catdir(errorDir);
 }
+
+
+string firstAvailIDForDir(string dir) {
+    DIR *c_dir;
+    struct dirent *c_dirEntry;
+    string lastID = "";
+
+    if ((c_dir = opendir(dir.c_str())) != NULL) {
+        while ((c_dirEntry = readdir(c_dir)) != NULL) {
+            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+                continue;
+
+            auto filename = string(c_dirEntry->d_name);
+            auto delimit = filename.find(":");
+
+            if (delimit != string::npos) {
+                auto id = filename.substr(0, delimit);
+
+                if (lastID < id)
+                    lastID = id;
+            }
+        }
+
+        closedir(c_dir);
+    }
+
+    if (!lastID.length())
+        return "A";
+
+    char lastLetter = lastID.back();
+    if (lastLetter == 'Z')
+        return(lastID + "A");
+
+    int i = lastLetter;
+    char c = (char)(i+1);
+    char result[100];
+    sprintf(result, "%s%c", lastID.substr(0, lastID.length() - 1).c_str(), c);
+    return(result);
+
+}
+
 
