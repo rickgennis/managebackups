@@ -327,7 +327,7 @@ unsigned int BackupConfig::removeEmptyDirs(string directory) {
             ++entryCount;
             ++GLOBALS.statsCount;
             struct stat statData;
-            string fullFilename = addSlash(dir) + string(c_dirEntry->d_name);
+            string fullFilename = slashConcat(dir, c_dirEntry->d_name);
             if (!stat(fullFilename.c_str(), &statData)) {
 
                 // recurse into subdirectories

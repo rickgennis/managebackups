@@ -98,7 +98,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
             if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
                continue;
 
-            string fullFilename = addSlash(directory) + string(c_dirEntry->d_name);
+            string fullFilename = slashConcat(directory, c_dirEntry->d_name);
 
             ++GLOBALS.statsCount;
             struct stat statData;
@@ -346,7 +346,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
 
     if (currentConf == &tempConfig) {
         if (bProfile && bSave) {
-            tempConfig.config_filename = addSlash(GLOBALS.confDir) + safeFilename(tempConfig.settings[sTitle].value) + ".conf";
+            tempConfig.config_filename = slashConcat(GLOBALS.confDir, safeFilename(tempConfig.settings[sTitle].value)) + ".conf";
             tempConfig.temp = false;
         }
 
@@ -908,13 +908,13 @@ void performBackup(BackupConfig& config) {
     char buffer[100];
     now = time(NULL);
 
-    strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d": "%Y/%m", localtime(&now));
+    strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d" : "%Y/%m", localtime(&now));
     string subDir = buffer;
 
-    strftime(buffer, sizeof(buffer), incTime ? "-%Y%m%d-%H:%M:%S": "-%Y%m%d", localtime(&now));
+    strftime(buffer, sizeof(buffer), incTime ? "-%Y%m%d-%H:%M:%S" : "-%Y%m%d", localtime(&now));
     string fnameInsert = buffer;
 
-    string fullDirectory = addSlash(setDir) + subDir + "/";
+    string fullDirectory = slashConcat(setDir, subDir) + "/";
     string basicFilename;
 
     Pcre fnamePartsRE("(.*)(\\.[^.]+)$");
@@ -1053,9 +1053,9 @@ void setupUserDirectories() {
     }
     
     string mbs = "managebackups";
-    GLOBALS.confDir = addSlash(pws->pw_dir) + mbs + "/etc";
-    GLOBALS.cacheDir = addSlash(pws->pw_dir) + mbs + "/var/cache";
-    GLOBALS.logDir = addSlash(pws->pw_dir) + mbs + "/var/log";
+    GLOBALS.confDir = slashConcat(pws->pw_dir, mbs, "/etc");
+    GLOBALS.cacheDir = slashConcat(pws->pw_dir, mbs, "/var/cache");
+    GLOBALS.logDir = slashConcat(pws->pw_dir, mbs, "/var/log");
 }
 
 

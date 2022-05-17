@@ -35,7 +35,7 @@ ConfigManager::ConfigManager() {
                     !strcmp(c_dirEntry->d_name, "managebackups.conf") || !regEx.search(string(c_dirEntry->d_name)))
                 continue;
 
-            string fullFilename = addSlash(GLOBALS.confDir) + string(c_dirEntry->d_name);
+            string fullFilename = slashConcat(GLOBALS.confDir, c_dirEntry->d_name);
             BackupConfig backupConfig;
             backupConfig.loadConfig(fullFilename);
             configs.insert(configs.begin(), backupConfig);

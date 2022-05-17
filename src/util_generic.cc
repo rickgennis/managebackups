@@ -108,8 +108,19 @@ void log(string message) {
 struct timeval mktimeval(unsigned long secs) { struct timeval t; t.tv_sec = secs; t.tv_usec = 0; return t; }
 
 
-string addSlash(string str) {
-    return(str.length() && str[str.length() - 1] == '/' ? str : str + "/");
+string slashConcat(string str1, string str2) {
+    if (str1.length() && str1[str1.length() - 1] == '/')
+        str1.pop_back();
+
+    if (str2.length() && str2[0] == '/')
+        str2.erase(0, 1);
+
+    return(str1 + "/" + str2);
+}
+
+
+string slashConcat(string str1, string str2, string str3) {
+    return slashConcat(slashConcat(str1, str2), str3);
 }
 
 
@@ -759,7 +770,7 @@ void rmrfdir(string dir) {
                 continue;
 
             struct stat statData;
-            string filename = addSlash(dir) + c_dirEntry->d_name; 
+            string filename = slashConcat(dir, c_dirEntry->d_name);
             if (!stat(filename.c_str(), &statData)) {
 
                 // recurse into subdirectories
@@ -775,4 +786,11 @@ void rmrfdir(string dir) {
     }
 }
 
+
+int mkbasedirs(string path) {
+    if (path.length())
+        return mkdirp(path.substr(0, path.find_last_of("/")));
+
+    return -1;
+}
 
