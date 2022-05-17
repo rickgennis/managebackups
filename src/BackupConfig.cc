@@ -1,7 +1,6 @@
 #include <fstream>
 #include <sys/stat.h>
 #include <stdio.h>
-#include <variant>
 #include <unistd.h>
 #include <dirent.h>
 #include <pcre++.h>

@@ -147,7 +147,6 @@ int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
             }
 
             // dup and close remaining fds
-            //auto back_it = proc_it - 1;
             auto back_it = proc_it - 1;
             DUP2(back_it->fd[READ_END], READ_END);
             close(procs[0].fd[WRITE_END]);

@@ -1158,7 +1158,6 @@ int main(int argc, char *argv[]) {
         (string("f,") + CLI_FILE, "Filename", cxxopts::value<std::string>())
         (string("c,") + CLI_COMMAND, "Command", cxxopts::value<std::string>())
         (string("n,") + CLI_NOTIFY, "Notify", cxxopts::value<std::string>())
-        //(string("v,") + CLI_VERBOSE, "Verbose output", cxxopts::value<string>())
         (string("V,") + CLI_VERSION, "Version", cxxopts::value<bool>()->default_value("false"))
         (string("q,") + CLI_QUIET, "No output", cxxopts::value<bool>()->default_value("false"))
         (string("l,") + CLI_MAXLINKS, "Max hard links", cxxopts::value<int>())
@@ -1170,7 +1169,7 @@ int main(int argc, char *argv[]) {
         (string("x,") + CLI_LOCK, "Lock profile", cxxopts::value<bool>()->default_value("false"))
         (string("k,") + CLI_CRONS, "Cron", cxxopts::value<bool>()->default_value("false"))
         (string("K,") + CLI_CRONP, "Cron", cxxopts::value<bool>()->default_value("false"))
-        //(CLI_VERBOSEMAX, "Max verbosity", cxxopts::value<bool>()->default_value("false"))
+        (string("h,") + CLI_HELP, "Show help", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))
         (CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))
         (CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())
@@ -1187,7 +1186,6 @@ int main(int argc, char *argv[]) {
         (CLI_TIME, "Include time", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOBACKUP, "Don't backup", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOCOLOR, "Disable color", cxxopts::value<bool>()->default_value("false"))
-        (CLI_HELP, "Show help", cxxopts::value<bool>()->default_value("false"))
         (CLI_CONFDIR, "Configuration directory", cxxopts::value<std::string>())
         (CLI_CACHEDIR, "Cache directory", cxxopts::value<std::string>())
         (CLI_LOGDIR, "Log directory", cxxopts::value<std::string>())
@@ -1203,7 +1201,7 @@ int main(int argc, char *argv[]) {
         (CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
 
     try {
-        options.allow_unrecognised_options();
+        options.allow_unrecognised_options();  // to support -v...
         GLOBALS.cli = options.parse(argc, argv);
         GLOBALS.color = !(GLOBALS.cli[CLI_QUIET].as<bool>() || GLOBALS.cli[CLI_NOCOLOR].as<bool>());
         GLOBALS.stats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2);
@@ -1237,11 +1235,17 @@ int main(int argc, char *argv[]) {
                         uschar *usc = (uschar*)uarg.substr(2, string::npos).c_str();
                         decode_bits(&selector, 1, debug_notall, usc, debug_options, ndebug_options);
                         GLOBALS.debugSelector = selector;
+                        continue;
                     }
                 }
-                else
-                    if (uarg == "-v")
+                else 
+                    if (uarg == "-v") {
                         GLOBALS.debugSelector = D_default;
+                        continue;
+                    }
+
+            SCREENERR("error: unrecognized parameter " << uarg << "\nUse --help for a list of options.");
+            exit(1);
         }
     }
     catch (cxxopts::OptionParseException& e) {
@@ -1472,7 +1476,7 @@ int main(int argc, char *argv[]) {
     }
     
     AppTimer.stop();
-    DEBUG(D_any) DFMT("stats: " << GLOBALS.statsCount << ", md5s: " << GLOBALS.md5Count << ", total time: " << AppTimer.elapsed(3));
+    DEBUG(D_any) DFMT("stats: " << BOLDGREEN << GLOBALS.statsCount << RESET << GREEN << ", md5s: " << BOLDGREEN << GLOBALS.md5Count << RESET << GREEN << ", total time: " << BOLDGREEN << AppTimer.elapsed(3));
     return 0;
 }
 

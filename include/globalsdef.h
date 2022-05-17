@@ -42,8 +42,6 @@
 #define CLI_NOTIFY "notify"
 #define CLI_NOS "nos"
 #define CLI_SAVE "save"
-#define CLI_VERBOSE "verbose"
-#define CLI_VERBOSEMAX "vv"
 #define CLI_NOCOLOR "nocolor"
 #define CLI_STATS1 "1"
 #define CLI_STATS2 "0"

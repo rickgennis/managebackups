@@ -52,7 +52,7 @@ void showHelp(enum helpType kind) {
             + "   --dow [x]           Day of week to save for weeklies (0=Sunday, 1=Monday, etc); defaults to Sunday.\n"
             + "   --fs_backups [b]    FAILSAFE: Require b backups before pruning\n"
             + "   --fs_days [d]       FAILSAFE: within the last d days.\n"
-            + "   --fp                FAILSAFE: Paranoid mode; sets --fb=1, --fd=2\n"
+            + "   --fp                FAILSAFE: Paranoid mode; sets --fs_backups 1 --fs_days 2\n"
             + "\n" + string(BOLDBLUE) + "HARD LINKING\n" + RESET
             + "   --maxlinks [x]      Max number of links to a file (default 20).\n"
             + "   --prune             Enable pruning.\n"

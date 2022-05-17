@@ -17,6 +17,10 @@ using namespace std;
 string oldMessage = ">24H old";
 
 
+/* The summaryStats structure is used to return stat totals on a given config to the calling function.
+ * Some data is broken out into individual totals (the longs).  Other is returned as strings for
+ * easy display (stringOutput).
+ */
 struct summaryStats {
     bool success;
     bool inProcess;
@@ -91,7 +95,7 @@ summaryStats _displaySummaryStats(BackupConfig& config, int statDetail = 0, int 
             to_string(saved) + "%",
             timeDiff(mktimeval(first_it->second.name_mtime)),
             timeDiff(mktimeval(last_it->second.mtime)),
-            processAge.length() ? processAge : GLOBALS.startupTime - last_it->second.mtime > 60*60*24 ? oldMessage : ""};
+            processAge.length() ? processAge : GLOBALS.startupTime - last_it->second.name_mtime > 2*60*60*24 ? oldMessage : ""};
             
         for (int i = 0; i < NUMSTATDETAILS; ++i)
             resultStats.stringOutput[i] = soutput[i];
