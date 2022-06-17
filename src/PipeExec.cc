@@ -1,5 +1,6 @@
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <dirent.h>
@@ -63,9 +64,9 @@ PipeExec::~PipeExec() {
 
         while (numProcs--)
             waitpid(-1, NULL, WNOHANG);
-    }
 
-    flushErrors();
+        flushErrors();
+    }
 }
 
 
@@ -116,7 +117,7 @@ void PipeExec::dump() {
 }
 
 
-int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
+int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, bool noErrToDisk) {
     bypassDestructor = noDestruct;
     procs.insert(procs.begin(), procDetail("head"));
 
@@ -137,13 +138,15 @@ int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
             DEBUG(D_exec) DFMT("executing final command [" << proc_it->command << "]");
 
             // redirect stderr to a file
-            int errorFd = open(stderrFname.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-            if (errorFd > 0) 
-                DUP2(errorFd, 2);
-            else { 
-                string msg = "warning: unable to redirect STDERR of subprocess because " + stderrFname + " isn't writable";
-                SCREENERR("\n" << msg);
-                log(msg);
+            if (!noErrToDisk) {
+                int errorFd = open(stderrFname.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+                if (errorFd > 0) 
+                    DUP2(errorFd, 2);
+                else { 
+                    string msg = "warning: unable to redirect STDERR of subprocess to " + stderrFname + " (" + strerror(errno) + ")";
+                    SCREENERR("\n" << msg);
+                    log(msg);
+                }
             }
 
             // dup and close remaining fds
@@ -152,7 +155,7 @@ int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
             close(procs[0].fd[WRITE_END]);
             close(procs[0].readfd[READ_END]);
 
-            if (!leaveOutput)
+            if (!leaveFinalOutput)
                 DUP2(procs[0].readfd[WRITE_END], 1);
 
             // exec the last process
@@ -172,13 +175,15 @@ int PipeExec::execute(string procName, bool leaveOutput, bool noDestruct) {
                     DEBUG(D_exec) DFMT("executing mid command [" << proc_it->command << "] with pipes " << proc_it->fd[0] << " & " << proc_it->fd[1]);
 
                     // redirect stderr to a file
-                    int errorFd = open(stderrFname.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-                    if (errorFd > 0) 
-                        DUP2(errorFd, 2);
-                    else {
-                        string msg = "warning: unable to redirect STDERR of subprocess because " + stderrFname + " isn't writable";
-                        SCREENERR("\n" << msg);
-                        log(msg);
+                    if (!noErrToDisk) {
+                        int errorFd = open(stderrFname.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+                        if (errorFd > 0) 
+                            DUP2(errorFd, 2);
+                        else {
+                            string msg = "warning: unable to redirect STDERR of subprocess to " + stderrFname + " (" + strerror(errno) + ")";
+                            SCREENERR("\n" << msg);
+                            log(msg);
+                        }
                     }
 
                     // close fds from two procs back

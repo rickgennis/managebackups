@@ -21,6 +21,7 @@ bit_table debug_options[]      = { /* must be in alphabetical order and use
   BIT_TABLE(D, config),
   BIT_TABLE(D, exec),
   BIT_TABLE(D, link),
+  BIT_TABLE(D, netproto),
   BIT_TABLE(D, notify),
   BIT_TABLE(D, prune),
   BIT_TABLE(D, scan),

@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.2.5"
+#define VERSION "1.2.6"
 
 #include "cxxopts.hpp"
 #include "colors.h"
@@ -78,6 +78,7 @@
 #define CLI_NOTIFYEVERY "notifyevery"
 #define CLI_MAILFROM "from"
 #define CLI_LEAVEOUTPUT "leaveoutput"
+#define CLI_FAUB "faub"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -111,6 +112,7 @@
 #define RE_NOTIFYEVERY "(notifyevery|every)"
 #define RE_MAILFROM "(mailfrom|from)"
 #define RE_LEAVEOUTPUT "(leaveoutput)"
+#define RE_FAUB "(faub|faubstyle)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"
@@ -123,6 +125,7 @@ using namespace std;
 enum helpType { hDefaults, hOptions, hExamples, hSyntax };
 
 struct global_vars {
+    int sessionId;
     unsigned int debugSelector;
     time_t startupTime;
     unsigned long statsCount;

@@ -60,6 +60,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_NOTIFYEVERY, RE_NOTIFYEVERY, INT, "0"));
     settings.insert(settings.end(), Setting(CLI_MAILFROM, RE_MAILFROM, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_LEAVEOUTPUT, RE_LEAVEOUTPUT, BOOL, "false"));
+    settings.insert(settings.end(), Setting(CLI_FAUB, RE_FAUB, BOOL, "false"));
 }
 
 

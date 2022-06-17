@@ -58,11 +58,12 @@ enum {
   DEBUG_BIT(config),
   DEBUG_BIT(exec),
   DEBUG_BIT(link),
+  DEBUG_BIT(netproto),
   DEBUG_BIT(notify),
   DEBUG_BIT(prune),
   DEBUG_BIT(scan),
   DEBUG_BIT(transfer),
-  DEBUG_BIT(tripwire)
+  DEBUG_BIT(tripwire),
 };
 
 #define D_all                        0xffffffff

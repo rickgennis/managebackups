@@ -62,7 +62,7 @@ class PipeExec {
         PipeExec(string cmd);
         ~PipeExec();
 
-        /* execute(procName, leaveOutput)
+        /* execute(procName, leaveFinalOutput, noDestruct, noErrToDisk)
          * This executes the entire cmd from the constructor, inclusive all off sub-processes required for any
          * embedded pipes. STDIO is passed from proc to proc (STDOUT of proc 1 to STDIN of proc 2, etc).  STDERR
          * from each child proc (if any) would spill to the screen and look ugly. Instead we redirect the STDERRs
@@ -70,7 +70,7 @@ class PipeExec {
          *
          * The final child proc's STDOUT is redirected back to the initial parent to be able to read its output.
          * If it's preferable to just have the final child's STDOUT appear on the screen (such as if you're
-         * calling "less" and piping text to it, set leaveOutput to true. If the PipeExec class goes out of scope,
+         * calling "less" and piping text to it, set leaveFinalOutput to true. If the PipeExec class goes out of scope,
          * including the main executable terminating, then wait(NULL) should be called if the sub-process
          * (like "less") will need time to finish.
          *
@@ -78,7 +78,7 @@ class PipeExec {
          * noDestruct is to avoid calling the destructor which does a wait() on each child proc.
          */
 
-        int execute(string procName = "", bool leaveOutput = false, bool noDestruct = false);    
+        int execute(string procName = "", bool leaveFinalOutput = false, bool noDestruct = false, bool noErrToDisk = false);
         bool execute2file(string toFile, string procName = "");
 
         ssize_t readProc(void *buf, size_t count);

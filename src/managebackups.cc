@@ -34,6 +34,7 @@
 #include "PipeExec.h"
 #include "setup.h"
 #include "debug.h"
+#include "network.h"
 
 
 using namespace pcrepp;
@@ -887,6 +888,127 @@ bool performTripwire(BackupConfig& config) {
     return true;
 }
 
+/*
+void serverSideFaubProcessing(tcpSocket& client, vector<BackupConfig>& configs);
+
+
+void startFaubServer(vector<BackupConfig>& configs) {
+    if (fork())
+        return;
+
+    tcpSocket listeningServer(2029);
+
+    while (1) {
+        tcpSocket client = listeningServer.accept(15);
+
+        if (!fork()) {
+            serverSideFaubProcessing(client, vector<BackupConfig>& configs);
+            exit(0);
+        }
+    }
+
+    exit(0);
+}
+*/
+
+void serverSideFaubProcessing(tcpSocket& client, vector<BackupConfig>& configs) {
+    string remoteFilename;
+    string localPrevFilename;
+    string localCurFilename;
+    struct stat statData;
+
+    long clientId = client.read() - GLOBALS.sessionId;
+    if (clientId < 0 || clientId > configs.size()) {
+        SCREENERR("Invalid session id.");
+        exit(5);
+    }
+
+    string prevDir;
+    string currentDir;   // SET THESE
+
+    do {
+        vector<string> neededFiles;
+        map<string,string> linkList;
+
+        /*
+         * phase 1 - get list of filenames and mtimes from client
+         * and see if the remote file is different from what we
+         * have locally in the most recent backup.
+        */
+        unsigned int fileCount = 0;
+        unsigned int allFiles = 0;
+
+        while (1) {
+            remoteFilename = client.readTo(NET_DELIM);
+
+            if (remoteFilename == NET_OVER)
+                break;
+
+            ++allFiles;
+            long mtime = client.read();
+            localPrevFilename = slashConcat(prevDir, remoteFilename);
+            localCurFilename = slashConcat(currentDir, remoteFilename);
+
+            /*
+             * if the remote file and mtime match with the copy in our most recent
+             * local backup then we want to hard ink the current local backup's copy to
+             * that previous backup version. if they don't match or the previous backup's
+             * copy doesn't exist, add the file to the list of ones we need to get
+             * from the remote end. For ones we want to link, add them to a list to do
+             * at the end.  We can't do them now because the subdirectories they live in
+             * may not have come over yet.
+            */
+            if (prevDir.length() &&
+                    !stat(localPrevFilename.c_str(), &statData) &&
+                    statData.st_mtime == mtime) {
+                linkList.insert(linkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
+            }
+            else {
+                ++fileCount;
+                neededFiles.insert(neededFiles.end(), remoteFilename);
+                //cout << "\tserver: added needed file " << remoteFilename << endl;
+            }
+        }
+
+        cout << "server: phase 1 complete - examined " << allFiles << " files, need " << fileCount << " from client." << endl;
+
+        /*
+         * phase 2 - send the client the list of files that we need full copies of
+         * because they've changed or are missing from the previous backup
+        */
+        for (auto &file: neededFiles)
+            client.write(string(file + NET_DELIM).c_str());
+        client.write(NET_OVER_DELIM);
+
+        cout << "server: phase 2 complete, told client which files we need." << endl;
+
+        /*
+         * phase 3 - receive full copies of the files we've requested. they come over
+         * in the order we've requested in the format of 8 bytes for 'size' and then
+         * the 'size' number of bytes of data.
+        */
+        fileCount = 0;
+        for (auto &file: neededFiles) {
+            ++fileCount;
+            client.readToFile(slashConcat(currentDir, file));
+        }
+        cout << "server: phase 3 complete, received " << fileCount << " files from client." << endl;
+
+        /*
+         * phase 4 - create the links for everything that matches the previous backup.
+        */
+        fileCount = 0;
+        for (auto &links: linkList) {
+            ++fileCount;
+            mkbasedirs(links.second);
+            link(links.first.c_str(), links.second.c_str());
+        }
+        cout << "server: phase 4 complete, created " << fileCount << " links to previously backed up files.\n" << endl;
+
+    } while (client.read());
+    
+}
+
 
 /*******************************************************************************
  * performBackup(config)
@@ -1126,6 +1248,7 @@ int main(int argc, char *argv[]) {
     GLOBALS.statsCount = 0;
     GLOBALS.md5Count = 0;
     GLOBALS.pid = getpid();
+    GLOBALS.sessionId = rand();
 
     // default directories
     GLOBALS.confDir = CONF_DIR;
@@ -1280,7 +1403,7 @@ int main(int argc, char *argv[]) {
 
     if (GLOBALS.cli.count(CLI_VERSION)) {
         cout << "managebackups " << VERSION << "\n";
-        cout << "2022 released under GPLv2." << endl;
+        cout << "(c) 2022 released under GPLv2." << endl;
         exit(0);
     }
 
@@ -1298,6 +1421,11 @@ int main(int argc, char *argv[]) {
             GLOBALS.cli.count(CLI_SCPTO) ||
             GLOBALS.cli.count(CLI_SFTPTO))) {
         SCREENERR("error: --file, --command, --save, --directory, --scp and --sftp are incompatible with --all/--All and --cron/--Cron");
+        exit(1);
+    } 
+
+    if (GLOBALS.cli.count(CLI_FAUB) && (GLOBALS.cli.count(CLI_SFTPTO) || GLOBALS.cli.count(CLI_SCPTO))) {
+        SCREENERR("error: --faub is incompatible with --sftp and --scp");
         exit(1);
     } 
 
@@ -1371,6 +1499,7 @@ int main(int argc, char *argv[]) {
             paramIfSpecified(CLI_TRIPWIRE) +
             paramIfSpecified(CLI_NOTIFYEVERY) +
             paramIfSpecified(CLI_YEARS) +
+            paramIfSpecified(CLI_FAUB) +
             (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ? " -x" : "") +
             paramIfSpecified(CLI_MAXLINKS);
 
@@ -1416,7 +1545,7 @@ int main(int argc, char *argv[]) {
 
                     // launch each profile in a separate child
                     PipeExec miniMe(string(argv[0]) + " -p " + config.settings[sTitle].value + commonSwitches + " -z");
-                    auto childPID = miniMe.execute("", true, true);
+                    auto childPID = miniMe.execute("", true, false, true);
                     miniMe.closeAll();
 
                     // save the child PID and pipe object in our map
