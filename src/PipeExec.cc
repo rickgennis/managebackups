@@ -364,7 +364,7 @@ string firstAvailIDForDir(string dir) {
     int i = lastLetter;
     char c = (char)(i+1);
     char result[100];
-    sprintf(result, "%s%c", lastID.substr(0, lastID.length() - 1).c_str(), c);
+    snprintf(result, sizeof(result), "%s%c", lastID.substr(0, lastID.length() - 1).c_str(), c);
     return(result);
 
 }

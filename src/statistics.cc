@@ -219,7 +219,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
             string msg = statStrings[line * NUMSTATDETAILS + 9];
             bool is_old = msg == oldMessage;
 
-            sprintf(result, lineFormat.c_str(), 
+            snprintf(result, sizeof(result), lineFormat.c_str(), 
                     statStrings[line * NUMSTATDETAILS].c_str(),
                     statStrings[line * NUMSTATDETAILS + 1].c_str(),
                     statStrings[line * NUMSTATDETAILS + 2].c_str(),
@@ -238,7 +238,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
 
         // print the totals line
         if (!singleConfig && nonTempConfigs > 1) {
-            sprintf(result, string(
+            snprintf(result, sizeof(result), string(
                     "%-" + to_string(max(headers[3].length(), colLen[3])) + "s  " +
                     "%-" + to_string(max(headers[4].length(), colLen[4])) + "s  " +
                     "%-" + to_string(max(headers[5].length(), colLen[5])) + "s  " +
@@ -334,7 +334,7 @@ void _displayDetailedStats(BackupConfig& config) {
 
             // format the detail for output
             char result[1000];
-            sprintf(result, 
+            snprintf(result, sizeof(result), 
                     // filename
                     string(string("%-") + to_string(fnameLen+1) + "s  " + 
                     // size

@@ -19,7 +19,7 @@ void showHelp(enum helpType kind) {
 
             char buffer[200];
             for (auto cfg: config.settings) {
-                sprintf(buffer, "   %-15s %s", cfg.display_name.c_str(), cfg.value.c_str());
+                snprintf(buffer, sizeof(buffer), "   %-15s %s", cfg.display_name.c_str(), cfg.value.c_str());
                 cout << buffer << endl;
             }
             break;
