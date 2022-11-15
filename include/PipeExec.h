@@ -56,14 +56,15 @@ class PipeExec {
     int numProcs;
     string stateBuffer;
     bool bypassDestructor;
+    bool dontCleanup;
     string errorDir;
 
     public:
         PipeExec(string cmd);
         ~PipeExec();
 
-        /* execute(procName, leaveFinalOutput, noDestruct, noErrToDisk)
-         * This executes the entire cmd from the constructor, inclusive all off sub-processes required for any
+        /* execute(procName, leaveFinalOutput, noDestruct, noErrToDisk, noTmpCleanup)
+         * This executes the entire cmd from the constructor, inclusive of all sub-processes required for any
          * embedded pipes. STDIO is passed from proc to proc (STDOUT of proc 1 to STDIN of proc 2, etc).  STDERR
          * from each child proc (if any) would spill to the screen and look ugly. Instead we redirect the STDERRs
          * to files under /tmp.
@@ -78,7 +79,7 @@ class PipeExec {
          * noDestruct is to avoid calling the destructor which does a wait() on each child proc.
          */
 
-        int execute(string procName = "", bool leaveFinalOutput = false, bool noDestruct = false, bool noErrToDisk = false);
+        int execute(string procName = "", bool leaveFinalOutput = false, bool noDestruct = false, bool noErrToDisk = false, bool noTmpCleanup = false);
         bool execute2file(string toFile, string procName = "");
 
         ssize_t readProc(void *buf, size_t count);

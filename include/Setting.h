@@ -3,6 +3,7 @@
 #define SETTING_H
 
 #include <string>
+#include <map>
 #include <pcre++.h>
 #include <util_generic.h>
 
@@ -14,6 +15,8 @@ enum SetSpecifier { sTitle, sDirectory, sBackupFilename, sBackupCommand, sDays, 
     sSCPTo, sSFTPTo, sPruneLive, sNotify, sMaxLinks, sIncTime, sNos, sMinSize, sDOW, sFP, sMode, sMinSpace, sMinSFTPSpace, sNice, sTripwire, 
     sNotifyEvery, sMailFrom, sLeaveOutput, sFaub };
 
+extern map<string, int>settingMap;
+
 class Setting {
     public:
         string display_name;
@@ -22,6 +25,7 @@ class Setting {
         string defaultValue;
         Pcre regex;
         bool seen;
+        string execParam;
 
         int ivalue() { return stoi(value); }
         string confPrint(string sample = "");

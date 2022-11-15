@@ -65,14 +65,19 @@ PipeExec::~PipeExec() {
         while (numProcs--)
             waitpid(-1, NULL, WNOHANG);
 
-        flushErrors();
+        if (!dontCleanup) {
+            log("note: destructor calling flushErrors()");
+            flushErrors();
+        }
     }
 }
 
 
 void PipeExec::flushErrors() {
-    if (errorDir.length())
+    if (errorDir.length()) {
+        log("flushErrors(" + errorDir + "): " + origCommand);
         rmrfdir(errorDir);
+    }
 }
 
 
@@ -117,8 +122,9 @@ void PipeExec::dump() {
 }
 
 
-int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, bool noErrToDisk) {
+int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, bool noErrToDisk, bool noTmpCleanup) {
     bypassDestructor = noDestruct;
+    dontCleanup = noTmpCleanup;
     procs.insert(procs.begin(), procDetail("head"));
 
     errorDir = string(TMP_OUTPUT_DIR) + "/" + (procName.length() ? safeFilename(procName) : "pid_" + to_string(getpid())) + "/";
@@ -143,7 +149,7 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
                 if (errorFd > 0) 
                     DUP2(errorFd, 2);
                 else { 
-                    string msg = "warning: unable to redirect STDERR of subprocess to " + stderrFname + " (" + strerror(errno) + ")";
+                    string msg = "warning: unable to redirect STDERR of subprocess to " + stderrFname + " (A: " + strerror(errno) + ")";
                     SCREENERR("\n" << msg);
                     log(msg);
                 }
@@ -180,7 +186,7 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
                         if (errorFd > 0) 
                             DUP2(errorFd, 2);
                         else {
-                            string msg = "warning: unable to redirect STDERR of subprocess to " + stderrFname + " (" + strerror(errno) + ")";
+                            string msg = "warning: unable to redirect STDERR of subprocess to " + stderrFname + " (B: " + strerror(errno) + ")";
                             SCREENERR("\n" << msg);
                             log(msg);
                         }
@@ -235,7 +241,7 @@ bool PipeExec::execute2file(string toFile, string procName) {
     DEBUG(D_exec) DFMT("toFile=" << toFile << "; procName=" << procName);
 
     if ((outFile = open(toFile.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR)) > 0) {
-        execute(procName);
+        execute(procName, false, false, false, true);
 
         while ((bytesRead = readProc(&data, sizeof(data)))) {
             pos = 0;
@@ -290,6 +296,11 @@ ssize_t PipeExec::readProc(void *buf, size_t count) {
 ssize_t PipeExec::writeProc(const void *buf, size_t count) {
     return write(procs[0].fd[WRITE_END], buf, count);
 }
+
+
+//ssize_t PipeExec::send2Proc(const void *buf) {
+    
+//}
 
 
 string PipeExec::statefulReadAndMatchRegex(string regex, int buffSize) {

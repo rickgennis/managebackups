@@ -127,7 +127,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
         perStats = _displaySummaryStats(configManager.configs[configManager.activeConfig], statDetail, maxFileLen, maxProfLen);
         profileInProcess.insert(profileInProcess.end(), perStats.inProcess);
 
-        for (int i = 0; i < NUMSTATDETAILS; ++i) 
+        for (int i = 0; i < NUMSTATDETAILS; ++i)
             statStrings.insert(statStrings.end(), perStats.stringOutput[i]);
     }
     else {
@@ -349,7 +349,7 @@ void _displayDetailedStats(BackupConfig& config) {
                     "%s").c_str(),
                         raw_it->second.filename.c_str(), approximate(raw_it->second.size).c_str(), 
                         seconds2hms(raw_it->second.duration).c_str(),
-                        raw_it->second.date_day == 1 ? "Mnth" : raw_it->second.dow == 0 ? "Week" : "Day",
+                        raw_it->second.date_month == 1 && raw_it->second.date_day == 1 ? "Year" : raw_it->second.date_day == 1 ? "Mnth" : raw_it->second.dow == 0 ? "Week" : "Day",
                         raw_it->second.links, timeDiff(mktimeval(prectime ? raw_it->second.mtime : raw_it->second.name_mtime)).c_str());
 
             // if there's more than 1 file with this MD5 then color code it as a set; otherwise no color

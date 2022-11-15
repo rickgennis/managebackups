@@ -1,13 +1,13 @@
 
-MAKEFLAGS := -j3
+MAKEFLAGS := -j
 
 IDIR =../include
 CC=c++
-CFLAGS=-I../include -I/usr/local/include -I/usr/local/Cellar/openssl@1.1/1.1.1m/include -Wno-c++11-extensions -fno-stack-protector -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-math-errno -fno-unroll-loops -fmerge-all-constants -fno-ident
+CFLAGS=-I../include -I/opt/homebrew/include -I/opt/homebrew/Cellar/openssl@3/3.0.5/include -Wno-c++11-extensions -fno-stack-protector -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-math-errno -fno-unroll-loops -fmerge-all-constants
 ODIR=../obj
 LDIR =../lib
 
-LIBS=-lm -L/usr/local/Cellar/pcre++/0.9.5/lib -L/usr/local/Cellar/openssl@1.1/1.1.1m/lib -lpcre++ -lcrypto
+LIBS=-lm -L/opt/homebrew/Cellar/pcre++/0.9.5/lib -L/opt/homebrew/opt/openssl@3/lib -lpcre++ -lcrypto
 
 _DEPS = BackupEntry.h BackupCache.h Setting.h BackupConfig.h ConfigManager.h PipeExec.h util_generic.h notify.h globals.h globalsdef.h statistics.h colors.h help.h setup.h debug.h network.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))

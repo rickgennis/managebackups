@@ -36,7 +36,7 @@ class BackupConfig {
         unsigned int getPreviousFailures();
 
         string setLockPID(unsigned int pid);
-        unsigned int getLockPID();
+        tuple<int, time_t> getLockPID();
 
         string ifTitle();
         unsigned int removeEmptyDirs(string dir = "");

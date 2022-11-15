@@ -7,7 +7,8 @@ my $sVersionRegex = qr/(\d+\.\d+\.\d+)/;
 my %hChanges = (
     "/Users/rennis/managebackups/include/globalsdef.h" => qr/ VERSION\s+\"$sVersionRegex\"/,
     "/Users/rennis/managebackups/src/managebackups.1.md" => qr/ managebackups $sVersionRegex/,
-    "/Users/rennis/managebackups/src/package.deb/scripts/package" => qr/VERSION=$sVersionRegex/
+    "/Users/rennis/managebackups/src/package.deb/scripts/package" => qr/VERSION=$sVersionRegex/,
+    "/Users/rennis/managebackups/src/package.deb/managebackups/DEBIAN/control" => qr/Version:\s+$sVersionRegex/
 );
 
 

@@ -35,6 +35,7 @@
 #include "setup.h"
 #include "debug.h"
 #include "network.h"
+//#include "faub.h"
 
 
 using namespace pcrepp;
@@ -228,7 +229,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
 
     // if --profile is specified on the command line set the active config
     if (bProfile) {
-        if (int configNumber = configManager.config(GLOBALS.cli[CLI_PROFILE].as<string>())) {
+        if (int configNumber = configManager.findConfig(GLOBALS.cli[CLI_PROFILE].as<string>())) {
             configManager.activeConfig = configNumber - 1;
             currentConf = &configManager.configs[configManager.activeConfig];
         }
@@ -270,13 +271,19 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
                     if (bSave && (setting.value != to_string(GLOBALS.cli[setting.display_name].as<int>())))
                         currentConf->modified = 1;
                     setting.value = to_string(GLOBALS.cli[setting.display_name].as<int>());
+                    setting.execParam = "--" + setting.display_name + " " + setting.value;
                     break; 
 
                 case STRING:
                     default:
+                    if (setting.display_name == CLI_PROFILE)
+                        break;
+
                     if (bSave && (setting.value != GLOBALS.cli[setting.display_name].as<string>()))
                         currentConf->modified = 1;
                     setting.value = GLOBALS.cli[setting.display_name].as<string>();
+                    setting.execParam = "--" + setting.display_name + " '" + setting.value + "'";
+
                     if (setting.display_name == CLI_TRIPWIRE)
                         verifyTripwireParams(setting.value);
                     break;
@@ -286,6 +293,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
                         currentConf->modified = 1;
                     try {
                         setting.value = GLOBALS.cli[setting.display_name].as<string>();
+                        setting.execParam = "--" + setting.display_name + " " + setting.value;
                         auto ignored = stol(setting.value, NULL, 8);  // throws on error
                     }
                     catch (...) {
@@ -301,6 +309,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
                         currentConf->modified = 1;
                     try {
                         setting.value = GLOBALS.cli[setting.display_name].as<string>();
+                        setting.execParam = "--" + setting.display_name + " " + setting.value;
                         auto ignored = approx2bytes(setting.value);  // throws on error
                     }
                     catch (...) {
@@ -315,6 +324,7 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
                     if (bSave && (setting.value != to_string(GLOBALS.cli[setting.display_name].as<bool>())))
                         currentConf->modified = 1;
                     setting.value = to_string(GLOBALS.cli[setting.display_name].as<bool>());
+                    setting.execParam = "--" + setting.display_name;
                     break;
             }
         }
@@ -564,8 +574,9 @@ void updateLinks(BackupConfig& config) {
             for (auto &fileID: md5.second) {
                 auto raw_it = config.cache.rawData.find(fileID);
 
-                DEBUG(D_link) DFMT("ref loop - considering for ref file " << raw_it->second.filename << " (links=" << raw_it->second.links << ")");
                 if (raw_it != config.cache.rawData.end()) {
+                    DEBUG(D_link) DFMT("ref loop - considering for ref file " << raw_it->second.filename << " (links=" << 
+                        raw_it->second.links << ", found=" << maxLinksFound << ", max=" << maxLinksAllowed << ", age=" << raw_it->second.day_age << ")");
 
                     if (raw_it->second.links > maxLinksFound &&            // more links than previous files for this md5
                             raw_it->second.links < maxLinksAllowed &&      // still less than the configured max
@@ -668,6 +679,7 @@ void updateLinks(BackupConfig& config) {
  * Substitute variable values into SCP/SFP commands.
  *******************************************************************************/
 string interpolate(string command, string subDir, string fullDirectory, string basicFilename) {
+    string origCmd = command;
     size_t pos;
 
     while ((pos = command.find(INTERP_SUBDIR)) != string::npos)
@@ -679,6 +691,7 @@ string interpolate(string command, string subDir, string fullDirectory, string b
     while ((pos = command.find(INTERP_FILE)) != string::npos)
         command.replace(pos, string(INTERP_FILE).length(), basicFilename);
 
+    DEBUG(D_any) DFMT("interpolate: [" << origCmd << "], " << subDir << ", " << fullDirectory << ", " << basicFilename << " = " << command);
     return(command);
 }
  
@@ -768,6 +781,7 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
     string backspaces = string(screenMessage.length(), '\b');
     string blankspaces = string(screenMessage.length() , ' ');
     NOTQUIET && ANIMATE && cout << screenMessage << flush;
+    DEBUG(D_transfer) { cout << "\n"; DFMT("filename: " << backupFilename << "\nsubdir: " << subDir << "\nparams: " << sFtpParams); }
 
     // execute the sftp command
     sFtpTime.start();
@@ -781,14 +795,16 @@ methodStatus sFtpBackup(BackupConfig& config, string backupFilename, string subD
 
         // make each component of the subdirectory "mkdir -p" style
         while (p) {
-            path += string("/") + p;
+            path += p + string("/");
             command = "mkdir " + path + "\n";
+            DEBUG(D_transfer) DFMT("SFTP: " << command);
             sFtp.writeProc(command.c_str(), command.length());
             p = strtok(NULL, "/");
         }
 
         // cd to the new subdirectory
         command = "cd " + subDir + "\n";
+        DEBUG(D_transfer) DFMT("SFTP: " << command);
         sFtp.writeProc(command.c_str(), command.length());
     }
 
@@ -886,127 +902,6 @@ bool performTripwire(BackupConfig& config) {
     }
 
     return true;
-}
-
-/*
-void serverSideFaubProcessing(tcpSocket& client, vector<BackupConfig>& configs);
-
-
-void startFaubServer(vector<BackupConfig>& configs) {
-    if (fork())
-        return;
-
-    tcpSocket listeningServer(2029);
-
-    while (1) {
-        tcpSocket client = listeningServer.accept(15);
-
-        if (!fork()) {
-            serverSideFaubProcessing(client, vector<BackupConfig>& configs);
-            exit(0);
-        }
-    }
-
-    exit(0);
-}
-*/
-
-void serverSideFaubProcessing(tcpSocket& client, vector<BackupConfig>& configs) {
-    string remoteFilename;
-    string localPrevFilename;
-    string localCurFilename;
-    struct stat statData;
-
-    long clientId = client.read() - GLOBALS.sessionId;
-    if (clientId < 0 || clientId > configs.size()) {
-        SCREENERR("Invalid session id.");
-        exit(5);
-    }
-
-    string prevDir;
-    string currentDir;   // SET THESE
-
-    do {
-        vector<string> neededFiles;
-        map<string,string> linkList;
-
-        /*
-         * phase 1 - get list of filenames and mtimes from client
-         * and see if the remote file is different from what we
-         * have locally in the most recent backup.
-        */
-        unsigned int fileCount = 0;
-        unsigned int allFiles = 0;
-
-        while (1) {
-            remoteFilename = client.readTo(NET_DELIM);
-
-            if (remoteFilename == NET_OVER)
-                break;
-
-            ++allFiles;
-            long mtime = client.read();
-            localPrevFilename = slashConcat(prevDir, remoteFilename);
-            localCurFilename = slashConcat(currentDir, remoteFilename);
-
-            /*
-             * if the remote file and mtime match with the copy in our most recent
-             * local backup then we want to hard ink the current local backup's copy to
-             * that previous backup version. if they don't match or the previous backup's
-             * copy doesn't exist, add the file to the list of ones we need to get
-             * from the remote end. For ones we want to link, add them to a list to do
-             * at the end.  We can't do them now because the subdirectories they live in
-             * may not have come over yet.
-            */
-            if (prevDir.length() &&
-                    !stat(localPrevFilename.c_str(), &statData) &&
-                    statData.st_mtime == mtime) {
-                linkList.insert(linkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
-            }
-            else {
-                ++fileCount;
-                neededFiles.insert(neededFiles.end(), remoteFilename);
-                //cout << "\tserver: added needed file " << remoteFilename << endl;
-            }
-        }
-
-        cout << "server: phase 1 complete - examined " << allFiles << " files, need " << fileCount << " from client." << endl;
-
-        /*
-         * phase 2 - send the client the list of files that we need full copies of
-         * because they've changed or are missing from the previous backup
-        */
-        for (auto &file: neededFiles)
-            client.write(string(file + NET_DELIM).c_str());
-        client.write(NET_OVER_DELIM);
-
-        cout << "server: phase 2 complete, told client which files we need." << endl;
-
-        /*
-         * phase 3 - receive full copies of the files we've requested. they come over
-         * in the order we've requested in the format of 8 bytes for 'size' and then
-         * the 'size' number of bytes of data.
-        */
-        fileCount = 0;
-        for (auto &file: neededFiles) {
-            ++fileCount;
-            client.readToFile(slashConcat(currentDir, file));
-        }
-        cout << "server: phase 3 complete, received " << fileCount << " files from client." << endl;
-
-        /*
-         * phase 4 - create the links for everything that matches the previous backup.
-        */
-        fileCount = 0;
-        for (auto &links: linkList) {
-            ++fileCount;
-            mkbasedirs(links.second);
-            link(links.first.c_str(), links.second.c_str());
-        }
-        cout << "server: phase 4 complete, created " << fileCount << " links to previously backed up files.\n" << endl;
-
-    } while (client.read());
-    
 }
 
 
@@ -1144,15 +1039,18 @@ void performBackup(BackupConfig& config) {
                 }
 
                 notify(config, notifyMessage, overallSuccess);
+                backup.flushErrors();
             }
             else {
                 unlink(string(backupFilename + tempExtension).c_str());
                 notify(config, errorcom(config.ifTitle(), "backup failed, unable to rename temp file to " + backupFilename) + "\n", false);
+                backup.flushErrors();
             }
         }
         else {
             unlink(string(backupFilename + tempExtension).c_str());
-            notify(config, errorcom(config.ifTitle(), "backup failed to " + backupFilename + " (insufficient output/size)") + "\n", false);
+            notify(config, errorcom(config.ifTitle(), "backup failed to " + backupFilename + " (insufficient output/size: " +
+                        to_string(statData.st_size) + " bytes)") + "\n", false);
         }
     }
     else 
@@ -1454,16 +1352,21 @@ int main(int argc, char *argv[]) {
             currentConfig->settings[sDirectory].value = "/";
             currentConfig->settings[sBackupFilename].value = "all";
 
-            auto pid = currentConfig->getLockPID();
+            auto [pid, lockTime]  = currentConfig->getLockPID();
+
             if (pid) {
                 if (!kill(pid, 0)) {
-                    NOTQUIET && cerr << "[ALL] profile is locked while previous invocation is still running (pid " 
-                        << pid << "); skipping this run." << endl;
-                    log("[ALL] skipped run due to profile lock while previous invocation is still running (pid " + to_string(pid) + ")");
-                    exit(1);
+                    if (GLOBALS.startupTime - lockTime < 60*60*24) {
+                        NOTQUIET && cerr << "[ALL] profile is locked while previous invocation is still running (pid " 
+                            << pid << "); skipping this run." << endl;
+                        log("[ALL] skipped run due to profile lock while previous invocation is still running (pid " + to_string(pid) + ")");
+                        exit(1);
+                    }
+                    else
+                        notify(*currentConfig, errorcom("ALL", "abandoning previous lock because its over 24 hours old"), false, true);
                 }
-
-                log("[ALL] abandoning previous lock because pid " + to_string(pid) + " has vanished");
+                else
+                    log("[ALL] abandoning previous lock because pid " + to_string(pid) + " has vanished");
             }
 
             // locking requested
@@ -1471,37 +1374,37 @@ int main(int argc, char *argv[]) {
                 GLOBALS.interruptLock = currentConfig->setLockPID(GLOBALS.pid);
         }
 
-        #define paramIfSpecified(x) (GLOBALS.cli.count(x) ? string(" --") + x : "")
+        #define BoolParamIfSpecified(x) (GLOBALS.cli.count(x) ? string(" --") + x : "")
+        #define ValueParamIfSpecified(x) (GLOBALS.cli.count(x) ? currentConfig->settings[settingMap[x]].execParam : "")
         string commonSwitches = 
             string(NOTQUIET ? "" : " -q") + 
-            paramIfSpecified(CLI_TEST) + 
-            paramIfSpecified(CLI_TEST) +
-            paramIfSpecified(CLI_NOBACKUP) +
-            paramIfSpecified(CLI_NOPRUNE) +
-            paramIfSpecified(CLI_PRUNE) +
-            paramIfSpecified(CLI_CONFDIR) +
-            paramIfSpecified(CLI_CACHEDIR) +
-            paramIfSpecified(CLI_LOGDIR) +
-            paramIfSpecified(CLI_FS_FP) +
-            paramIfSpecified(CLI_FS_BACKUPS) +
-            paramIfSpecified(CLI_FS_DAYS) +
-            paramIfSpecified(CLI_TIME) +
-            paramIfSpecified(CLI_MODE) +
-            paramIfSpecified(CLI_MINSPACE) +
-            paramIfSpecified(CLI_MINSFTPSPACE) +
-            paramIfSpecified(CLI_DOW) +
-            paramIfSpecified(CLI_NOCOLOR) +
-            paramIfSpecified(CLI_NOTIFY) +
-            paramIfSpecified(CLI_NOS) +
-            paramIfSpecified(CLI_DAYS) +
-            paramIfSpecified(CLI_WEEKS) +
-            paramIfSpecified(CLI_MONTHS) +
-            paramIfSpecified(CLI_TRIPWIRE) +
-            paramIfSpecified(CLI_NOTIFYEVERY) +
-            paramIfSpecified(CLI_YEARS) +
-            paramIfSpecified(CLI_FAUB) +
+            BoolParamIfSpecified(CLI_TEST) +
+            BoolParamIfSpecified(CLI_NOBACKUP) +
+            BoolParamIfSpecified(CLI_NOPRUNE) +
+            BoolParamIfSpecified(CLI_PRUNE) +
+            (GLOBALS.cli.count(CLI_CONFDIR) ? string("--") + CLI_CONFDIR + " " + GLOBALS.confDir : "") +
+            (GLOBALS.cli.count(CLI_CACHEDIR) ? string("--") + CLI_CACHEDIR + " " + GLOBALS.cacheDir : "") +
+            (GLOBALS.cli.count(CLI_LOGDIR) ? string("--") + CLI_LOGDIR + " " + GLOBALS.logDir : "") +
+            ValueParamIfSpecified(CLI_FS_FP) +
+            ValueParamIfSpecified(CLI_FS_BACKUPS) +
+            ValueParamIfSpecified(CLI_FS_DAYS) +
+            ValueParamIfSpecified(CLI_TIME) +
+            ValueParamIfSpecified(CLI_MODE) +
+            ValueParamIfSpecified(CLI_MINSPACE) +
+            ValueParamIfSpecified(CLI_MINSFTPSPACE) +
+            ValueParamIfSpecified(CLI_DOW) +
+            ValueParamIfSpecified(CLI_NOCOLOR) +
+            ValueParamIfSpecified(CLI_NOTIFY) +
+            ValueParamIfSpecified(CLI_NOS) +
+            ValueParamIfSpecified(CLI_DAYS) +
+            ValueParamIfSpecified(CLI_WEEKS) +
+            ValueParamIfSpecified(CLI_MONTHS) +
+            ValueParamIfSpecified(CLI_TRIPWIRE) +
+            ValueParamIfSpecified(CLI_NOTIFYEVERY) +
+            ValueParamIfSpecified(CLI_YEARS) +
+            ValueParamIfSpecified(CLI_FAUB) +
             (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ? " -x" : "") +
-            paramIfSpecified(CLI_MAXLINKS);
+            ValueParamIfSpecified(CLI_MAXLINKS);
 
             if (GLOBALS.debugSelector)
                 commonSwitches += " -v=" + to_string(GLOBALS.debugSelector);
@@ -1510,8 +1413,8 @@ int main(int argc, char *argv[]) {
          * for all profiles
          * ****************************/
         if (GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_CRONS)) {
-            timer allRun;
-            allRun.start();
+            timer allRunTimer;
+            allRunTimer.start();
             log("[ALL] starting sequential processing of all profiles");
             NOTQUIET && cout << "starting sequential processing of all profiles" << endl;
 
@@ -1525,17 +1428,17 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            allRun.stop();
-            NOTQUIET && cout << "\ncompleted sequential processing of all profiles in " << allRun.elapsed() << endl;
-            log("[ALL] completed sequential processing of all profiles in " + allRun.elapsed());
+            allRunTimer.stop();
+            NOTQUIET && cout << "\ncompleted sequential processing of all profiles in " << allRunTimer.elapsed() << endl;
+            log("[ALL] completed sequential processing of all profiles in " + allRunTimer.elapsed());
         }
 
         /* ALL PARALLEL RUN (prune, link, backup)
          * ****************************/
         else if (GLOBALS.cli.count(CLI_ALLPAR) || GLOBALS.cli.count(CLI_CRONP)) {
-            timer allRun;
+            timer allRunTimer;
 
-            allRun.start();
+            allRunTimer.start();
             log("[ALL] starting parallel processing of all profiles");
             NOTQUIET && cout << "starting parallel processing of all profiles" << endl;
 
@@ -1558,26 +1461,37 @@ int main(int argc, char *argv[]) {
 
                 if (pid > 0 && childProcMap.find(pid) != childProcMap.end())
                     childProcMap.erase(pid);
+
+                if (pid == -1) {
+                    NOTQUIET && cout << "[ALL] aborting on error: wait() returned " << to_string(errno) << endl;
+                    log("[ALL] aborting on error: wait() returned " + to_string(errno));
+                    break;
+                }
             }
 
-            allRun.stop();
-            NOTQUIET && cout << "completed parallel processing of all profiles in " << allRun.elapsed() << endl;
-            log("[ALL] completed parallel processing of all profiles in " + allRun.elapsed());
+            allRunTimer.stop();
+            NOTQUIET && cout << "completed parallel processing of all profiles in " << allRunTimer.elapsed() << endl;
+            log("[ALL] completed parallel processing of all profiles in " + allRunTimer.elapsed());
         } 
 
         /* NORMAL RUN (prune, link, backup)
          * ****************************/
         else {
-            auto pid = currentConfig->getLockPID();
+            auto [pid, lockTime] = currentConfig->getLockPID();
+
             if (pid) {
                 if (!kill(pid, 0)) {
-                    NOTQUIET && cerr << currentConfig->ifTitle() + " profile is locked while previous invocation is still running (pid " 
-                        << pid << "); skipping this run." << endl;
-                    log(currentConfig->ifTitle() + " skipped run due to profile lock while previous invocation is still running (pid " + to_string(pid) + ")");
-                    exit(1);
+                    if (GLOBALS.startupTime - lockTime < 60*60*24) {
+                        NOTQUIET && cerr << currentConfig->ifTitle() + " profile is locked while previous invocation is still running (pid " 
+                            << pid << "); skipping this run." << endl;
+                        log(currentConfig->ifTitle() + " skipped run due to profile lock while previous invocation is still running (pid " + to_string(pid) + ")");
+                        exit(1);
+                    }
+                    else
+                        notify(*currentConfig, errorcom(currentConfig->ifTitle(), "abandoning previous lock because its over 24 hours old"), false, true);
                 }
-
-                log(currentConfig->ifTitle() + " abandoning previous lock because pid " + to_string(pid) + " has vanished");
+                else
+                    log(currentConfig->ifTitle() + " abandoning previous lock because pid " + to_string(pid) + " has vanished");
             }
 
             if (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)) 

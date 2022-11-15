@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include "time.h"
 #include <syslog.h>
-#include <openssl/md5.h>
+#include <openssl/evp.h>
 #include <algorithm>
 #include <sys/stat.h>
 #include "math.h"
@@ -157,20 +157,25 @@ string MD5file(string filename, bool quiet) {
 
         unsigned char data[65536];
         int bytesRead;
-        MD5_CTX md5Context;
+        EVP_MD_CTX *md5Context;
+        unsigned char *md5Digest;
+        unsigned int md5DigestLen = EVP_MD_size(EVP_md5());
 
-        MD5_Init(&md5Context);
+        md5Context = EVP_MD_CTX_new();
+        EVP_DigestInit_ex(md5Context, EVP_md5(), NULL);
+
         while ((bytesRead = fread(data, 1, 65536, inputFile)) != 0)
-            MD5_Update(&md5Context, data, bytesRead);
+            EVP_DigestUpdate(md5Context, data, bytesRead);
 
         fclose(inputFile);
-        unsigned char md5Result[MD5_DIGEST_LENGTH];
-        MD5_Final(md5Result, &md5Context);
+        md5Digest = (unsigned char*)OPENSSL_malloc(md5DigestLen);
+        EVP_DigestFinal_ex(md5Context, md5Digest, &md5DigestLen);
+        EVP_MD_CTX_free(md5Context);
 
-        char tempStr[MD5_DIGEST_LENGTH * 2 + 1];
-        for (int i = 0; i < MD5_DIGEST_LENGTH; i++)
-            sprintf(tempStr+(2*i), "%02x", md5Result[i]);
-        tempStr[MD5_DIGEST_LENGTH * 2] = 0;
+        char tempStr[md5DigestLen * 2 + 1];
+        for (int i = 0; i < md5DigestLen; i++)
+            snprintf(tempStr+(2*i), 3, "%02x", md5Digest[i]);
+        tempStr[md5DigestLen * 2] = 0;
 
         if (!quiet) {
             string back = string(message.length(), '\b');
@@ -187,24 +192,31 @@ string MD5file(string filename, bool quiet) {
 
 string MD5string(string origString) {
         unsigned char data[65536];
-        unsigned char md5Result[MD5_DIGEST_LENGTH];
+        EVP_MD_CTX *md5Context;
+        unsigned char *md5Digest;
+        unsigned int md5DigestLen = EVP_MD_size(EVP_md5());
         char* c_origString = const_cast<char*>(origString.c_str());
 
-        MD5_CTX md5Context;
-        MD5_Init(&md5Context);
-        MD5_Update(&md5Context, c_origString, origString.length());
-        MD5_Final(md5Result, &md5Context);
+        md5Context = EVP_MD_CTX_new();
+        EVP_DigestInit_ex(md5Context, EVP_md5(), NULL);
 
-        char tempStr[MD5_DIGEST_LENGTH * 2];
-        for (int i = 0; i < MD5_DIGEST_LENGTH; i++)
-            sprintf(tempStr+(2*i), "%02x", md5Result[i]);
+        EVP_DigestUpdate(md5Context, c_origString, origString.length());
+
+        md5Digest = (unsigned char*)OPENSSL_malloc(md5DigestLen);
+        EVP_DigestFinal_ex(md5Context, md5Digest, &md5DigestLen);
+        EVP_MD_CTX_free(md5Context);
+
+        char tempStr[md5DigestLen * 2];
+        for (int i = 0; i < md5DigestLen ; i++)
+            snprintf(tempStr+(2*i), 3, "%02x", md5Digest[i]);
+
         return(tempStr);
 }
 
 
 string onevarsprintf(string format, string data) {
-    char buffer[500];
-    sprintf(buffer, format.c_str(), data.c_str());
+    char buffer[1000];
+    snprintf(buffer, sizeof(buffer), format.c_str(), data.c_str());
     return buffer;
 }
 
@@ -220,7 +232,7 @@ string approximate(double size, int maxUnits, bool commas) {
     }
 
     char buffer[150];
-    sprintf(buffer, index > 2 ? "%.01f" : "%.0f", index > 2 ? size : floor(size));
+    snprintf(buffer, sizeof(buffer), index > 2 ? "%.01f" : "%.0f", index > 2 ? size : floor(size));
     string unitSuffix(1, unit[index]);
     string result = string(buffer);
 
@@ -293,7 +305,7 @@ string seconds2hms(unsigned long seconds) {
             seconds = leftover;
 
             char buffer[50];
-            sprintf(buffer, "%02.0f", value);
+            snprintf(buffer, sizeof(buffer), "%02.0f", value);
             result += string(dataAdded ? ":" : "") + buffer;
             dataAdded = true;
         }
@@ -340,7 +352,7 @@ string timeDiff(struct timeval start, struct timeval end, int maxUnits, int prec
     // are also provided, include them
     if (secs < 60 && us) {
         char ms[10];
-        sprintf(ms, string(string("%.") + to_string(precision) + "f").c_str(), 1.0 * us / MILLION);
+        snprintf(ms, sizeof(ms), string(string("%.") + to_string(precision) + "f").c_str(), 1.0 * us / MILLION);
 
         string sms = ms;
         if (sms.back() == '0')
@@ -668,7 +680,7 @@ bool mtimesAreSameDay(time_t m1, time_t m2) {
 
 string horizontalLine(int length) {
     char dash[5];
-    sprintf(dash, "\u2501");
+    snprintf(dash, sizeof(dash), "\u2501");
     string line;
 
     for (int x = 0; x < length; ++x)
@@ -712,7 +724,7 @@ string todayString() {
 
 string blockp(string data, int width) {
     char cstr[2000];
-    sprintf(cstr, string(string("%") + to_string(width) + "s").c_str(), data.c_str());
+    snprintf(cstr, sizeof(cstr), string(string("%") + to_string(width) + "s").c_str(), data.c_str());
     return(cstr);
 }
 

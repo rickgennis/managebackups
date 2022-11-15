@@ -21,7 +21,7 @@ class ConfigManager {
     public:
         int activeConfig;
         vector<BackupConfig> configs;
-        int config(string title);
+        int findConfig(string title);
         void fullDump();
         void loadAllConfigCaches();
 

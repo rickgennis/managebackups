@@ -1,6 +1,38 @@
 #include "Setting.h"
 #include "globals.h"
 
+map<string, int>settingMap =
+    {{ CLI_PROFILE, sTitle },
+     { CLI_DIR, sDirectory },
+     { CLI_FILE, sBackupFilename },
+     { CLI_COMMAND, sBackupCommand },
+     { CLI_DAYS, sDays },
+     { CLI_WEEKS, sWeeks },
+     { CLI_MONTHS, sMonths },
+     { CLI_YEARS, sYears },
+     { CLI_FS_BACKUPS, sFailsafeBackups },
+     { CLI_FS_DAYS, sFailsafeDays },
+     { CLI_SCPTO, sSCPTo },
+     { CLI_SFTPTO, sSFTPTo },
+     { CLI_PRUNE, sPruneLive },
+     { CLI_NOTIFY, sNotify },
+     { CLI_MAXLINKS, sMaxLinks },
+     { CLI_TIME, sIncTime },
+     { CLI_NOS, sNos },
+     { CLI_MINSIZE, sMinSize },
+     { CLI_DOW, sDOW },
+     { CLI_FS_FP, sFP },
+     { CLI_MODE, sMode },
+     { CLI_MINSPACE, sMinSpace },
+     { CLI_MINSFTPSPACE, sMinSFTPSpace },
+     { CLI_NICE, sNice },
+     { CLI_TRIPWIRE, sTripwire },
+     { CLI_NOTIFYEVERY, sNotifyEvery },
+     { CLI_MAILFROM, sMailFrom },
+     { CLI_LEAVEOUTPUT, sLeaveOutput },
+     { CLI_FAUB, sFaub }};
+
+
 
 Setting::Setting(string name, string pattern, enum SetType setType, string defaultVal) {
     regex = Pcre("(?:^|\\s)" + pattern + CAPTURE_VALUE + RE_COMMENT);

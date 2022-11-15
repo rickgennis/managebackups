@@ -10,13 +10,27 @@
 using namespace pcrepp;
 
 
-int ConfigManager::config(string title) {
+int ConfigManager::findConfig(string title) {
     int index = 0;
+    int partialMatchIdx = 0;
+
     for (auto &config: configs) {
         ++index;
+
         if (config.settings[sTitle].value == title)   
             return index;
+
+        if (config.settings[sTitle].value.find(title) != string::npos) {
+            if (partialMatchIdx) {
+                return 0;
+            }
+            else
+                partialMatchIdx = index;
+        }
     }
+
+    if (partialMatchIdx)
+        return partialMatchIdx;
 
     return 0;
 }
