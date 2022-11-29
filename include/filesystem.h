@@ -9,8 +9,8 @@
 
 using namespace std;
 
-void c_scanToServer(string directory, tcpSocket& server);
-void c_sendFilesToServer(tcpSocket& server);
+void fc_scanToServer(string directory, tcpSocket& server);
+void fc_sendFilesToServer(tcpSocket& server);
 
 
 #endif

@@ -35,7 +35,7 @@
 #include "setup.h"
 #include "debug.h"
 #include "network.h"
-//#include "faub.h"
+#include "faub.h"
 
 
 using namespace pcrepp;
@@ -1191,6 +1191,7 @@ int main(int argc, char *argv[]) {
         (string("k,") + CLI_CRONS, "Cron", cxxopts::value<bool>()->default_value("false"))
         (string("K,") + CLI_CRONP, "Cron", cxxopts::value<bool>()->default_value("false"))
         (string("h,") + CLI_HELP, "Show help", cxxopts::value<bool>()->default_value("false"))
+        (CLI_FAUB, "Faub", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))
         (CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))
         (CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())
@@ -1406,8 +1407,14 @@ int main(int argc, char *argv[]) {
             (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ? " -x" : "") +
             ValueParamIfSpecified(CLI_MAXLINKS);
 
-            if (GLOBALS.debugSelector)
-                commonSwitches += " -v=" + to_string(GLOBALS.debugSelector);
+        if (GLOBALS.debugSelector)
+            commonSwitches += " -v=" + to_string(GLOBALS.debugSelector);
+
+        if (GLOBALS.cli.count(CLI_FAUB)) {
+            fs_startServer(configManager.configs, "/tmp/mybackups");
+            sleep(1);
+            fc_mainEngine();
+        }
         
         /* ALL SEQUENTIAL RUN (prune, link, backup)
          * for all profiles

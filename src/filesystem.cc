@@ -11,11 +11,11 @@ using namespace std;
 
 
 /*
- * c_scanToServer()
+ * fc_scanToServer()
  * Scan a filesystem, sending the filenames and their associated mtime's back
  * to the remote server. This is the client's side of phase 1.
  */
-void c_scanToServer(string directory, tcpSocket& server) {
+void fc_scanToServer(string directory, tcpSocket& server) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
     struct stat statData;
@@ -33,7 +33,7 @@ void c_scanToServer(string directory, tcpSocket& server) {
                 fTrans.sendStatInfo();
 
                 if (fTrans.isDir())
-                    c_scanToServer(fullFilename, server);
+                    fc_scanToServer(fullFilename, server);
             }
         }
 
@@ -43,11 +43,11 @@ void c_scanToServer(string directory, tcpSocket& server) {
 }
 
 /*
- * c_sendFilesToServer()
+ * fc_sendFilesToServer()
  * Receive a list of files from the server (client side of phase 2) and
  * send each file back to the server (client side of phase 3).
  */
-void c_sendFilesToServer(tcpSocket& server) {
+void fc_sendFilesToServer(tcpSocket& server) {
     vector<string> neededFiles;
 
     unsigned int fileCount = 0;

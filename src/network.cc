@@ -22,21 +22,29 @@ tcpSocket::tcpSocket(int port, int backlog) {
             address.sin_port = htons(port);
 
             if (::bind(socketFd, (struct sockaddr*)&address, sizeof(address)) == 0) {
-                if (!listen(socketFd, backlog)) 
+                if (!listen(socketFd, backlog))  {
+                    cout << "[server] listening on *:" << port << endl;
                     return;
-                else
-                    perror("listen(server)");
+                }
+                else {
+                    socketFd = 0;
+                    throw(string("listen(server): ") + string(strerror(errno)));
+                }
             }
-            else
-                perror("bind(server)");
+            else {
+                socketFd = 0;
+                throw(string("bind(server): ") + string(strerror(errno)));
+            }
         }
-        else
-            perror("setsockopt(server)");
+        else {
+            socketFd = 0;
+            throw(string("setsockopt(server): ") + string(strerror(errno)));
+        }
     }
-    else
-        perror("socket(server)");
-
-    socketFd = 0;
+    else {
+        socketFd = 0;
+        throw(string("socket(server): ") + string(strerror(errno)));
+    }
 }
 
 
@@ -45,20 +53,24 @@ tcpSocket::tcpSocket(string server, int port) {
         address.sin_family = AF_INET;
         address.sin_port = htons(port);
 
-        cout << "connect to server " << server << endl;
-        if (inet_pton(AF_INET, "127.0.0.1", &address.sin_addr) > 0) {
+        cout << "[client] connect to server " << server << ":" << port << endl;
+        if (inet_pton(AF_INET, server.c_str(), &address.sin_addr) > 0) {
             if (!connect(socketFd, (struct sockaddr*)&address, sizeof(address)))
                 return;
-            else
-                perror("connect(client)");
+            else {
+                socketFd = 0;
+                throw(string("connect(client): ") + string(strerror(errno)));
+            }
         }
-        else
-            perror("inet_pton(client)");
+        else {
+            socketFd = 0;
+            throw(string("inet_pton(client): ") + string(strerror(errno)));
+        }
     }
-    else
-        perror("socket(client)");
-
-    socketFd = 0;
+    else {
+        socketFd = 0;
+        throw(string("socket(client): ") + string(strerror(errno)));
+    }
 }
 
 
@@ -71,22 +83,23 @@ tcpSocket::tcpSocket(int fd, string bogus) {  // bogus is merely to differentiat
 tcpSocket tcpSocket::accept(int timeoutSecs) {
     int addrlen = sizeof(address);
 
-    cout << "accept(): socketFd = " << socketFd << endl;
+    cout << "[server] accept(): socketFd = " << socketFd << endl;
 
-    int newFd;
     fd_set readSet;
     FD_ZERO(&readSet);
     FD_SET(socketFd, &readSet);
+
     struct timeval tv;
     tv.tv_sec = timeoutSecs;
     tv.tv_usec = 0;
     
     int result;
-    if ((result = select(1, &readSet, NULL, NULL, &tv)) < 1)
+    if ((result = select(socketFd + 1, &readSet, NULL, NULL, &tv)) < 1)
         exit(0);
 
+    int newFd;
     if ((newFd = ::accept(socketFd, (struct sockaddr*)&address, (socklen_t*)&addrlen)) > 0) {  
-        cout << "accept returned" << endl;
+        cout << "[server] accept returned newFd = " << newFd << endl;
         tcpSocket client(newFd, "bogus");
         return client; 
     }
