@@ -4,6 +4,7 @@
 
 #include "faub.h"
 #include "PipeExec.h"
+#include "debug.h"
 #include "globals.h"
 
 
@@ -72,15 +73,9 @@ void fs_startServer(vector<BackupConfig>& configs, string dir) {
     }
 */
     
-    cerr << "server: executing faub" << endl;
     PipeExec faub("/usr/bin/ssh fw /usr/bin/managebackups --directory /tmp --faubclient");
     faub.execute("faubcall", false, false, true);
-    cerr << "server: setting up client socket" << endl;
-    //tcpSocket client(faub.getWriteFd());
-    //client.setReadFd(faub.getReadFd());
-    cerr << "server: processing socket" << endl;
     fs_serverProcessing(faub, configs, mostRecentBackupDir(dir), newBackupDir(dir, "firewall"));
-    cerr << "server: done" << endl;
     exit(0);
 }
 
@@ -106,27 +101,22 @@ void fs_serverProcessing(PipeExec& client, vector<BackupConfig>& configs, string
          * and see if the remote file is different from what we
          * have locally in the most recent backup.
         */
-        unsigned int fileCount = 0;
         unsigned int allFiles = 0;
 
         while (1) {
             remoteFilename = client.readTo(NET_DELIM);
-            log("server: received filename [" + remoteFilename + "]");
-            log("STATUS0");
+            DEBUG(D_faub) DFMT("server received filename " << remoteFilename);
 
             if (remoteFilename == NET_OVER) {
                 break;
             }
 
-            log("STATUS1");
-
             ++allFiles;
             long mtime = client.readProc();
+            long mode  = client.readProc();
 
-            log("STATUS2");
             localPrevFilename = slashConcat(prevDir, remoteFilename);
             localCurFilename = slashConcat(currentDir, remoteFilename);
-            log("STATUS3");
 
             /*
              * if the remote file and mtime match with the copy in our most recent
@@ -137,35 +127,29 @@ void fs_serverProcessing(PipeExec& client, vector<BackupConfig>& configs, string
              * at the end.  We can't do them now because the subdirectories they live in
              * may not have come over yet.
             */
-            if (prevDir.length() &&
+            if (prevDir.length() && !S_ISDIR(mode) &&
                     !stat(localPrevFilename.c_str(), &statData) &&
                     statData.st_mtime == mtime) {
                 linkList.insert(linkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
             }
-            else {
-                ++fileCount;
+            else
                 neededFiles.insert(neededFiles.end(), remoteFilename);
-                //cout << "\tserver: added needed file " << remoteFilename << endl;
-            }
-            log("STATUS4");
         }
 
-        cerr << "server: phase 1 complete - examined " << allFiles << " files, need " << fileCount << " from client." << endl;
+        DEBUG(D_faub) DFMT("server phase 1 complete; total:" << allFiles << ", need:" << neededFiles.size() 
+                << ", willLink:" << linkList.size());
 
         /*
          * phase 2 - send the client the list of files that we need full copies of
          * because they've changed or are missing from the previous backup
         */
         for (auto &file: neededFiles) {
-            log("server sending request for " + file);
+            DEBUG(D_faub) DFMT("server requesting " << file);
             client.writeProc(string(file + NET_DELIM).c_str());
         }
-        log("server telling client phase 2 complete");
         client.writeProc(NET_OVER_DELIM);
-        //client.flush();
 
-        cerr << "server: phase 2 complete, told client which files we need (" << neededFiles.size() << ")." << endl;
-        log("server: phase 2 complete, told client which files we need (" + to_string(neededFiles.size()) + ").");
+        DEBUG(D_faub) DFMT("server phase 2 complete; told client we need " << neededFiles.size() << " file(s)");
 
         /*
          * phase 3 - receive full copies of the files we've requested. they come over
@@ -173,22 +157,26 @@ void fs_serverProcessing(PipeExec& client, vector<BackupConfig>& configs, string
          * the 'size' number of bytes of data.
         */
         for (auto &file: neededFiles) {
-            log("server waiting for " + file);
-            cerr << "server waiting for " << file << endl;
+            DEBUG(D_faub) DFMT("server waiting for " << file);
             client.readToFile(slashConcat(currentDir, file));
         }
-        log("server got all files - phase 3 complete");
 
-        cerr << "server: phase 3 complete, received " << neededFiles.size() << " files from client." << endl;
+        DEBUG(D_faub) DFMT("server phase 3 complete; received " << neededFiles.size() << " files from client");
 
         /*
          * phase 4 - create the links for everything that matches the previous backup.
         */
+        unsigned int linkErrors = 0;
         for (auto &links: linkList) {
             mkbasedirs(links.second);
-            link(links.first.c_str(), links.second.c_str());
+            if (link(links.first.c_str(), links.second.c_str()) < 0) {
+                ++linkErrors;
+                SCREENERR("error: unable to link " << links.second << " to " << links.first << " - " << strerror(errno));
+                log("error: unable to link " + links.second + " to " + links.first + " - " + strerror(errno));
+            }
         }
-        cerr << "server: phase 4 complete, created " << linkList.size() << " links to previously backed up files.\n" << endl;
+        DEBUG(D_faub) DFMT("server phase 4 complete; created " << (linkList.size() - linkErrors)  << 
+                " links to previously backed up files" << (linkErrors ? string(" (" + to_string(linkErrors) + " error(s))") : ""));
 
     } while (client.readProc());
     
@@ -213,7 +201,6 @@ void fc_scanToServer(string directory, tcpSocket& server) {
 
             string fullFilename = directory + "/" + string(c_dirEntry->d_name);
 
-            log("client sending file info for " + fullFilename);
             fileTransport fTrans(server);
             if (!fTrans.statFile(fullFilename)) {
                 fTrans.sendStatInfo();
@@ -237,8 +224,7 @@ void fc_sendFilesToServer(tcpSocket& server) {
 
     while (1) {
         string filename = server.readTo(NET_DELIM);
-        log("client got request for " + filename);
-        cerr << "client got request for " << filename << endl;
+        DEBUG(D_faub) DFMT("client received request for " << filename);
 
         if (filename == NET_OVER)
             break;
@@ -246,34 +232,33 @@ void fc_sendFilesToServer(tcpSocket& server) {
         neededFiles.insert(neededFiles.end(), filename);
     }
 
-    log("client got all file requests (" + to_string(neededFiles.size()) + ")");
+    DEBUG(D_faub) DFMT("client received requests for " << to_string(neededFiles.size()) << " file(s)");
 
     for (auto &file: neededFiles) {
-        cerr << "sending " << file << " to server" << endl;
+        DEBUG(D_faub) DFMT("client sending " << file << " to server");
         fileTransport fTrans(server);
         fTrans.statFile(file);
         fTrans.sendFullContents();
     }
-
-    cerr << "client: sent full file content for " << neededFiles.size() << " files" << endl;
 }
 
 
 void fc_mainEngine() {
     try {
-        setvbuf(stdout, NULL, _IONBF, 0);
-        setvbuf(stdin, NULL, _IONBF, 0);
+        tcpSocket server(1); // setup socket library to use stdout
+        server.setReadFd(0); // and stdin
 
-        tcpSocket server(1);
-        server.setReadFd(0);
+        // disable buffering on both
+        //setvbuf(stdout, NULL, _IONBF, 0);
+        //setvbuf(stdin, NULL, _IONBF, 0);
 
+        // write sessionId
         server.write(2);
 
         vector<string> dirs = { "/etc" };
         for (auto it = dirs.begin(); it != dirs.end(); ++it) {
             fc_scanToServer(*it, server);
             server.write(NET_OVER_DELIM);
-            log("client finished sending initial file list");
             fc_sendFilesToServer(server);
 
             long end = (it+1) != dirs.end();
@@ -281,7 +266,7 @@ void fc_mainEngine() {
         }
     }
     catch (string s) {
-        cerr << "caught internal exception: " << s << endl;
+        cerr << "faub client caught internal exception: " << s << endl;
     }
 
     exit(1);

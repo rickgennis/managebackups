@@ -328,18 +328,13 @@ long PipeExec::readProc() {
         int bytes = pos > 8 ? 8 : pos;
         tempData = strBuf.substr(0, bytes);
         strBuf.erase(0, bytes);
-        log("PipeExec::readProc(8): pos = " + to_string(pos) + ", tempData = [" + tempData + "]");
         memcpy((char*)&data, tempData.c_str(), bytes);
     }
-    log("PipeExec::readProc(8) mid phase");
 
-    while (pos < 8) {
-        log("PipeExec::readProc(8) reading from socket");
+    while (pos < 8)
         pos += readProc((char*)&data + pos, 8 - pos);
-    }
 
     long temp = ntohl(data);
-    log("PipeExec::readProc(8) read " + to_string(temp));
     return temp;
 }
 
@@ -356,11 +351,9 @@ string PipeExec::readTo(string delimiter) {
             }
         } 
 
-        log("PipeExec::readTo() reading " + to_string(sizeof(rawBuf)));
         size_t bytes = readProc(rawBuf, sizeof(rawBuf));
         string tempStr(rawBuf, bytes);
         strBuf += tempStr;
-        log("PipeExec::readTo() read " + tempStr);
     }
 }
 

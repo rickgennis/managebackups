@@ -138,8 +138,10 @@ size_t tcpSocket::write(const void *data, size_t count) {
     ssize_t totalBytesWritten = 0;
 
     while (count && (bytesWritten = 
-        (socketFd > 2 ? ::write(socketFd, (char*)data + totalBytesWritten, count - totalBytesWritten) :
-        fwrite(data, 1, count, stdout))) > 0) {
+        ::write(socketFd, (char*)data + totalBytesWritten, count - totalBytesWritten))) {
+
+        //(socketFd > 2 ? ::write(socketFd, (char*)data + totalBytesWritten, count - totalBytesWritten) :
+        //fwrite(data, 1, count, stdout))) > 0) {
 
         count -= bytesWritten;
         totalBytesWritten += bytesWritten;
@@ -156,7 +158,6 @@ size_t tcpSocket::write(const char *data) {
 
 size_t tcpSocket::write(long data) {
     long netLong = htonl(data);
-    log("tcpSocket::write(8) writing " + to_string(data));
     return (write(&netLong, 8));
 }
 
@@ -200,18 +201,14 @@ string tcpSocket::readTo(string delimiter) {
             size_t index;
 
             if ((index = strBuf.find(delimiter)) != string::npos) {
-                log("readTo() strBuf length is " + to_string(strBuf.length()));
                 string result = strBuf.substr(0, index);
                 strBuf.erase(0, index + delimiter.length());
                 return result;
             }
-            else
-                log("readTo() no delimit found (" + to_string(strBuf.length()) + "); reading [" + strBuf + "]");
         }
 
         size_t bytes = read(rawBuf, sizeof(rawBuf));
         string tempStr(rawBuf, bytes);
-        log("readTo() read [" + tempStr + "]");
         strBuf += tempStr;
 
         if (!bytes && !--attempt) {
@@ -230,8 +227,6 @@ void tcpSocket::readToFile(string filename) {
     long mode = read();
     long mtime = read();
 
-    //cout << "server: receive " << filename << ", mode:" << mode << ", uid: " << uid << ", gid: " << gid << ", mtime: " << mtime << endl;
-
     // handle directories that are specifically sent
     if (S_ISDIR(mode)) {
         mkdirp(filename);
@@ -242,13 +237,11 @@ void tcpSocket::readToFile(string filename) {
         timeBuf.actime = timeBuf.modtime = mtime;
         utime(filename.c_str(), &timeBuf);
 
-        //cout << "server: created directory " << filename << endl;
         return;
     }
 
     // handle directories that are inherent in the filename
     string dirName = filename.substr(0, filename.find_last_of("/"));
-    //cout << "making " << dirName << ": " << mkdirp(dirName);  // need a mode, gid and uid here
                                                               
     if (S_ISLNK(mode)) {
         char target[1025];
@@ -263,13 +256,11 @@ void tcpSocket::readToFile(string filename) {
         chmod(filename.c_str(), mode);
         chown(filename.c_str(), uid, gid);
 
-        //cout << "server: created symlink " << filename << " (-> " << target << ")" << endl;
         return;
     }
 
     // handle files
     auto bytesRemaining = read();
-    //cout << "server: receiving " << filename << " as " << bytesRemaining << " bytes" << endl;
 
     FILE *dataf;
     auto bufSize = sizeof(rawBuf);
@@ -282,7 +273,6 @@ void tcpSocket::readToFile(string filename) {
      * even if there was an issue with this one.
      */
 
-    //cout << "\tserver: created " << filename << endl;
     while (bytesRemaining) {
         size_t readSize = bytesRemaining < bufSize ? bytesRemaining : bufSize;
         size_t bytesRead = read(rawBuf, readSize);
@@ -306,15 +296,11 @@ void tcpSocket::readToFile(string filename) {
         timeBuf.actime = timeBuf.modtime = mtime;
         utime(filename.c_str(), &timeBuf);
     }
-
-    //cout << "server: completed " << filename << endl;
 }
 
 
 void tcpSocket::sendRawFile(fileInfo& fi) {
     FILE *dataf;
-
-    //cout << "client: sending " << fi.filename << " as " << fi.size << " bytes." << endl;
 
     if ((dataf = fopen(fi.filename.c_str(), "rb")) != NULL) {
         write(fi.size);
@@ -324,13 +310,10 @@ void tcpSocket::sendRawFile(fileInfo& fi) {
             size_t readSize = readRemaining < bufSize ? readRemaining : bufSize;
             auto bytesRead = fread(rawBuf, 1, readSize, dataf);
             readRemaining -= bytesRead;
-
-            //cout << "client send: " << fi.filename << " - " << "readSize:" << readSize << ", bytesread:" << bytesRead << ", readRemaining:" << readRemaining << endl;
             write(rawBuf, bytesRead);
         }
 
         fclose(dataf);
-        //cout << "client: completed " << fi.filename << " with " << readRemaining << " bytes left." << endl;
     }
     else {
         write((long)0);
@@ -341,8 +324,6 @@ void tcpSocket::sendRawFile(fileInfo& fi) {
 
 void fileTransport::sendFullContents() {
     if (fi.mode > 0) {
-        //cout << "client: sending " << fi.filename << " mode as " << fi.mode << endl;
-
         server.write(fi.uid);
         server.write(fi.gid);
         server.write(fi.mode);
@@ -388,6 +369,7 @@ int fileTransport::statFile(string file) {
 void fileTransport::sendStatInfo() {
     server.write(string(fi.filename + NET_DELIM).c_str());
     server.write(fi.mtime);
+    server.write(fi.mode);
 }
 
 

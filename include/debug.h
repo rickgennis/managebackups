@@ -57,6 +57,7 @@ enum {
   DEBUG_BIT(cache),
   DEBUG_BIT(config),
   DEBUG_BIT(exec),
+  DEBUG_BIT(faub),
   DEBUG_BIT(link),
   DEBUG_BIT(netproto),
   DEBUG_BIT(notify),
