@@ -3,6 +3,8 @@
 #include "sys/stat.h"
 
 #include "faub.h"
+#include "PipeExec.h"
+#include "globals.h"
 
 
 string mostRecentBackupDir(string backupDir) {
@@ -34,7 +36,7 @@ string mostRecentBackupDir(string backupDir) {
 }
 
 
-string newBackupDir(string backupDir) {
+string newBackupDir(string backupDir, string baseFilename) {
     time_t rawTime;
     struct tm *timeFields;
     char buffer[100];
@@ -49,11 +51,11 @@ string newBackupDir(string backupDir) {
 
 void fs_startServer(vector<BackupConfig>& configs, string dir) {
     // fork main listening daemon
-    if (fork())
+/*    if (fork())
         return;
 
     try {
-        tcpSocket listeningServer(2029);
+        tcpSocket listeningServer(2029, 50);
 
         while (1) {
             tcpSocket client = listeningServer.accept(15);
@@ -68,20 +70,30 @@ void fs_startServer(vector<BackupConfig>& configs, string dir) {
     catch (string s) {
         cerr << s << endl;
     }
-
+*/
+    
+    cerr << "server: executing faub" << endl;
+    PipeExec faub("/usr/bin/ssh fw /usr/bin/managebackups --directory /tmp --faubclient");
+    faub.execute("faubcall", false, false, true);
+    cerr << "server: setting up client socket" << endl;
+    //tcpSocket client(faub.getWriteFd());
+    //client.setReadFd(faub.getReadFd());
+    cerr << "server: processing socket" << endl;
+    fs_serverProcessing(faub, configs, mostRecentBackupDir(dir), newBackupDir(dir, "firewall"));
+    cerr << "server: done" << endl;
     exit(0);
 }
 
 
-void fs_serverProcessing(tcpSocket& client, vector<BackupConfig>& configs, string prevDir, string currentDir) {
+void fs_serverProcessing(PipeExec& client, vector<BackupConfig>& configs, string prevDir, string currentDir) {
     string remoteFilename;
     string localPrevFilename;
     string localCurFilename;
     struct stat statData;
 
-    long clientId = client.read() - GLOBALS.sessionId;
+    long clientId = client.readProc();
     if (clientId < 0 || clientId > configs.size()) {
-        SCREENERR("Invalid session id.");
+        SCREENERR("Invalid session id (" << clientId << ").");
         exit(5);
     }
 
@@ -99,14 +111,22 @@ void fs_serverProcessing(tcpSocket& client, vector<BackupConfig>& configs, strin
 
         while (1) {
             remoteFilename = client.readTo(NET_DELIM);
+            log("server: received filename [" + remoteFilename + "]");
+            log("STATUS0");
 
-            if (remoteFilename == NET_OVER)
+            if (remoteFilename == NET_OVER) {
                 break;
+            }
+
+            log("STATUS1");
 
             ++allFiles;
-            long mtime = client.read();
+            long mtime = client.readProc();
+
+            log("STATUS2");
             localPrevFilename = slashConcat(prevDir, remoteFilename);
             localCurFilename = slashConcat(currentDir, remoteFilename);
+            log("STATUS3");
 
             /*
              * if the remote file and mtime match with the copy in our most recent
@@ -127,44 +147,50 @@ void fs_serverProcessing(tcpSocket& client, vector<BackupConfig>& configs, strin
                 neededFiles.insert(neededFiles.end(), remoteFilename);
                 //cout << "\tserver: added needed file " << remoteFilename << endl;
             }
+            log("STATUS4");
         }
 
-        cout << "server: phase 1 complete - examined " << allFiles << " files, need " << fileCount << " from client." << endl;
+        cerr << "server: phase 1 complete - examined " << allFiles << " files, need " << fileCount << " from client." << endl;
 
         /*
          * phase 2 - send the client the list of files that we need full copies of
          * because they've changed or are missing from the previous backup
         */
-        for (auto &file: neededFiles)
-            client.write(string(file + NET_DELIM).c_str());
-        client.write(NET_OVER_DELIM);
+        for (auto &file: neededFiles) {
+            log("server sending request for " + file);
+            client.writeProc(string(file + NET_DELIM).c_str());
+        }
+        log("server telling client phase 2 complete");
+        client.writeProc(NET_OVER_DELIM);
+        //client.flush();
 
-        cout << "server: phase 2 complete, told client which files we need." << endl;
+        cerr << "server: phase 2 complete, told client which files we need (" << neededFiles.size() << ")." << endl;
+        log("server: phase 2 complete, told client which files we need (" + to_string(neededFiles.size()) + ").");
 
         /*
          * phase 3 - receive full copies of the files we've requested. they come over
          * in the order we've requested in the format of 8 bytes for 'size' and then
          * the 'size' number of bytes of data.
         */
-        fileCount = 0;
         for (auto &file: neededFiles) {
-            ++fileCount;
+            log("server waiting for " + file);
+            cerr << "server waiting for " << file << endl;
             client.readToFile(slashConcat(currentDir, file));
         }
-        cout << "server: phase 3 complete, received " << fileCount << " files from client." << endl;
+        log("server got all files - phase 3 complete");
+
+        cerr << "server: phase 3 complete, received " << neededFiles.size() << " files from client." << endl;
 
         /*
          * phase 4 - create the links for everything that matches the previous backup.
         */
-        fileCount = 0;
         for (auto &links: linkList) {
-            ++fileCount;
             mkbasedirs(links.second);
             link(links.first.c_str(), links.second.c_str());
         }
-        cout << "server: phase 4 complete, created " << fileCount << " links to previously backed up files.\n" << endl;
+        cerr << "server: phase 4 complete, created " << linkList.size() << " links to previously backed up files.\n" << endl;
 
-    } while (client.read());
+    } while (client.readProc());
     
 }
 
@@ -187,6 +213,7 @@ void fc_scanToServer(string directory, tcpSocket& server) {
 
             string fullFilename = directory + "/" + string(c_dirEntry->d_name);
 
+            log("client sending file info for " + fullFilename);
             fileTransport fTrans(server);
             if (!fTrans.statFile(fullFilename)) {
                 fTrans.sendStatInfo();
@@ -198,7 +225,6 @@ void fc_scanToServer(string directory, tcpSocket& server) {
 
         closedir(c_dir);
     }
-
 }
 
 /*
@@ -209,38 +235,45 @@ void fc_scanToServer(string directory, tcpSocket& server) {
 void fc_sendFilesToServer(tcpSocket& server) {
     vector<string> neededFiles;
 
-    unsigned int fileCount = 0;
     while (1) {
         string filename = server.readTo(NET_DELIM);
+        log("client got request for " + filename);
+        cerr << "client got request for " << filename << endl;
 
         if (filename == NET_OVER)
             break;
 
-        ++fileCount;
         neededFiles.insert(neededFiles.end(), filename);
     }
 
+    log("client got all file requests (" + to_string(neededFiles.size()) + ")");
+
     for (auto &file: neededFiles) {
+        cerr << "sending " << file << " to server" << endl;
         fileTransport fTrans(server);
         fTrans.statFile(file);
         fTrans.sendFullContents();
     }
 
-    cout << "client: sent full file content for " << fileCount << " files" << endl;
+    cerr << "client: sent full file content for " << neededFiles.size() << " files" << endl;
 }
 
 
 void fc_mainEngine() {
     try {
-        tcpSocket server("127.0.0.1", 2029);
+        setvbuf(stdout, NULL, _IONBF, 0);
+        setvbuf(stdin, NULL, _IONBF, 0);
 
-        // send sessionId
-        server.write(GLOBALS.sessionId + 2);
+        tcpSocket server(1);
+        server.setReadFd(0);
 
-        vector<string> dirs = { "/tmp/data", "/etc" };
+        server.write(2);
+
+        vector<string> dirs = { "/etc" };
         for (auto it = dirs.begin(); it != dirs.end(); ++it) {
             fc_scanToServer(*it, server);
             server.write(NET_OVER_DELIM);
+            log("client finished sending initial file list");
             fc_sendFilesToServer(server);
 
             long end = (it+1) != dirs.end();
@@ -248,7 +281,7 @@ void fc_mainEngine() {
         }
     }
     catch (string s) {
-        cerr << s << endl;
+        cerr << "caught internal exception: " << s << endl;
     }
 
     exit(1);

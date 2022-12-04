@@ -1192,6 +1192,7 @@ int main(int argc, char *argv[]) {
         (string("K,") + CLI_CRONP, "Cron", cxxopts::value<bool>()->default_value("false"))
         (string("h,") + CLI_HELP, "Show help", cxxopts::value<bool>()->default_value("false"))
         (CLI_FAUB, "Faub", cxxopts::value<bool>()->default_value("false"))
+        (CLI_FAUBCLIENT, "Faub client", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))
         (CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))
         (CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())
@@ -1323,7 +1324,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     } 
 
-    if (GLOBALS.cli.count(CLI_FAUB) && (GLOBALS.cli.count(CLI_SFTPTO) || GLOBALS.cli.count(CLI_SCPTO))) {
+    if ((GLOBALS.cli.count(CLI_FAUB) || GLOBALS.cli.count(CLI_FAUBCLIENT)) && (GLOBALS.cli.count(CLI_SFTPTO) || GLOBALS.cli.count(CLI_SCPTO))) {
         SCREENERR("error: --faub is incompatible with --sftp and --scp");
         exit(1);
     } 
@@ -1383,6 +1384,8 @@ int main(int argc, char *argv[]) {
             BoolParamIfSpecified(CLI_NOBACKUP) +
             BoolParamIfSpecified(CLI_NOPRUNE) +
             BoolParamIfSpecified(CLI_PRUNE) +
+            BoolParamIfSpecified(CLI_FAUB) +
+            BoolParamIfSpecified(CLI_FAUBCLIENT) +
             (GLOBALS.cli.count(CLI_CONFDIR) ? string("--") + CLI_CONFDIR + " " + GLOBALS.confDir : "") +
             (GLOBALS.cli.count(CLI_CACHEDIR) ? string("--") + CLI_CACHEDIR + " " + GLOBALS.cacheDir : "") +
             (GLOBALS.cli.count(CLI_LOGDIR) ? string("--") + CLI_LOGDIR + " " + GLOBALS.logDir : "") +
@@ -1403,7 +1406,6 @@ int main(int argc, char *argv[]) {
             ValueParamIfSpecified(CLI_TRIPWIRE) +
             ValueParamIfSpecified(CLI_NOTIFYEVERY) +
             ValueParamIfSpecified(CLI_YEARS) +
-            ValueParamIfSpecified(CLI_FAUB) +
             (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ? " -x" : "") +
             ValueParamIfSpecified(CLI_MAXLINKS);
 
@@ -1412,8 +1414,12 @@ int main(int argc, char *argv[]) {
 
         if (GLOBALS.cli.count(CLI_FAUB)) {
             fs_startServer(configManager.configs, "/tmp/mybackups");
-            sleep(1);
+            exit(1);
+        }
+
+        if (GLOBALS.cli.count(CLI_FAUBCLIENT)) {
             fc_mainEngine();
+            exit(1);
         }
         
         /* ALL SEQUENTIAL RUN (prune, link, backup)

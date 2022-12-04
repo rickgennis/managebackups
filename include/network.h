@@ -26,19 +26,22 @@ struct fileInfo {
 
 class tcpSocket {
     int socketFd;
+    int readFd;  // not used for a socket; only for when this class is used to talk to pipes
+
     struct sockaddr_in address;
     string strBuf;
     char rawBuf[BUFFER_SIZE];
     char responseBuf[BUFFER_SIZE];
     
     public:
-        tcpSocket(int port, int backlog = 50);
+        tcpSocket(int port, int backlog);
         tcpSocket(string server, int port);
-        tcpSocket(int fd, string bogus);
+        tcpSocket(int fd);
         ~tcpSocket();
 
         tcpSocket accept(int timeoutSecs);
 
+        void setReadFd(int fd);
         size_t write(const void *data, size_t count);
         size_t write(const char *data);
         size_t write(long data);
@@ -49,6 +52,7 @@ class tcpSocket {
         string readTo(string delimiter);
         void readToFile(string filename);
 
+        void flush();
         void closeConnection();
 };
 

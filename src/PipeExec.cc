@@ -5,8 +5,10 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <sys/wait.h>
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <vector>
+#include <utime.h>
 #include "pcre++.h"
 #include "util_generic.h"
 #include "colors.h"
@@ -294,13 +296,83 @@ ssize_t PipeExec::readProc(void *buf, size_t count) {
 
 
 ssize_t PipeExec::writeProc(const void *buf, size_t count) {
-    return write(procs[0].fd[WRITE_END], buf, count);
+    ssize_t bytesWritten;
+    ssize_t totalBytesWritten = 0;
+
+    while (count && ((bytesWritten = write(procs[0].fd[WRITE_END], buf, count)) > 0)) {
+        count -= bytesWritten;
+        totalBytesWritten += bytesWritten;
+    }
+
+    return totalBytesWritten;
 }
 
 
-//ssize_t PipeExec::send2Proc(const void *buf) {
-    
-//}
+ssize_t PipeExec::writeProc(const char *data) {
+    return writeProc(data, strlen(data));
+}
+
+
+ssize_t PipeExec::writeProc(long data) {
+    long netLong = htonl(data);
+    return writeProc(&netLong, 8);
+}
+
+
+long PipeExec::readProc() {
+    long data;
+
+    string tempData;
+    int pos = strBuf.length();
+    if (pos) {
+        int bytes = pos > 8 ? 8 : pos;
+        tempData = strBuf.substr(0, bytes);
+        strBuf.erase(0, bytes);
+        log("PipeExec::readProc(8): pos = " + to_string(pos) + ", tempData = [" + tempData + "]");
+        memcpy((char*)&data, tempData.c_str(), bytes);
+    }
+    log("PipeExec::readProc(8) mid phase");
+
+    while (pos < 8) {
+        log("PipeExec::readProc(8) reading from socket");
+        pos += readProc((char*)&data + pos, 8 - pos);
+    }
+
+    long temp = ntohl(data);
+    log("PipeExec::readProc(8) read " + to_string(temp));
+    return temp;
+}
+
+
+string PipeExec::readTo(string delimiter) {
+    while (1) {
+        if (strBuf.length()) {
+            size_t index;
+
+            if ((index = strBuf.find(delimiter)) != string ::npos) {
+                string result = strBuf.substr(0, index);
+                strBuf.erase(0, index + delimiter.length());
+                return result;
+            }
+        } 
+
+        log("PipeExec::readTo() reading " + to_string(sizeof(rawBuf)));
+        size_t bytes = readProc(rawBuf, sizeof(rawBuf));
+        string tempStr(rawBuf, bytes);
+        strBuf += tempStr;
+        log("PipeExec::readTo() read " + tempStr);
+    }
+}
+
+
+int PipeExec::getReadFd() {
+    return procs[0].readfd[READ_END];
+}
+
+
+int PipeExec::getWriteFd() {
+    return procs[0].fd[WRITE_END];
+}
 
 
 string PipeExec::statefulReadAndMatchRegex(string regex, int buffSize) {
@@ -323,6 +395,7 @@ string PipeExec::statefulReadAndMatchRegex(string regex, int buffSize) {
 
     return ""; 
 }
+
 
 
 string PipeExec::errorOutput() {
@@ -368,5 +441,93 @@ string firstAvailIDForDir(string dir) {
     return(result);
 
 }
+
+
+void PipeExec::readToFile(string filename) {
+    long uid = readProc();
+    long gid = readProc();
+    long mode = readProc();
+    long mtime = readProc();
+
+    //cout << "server: receive " << filename << ", mode:" << mode << ", uid: " << uid << ", gid: " << gid << ", mtime: " << mtime << endl;
+
+    // handle directories that are specifically sent
+    if (S_ISDIR(mode)) {
+        mkdirp(filename);
+        chmod(filename.c_str(), mode);
+        chown(filename.c_str(), uid, gid);
+
+        struct utimbuf timeBuf;
+        timeBuf.actime = timeBuf.modtime = mtime;
+        utime(filename.c_str(), &timeBuf);
+
+        //cout << "server: created directory " << filename << endl;
+        return;
+    }
+
+    // handle directories that are inherent in the filename
+    string dirName = filename.substr(0, filename.find_last_of("/"));
+    //cout << "making " << dirName << ": " << mkdirp(dirName);  // need a mode, gid and uid here
+
+    if (S_ISLNK(mode)) {
+        char target[1025];
+        long bytes = readProc();
+        readProc(target, bytes);
+        target[bytes] = 0;
+        if (symlink(target, filename.c_str())) {
+            cerr << "unable to create symlink (" << filename << "): ";
+            perror("");
+            return;
+        }
+        chmod(filename.c_str(), mode);
+        chown(filename.c_str(), uid, gid);
+
+        //cout << "server: created symlink " << filename << " (-> " << target << ")" << endl;
+        return;
+    }
+
+    // handle files
+    auto bytesRemaining = readProc();
+    //cout << "server: receiving " << filename << " as " << bytesRemaining << " bytes" << endl;
+
+    FILE *dataf;
+    auto bufSize = sizeof(rawBuf);
+    dataf = fopen(filename.c_str(), "wb");
+
+    /*
+     * To maintain the network protocol with the client we have to read 'bytesRemaining' bytes
+     * even if our fopen() failed and we can't save them to the local disk. That way all the
+     * other read()s in this network connection still line up and subsequent files may transfer
+     * even if there was an issue with this one.
+     */
+
+    //cout << "\tserver: created " << filename << endl;
+    while (bytesRemaining) {
+        size_t readSize = bytesRemaining < bufSize ? bytesRemaining : bufSize;
+        size_t bytesRead = readProc(rawBuf, readSize);
+        bytesRemaining -= bytesRead;
+
+        if (dataf != NULL) {
+            if (fwrite(rawBuf, 1, bytesRead, dataf) < bytesRead) {
+                perror(filename.c_str());
+                fclose(dataf);
+                break;
+            }
+        }
+    }
+
+    if (dataf != NULL) {
+        fclose(dataf);
+        chown(filename.c_str(), uid, gid);
+        chmod(filename.c_str(), mode);
+
+        struct utimbuf timeBuf;
+        timeBuf.actime = timeBuf.modtime = mtime;
+        utime(filename.c_str(), &timeBuf);
+    }
+
+    //cout << "server: completed " << filename << endl;
+}
+
 
 

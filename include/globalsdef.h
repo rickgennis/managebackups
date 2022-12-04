@@ -79,6 +79,7 @@
 #define CLI_MAILFROM "from"
 #define CLI_LEAVEOUTPUT "leaveoutput"
 #define CLI_FAUB "faub"
+#define CLI_FAUBCLIENT "faubclient"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -140,6 +141,7 @@ struct global_vars {
     bool saveErrorSeen;
     string interruptFilename;
     string interruptLock;
+    int pipes[2][2];
 };
 
 #endif

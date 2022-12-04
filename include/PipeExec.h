@@ -58,6 +58,8 @@ class PipeExec {
     bool bypassDestructor;
     bool dontCleanup;
     string errorDir;
+    string strBuf;
+    char rawBuf[8*1024];
 
     public:
         PipeExec(string cmd);
@@ -83,14 +85,21 @@ class PipeExec {
         bool execute2file(string toFile, string procName = "");
 
         ssize_t readProc(void *buf, size_t count);
+        long readProc(); // 8 byte long
         ssize_t writeProc(const void *buf, size_t count);
+        ssize_t writeProc(const char *data);
+        ssize_t writeProc(long data);  // 8 byte long
 
         void readAndTrash();
         bool readAndMatch(string matchStr);
         string statefulReadAndMatchRegex(string regex, int buffSize = 1024 * 2);
+        string readTo(string delimiter);
+        void readToFile(string filename);
         
         string errorOutput();
         void flushErrors();
+        int getReadFd();
+        int getWriteFd();
 
         int closeWrite();
         int closeRead();

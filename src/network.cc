@@ -10,8 +10,18 @@
 
 using namespace std;
 
+void tcpSocket::flush() {
+    if (socketFd < 3)
+        fsync(socketFd);
+
+    if (readFd < 3)
+        fsync(readFd);
+}
+
 
 tcpSocket::tcpSocket(int port, int backlog) {
+    readFd = -1;
+
     if ((socketFd = socket(AF_INET, SOCK_STREAM, 0)) > 0) {
         int option = 1;
 
@@ -49,11 +59,12 @@ tcpSocket::tcpSocket(int port, int backlog) {
 
 
 tcpSocket::tcpSocket(string server, int port) {
+    readFd = -1;
+
     if ((socketFd = socket(AF_INET, SOCK_STREAM, 0)) > 0) {
         address.sin_family = AF_INET;
         address.sin_port = htons(port);
 
-        cout << "[client] connect to server " << server << ":" << port << endl;
         if (inet_pton(AF_INET, server.c_str(), &address.sin_addr) > 0) {
             if (!connect(socketFd, (struct sockaddr*)&address, sizeof(address)))
                 return;
@@ -74,16 +85,20 @@ tcpSocket::tcpSocket(string server, int port) {
 }
 
 
-tcpSocket::tcpSocket(int fd, string bogus) {  // bogus is merely to differentiate the signature
+tcpSocket::tcpSocket(int fd) {
+    readFd = -1;
     socketFd = fd;
     address.sin_family = AF_INET;
 }
 
 
+void tcpSocket::setReadFd(int fd) {
+    readFd = fd;
+}
+
+
 tcpSocket tcpSocket::accept(int timeoutSecs) {
     int addrlen = sizeof(address);
-
-    cout << "[server] accept(): socketFd = " << socketFd << endl;
 
     fd_set readSet;
     FD_ZERO(&readSet);
@@ -99,8 +114,7 @@ tcpSocket tcpSocket::accept(int timeoutSecs) {
 
     int newFd;
     if ((newFd = ::accept(socketFd, (struct sockaddr*)&address, (socklen_t*)&addrlen)) > 0) {  
-        cout << "[server] accept returned newFd = " << newFd << endl;
-        tcpSocket client(newFd, "bogus");
+        tcpSocket client(newFd);
         return client; 
     }
 
@@ -123,7 +137,10 @@ size_t tcpSocket::write(const void *data, size_t count) {
     ssize_t bytesWritten;
     ssize_t totalBytesWritten = 0;
 
-    while ((bytesWritten = send(socketFd, (char*)data + totalBytesWritten, count - totalBytesWritten, 0)) > 0) {
+    while (count && (bytesWritten = 
+        (socketFd > 2 ? ::write(socketFd, (char*)data + totalBytesWritten, count - totalBytesWritten) :
+        fwrite(data, 1, count, stdout))) > 0) {
+
         count -= bytesWritten;
         totalBytesWritten += bytesWritten;
     }
@@ -139,6 +156,7 @@ size_t tcpSocket::write(const char *data) {
 
 size_t tcpSocket::write(long data) {
     long netLong = htonl(data);
+    log("tcpSocket::write(8) writing " + to_string(data));
     return (write(&netLong, 8));
 }
 
@@ -147,7 +165,6 @@ size_t tcpSocket::read(void *data, size_t count) {
     auto bufLen = strBuf.length();
     size_t dataLen = 0;
 
-    //cout << "\t\tread: count=" << count << ", bufLen=" << bufLen << endl;
     if (bufLen) {
         dataLen = bufLen > count ? count : bufLen;
         memcpy(data, strBuf.c_str(), dataLen);
@@ -159,9 +176,7 @@ size_t tcpSocket::read(void *data, size_t count) {
         count -= dataLen;
     }
 
-    //cout << "\t\t\t:read for " << count << " more bytes" << endl;
-
-    return (::read(socketFd, (char*)data + dataLen, count));
+    return (::read(readFd > -1 ? readFd : socketFd, (char*)data + dataLen, count));
 }
 
 
@@ -178,20 +193,33 @@ long tcpSocket::read() {
 
 
 string tcpSocket::readTo(string delimiter) {
+    int attempt = 5;
+
     while (1) {
         if (strBuf.length()) {
             size_t index;
 
             if ((index = strBuf.find(delimiter)) != string::npos) {
+                log("readTo() strBuf length is " + to_string(strBuf.length()));
                 string result = strBuf.substr(0, index);
                 strBuf.erase(0, index + delimiter.length());
                 return result;
             }
+            else
+                log("readTo() no delimit found (" + to_string(strBuf.length()) + "); reading [" + strBuf + "]");
         }
 
         size_t bytes = read(rawBuf, sizeof(rawBuf));
         string tempStr(rawBuf, bytes);
+        log("readTo() read [" + tempStr + "]");
         strBuf += tempStr;
+
+        if (!bytes && !--attempt) {
+            sleep(1);
+            cerr << "failed socket read" << endl;
+            log("failed socket read");
+            //exit(10);
+        }
     }
 }
 
