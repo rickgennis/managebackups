@@ -367,7 +367,7 @@ The date and optionally time are inserted before the extension, or if no
 extension, at the end.
 A filename of mybackup.tgz will become mybackup-YYYYMMDD.tgz.
 .TP
-\f[B]\[en]cmd\f[R], \f[B]\[en]command\f[R] [\f[I]cmd\f[R]]
+\f[B]-c\f[R], \f[B]\[en]command\f[R] [\f[I]cmd\f[R]]
 Use \f[I]cmd\f[R] to perform a backup.
 \f[I]cmd\f[R] should be double-quoted and may include as many pipes as
 desired.

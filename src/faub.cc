@@ -46,51 +46,43 @@ string newBackupDir(string backupDir, string baseFilename) {
     timeFields = localtime(&rawTime);
     strftime(buffer, sizeof(buffer), "%Y-%m-%d@%X", timeFields);
 
-    return(backupDir + "/" + buffer);
+    return(backupDir + "/" + baseFilename + "_" + buffer);
 }
 
 
-void fs_startServer(vector<BackupConfig>& configs, string dir) {
-    // fork main listening daemon
-/*    if (fork())
-        return;
+void fs_startServer(BackupConfig& config) {
+    auto dir = config.settings[sDirectory].value;
 
-    try {
-        tcpSocket listeningServer(2029, 50);
-
-        while (1) {
-            tcpSocket client = listeningServer.accept(15);
-
-            // fork a daemon for this connection
-            if (!fork()) {
-                fs_serverProcessing(client, configs, mostRecentBackupDir(dir), newBackupDir(dir));
-                exit(0);
-            }
-        }
-    }
-    catch (string s) {
-        cerr << s << endl;
-    }
-*/
-    
-    PipeExec faub("/usr/bin/ssh fw /usr/bin/managebackups --directory /tmp --faubclient");
-    faub.execute("faubcall", false, false, true);
-    fs_serverProcessing(faub, configs, mostRecentBackupDir(dir), newBackupDir(dir, "firewall"));
-    exit(0);
+    PipeExec faub(config.settings[sFaub].value);
+    DEBUG(D_faub) DFMT("executing: \"" << config.settings[sFaub].value << "\"");
+    faub.execute("faub", false, false, true);
+    fs_serverProcessing(faub, config, mostRecentBackupDir(dir), newBackupDir(dir, config.settings[sTitle].value));
 }
 
 
-void fs_serverProcessing(PipeExec& client, vector<BackupConfig>& configs, string prevDir, string currentDir) {
+void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir, string currentDir) {
     string remoteFilename;
     string localPrevFilename;
     string localCurFilename;
     struct stat statData;
+    ssize_t fileTotal = 0;
+    ssize_t fileModified = 0;
+    ssize_t fileLinked = 0;
+    ssize_t unmodDirs = 0;
 
-    long clientId = client.readProc();
-    if (clientId < 0 || clientId > configs.size()) {
-        SCREENERR("Invalid session id (" << clientId << ").");
-        exit(5);
-    }
+    // note start time
+    timer backupTime;
+    backupTime.start();
+
+    log(config.ifTitle() + " starting backup to " + currentDir);
+    string screenMessage = config.ifTitle() + " backing up to " + currentDir + "... ";
+    string backspaces = string(screenMessage.length(), '\b');
+    string blankspaces = string(screenMessage.length() , ' ');
+    NOTQUIET && ANIMATE && cout << screenMessage << flush;
+
+    DEBUG(D_faub) DFMT("faub server ready to receive");
+    DEBUG(D_faub) DFMT("current: " << currentDir);
+    DEBUG(D_faub) DFMT("previous: " << prevDir);
 
     do {
         vector<string> neededFiles;
@@ -101,7 +93,6 @@ void fs_serverProcessing(PipeExec& client, vector<BackupConfig>& configs, string
          * and see if the remote file is different from what we
          * have locally in the most recent backup.
         */
-        unsigned int allFiles = 0;
 
         while (1) {
             remoteFilename = client.readTo(NET_DELIM);
@@ -111,7 +102,7 @@ void fs_serverProcessing(PipeExec& client, vector<BackupConfig>& configs, string
                 break;
             }
 
-            ++allFiles;
+            ++fileTotal;
             long mtime = client.readProc();
             long mode  = client.readProc();
 
@@ -127,16 +118,26 @@ void fs_serverProcessing(PipeExec& client, vector<BackupConfig>& configs, string
              * at the end.  We can't do them now because the subdirectories they live in
              * may not have come over yet.
             */
-            if (prevDir.length() && !S_ISDIR(mode) &&
-                    !stat(localPrevFilename.c_str(), &statData) &&
-                    statData.st_mtime == mtime) {
-                linkList.insert(linkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
+            if (prevDir.length() && 
+                    !stat(localPrevFilename.c_str(), &statData) && statData.st_mtime == mtime) {
+
+                if (!S_ISDIR(mode))
+                    linkList.insert(linkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
+                else {
+                    /* 
+                     * directories are special cases because we don't want to link them so
+                     * we always need them sent over. unmodDirs is used just to keep the
+                     * stats clean at the end.
+                     */
+                    neededFiles.insert(neededFiles.end(), remoteFilename);
+                    ++unmodDirs;
+                }
             }
             else
                 neededFiles.insert(neededFiles.end(), remoteFilename);
         }
 
-        DEBUG(D_faub) DFMT("server phase 1 complete; total:" << allFiles << ", need:" << neededFiles.size() 
+        DEBUG(D_faub) DFMT("server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size() 
                 << ", willLink:" << linkList.size());
 
         /*
@@ -178,8 +179,19 @@ void fs_serverProcessing(PipeExec& client, vector<BackupConfig>& configs, string
         DEBUG(D_faub) DFMT("server phase 4 complete; created " << (linkList.size() - linkErrors)  << 
                 " links to previously backed up files" << (linkErrors ? string(" (" + to_string(linkErrors) + " error(s))") : ""));
 
+        fileModified += neededFiles.size();
+        fileLinked += linkList.size();
+
     } while (client.readProc());
     
+    // note finish time
+    backupTime.stop();
+    NOTQUIET && ANIMATE && cout << backspaces << blankspaces << backspaces << flush;
+
+    string message = "backup completed to " + currentDir + " in " + backupTime.elapsed() + "\n\t\t(total files: " +
+        to_string(fileTotal) + ", modified: " + to_string(fileModified - unmodDirs) + ", linked: " + to_string(fileLinked) + ")";
+    log(config.ifTitle() + " " + message);
+    NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message << endl;
 }
 
 
@@ -243,25 +255,17 @@ void fc_sendFilesToServer(tcpSocket& server) {
 }
 
 
-void fc_mainEngine() {
+void fc_mainEngine(vector<string> paths) {
     try {
         tcpSocket server(1); // setup socket library to use stdout
         server.setReadFd(0); // and stdin
 
-        // disable buffering on both
-        //setvbuf(stdout, NULL, _IONBF, 0);
-        //setvbuf(stdin, NULL, _IONBF, 0);
-
-        // write sessionId
-        server.write(2);
-
-        vector<string> dirs = { "/etc" };
-        for (auto it = dirs.begin(); it != dirs.end(); ++it) {
+        for (auto it = paths.begin(); it != paths.end(); ++it) {
             fc_scanToServer(*it, server);
             server.write(NET_OVER_DELIM);
             fc_sendFilesToServer(server);
 
-            long end = (it+1) != dirs.end();
+            long end = (it+1) != paths.end();
             server.write(end);
         }
     }

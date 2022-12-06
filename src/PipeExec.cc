@@ -319,6 +319,7 @@ ssize_t PipeExec::writeProc(long data) {
 }
 
 
+// read 8-bytes and return it as a long
 long PipeExec::readProc() {
     long data;
 
@@ -340,11 +341,13 @@ long PipeExec::readProc() {
 
 
 string PipeExec::readTo(string delimiter) {
+    int fails = 0;
+
     while (1) {
         if (strBuf.length()) {
             size_t index;
 
-            if ((index = strBuf.find(delimiter)) != string ::npos) {
+            if ((index = strBuf.find(delimiter)) != string::npos) {
                 string result = strBuf.substr(0, index);
                 strBuf.erase(0, index + delimiter.length());
                 return result;
@@ -354,6 +357,15 @@ string PipeExec::readTo(string delimiter) {
         size_t bytes = readProc(rawBuf, sizeof(rawBuf));
         string tempStr(rawBuf, bytes);
         strBuf += tempStr;
+
+        if (!bytes) 
+            ++fails;
+
+        if (fails > 5) {
+            SCREENERR("error: no data from faub client; aborting (did the faub command execute successfully?)");
+            log("error: no data from faub client; aborting (did the faub command execute successfully?)");
+            exit(9);
+        }
     }
 }
 

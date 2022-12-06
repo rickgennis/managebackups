@@ -30,7 +30,8 @@ map<string, int>settingMap =
      { CLI_NOTIFYEVERY, sNotifyEvery },
      { CLI_MAILFROM, sMailFrom },
      { CLI_LEAVEOUTPUT, sLeaveOutput },
-     { CLI_FAUB, sFaub }};
+     { CLI_FAUB, sFaub },
+     { CLI_PATHS, sPaths }};
 
 
 

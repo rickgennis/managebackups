@@ -116,7 +116,7 @@ Options are relative to the three functions of **managebackups**.
 **--file** [*filename*]
 : Use *filename* as the base filename to create for new backups.  The date and optionally time are inserted before the extension, or if no extension, at the end.  A filename of mybackup.tgz will become mybackup-YYYYMMDD.tgz.
 
-**--cmd**, **--command** [*cmd*]
+**-c**, **--command** [*cmd*]
 : Use *cmd* to perform a backup.  *cmd* should be double-quoted and may include as many pipes as desired. Have the command send the backed up data to its STDOUT.  For example, **--cmd** "tar -cz /mydata" or **--cmd** "/usr/bin/tar -c /opt | /usr/bin/gzip -n".
 
 **--mode** [*mode*]

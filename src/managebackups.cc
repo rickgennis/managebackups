@@ -145,6 +145,8 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                             continue;
                         }
                     }
+                    else
+                        cerr << fullFilename << " not found in cache " << cache.size() << endl;
 
                     // otherwise let's update the cache with everything we just read and
                     // then calculate a new md5
@@ -160,8 +162,8 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                         cache.addOrUpdate(cacheEntry, true, true);
                     }
                     else {
-                        log("error: unable to read " + fullFilename);
-                        SCREENERR("error: unable to read " << fullFilename);
+                        log("error: unable to read " + fullFilename + " (MD5)");
+                        SCREENERR("error: unable to read " << fullFilename << " (MD5)");
                     }
                 }
             }
@@ -192,6 +194,9 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
  * Wrapper function for parseDirToCache().
  *******************************************************************************/
 void scanConfigToCache(BackupConfig& config) {
+    if (config.settings[sFaub].value.length())
+        return;
+
     string directory = "";
     string fnamePattern = "";
     if (config.settings[sDirectory].value.length())
@@ -367,13 +372,13 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
         currentConf = &configManager.configs[configManager.activeConfig];
     }
 
-    // user doesn't want to show stats
-    if (!GLOBALS.stats && 
+    // user doesn't want to show stats & this isn't a faub client run via --paths
+    if (!GLOBALS.stats && !GLOBALS.cli.count(CLI_PATHS) &&
 
-            // the current profile (either via -p or full config spelled out in CLI) doesn't have a dir specified
+            // & the current profile (either via -p or full config spelled out in CLI) doesn't have a dir specified
             !currentConf->settings[sDirectory].value.length() &&
 
-            // user hasn't selected --all/--All where there's a dir configured in at least one (first) profile
+            // & user hasn't selected --all/--All where there's a dir configured in at least one (first) profile
             !((GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP))
                 && configManager.configs.size() && configManager.configs[0].settings[sDirectory].value.length())) {
 
@@ -1191,8 +1196,8 @@ int main(int argc, char *argv[]) {
         (string("k,") + CLI_CRONS, "Cron", cxxopts::value<bool>()->default_value("false"))
         (string("K,") + CLI_CRONP, "Cron", cxxopts::value<bool>()->default_value("false"))
         (string("h,") + CLI_HELP, "Show help", cxxopts::value<bool>()->default_value("false"))
-        (CLI_FAUB, "Faub", cxxopts::value<bool>()->default_value("false"))
-        (CLI_FAUBCLIENT, "Faub client", cxxopts::value<bool>()->default_value("false"))
+        (CLI_FAUB, "Faub backup", cxxopts::value<std::string>())
+        (CLI_PATHS, "Faub paths", cxxopts::value<std::vector<std::string>>())
         (CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))
         (CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))
         (CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())
@@ -1313,6 +1318,11 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    if ((GLOBALS.cli.count(CLI_DIR) || GLOBALS.cli.count(CLI_FAUB)) && GLOBALS.cli.count(CLI_PATHS)) {
+        SCREENERR("error: --directory and --faub are mutually-exclusive with --paths.  --paths is only used in the configuration of the remote command");
+        exit(1);
+    }
+
     if ((GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)) && 
             (GLOBALS.cli.count(CLI_FILE) ||
             GLOBALS.cli.count(CLI_COMMAND) ||
@@ -1324,8 +1334,8 @@ int main(int argc, char *argv[]) {
         exit(1);
     } 
 
-    if ((GLOBALS.cli.count(CLI_FAUB) || GLOBALS.cli.count(CLI_FAUBCLIENT)) && (GLOBALS.cli.count(CLI_SFTPTO) || GLOBALS.cli.count(CLI_SCPTO))) {
-        SCREENERR("error: --faub is incompatible with --sftp and --scp");
+    if ((GLOBALS.cli.count(CLI_FAUB) || GLOBALS.cli.count(CLI_PATHS)) && (GLOBALS.cli.count(CLI_SFTPTO) || GLOBALS.cli.count(CLI_SCPTO))) {
+        SCREENERR("error: --faub and --paths are incompatible with --sftp and --scp");
         exit(1);
     } 
 
@@ -1384,11 +1394,11 @@ int main(int argc, char *argv[]) {
             BoolParamIfSpecified(CLI_NOBACKUP) +
             BoolParamIfSpecified(CLI_NOPRUNE) +
             BoolParamIfSpecified(CLI_PRUNE) +
-            BoolParamIfSpecified(CLI_FAUB) +
-            BoolParamIfSpecified(CLI_FAUBCLIENT) +
             (GLOBALS.cli.count(CLI_CONFDIR) ? string("--") + CLI_CONFDIR + " " + GLOBALS.confDir : "") +
             (GLOBALS.cli.count(CLI_CACHEDIR) ? string("--") + CLI_CACHEDIR + " " + GLOBALS.cacheDir : "") +
             (GLOBALS.cli.count(CLI_LOGDIR) ? string("--") + CLI_LOGDIR + " " + GLOBALS.logDir : "") +
+            ValueParamIfSpecified(CLI_FAUB) +
+            ValueParamIfSpecified(CLI_PATHS) +
             ValueParamIfSpecified(CLI_FS_FP) +
             ValueParamIfSpecified(CLI_FS_BACKUPS) +
             ValueParamIfSpecified(CLI_FS_DAYS) +
@@ -1412,13 +1422,9 @@ int main(int argc, char *argv[]) {
         if (GLOBALS.debugSelector)
             commonSwitches += " -v=" + to_string(GLOBALS.debugSelector);
 
-        if (GLOBALS.cli.count(CLI_FAUB)) {
-            fs_startServer(configManager.configs, "/tmp/mybackups");
-            exit(1);
-        }
-
-        if (GLOBALS.cli.count(CLI_FAUBCLIENT)) {
-            fc_mainEngine();
+        if (GLOBALS.cli.count(CLI_PATHS)) {
+            auto paths = GLOBALS.cli[CLI_PATHS].as<vector<string>>();
+            fc_mainEngine(paths);
             exit(1);
         }
         
@@ -1516,6 +1522,10 @@ int main(int argc, char *argv[]) {
 
             scanConfigToCache(*currentConfig);
             if (performTripwire(*currentConfig)) {
+
+                if (currentConfig->settings[sFaub].value.length())
+                    fs_startServer(*currentConfig);
+
                 pruneBackups(*currentConfig);
                 updateLinks(*currentConfig);
                 if (enoughLocalSpace(*currentConfig)) {

@@ -79,7 +79,7 @@
 #define CLI_MAILFROM "from"
 #define CLI_LEAVEOUTPUT "leaveoutput"
 #define CLI_FAUB "faub"
-#define CLI_FAUBCLIENT "faubclient"
+#define CLI_PATHS "path"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -113,7 +113,8 @@
 #define RE_NOTIFYEVERY "(notifyevery|every)"
 #define RE_MAILFROM "(mailfrom|from)"
 #define RE_LEAVEOUTPUT "(leaveoutput)"
-#define RE_FAUB "(faub|faubstyle)"
+#define RE_FAUB "(faub)"
+#define RE_PATHS "(path)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"
