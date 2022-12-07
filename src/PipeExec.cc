@@ -448,13 +448,11 @@ string firstAvailIDForDir(string dir) {
 }
 
 
-void PipeExec::readToFile(string filename) {
+void PipeExec::readToFile(string filename, bool preDelete) {
     long uid = readProc();
     long gid = readProc();
     long mode = readProc();
     long mtime = readProc();
-
-    //cout << "server: receive " << filename << ", mode:" << mode << ", uid: " << uid << ", gid: " << gid << ", mtime: " << mtime << endl;
 
     // handle directories that are specifically sent
     if (S_ISDIR(mode)) {
@@ -466,19 +464,19 @@ void PipeExec::readToFile(string filename) {
         timeBuf.actime = timeBuf.modtime = mtime;
         utime(filename.c_str(), &timeBuf);
 
-        //cout << "server: created directory " << filename << endl;
         return;
     }
 
-    // handle directories that are inherent in the filename
-    string dirName = filename.substr(0, filename.find_last_of("/"));
-    //cout << "making " << dirName << ": " << mkdirp(dirName);  // need a mode, gid and uid here
-
+    // handle symlinks
     if (S_ISLNK(mode)) {
         char target[1025];
         long bytes = readProc();
         readProc(target, bytes);
         target[bytes] = 0;
+
+        if (preDelete)
+            unlink(filename.c_str());
+
         if (symlink(target, filename.c_str())) {
             cerr << "unable to create symlink (" << filename << "): ";
             perror("");
@@ -487,13 +485,15 @@ void PipeExec::readToFile(string filename) {
         chmod(filename.c_str(), mode);
         chown(filename.c_str(), uid, gid);
 
-        //cout << "server: created symlink " << filename << " (-> " << target << ")" << endl;
         return;
     }
 
+    // handle directories that are inherent in the filename
+    string dirName = filename.substr(0, filename.find_last_of("/"));
+    mkdirp(dirName);
+
     // handle files
     auto bytesRemaining = readProc();
-    //cout << "server: receiving " << filename << " as " << bytesRemaining << " bytes" << endl;
 
     FILE *dataf;
     auto bufSize = sizeof(rawBuf);
@@ -506,7 +506,6 @@ void PipeExec::readToFile(string filename) {
      * even if there was an issue with this one.
      */
 
-    //cout << "\tserver: created " << filename << endl;
     while (bytesRemaining) {
         size_t readSize = bytesRemaining < bufSize ? bytesRemaining : bufSize;
         size_t bytesRead = readProc(rawBuf, readSize);
@@ -530,8 +529,6 @@ void PipeExec::readToFile(string filename) {
         timeBuf.actime = timeBuf.modtime = mtime;
         utime(filename.c_str(), &timeBuf);
     }
-
-    //cout << "server: completed " << filename << endl;
 }
 
 

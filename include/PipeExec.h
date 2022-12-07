@@ -94,7 +94,7 @@ class PipeExec {
         bool readAndMatch(string matchStr);
         string statefulReadAndMatchRegex(string regex, int buffSize = 1024 * 2);
         string readTo(string delimiter);
-        void readToFile(string filename);
+        void readToFile(string filename, bool preDelete = false);
         
         string errorOutput();
         void flushErrors();

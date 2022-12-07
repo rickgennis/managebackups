@@ -7,14 +7,33 @@
 #include "debug.h"
 #include "globals.h"
 
+tuple<string, time_t> mostRecentBackupDirInternal(string backupDir);
 
 string mostRecentBackupDir(string backupDir) {
+    auto [fname, fmtime] = mostRecentBackupDirInternal(backupDir);
+    return fname;
+}
+
+
+tuple<string, time_t> mostRecentBackupDirInternal(string backupDir) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
     struct stat statData;
 
     string recentName;
     time_t recentTime = 0;
+
+    Pcre matchSpec("-\\d{8}($|-\\d{2}:)");
+    if (matchSpec.search(backupDir)) {
+
+        if (!stat(backupDir.c_str(), &statData)) {
+            return {backupDir, statData.st_mtime};
+        }
+
+        return {"", 0};
+    }
+
+
     if ((c_dir = opendir(backupDir.c_str())) != NULL) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
 
@@ -23,40 +42,57 @@ string mostRecentBackupDir(string backupDir) {
 
             string fullFilename = backupDir + "/" + string(c_dirEntry->d_name);
             if (!stat(fullFilename.c_str(), &statData)) {
-                if (statData.st_mtime > recentTime) {
-                    recentTime = statData.st_mtime;
-                    recentName = fullFilename;
+
+                if (S_ISDIR(statData.st_mode)) {
+                    auto [fname, fmtime] = mostRecentBackupDirInternal(fullFilename);
+                    if (fmtime > recentTime) {
+                        recentTime = fmtime;
+                        recentName = fname;
+                    }
                 }
+                else
+                    if (statData.st_mtime > recentTime) {
+                        recentTime = statData.st_mtime;
+                        recentName = fullFilename;
+                    }
             }
         }
 
         closedir(c_dir);
     }
 
-    return recentName;
+    return {recentName, recentTime};
 }
 
 
-string newBackupDir(string backupDir, string baseFilename) {
+string newBackupDir(BackupConfig& config) {
     time_t rawTime;
     struct tm *timeFields;
     char buffer[100];
 
     time(&rawTime);
     timeFields = localtime(&rawTime);
+    bool incTime = str2bool(config.settings[sIncTime].value);
     strftime(buffer, sizeof(buffer), "%Y-%m-%d@%X", timeFields);
 
-    return(backupDir + "/" + baseFilename + "_" + buffer);
+    string setDir = config.settings[sDirectory].value;
+    strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d" : "%Y/%m", localtime(&rawTime));
+    string subDir = buffer;
+
+    strftime(buffer, sizeof(buffer), incTime ? "-%Y%m%d-%H:%M:%S" : "-%Y%m%d", localtime(&rawTime));
+    string filename = buffer;
+
+    string fullPath = slashConcat(config.settings[sDirectory].value, subDir, safeFilename(config.settings[sTitle].value) + filename) + "/";
+
+    return fullPath;
 }
 
 
 void fs_startServer(BackupConfig& config) {
-    auto dir = config.settings[sDirectory].value;
-
     PipeExec faub(config.settings[sFaub].value);
     DEBUG(D_faub) DFMT("executing: \"" << config.settings[sFaub].value << "\"");
     faub.execute("faub", false, false, true);
-    fs_serverProcessing(faub, config, mostRecentBackupDir(dir), newBackupDir(dir, config.settings[sTitle].value));
+    fs_serverProcessing(faub, config, mostRecentBackupDir(config.settings[sDirectory].value), newBackupDir(config));
 }
 
 
@@ -157,9 +193,10 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
          * in the order we've requested in the format of 8 bytes for 'size' and then
          * the 'size' number of bytes of data.
         */
+        bool incTime = str2bool(config.settings[sIncTime].value);
         for (auto &file: neededFiles) {
             DEBUG(D_faub) DFMT("server waiting for " << file);
-            client.readToFile(slashConcat(currentDir, file));
+            client.readToFile(slashConcat(currentDir, file), !incTime);
         }
 
         DEBUG(D_faub) DFMT("server phase 3 complete; received " << neededFiles.size() << " files from client");
@@ -170,6 +207,12 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         unsigned int linkErrors = 0;
         for (auto &links: linkList) {
             mkbasedirs(links.second);
+
+            // when Time isn't included we're potentially overwriting an existing backup. let's pre-delete
+            // so we don't get an error.
+            if (!incTime)
+                unlink(links.second.c_str());
+
             if (link(links.first.c_str(), links.second.c_str()) < 0) {
                 ++linkErrors;
                 SCREENERR("error: unable to link " << links.second << " to " << links.first << " - " << strerror(errno));
