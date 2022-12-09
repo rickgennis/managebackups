@@ -2,20 +2,21 @@
 #include "dirent.h"
 #include "sys/stat.h"
 
+#include "FaubCache.h"
 #include "faub.h"
 #include "PipeExec.h"
 #include "debug.h"
 #include "globals.h"
 
-tuple<string, time_t> mostRecentBackupDirInternal(string backupDir);
+tuple<string, time_t> mostRecentBackupDirInternal(string backupDir, string newDir);
 
-string mostRecentBackupDir(string backupDir) {
-    auto [fname, fmtime] = mostRecentBackupDirInternal(backupDir);
+string mostRecentBackupDir(string backupDir, string newDir) {
+    auto [fname, fmtime] = mostRecentBackupDirInternal(backupDir, newDir);
     return fname;
 }
 
 
-tuple<string, time_t> mostRecentBackupDirInternal(string backupDir) {
+tuple<string, time_t> mostRecentBackupDirInternal(string backupDir, string newDir) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
     struct stat statData;
@@ -41,10 +42,13 @@ tuple<string, time_t> mostRecentBackupDirInternal(string backupDir) {
                continue;
 
             string fullFilename = backupDir + "/" + string(c_dirEntry->d_name);
+            if (fullFilename == newDir)
+                continue;
+
             if (!stat(fullFilename.c_str(), &statData)) {
 
                 if (S_ISDIR(statData.st_mode)) {
-                    auto [fname, fmtime] = mostRecentBackupDirInternal(fullFilename);
+                    auto [fname, fmtime] = mostRecentBackupDirInternal(fullFilename, newDir);
                     if (fmtime > recentTime) {
                         recentTime = fmtime;
                         recentName = fname;
@@ -82,7 +86,7 @@ string newBackupDir(BackupConfig& config) {
     strftime(buffer, sizeof(buffer), incTime ? "-%Y%m%d-%H:%M:%S" : "-%Y%m%d", localtime(&rawTime));
     string filename = buffer;
 
-    string fullPath = slashConcat(config.settings[sDirectory].value, subDir, safeFilename(config.settings[sTitle].value) + filename) + "/";
+    string fullPath = slashConcat(config.settings[sDirectory].value, subDir, safeFilename(config.settings[sTitle].value) + filename);
 
     return fullPath;
 }
@@ -92,7 +96,8 @@ void fs_startServer(BackupConfig& config) {
     PipeExec faub(config.settings[sFaub].value);
     DEBUG(D_faub) DFMT("executing: \"" << config.settings[sFaub].value << "\"");
     faub.execute("faub", false, false, true);
-    fs_serverProcessing(faub, config, mostRecentBackupDir(config.settings[sDirectory].value), newBackupDir(config));
+    string newDir = newBackupDir(config);
+    fs_serverProcessing(faub, config, mostRecentBackupDir(config.settings[sDirectory].value, newDir), newDir);
 }
 
 
@@ -105,6 +110,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     ssize_t fileModified = 0;
     ssize_t fileLinked = 0;
     ssize_t unmodDirs = 0;
+    unsigned int linkErrors = 0;
 
     // note start time
     timer backupTime;
@@ -120,8 +126,12 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     DEBUG(D_faub) DFMT("current: " << currentDir);
     DEBUG(D_faub) DFMT("previous: " << prevDir);
 
+    cerr << endl;
+    DFMT("current: " << currentDir);
+    DFMT("previous: " << prevDir);
+
     do {
-        vector<string> neededFiles;
+        set<string> neededFiles;
         map<string,string> linkList;
 
         /*
@@ -132,8 +142,6 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
         while (1) {
             remoteFilename = client.readTo(NET_DELIM);
-            DEBUG(D_faub) DFMT("server received filename " << remoteFilename);
-
             if (remoteFilename == NET_OVER) {
                 break;
             }
@@ -141,6 +149,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             ++fileTotal;
             long mtime = client.readProc();
             long mode  = client.readProc();
+
+            DEBUG(D_faub) DFMT("server learned about " << remoteFilename << " (" << to_string(mode) << ")");
 
             localPrevFilename = slashConcat(prevDir, remoteFilename);
             localCurFilename = slashConcat(currentDir, remoteFilename);
@@ -196,7 +206,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         bool incTime = str2bool(config.settings[sIncTime].value);
         for (auto &file: neededFiles) {
             DEBUG(D_faub) DFMT("server waiting for " << file);
-            client.readToFile(slashConcat(currentDir, file), !incTime);
+            if (!client.readToFile(slashConcat(currentDir, file), !incTime))
+                ++linkErrors;
         }
 
         DEBUG(D_faub) DFMT("server phase 3 complete; received " << neededFiles.size() << " files from client");
@@ -204,7 +215,6 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         /*
          * phase 4 - create the links for everything that matches the previous backup.
         */
-        unsigned int linkErrors = 0;
         for (auto &links: linkList) {
             mkbasedirs(links.second);
 
@@ -231,8 +241,14 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     backupTime.stop();
     NOTQUIET && ANIMATE && cout << backspaces << blankspaces << backspaces << flush;
 
-    string message = "backup completed to " + currentDir + " in " + backupTime.elapsed() + "\n\t\t(total files: " +
-        to_string(fileTotal) + ", modified: " + to_string(fileModified - unmodDirs) + ", linked: " + to_string(fileLinked) + ")";
+    FaubCache fcachePrev(prevDir, false);
+    FaubCache fcacheCurrent(currentDir);
+    auto [totalSize, totalSaved] = dus(currentDir, fcachePrev.inodes, fcacheCurrent.inodes);
+
+    string message = "backup completed to " + currentDir + " in " + backupTime.elapsed() + "\n\t\t(files: " +
+        to_string(fileTotal) + ", modified: " + to_string(fileModified - unmodDirs) + ", linked: " + to_string(fileLinked) + 
+        (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") + 
+        ", size: " + approximate(totalSize) + ", usage: " + approximate(totalSize - totalSaved) + ")";
     log(config.ifTitle() + " " + message);
     NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message << endl;
 }

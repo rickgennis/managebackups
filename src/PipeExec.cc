@@ -448,7 +448,7 @@ string firstAvailIDForDir(string dir) {
 }
 
 
-void PipeExec::readToFile(string filename, bool preDelete) {
+bool PipeExec::readToFile(string filename, bool preDelete) {
     long uid = readProc();
     long gid = readProc();
     long mode = readProc();
@@ -464,7 +464,7 @@ void PipeExec::readToFile(string filename, bool preDelete) {
         timeBuf.actime = timeBuf.modtime = mtime;
         utime(filename.c_str(), &timeBuf);
 
-        return;
+        return true;
     }
 
     // handle symlinks
@@ -480,12 +480,12 @@ void PipeExec::readToFile(string filename, bool preDelete) {
         if (symlink(target, filename.c_str())) {
             cerr << "unable to create symlink (" << filename << "): ";
             perror("");
-            return;
+            return false;
         }
         chmod(filename.c_str(), mode);
         chown(filename.c_str(), uid, gid);
 
-        return;
+        return true;
     }
 
     // handle directories that are inherent in the filename
@@ -494,6 +494,7 @@ void PipeExec::readToFile(string filename, bool preDelete) {
 
     // handle files
     auto bytesRemaining = readProc();
+    auto totalBytes = bytesRemaining;
 
     FILE *dataf;
     auto bufSize = sizeof(rawBuf);
@@ -529,6 +530,8 @@ void PipeExec::readToFile(string filename, bool preDelete) {
         timeBuf.actime = timeBuf.modtime = mtime;
         utime(filename.c_str(), &timeBuf);
     }
+
+    return true;
 }
 
 

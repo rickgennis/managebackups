@@ -5,6 +5,7 @@
 #include <string>
 #include <time.h>
 #include <sys/time.h>
+#include <set>
 #include "globals.h"
 
 using namespace std;
@@ -119,6 +120,9 @@ string catdir(string dir);
 void rmrfdir(string dir);
 
 int mkbasedirs(string path);
+
+tuple<size_t, size_t> dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes);
+tuple<size_t, size_t> dus(string path);
 
 #endif
 

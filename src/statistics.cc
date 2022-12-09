@@ -40,15 +40,14 @@ struct summaryStats {
 };
 
 
-summaryStats _displaySummaryStats(BackupConfig& config, int statDetail = 0, int maxFileLen = 0, int maxProfLen = 0) {
+summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0, int maxFileLen = 0, int maxProfLen = 0) {
     set<unsigned long> countedInode;
     struct summaryStats resultStats;
     int precisionLevel = statDetail > 1 ? 1 : -1;
 
     resultStats.numberOfBackups = config.cache.rawData.size();
-    if (resultStats.numberOfBackups < 1) {
+    if (resultStats.numberOfBackups < 1)
         return resultStats;
-    }
 
     // calcuclate stats from the entire list of backups
     for (auto &raw: config.cache.rawData) {
@@ -124,7 +123,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
 
     // calculate totals
     if (singleConfig) {
-        perStats = _displaySummaryStats(configManager.configs[configManager.activeConfig], statDetail, maxFileLen, maxProfLen);
+        perStats = calculateSummaryStats(configManager.configs[configManager.activeConfig], statDetail, maxFileLen, maxProfLen);
         profileInProcess.insert(profileInProcess.end(), perStats.inProcess);
 
         for (int i = 0; i < NUMSTATDETAILS; ++i)
@@ -134,7 +133,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
         for (auto &config: configManager.configs) 
             if (!config.temp) {
                 ++nonTempConfigs;
-                perStats = _displaySummaryStats(config, statDetail, maxFileLen, maxProfLen);
+                perStats = calculateSummaryStats(config, statDetail, maxFileLen, maxProfLen);
                 totalStats.lastBackupBytes += perStats.lastBackupBytes;
                 totalStats.totalBytesUsed += perStats.totalBytesUsed;
                 totalStats.totalBytesSaved += perStats.totalBytesSaved;

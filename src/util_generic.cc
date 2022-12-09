@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <vector>
+#include <set>
 
 #include "pcre++.h"
 #include "util_generic.h"
@@ -804,5 +805,57 @@ int mkbasedirs(string path) {
         return mkdirp(path.substr(0, path.find_last_of("/")));
 
     return -1;
+}
+
+tuple<size_t, size_t> dus(string path) {    // du -s
+    set<ino_t> seenInodes;
+    set<ino_t> newInodes;
+    return dus(path, seenInodes, newInodes);
+}
+
+
+tuple<size_t, size_t>  dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes) {    // du -s
+    vector<string> subDirs;
+    DIR *dir;
+    struct stat statData;
+    struct dirent *dirEnt;
+    size_t totalSize = 0;
+    size_t totalSaved = 0;
+    size_t temp = 0;
+
+    if ((dir = opendir(path.c_str())) == NULL) {
+        perror(path.c_str());
+        return {0,0};
+    }
+
+    while ((dirEnt = readdir(dir)) != NULL) {
+        if (!strcmp(dirEnt->d_name, ".") || !strcmp(dirEnt->d_name, ".."))
+            continue;
+
+        string fullFilename = path + "/" + dirEnt->d_name;
+        if (lstat(fullFilename.c_str(), &statData) < 0)
+            cerr << "stat(" << fullFilename << "): " << strerror(errno) << endl;
+        else {
+            if (seenInodes.find(statData.st_ino) != seenInodes.end())
+                totalSaved += statData.st_size;
+
+            totalSize += statData.st_size;
+            seenInodes.insert(statData.st_ino);
+            newInodes.insert(statData.st_ino);
+
+            if (S_ISDIR(statData.st_mode) && strcmp(dirEnt->d_name, ".") && strcmp(dirEnt->d_name, ".."))
+                subDirs.insert(subDirs.end(), fullFilename);    
+        }
+    }
+
+    closedir(dir);
+
+    for (auto &subDir: subDirs) {
+        auto [tSize, tSaved] = dus(subDir, seenInodes, newInodes);
+        totalSize += tSize;
+        totalSaved += tSaved;
+    }
+    
+    return {totalSize, totalSaved};
 }
 
