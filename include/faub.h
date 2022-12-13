@@ -14,4 +14,4 @@ void fs_startServer(BackupConfig& config);
 void fc_scanToServer(string directory, tcpSocket& server);
 void fc_sendFilesToServer(tcpSocket& server);
 void fc_mainEngine(vector<string> paths);
-
+void pruneFaub(BackupConfig& config);

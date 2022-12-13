@@ -922,7 +922,7 @@ void performBackup(BackupConfig& config) {
     string setCommand = config.settings[sBackupCommand].value;
     string tempExtension = ".tmp." + to_string(GLOBALS.pid);
 
-    if (!setFname.length() || GLOBALS.cli.count(CLI_NOBACKUP) || !setCommand.length())
+    if (!setFname.length() || GLOBALS.cli.count(CLI_NOBACKUP) || !setCommand.length() || config.settings[sFaub].value.length())
         return;
 
     // setup path names and filenames
@@ -1523,13 +1523,16 @@ int main(int argc, char *argv[]) {
             scanConfigToCache(*currentConfig);
             if (performTripwire(*currentConfig)) {
 
-                if (currentConfig->settings[sFaub].value.length())
+                if (currentConfig->settings[sFaub].value.length()) {
+                    pruneFaub(*currentConfig);
                     fs_startServer(*currentConfig);
-
-                pruneBackups(*currentConfig);
-                updateLinks(*currentConfig);
-                if (enoughLocalSpace(*currentConfig)) {
-                    performBackup(*currentConfig);
+                }
+                else {
+                    pruneBackups(*currentConfig);
+                    updateLinks(*currentConfig);
+                    if (enoughLocalSpace(*currentConfig)) {
+                        performBackup(*currentConfig);
+                    }
                 }
             }
         }

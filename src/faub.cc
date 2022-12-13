@@ -83,7 +83,7 @@ string newBackupDir(BackupConfig& config) {
     strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d" : "%Y/%m", localtime(&rawTime));
     string subDir = buffer;
 
-    strftime(buffer, sizeof(buffer), incTime ? "-%Y%m%d-%H:%M:%S" : "-%Y%m%d", localtime(&rawTime));
+    strftime(buffer, sizeof(buffer), incTime ? "-%Y%m%d@%H:%M:%S" : "-%Y%m%d", localtime(&rawTime));
     string filename = buffer;
 
     string fullPath = slashConcat(config.settings[sDirectory].value, subDir, safeFilename(config.settings[sTitle].value) + filename);
@@ -94,6 +94,10 @@ string newBackupDir(BackupConfig& config) {
 
 void fs_startServer(BackupConfig& config) {
     PipeExec faub(config.settings[sFaub].value);
+
+    if (GLOBALS.cli.count(CLI_NOBACKUP))
+        return;
+
     DEBUG(D_faub) DFMT("executing: \"" << config.settings[sFaub].value << "\"");
     faub.execute("faub", false, false, true);
     string newDir = newBackupDir(config);
@@ -244,6 +248,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     FaubCache fcachePrev(prevDir, false);
     FaubCache fcacheCurrent(currentDir);
     auto [totalSize, totalSaved] = dus(currentDir, fcachePrev.inodes, fcacheCurrent.inodes);
+    fcacheCurrent.duration = backupTime.seconds();
+    fcacheCurrent.finishTime = time(NULL);
 
     string message = "backup completed to " + currentDir + " in " + backupTime.elapsed() + "\n\t\t(files: " +
         to_string(fileTotal) + ", modified: " + to_string(fileModified - unmodDirs) + ", linked: " + to_string(fileLinked) + 
@@ -333,5 +339,11 @@ void fc_mainEngine(vector<string> paths) {
     }
 
     exit(1);
+}
+
+
+
+void pruneFaub(BackupConfig& config) {
+
 }
 
