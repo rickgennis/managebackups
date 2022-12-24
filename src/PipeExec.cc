@@ -298,12 +298,14 @@ ssize_t PipeExec::readProc(void *buf, size_t count) {
 ssize_t PipeExec::writeProc(const void *buf, size_t count) {
     ssize_t bytesWritten;
     ssize_t totalBytesWritten = 0;
+    string data((char*)buf, count);
 
     while (count && ((bytesWritten = write(procs[0].fd[WRITE_END], buf, count)) > 0)) {
         count -= bytesWritten;
         totalBytesWritten += bytesWritten;
     }
 
+    cerr << "PipeExec::writeProc(" << data << "): " << totalBytesWritten << endl;
     return totalBytesWritten;
 }
 
@@ -354,7 +356,9 @@ string PipeExec::readTo(string delimiter) {
             }
         } 
 
+        DEBUG(D_faub) DFMT("server reading socket");
         size_t bytes = readProc(rawBuf, sizeof(rawBuf));
+        DEBUG(D_faub) DFMT("server read " << to_string(bytes) << " bytes");
         string tempStr(rawBuf, bytes);
         strBuf += tempStr;
 

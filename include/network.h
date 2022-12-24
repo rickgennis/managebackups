@@ -12,7 +12,7 @@ using std::string;
 #define BUFFER_SIZE     (1024 * 32)
 #define NET_DELIM   ";\n"
 #define NET_OVER    "///;/"
-#define NET_OVER_DELIM    (string(NET_OVER) + NET_DELIM).c_str()
+#define NET_OVER_DELIM    string(string(NET_OVER) + string(NET_DELIM)).c_str()
 
 struct fileInfo {
     string filename;

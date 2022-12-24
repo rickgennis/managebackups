@@ -1,6 +1,7 @@
 
 #include "dirent.h"
 #include "sys/stat.h"
+#include <fcntl.h>
 
 #include "FaubCache.h"
 #include "faub.h"
@@ -247,10 +248,12 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
     FaubCache fcachePrev(prevDir, false);
     FaubCache fcacheCurrent(currentDir);
-    auto [totalSize, totalSaved] = dus(currentDir, fcachePrev.inodes, fcacheCurrent.inodes);
+    /*auto [totalSize, totalSaved] = dus(currentDir, fcachePrev.inodes, fcacheCurrent.inodes);
     fcacheCurrent.duration = backupTime.seconds();
     fcacheCurrent.finishTime = time(NULL);
-
+*/
+    int totalSize;
+    int totalSaved;
     string message = "backup completed to " + currentDir + " in " + backupTime.elapsed() + "\n\t\t(files: " +
         to_string(fileTotal) + ", modified: " + to_string(fileModified - unmodDirs) + ", linked: " + to_string(fileLinked) + 
         (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") + 
@@ -281,6 +284,7 @@ void fc_scanToServer(string directory, tcpSocket& server) {
             fileTransport fTrans(server);
             if (!fTrans.statFile(fullFilename)) {
                 fTrans.sendStatInfo();
+                DEBUG(D_faub) DFMT("client told server about " << fullFilename);
 
                 if (fTrans.isDir())
                     fc_scanToServer(fullFilename, server);
@@ -324,6 +328,9 @@ void fc_mainEngine(vector<string> paths) {
     try {
         tcpSocket server(1); // setup socket library to use stdout
         server.setReadFd(0); // and stdin
+                             
+        int flags = fcntl(0, F_GETFL, 0);
+        fcntl(0, F_SETFL, flags | O_NONBLOCK);
 
         for (auto it = paths.begin(); it != paths.end(); ++it) {
             fc_scanToServer(*it, server);

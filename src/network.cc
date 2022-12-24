@@ -6,6 +6,9 @@
 
 #include "network.h"
 #include "util_generic.h"
+#include "debug.h"
+#include "globals.h"
+
 
 
 using namespace std;
@@ -198,6 +201,7 @@ string tcpSocket::readTo(string delimiter) {
 
     while (1) {
         if (strBuf.length()) {
+            cerr << "existing: " << strBuf.length() << " {[" << strBuf << "]}" << endl;
             size_t index;
 
             if ((index = strBuf.find(delimiter)) != string::npos) {
@@ -206,17 +210,25 @@ string tcpSocket::readTo(string delimiter) {
                 return result;
             }
         }
+        else
+            cerr << "empty" << endl;
 
-        size_t bytes = read(rawBuf, sizeof(rawBuf));
-        string tempStr(rawBuf, bytes);
-        strBuf += tempStr;
+        DEBUG(D_faub) DFMT("client reading socket (" << to_string(sizeof(rawBuf)) << " bytes)");
+        ssize_t bytes = read(rawBuf, sizeof(rawBuf));
+        DEBUG(D_faub) DFMT("client read " << to_string(bytes) << " bytes from socket");
+        if (bytes >= 0) {
+            string tempStr(rawBuf, bytes);
+            strBuf += tempStr;
+        }
+        else
+            sleep(1);
 
         if (!bytes && !--attempt) {
-            sleep(1);
-            cerr << "failed socket read" << endl;
+            cerr << "failed socket read; exiting" << endl;
             log("failed socket read");
-            //exit(10);
+            exit(10);
         }
+
     }
 }
 

@@ -7,10 +7,11 @@
 #include <set>
 
 #include "BackupEntry.h"
+#include "BaseCache.h"
 
 using namespace std;
 
-class BackupCache {
+class BackupCache : public BaseCache {
     public:
         map<unsigned int, BackupEntry> rawData;
         map<string, set<unsigned int> > indexByMD5;
