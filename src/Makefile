@@ -42,9 +42,11 @@ $(ODIR)/%.o: %.cc $(DEPS)
 clean:
 	rm -f $(ODIR)/*.o *~ core $(INCDIR)/*~ help.cc
 
+fw:
+	tar -C /Users/rennis --exclude "*.o" --exclude "help.cc" -czf /tmp/managebackups.tgz managebackups
+	scp /tmp/managebackups.tgz compile1@fw:/data
+	ssh compile2@fw 
+
 both:
-	make clean
-	tar -C /Users/rennis -czf /tmp/managebackups.tgz managebackups
-	scp /tmp/managebackups.tgz fw:/tmp
-	ssh fw "sudo /home/ennis/managebackups/src/package.deb/scripts/prep" &
-	make
+	make && make fw
+

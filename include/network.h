@@ -31,7 +31,6 @@ class tcpSocket {
     struct sockaddr_in address;
     string strBuf;
     char rawBuf[BUFFER_SIZE];
-    char responseBuf[BUFFER_SIZE];
     
     public:
         tcpSocket(int port, int backlog);
@@ -47,7 +46,7 @@ class tcpSocket {
         size_t write(long data);
         void sendRawFile(fileInfo& fi);
 
-        size_t read(void *data, size_t count);
+        ssize_t read(void *data, size_t count);
         long read();
         string readTo(string delimiter);
         void readToFile(string filename);

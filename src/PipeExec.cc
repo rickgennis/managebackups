@@ -291,7 +291,21 @@ bool PipeExec::readAndMatch(string matchStr) {
 
 
 ssize_t PipeExec::readProc(void *buf, size_t count) {
-    return read(procs[0].readfd[READ_END], buf, count); 
+    auto bufLen = strBuf.length();
+    size_t dataLen = 0;
+
+    if (bufLen) {
+        dataLen = bufLen > count ? count : bufLen;
+        memcpy(buf, strBuf.c_str(), dataLen);
+        strBuf.erase(0, dataLen);
+
+        if (count <= dataLen)
+            return(dataLen);
+
+        count -= dataLen;
+    }
+
+    return ::read(procs[0].readfd[READ_END], (char*)buf + dataLen, count); 
 }
 
 
@@ -300,12 +314,25 @@ ssize_t PipeExec::writeProc(const void *buf, size_t count) {
     ssize_t totalBytesWritten = 0;
     string data((char*)buf, count);
 
-    while (count && ((bytesWritten = write(procs[0].fd[WRITE_END], buf, count)) > 0)) {
+    fd_set writeSet;
+    FD_ZERO(&writeSet);
+    FD_SET(procs[0].fd[WRITE_END], &writeSet);
+
+    fd_set errorSet;
+    FD_ZERO(&errorSet);
+    FD_SET(procs[0].fd[WRITE_END], &errorSet);
+
+    struct timeval tv;
+    tv.tv_sec = 10;
+    tv.tv_usec = 0;
+
+    int result = select(procs[0].fd[WRITE_END] + 1, NULL, &writeSet, &errorSet, &tv);
+
+    while (count && ((bytesWritten = write(procs[0].fd[WRITE_END], (char*)buf + totalBytesWritten, count)) > 0)) {
         count -= bytesWritten;
         totalBytesWritten += bytesWritten;
     }
 
-    cerr << "PipeExec::writeProc(" << data << "): " << totalBytesWritten << endl;
     return totalBytesWritten;
 }
 
@@ -324,18 +351,10 @@ ssize_t PipeExec::writeProc(long data) {
 // read 8-bytes and return it as a long
 long PipeExec::readProc() {
     long data;
+    int bytes = 0;
 
-    string tempData;
-    int pos = strBuf.length();
-    if (pos) {
-        int bytes = pos > 8 ? 8 : pos;
-        tempData = strBuf.substr(0, bytes);
-        strBuf.erase(0, bytes);
-        memcpy((char*)&data, tempData.c_str(), bytes);
-    }
-
-    while (pos < 8)
-        pos += readProc((char*)&data + pos, 8 - pos);
+    while (bytes < 8)
+        bytes += readProc((char*)&data + bytes, 8 - bytes);
 
     long temp = ntohl(data);
     return temp;
@@ -357,7 +376,7 @@ string PipeExec::readTo(string delimiter) {
         } 
 
         DEBUG(D_faub) DFMT("server reading socket");
-        size_t bytes = readProc(rawBuf, sizeof(rawBuf));
+        ssize_t bytes = readProc(rawBuf, sizeof(rawBuf));
         DEBUG(D_faub) DFMT("server read " << to_string(bytes) << " bytes");
         string tempStr(rawBuf, bytes);
         strBuf += tempStr;

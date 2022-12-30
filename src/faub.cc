@@ -1,7 +1,6 @@
-
 #include "dirent.h"
 #include "sys/stat.h"
-#include <fcntl.h>
+#include <netinet/tcp.h>
 
 #include "FaubCache.h"
 #include "faub.h"
@@ -131,10 +130,6 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     DEBUG(D_faub) DFMT("current: " << currentDir);
     DEBUG(D_faub) DFMT("previous: " << prevDir);
 
-    cerr << endl;
-    DFMT("current: " << currentDir);
-    DFMT("previous: " << prevDir);
-
     do {
         set<string> neededFiles;
         map<string,string> linkList;
@@ -199,6 +194,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             DEBUG(D_faub) DFMT("server requesting " << file);
             client.writeProc(string(file + NET_DELIM).c_str());
         }
+
         client.writeProc(NET_OVER_DELIM);
 
         DEBUG(D_faub) DFMT("server phase 2 complete; told client we need " << neededFiles.size() << " file(s)");
@@ -305,11 +301,11 @@ void fc_sendFilesToServer(tcpSocket& server) {
 
     while (1) {
         string filename = server.readTo(NET_DELIM);
-        DEBUG(D_faub) DFMT("client received request for " << filename);
 
         if (filename == NET_OVER)
             break;
 
+        DEBUG(D_faub) DFMT("client received request for " << filename);
         neededFiles.insert(neededFiles.end(), filename);
     }
 
@@ -328,9 +324,6 @@ void fc_mainEngine(vector<string> paths) {
     try {
         tcpSocket server(1); // setup socket library to use stdout
         server.setReadFd(0); // and stdin
-                             
-        int flags = fcntl(0, F_GETFL, 0);
-        fcntl(0, F_SETFL, flags | O_NONBLOCK);
 
         for (auto it = paths.begin(); it != paths.end(); ++it) {
             fc_scanToServer(*it, server);
@@ -340,6 +333,8 @@ void fc_mainEngine(vector<string> paths) {
             long end = (it+1) != paths.end();
             server.write(end);
         }
+        
+        DEBUG(D_faub) DFMT("client complete.");
     }
     catch (string s) {
         cerr << "faub client caught internal exception: " << s << endl;

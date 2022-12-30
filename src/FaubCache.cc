@@ -24,31 +24,39 @@ FaubCache::~FaubCache() {
 void FaubCache::restoreCache() {
     ifstream cacheFile;
 
+    cerr << "RESTORE FAUBCACHE..." << endl;
+
     cacheFile.open(cacheFilename);
     if (cacheFile.is_open()) {
         FaubEntry entry;
         string cacheData;
 
-        getline(cacheFile, cacheData);
-        entry.totalSize = stoll(cacheData);
+        try {
+            getline(cacheFile, cacheData);
+            entry.totalSize = stoll(cacheData);
 
-        getline(cacheFile, cacheData);
-        entry.totalSaved = stoll(cacheData);
+            getline(cacheFile, cacheData);
+            entry.totalSaved = stoll(cacheData);
 
-        getline(cacheFile, cacheData);
-        entry.finishTime = stol(cacheData);
+            getline(cacheFile, cacheData);
+            entry.finishTime = stol(cacheData);
 
-        getline(cacheFile, cacheData);
-        entry.duration = stol(cacheData);
+            getline(cacheFile, cacheData);
+            entry.duration = stol(cacheData);
 
-        while (getline(cacheFile, cacheData)) {
-            entry.inodes.insert(entry.inodes.end(), stoll(cacheData));
+            while (getline(cacheFile, cacheData)) {
+                entry.inodes.insert(entry.inodes.end(), stoll(cacheData));
+            }
+
+            backups.insert(backups.end(), pair<string, FaubEntry>("foo", entry));
         }
-
-        backups.insert(backups.end(), pair<string, FaubEntry>("foo", entry));
+        catch (...) {
+            cerr << "caught stoll() exception" << endl;
+        }
 
         cacheFile.close();
     }
+    cerr << "RESTORE FAUBCACHE complete" << endl;
 }
 
 

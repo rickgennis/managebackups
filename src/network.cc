@@ -140,8 +140,7 @@ size_t tcpSocket::write(const void *data, size_t count) {
     ssize_t bytesWritten;
     ssize_t totalBytesWritten = 0;
 
-    while (count && (bytesWritten = 
-        ::write(socketFd, (char*)data + totalBytesWritten, count - totalBytesWritten))) {
+    while (count && (bytesWritten = ::write(socketFd, (char*)data + totalBytesWritten, count))) {
 
         //(socketFd > 2 ? ::write(socketFd, (char*)data + totalBytesWritten, count - totalBytesWritten) :
         //fwrite(data, 1, count, stdout))) > 0) {
@@ -165,7 +164,7 @@ size_t tcpSocket::write(long data) {
 }
 
 
-size_t tcpSocket::read(void *data, size_t count) {
+ssize_t tcpSocket::read(void *data, size_t count) {
     auto bufLen = strBuf.length();
     size_t dataLen = 0;
 
@@ -181,6 +180,8 @@ size_t tcpSocket::read(void *data, size_t count) {
     }
 
     return (::read(readFd > -1 ? readFd : socketFd, (char*)data + dataLen, count));
+    
+    //return (::read(readFd > -1 ? readFd : socketFd, data, count));
 }
 
 
@@ -197,11 +198,10 @@ long tcpSocket::read() {
 
 
 string tcpSocket::readTo(string delimiter) {
-    int attempt = 5;
+    int attempt = 7;
 
     while (1) {
         if (strBuf.length()) {
-            cerr << "existing: " << strBuf.length() << " {[" << strBuf << "]}" << endl;
             size_t index;
 
             if ((index = strBuf.find(delimiter)) != string::npos) {
@@ -210,8 +210,6 @@ string tcpSocket::readTo(string delimiter) {
                 return result;
             }
         }
-        else
-            cerr << "empty" << endl;
 
         DEBUG(D_faub) DFMT("client reading socket (" << to_string(sizeof(rawBuf)) << " bytes)");
         ssize_t bytes = read(rawBuf, sizeof(rawBuf));
@@ -223,7 +221,7 @@ string tcpSocket::readTo(string delimiter) {
         else
             sleep(1);
 
-        if (!bytes && !--attempt) {
+        if (bytes < 1 && !--attempt) {
             cerr << "failed socket read; exiting" << endl;
             log("failed socket read");
             exit(10);
