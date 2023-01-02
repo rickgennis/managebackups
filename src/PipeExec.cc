@@ -36,6 +36,12 @@ bool operator==(const struct ProcDetail& A, const struct ProcDetail& B) {
 }
  
 
+void showError(string message) {
+    SCREENERR(message + "\n");
+    log(message);
+}
+
+
 string firstAvailIDForDir(string dir);
 
 
@@ -128,7 +134,9 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
     procs.insert(procs.begin(), procDetail("head"));
 
     errorDir = string(TMP_OUTPUT_DIR) + "/" + (procName.length() ? safeFilename(procName) : "pid_" + to_string(getpid())) + "/";
-    mkdirp(errorDir);
+    if (mkdirp(errorDir))
+        showError("error: unable to mkdir " + errorDir + ": " + strerror(errno));
+
     string commandID = firstAvailIDForDir(errorDir);
 
     DEBUG(D_exec) DFMT("preparing full command [" << origCommand << "]");
@@ -387,9 +395,7 @@ string PipeExec::readTo(string delimiter) {
             }
         } 
 
-        DEBUG(D_faub) DFMT("server reading socket");
         ssize_t bytes = ::read(procs[0].readfd[READ_END], rawBuf, sizeof(rawBuf));
-        DEBUG(D_faub) DFMT("server read " << to_string(bytes) << " bytes");
         string tempStr(rawBuf, bytes);
         strBuf += tempStr;
 
@@ -491,9 +497,14 @@ bool PipeExec::readToFile(string filename, bool preDelete) {
 
     // handle directories that are specifically sent
     if (S_ISDIR(mode)) {
-        mkdirp(filename);
-        chmod(filename.c_str(), mode);
-        chown(filename.c_str(), uid, gid);
+        if (mkdirp(filename))
+            showError("error: unable to mkdir " + filename + ": " + strerror(errno));
+        
+        if (chmod(filename.c_str(), mode))
+            showError("error: unable to chmod directory " + filename + ": " + strerror(errno));
+
+        if (chown(filename.c_str(), uid, gid))
+            showError("error: unable to chown directory " + filename + ": " + strerror(errno));
 
         struct utimbuf timeBuf;
         timeBuf.actime = timeBuf.modtime = mtime;
@@ -513,19 +524,23 @@ bool PipeExec::readToFile(string filename, bool preDelete) {
             unlink(filename.c_str());
 
         if (symlink(target, filename.c_str())) {
-            cerr << "unable to create symlink (" << filename << "): ";
-            perror("");
+            showError("error: unable to create symlink (" + filename + "): " + strerror(errno));
             return false;
         }
-        chmod(filename.c_str(), mode);
-        chown(filename.c_str(), uid, gid);
+
+        /*if (chmod(filename.c_str(), mode))
+            showError("error: unable to chmod symlink " + filename + ": " + strerror(errno)); */
+
+        if (lchown(filename.c_str(), uid, gid))
+            showError("error: unable to chown symlink " + filename + ": " + strerror(errno));
 
         return true;
     }
 
     // handle directories that are inherent in the filename
     string dirName = filename.substr(0, filename.find_last_of("/"));
-    mkdirp(dirName);
+    if (mkdirp(dirName))
+        showError("error: unable to mkdir " + filename + ": " + strerror(errno));
 
     // handle files
     auto bytesRemaining = readProc();
@@ -542,24 +557,28 @@ bool PipeExec::readToFile(string filename, bool preDelete) {
      * even if there was an issue with this one.
      */
 
+    bool errorLogged = false;
     while (bytesRemaining) {
         size_t readSize = bytesRemaining < bufSize ? bytesRemaining : bufSize;
         size_t bytesRead = readProc(rawBuf, readSize);
         bytesRemaining -= bytesRead;
 
-        if (dataf != NULL) {
+        if (dataf != NULL && !errorLogged) {
             if (fwrite(rawBuf, 1, bytesRead, dataf) < bytesRead) {
-                perror(filename.c_str());
+                errorLogged = true;
+                showError("error: unable to fwrite to " + filename + ": " + strerror(errno));
                 fclose(dataf);
-                break;
             }
         }
     }
 
     if (dataf != NULL) {
         fclose(dataf);
-        chown(filename.c_str(), uid, gid);
-        chmod(filename.c_str(), mode);
+        if (chown(filename.c_str(), uid, gid))
+            showError("error: unable to chown file " + filename + ": " + strerror(errno));
+
+        if (chmod(filename.c_str(), mode))
+            showError("error: unable to chmod file " + filename + ": " + strerror(errno));
 
         struct utimbuf timeBuf;
         timeBuf.actime = timeBuf.modtime = mtime;
