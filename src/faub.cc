@@ -98,10 +98,22 @@ void fs_startServer(BackupConfig& config) {
     if (GLOBALS.cli.count(CLI_NOBACKUP))
         return;
 
-    DEBUG(D_faub) DFMT("executing: \"" << config.settings[sFaub].value << "\"");
-    faub.execute("faub", false, false, true);
-    string newDir = newBackupDir(config);
-    fs_serverProcessing(faub, config, mostRecentBackupDir(config.settings[sDirectory].value, newDir), newDir);
+    try {
+        DEBUG(D_faub) DFMT("executing: \"" << config.settings[sFaub].value << "\"");
+        faub.execute("faub", false, false, true);
+        string newDir = newBackupDir(config);
+        fs_serverProcessing(faub, config, mostRecentBackupDir(config.settings[sDirectory].value, newDir), newDir);
+    }
+    catch (string s) {
+        cerr << "faub server caught internal exception: " << s << endl;
+        log("error: faub server caught internal exception: " + s);
+        exit(7);
+    }
+    catch (...) {
+        cerr << "faub server caught unknown exception" << endl;
+        log("error: faub server caught unknown exception");
+        exit(7);
+    }
 }
 
 
@@ -182,7 +194,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             else
                 neededFiles.insert(neededFiles.end(), remoteFilename);
         }
-
+ 
+        log(config.ifTitle() + " phase 1: client provided " + to_string(fileTotal) + " entries"); 
         DEBUG(D_faub) DFMT("server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size() 
                 << ", willLink:" << linkList.size());
 
@@ -198,6 +211,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         client.writeProc(NET_OVER_DELIM);
 
         DEBUG(D_faub) DFMT("server phase 2 complete; told client we need " << neededFiles.size() << " file(s)");
+        log(config.ifTitle() + " phase 2: requested " + to_string(neededFiles.size()) + " entries from client");
 
         /*
          * phase 3 - receive full copies of the files we've requested. they come over
@@ -212,6 +226,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         }
 
         DEBUG(D_faub) DFMT("server phase 3 complete; received " << neededFiles.size() << " files from client");
+        log(config.ifTitle() + " phase 3: received " + to_string(neededFiles.size()) + " entries from client");
 
         /*
          * phase 4 - create the links for everything that matches the previous backup.
@@ -219,7 +234,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         for (auto &links: linkList) {
             mkbasedirs(links.second);
 
-            // when Time isn't included we're potentially overwriting an existing backup. let's pre-delete
+            // when Time isn't included we're potentially overwriting an existing backup. pre-delete
             // so we don't get an error.
             if (!incTime)
                 unlink(links.second.c_str());
@@ -227,11 +242,12 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             if (link(links.first.c_str(), links.second.c_str()) < 0) {
                 ++linkErrors;
                 SCREENERR("error: unable to link " << links.second << " to " << links.first << " - " << strerror(errno));
-                log("error: unable to link " + links.second + " to " + links.first + " - " + strerror(errno));
+                log(config.ifTitle() + " error: unable to link " + links.second + " to " + links.first + " - " + strerror(errno));
             }
         }
         DEBUG(D_faub) DFMT("server phase 4 complete; created " << (linkList.size() - linkErrors)  << 
                 " links to previously backed up files" << (linkErrors ? string(" (" + to_string(linkErrors) + " error(s))") : ""));
+        log(config.ifTitle() + " phase 4: created " + to_string(linkList.size() - linkErrors) + " links (" + to_string(linkErrors) + " error(s))");
 
         fileModified += neededFiles.size();
         fileLinked += linkList.size();
@@ -250,7 +266,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 */
     int totalSize;
     int totalSaved;
-    string message = "backup completed to " + currentDir + " in " + backupTime.elapsed() + "\n\t\t(files: " +
+    string message = "backup completed to " + currentDir + " in " + backupTime.elapsed() + "\n\t\t(total: " +
         to_string(fileTotal) + ", modified: " + to_string(fileModified - unmodDirs) + ", linked: " + to_string(fileLinked) + 
         (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") + 
         ", size: " + approximate(totalSize) + ", usage: " + approximate(totalSize - totalSaved) + ")";
@@ -280,7 +296,7 @@ void fc_scanToServer(string directory, tcpSocket& server) {
             fileTransport fTrans(server);
             if (!fTrans.statFile(fullFilename)) {
                 fTrans.sendStatInfo();
-                DEBUG(D_faub) DFMT("client told server about " << fullFilename);
+                DEBUG(D_faub) DFMT("client provided stats on " << fullFilename);
 
                 if (fTrans.isDir())
                     fc_scanToServer(fullFilename, server);
@@ -338,6 +354,11 @@ void fc_mainEngine(vector<string> paths) {
     }
     catch (string s) {
         cerr << "faub client caught internal exception: " << s << endl;
+        log("error: faub client caught internal exception: " + s);
+    }
+    catch (...) {
+        cerr << "faub client caught unknown exception" << endl;
+        log("error: faub client caught unknown exception");
     }
 
     exit(1);

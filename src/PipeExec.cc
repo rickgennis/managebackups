@@ -352,9 +352,23 @@ ssize_t PipeExec::writeProc(long data) {
 long PipeExec::readProc() {
     long data;
     int bytes = 0;
+    auto bufLen = strBuf.length();
 
-    while (bytes < 8)
-        bytes += readProc((char*)&data + bytes, 8 - bytes);
+    do {
+        if (bufLen) {
+            size_t dataLen = bufLen > 8 ? 8 : bufLen;
+            memcpy(&data, strBuf.c_str(), dataLen);
+            strBuf.erase(0, dataLen);
+
+            if (dataLen == 8)
+                break;  // skip readProc()
+
+            bytes += dataLen;
+        }
+
+        while (bytes < 8)
+            bytes += readProc((char*)&data + bytes, 8 - bytes);
+    } while (false);
 
     long temp = ntohl(data);
     return temp;
@@ -376,7 +390,7 @@ string PipeExec::readTo(string delimiter) {
         } 
 
         DEBUG(D_faub) DFMT("server reading socket");
-        ssize_t bytes = readProc(rawBuf, sizeof(rawBuf));
+        ssize_t bytes = ::read(procs[0].readfd[READ_END], rawBuf, sizeof(rawBuf));
         DEBUG(D_faub) DFMT("server read " << to_string(bytes) << " bytes");
         string tempStr(rawBuf, bytes);
         strBuf += tempStr;

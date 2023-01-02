@@ -13,7 +13,6 @@ using namespace std;
 
 class FaubCache : public BaseCache {
     private:
-
         bool _autoSave;
         string cacheFilename;
         map<string, FaubEntry> backups;

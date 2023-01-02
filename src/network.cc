@@ -180,17 +180,29 @@ ssize_t tcpSocket::read(void *data, size_t count) {
     }
 
     return (::read(readFd > -1 ? readFd : socketFd, (char*)data + dataLen, count));
-    
-    //return (::read(readFd > -1 ? readFd : socketFd, data, count));
 }
 
 
 long tcpSocket::read() {
     long data;
-    int pos = 0;
+    int bytes = 0;
+    auto bufLen = strBuf.length();
 
-    while (pos < 8)
-        pos += read((char*)&data + pos, 8 - pos);
+    do {
+        if (bufLen) {
+            size_t dataLen = bufLen > 8 ? 8 : bufLen;
+            memcpy(&data, strBuf.c_str(), dataLen);
+            strBuf.erase(0, dataLen);
+
+            if (dataLen == 8)
+                break;  // skip read()
+
+            bytes += dataLen;
+        }
+
+        while (bytes < 8)
+            bytes += read((char*)&data + bytes, 8 - bytes);
+    } while (false);
 
     long temp = ntohl(data);
     return(temp);
@@ -211,9 +223,8 @@ string tcpSocket::readTo(string delimiter) {
             }
         }
 
-        DEBUG(D_faub) DFMT("client reading socket (" << to_string(sizeof(rawBuf)) << " bytes)");
-        ssize_t bytes = read(rawBuf, sizeof(rawBuf));
-        DEBUG(D_faub) DFMT("client read " << to_string(bytes) << " bytes from socket");
+        ssize_t bytes = ::read(readFd > -1 ? readFd : socketFd, rawBuf, sizeof(rawBuf));
+
         if (bytes >= 0) {
             string tempStr(rawBuf, bytes);
             strBuf += tempStr;
