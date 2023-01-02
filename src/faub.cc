@@ -152,6 +152,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
          * have locally in the most recent backup.
         */
 
+        string fs = client.readTo(NET_DELIM);
+
         while (1) {
             remoteFilename = client.readTo(NET_DELIM);
             if (remoteFilename == NET_OVER) {
@@ -195,8 +197,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 neededFiles.insert(neededFiles.end(), remoteFilename);
         }
  
-        log(config.ifTitle() + " phase 1: client provided " + to_string(fileTotal) + " entries"); 
-        DEBUG(D_faub) DFMT("server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size() 
+        log(config.ifTitle() + " " + fs + " phase 1: client provided " + to_string(fileTotal) + " entries"); 
+        DEBUG(D_faub) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size() 
                 << ", willLink:" << linkList.size());
 
         /*
@@ -210,8 +212,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
         client.writeProc(NET_OVER_DELIM);
 
-        DEBUG(D_faub) DFMT("server phase 2 complete; told client we need " << neededFiles.size() << " file(s)");
-        log(config.ifTitle() + " phase 2: requested " + to_string(neededFiles.size()) + " entries from client");
+        DEBUG(D_faub) DFMT(fs << " server phase 2 complete; told client we need " << neededFiles.size() << " file(s)");
+        log(config.ifTitle() + " " + fs + " phase 2: requested " + to_string(neededFiles.size()) + " entries from client");
 
         /*
          * phase 3 - receive full copies of the files we've requested. they come over
@@ -225,8 +227,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 ++linkErrors;
         }
 
-        DEBUG(D_faub) DFMT("server phase 3 complete; received " << neededFiles.size() << " files from client");
-        log(config.ifTitle() + " phase 3: received " + to_string(neededFiles.size()) + " entries from client");
+        DEBUG(D_faub) DFMT(fs << " server phase 3 complete; received " << neededFiles.size() << " files from client");
+        log(config.ifTitle() + " " + fs + " phase 3: received " + to_string(neededFiles.size()) + " entries from client");
 
         /*
          * phase 4 - create the links for everything that matches the previous backup.
@@ -241,13 +243,13 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
             if (link(links.first.c_str(), links.second.c_str()) < 0) {
                 ++linkErrors;
-                SCREENERR("error: unable to link " << links.second << " to " << links.first << " - " << strerror(errno));
-                log(config.ifTitle() + " error: unable to link " + links.second + " to " + links.first + " - " + strerror(errno));
+                SCREENERR(fs << " error: unable to link " << links.second << " to " << links.first << " - " << strerror(errno));
+                log(config.ifTitle() + " " + fs + " error: unable to link " + links.second + " to " + links.first + " - " + strerror(errno));
             }
         }
-        DEBUG(D_faub) DFMT("server phase 4 complete; created " << (linkList.size() - linkErrors)  << 
-                " links to previously backed up files" << (linkErrors ? string(" (" + to_string(linkErrors) + " error(s))") : ""));
-        log(config.ifTitle() + " phase 4: created " + to_string(linkList.size() - linkErrors) + " links (" + to_string(linkErrors) + " error(s))");
+        DEBUG(D_faub) DFMT(fs << " server phase 4 complete; created " << (linkList.size() - linkErrors)  << 
+                " links to previously backed up files" << (linkErrors ? string(" (" + to_string(linkErrors) + " errors)") : ""));
+        log(config.ifTitle() + " " + fs + " phase 4: created " + to_string(linkList.size() - linkErrors) + " links (" + to_string(linkErrors) + " errors)");
 
         fileModified += neededFiles.size();
         fileLinked += linkList.size();
@@ -342,7 +344,10 @@ void fc_mainEngine(vector<string> paths) {
         server.setReadFd(0); // and stdin
 
         for (auto it = paths.begin(); it != paths.end(); ++it) {
+            server.write(string(*it + NET_DELIM).c_str());
+
             fc_scanToServer(*it, server);
+
             server.write(NET_OVER_DELIM);
             fc_sendFilesToServer(server);
 

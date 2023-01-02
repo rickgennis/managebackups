@@ -68,7 +68,6 @@ PipeExec::~PipeExec() {
             waitpid(-1, NULL, WNOHANG);
 
         if (!dontCleanup) {
-            log("note: destructor calling flushErrors()");
             flushErrors();
         }
     }
@@ -77,7 +76,6 @@ PipeExec::~PipeExec() {
 
 void PipeExec::flushErrors() {
     if (errorDir.length()) {
-        log("flushErrors(" + errorDir + "): " + origCommand);
         rmrfdir(errorDir);
     }
 }
@@ -566,9 +564,10 @@ bool PipeExec::readToFile(string filename, bool preDelete) {
         struct utimbuf timeBuf;
         timeBuf.actime = timeBuf.modtime = mtime;
         utime(filename.c_str(), &timeBuf);
+        return true;
     }
 
-    return true;
+    return false;
 }
 
 
