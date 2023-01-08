@@ -24,6 +24,7 @@ class FaubCache : public BaseCache {
         map<string, FaubEntry>::iterator getBackupByDir(string dir) { return backups.find(dir); }
         map<string, FaubEntry>::iterator getFirstBackup() { return (backups.begin()); }
         map<string, FaubEntry>::iterator getLastBackup() { return (backups.size() ? --backups.end() : backups.end()); }
+        map<string, FaubEntry>::iterator getEnd() { return backups.end(); }
 
         void recache(string dir);
 

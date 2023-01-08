@@ -17,7 +17,8 @@ FaubEntry::FaubEntry(string dir) {
 
 
 FaubEntry::~FaubEntry() {
-    saveStats();
+    if (updated)
+        saveStats();
 
     if (inodes.size())
         saveInodes();

@@ -268,7 +268,6 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
                         HIGHLIGHT + string(" -> ") + RESET + statStrings[line * NUMSTATDETAILS + 8] + 
                         HIGHLIGHT + BRACKETC).c_str(),
                     string(is_old ? string(BOLDRED) + msg : msg).c_str());
-                    //string(statStrings[line * NUMSTATDETAILS + 9]).c_str());
             cout << result << RESET << "\n";
             ++line;
         }
@@ -296,11 +295,69 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
 }
 
 
+bool _displayDetailedFaubStats(BackupConfig& config) {
+    FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
+
+    if (fcache.size()) {
+        // determine the backup max filename length
+        int fnameLen = 0;
+        auto backupIt = fcache.getFirstBackup();
+        while (backupIt != fcache.getEnd()) {
+            fnameLen = max(fnameLen, backupIt->first.length());
+            ++backupIt;
+        }
+
+        string lastMonthYear;
+        struct tm *timeDetail;
+        char result[1000];
+        backupIt = fcache.getFirstBackup();
+        while (backupIt != fcache.getEnd())  {
+            timeDetail = localtime(&backupIt->second.finishTime);
+            string monthYear = backupIt->second.finishTime ? vars2MY(timeDetail->tm_mon+1, timeDetail->tm_year+1900) : "Unknown";
+
+            // print the month header
+            if (lastMonthYear != monthYear)
+                cout << endl << BOLDBLUE << onevarsprintf("%-" + to_string(fnameLen+1) + "s  ", monthYear) <<
+                    "Size    Duration  Type        Age" << RESET << endl;
+
+            snprintf(result, sizeof(result), 
+                    // filename
+                    string(string("%-") + to_string(fnameLen+1) + "s  " +
+                    // size
+                    "%6s  " +
+                    // duration
+                    "%s  " +
+                    // type
+                    "%-4s  " +
+                    // links
+                    "%4s  " +
+                    // content age
+                    "%s").c_str(),
+                        backupIt->first.c_str(), approximate(backupIt->second.totalSize).c_str(),
+                        seconds2hms(backupIt->second.duration).c_str(),
+                        timeDetail->tm_mon  == 0 && timeDetail->tm_mday == 1 ? "Year" : timeDetail->tm_mday == 1 ? "Mnth" : timeDetail->tm_wday == 0 ? "Week" : "Day",
+                        "", backupIt->second.finishTime ? timeDiff(mktimeval(backupIt->second.finishTime)).c_str() : "?");
+
+            cout << result << endl;
+            ++backupIt;
+            lastMonthYear = monthYear;
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+
 void _displayDetailedStats(BackupConfig& config) {
-    unsigned long fnameLen = 0;
+    int fnameLen = 0;
     double bytesUsed = 0;
     double bytesSaved = 0;
     set<unsigned long> countedInode;
+
+    if (_displayDetailedFaubStats(config))
+        return;
 
     // calcuclate stats from the entire list of backups
     for (auto &raw: config.cache.rawData) {
