@@ -210,7 +210,7 @@ long tcpSocket::read() {
 
 
 string tcpSocket::readTo(string delimiter) {
-    int attempt = 7;
+    int attempt = 30;
 
     while (1) {
         if (strBuf.length()) {
@@ -225,19 +225,18 @@ string tcpSocket::readTo(string delimiter) {
 
         ssize_t bytes = ::read(readFd > -1 ? readFd : socketFd, rawBuf, sizeof(rawBuf));
 
-        if (bytes >= 0) {
+        if (bytes > 0) {
             string tempStr(rawBuf, bytes);
             strBuf += tempStr;
         }
-        else
+        else {
             sleep(1);
-
-        if (bytes < 1 && !--attempt) {
-            cerr << "failed socket read; exiting" << endl;
-            log("failed socket read");
-            exit(10);
+            if (!--attempt) {
+                cerr << "failed socket read; exiting" << endl;
+                log("failed socket read; exiting");
+                exit(10);
+            }
         }
-
     }
 }
 

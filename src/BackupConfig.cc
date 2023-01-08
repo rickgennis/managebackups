@@ -104,7 +104,7 @@ void BackupConfig::saveConfig() {
         cerr << "error: unable to create " << temp_filename << " (directory not writable?)" << endl << endl;
         cerr << "When --save is specified managebackups writes its configs to " << GLOBALS.confDir << "." << endl;
         cerr << "An initial --save run via sudo is sufficient then leave --save off of subsequent runs." << endl;
-        cerr << "However, managebackups will always need write acces to " << GLOBALS.cacheDir << "." << endl;
+        cerr << "However, managebackups will always need write access to " << GLOBALS.cacheDir << "." << endl;
         cerr << "These locations can be overriden via --confdir, --cachedir or the environment variables\n";
         cerr << "MB_CONFDIR, MB_CACHEDIR." << endl;
         log("error: unable to create " + temp_filename + " (directory not writable?)");

@@ -13,16 +13,16 @@ using namespace std;
 
 class FaubCache : public BaseCache {
     private:
-        bool _autoSave;
-        string cacheFilename;
+        string baseDir;
         map<string, FaubEntry> backups;
 
     public:
-        void saveCache();
-        void restoreCache();
+        void restoreCache(string profileName);
 
-        FaubCache(string path, bool autoSave = true);
-        FaubCache();
+        map<string, FaubEntry>::iterator getBackupByDir(string dir) { return backups.find(dir); }
+        void recache(string dir);
+
+        FaubCache(string path, string profileName);
         ~FaubCache();
 };
 

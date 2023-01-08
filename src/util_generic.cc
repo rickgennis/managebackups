@@ -28,6 +28,11 @@ string s(int number) {
 }
 
 
+string ies(int number) {
+    return(number == 1 ? "y" : "ies");
+}
+
+
 string cppgetenv(string variable) {
     char* c;
 
@@ -834,7 +839,7 @@ tuple<size_t, size_t>  dus(string path, set<ino_t>& seenInodes, set<ino_t>& newI
 
         string fullFilename = path + "/" + dirEnt->d_name;
         if (lstat(fullFilename.c_str(), &statData) < 0)
-            cerr << "stat(" << fullFilename << "): " << strerror(errno) << endl;
+            cerr << "dus: stat(" << fullFilename << "): " << strerror(errno) << endl;
         else {
             if (seenInodes.find(statData.st_ino) != seenInodes.end())
                 totalSaved += statData.st_size;

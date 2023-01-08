@@ -1377,8 +1377,10 @@ int main(int argc, char *argv[]) {
                     else
                         notify(*currentConfig, errorcom("ALL", "abandoning previous lock because its over 24 hours old"), false, true);
                 }
-                else
+                else {
                     log("[ALL] abandoning previous lock because pid " + to_string(pid) + " has vanished");
+                    kill(pid, 15);
+                }
             }
 
             // locking requested
@@ -1506,8 +1508,10 @@ int main(int argc, char *argv[]) {
                         log(currentConfig->ifTitle() + " skipped run due to profile lock while previous invocation is still running (pid " + to_string(pid) + ")");
                         exit(1);
                     }
-                    else
+                    else {
                         notify(*currentConfig, errorcom(currentConfig->ifTitle(), "abandoning previous lock because its over 24 hours old"), false, true);
+                        kill(pid, 15);
+                    }
                 }
                 else
                     log(currentConfig->ifTitle() + " abandoning previous lock because pid " + to_string(pid) + " has vanished");

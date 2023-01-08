@@ -2,9 +2,12 @@
 #ifndef BASECACHE_H
 #define BASECACHE_H
 
+#include <string>
+
+using namespace std;
+
+
 class BaseCache {
-    virtual void saveCache() = 0;
-    virtual void restoreCache() = 0;
 
     public:
         BaseCache();

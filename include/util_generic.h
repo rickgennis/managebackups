@@ -27,6 +27,8 @@ string cppgetenv(string variable);
 
 string s(int number);
 
+string ies(int number);
+
 void log(string message);
 
 struct timeval mktimeval(unsigned long secs);
@@ -46,6 +48,9 @@ class timer {
         void stop() { gettimeofday(&endTime, NULL); }
 
         time_t seconds() { 
+            unsigned long totalus = (endTime.tv_sec * MILLION + endTime.tv_usec) - (startTime.tv_sec * MILLION + startTime.tv_usec);
+            return floor(1.0 * totalus / MILLION);
+
             auto r = endTime.tv_sec - startTime.tv_sec - (endTime.tv_usec > startTime.tv_usec ? 1 : 0); 
             return(r > 0 ? r : 0); 
         }

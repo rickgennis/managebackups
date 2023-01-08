@@ -1,83 +1,101 @@
 
 #include <fstream>
+#include <algorithm>
+#include <queue>
+#include <dirent.h>
 #include "globals.h"
 #include "FaubCache.h"
 #include "BackupConfig.h"
 #include "util_generic.h"
+#include "debug.h"
 
 #include "FaubCache.h"
 
 
-FaubCache::FaubCache(string path, bool autoSave) {
-    _autoSave = autoSave;
-    cacheFilename = GLOBALS.cacheDir + "/" + MD5string(path) + ".faub";
-    restoreCache();
+FaubCache::FaubCache(string path, string profileName) {
+    baseDir = path;
+    restoreCache(profileName);
 }
 
 
 FaubCache::~FaubCache() {
-    if (_autoSave && cacheFilename.length())
-        saveCache();
 }
 
 
-void FaubCache::restoreCache() {
-    ifstream cacheFile;
+void FaubCache::restoreCache(string profileName) {
+    DIR *c_dir;
+    struct dirent *c_dirEntry;
+    queue<string> dirQueue;
+    string currentDir;
 
-    cerr << "RESTORE FAUBCACHE..." << endl;
+    dirQueue.push(baseDir);
+    auto baseSlashes = count(baseDir.begin(), baseDir.end(), '/');
 
-    cacheFile.open(cacheFilename);
-    if (cacheFile.is_open()) {
-        FaubEntry entry;
-        string cacheData;
+    while (dirQueue.size()) {
+        currentDir = dirQueue.front();
+        dirQueue.pop();
 
-        try {
-            getline(cacheFile, cacheData);
-            entry.totalSize = stoll(cacheData);
+        if ((c_dir = opendir(currentDir.c_str())) != NULL) {
+            while ((c_dirEntry = readdir(c_dir)) != NULL) {
 
-            getline(cacheFile, cacheData);
-            entry.totalSaved = stoll(cacheData);
+                if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+                    continue;
 
-            getline(cacheFile, cacheData);
-            entry.finishTime = stol(cacheData);
+                ++GLOBALS.statsCount;
+                struct stat statData;
+                string fullFilename = slashConcat(currentDir, c_dirEntry->d_name);
 
-            getline(cacheFile, cacheData);
-            entry.duration = stol(cacheData);
+                if (!stat(fullFilename.c_str(), &statData)) {
 
-            while (getline(cacheFile, cacheData)) {
-                entry.inodes.insert(entry.inodes.end(), stoll(cacheData));
+                    if ((statData.st_mode & S_IFMT) == S_IFDIR) {
+                        // regardless of the starting (baseDir) directory, we're only interested in subdirs
+                        // exactly 2 levels lower because that's where our backups will live. e.g.
+                        // baseDir = /tmp/backups then we're looking for things like /tmp/backups/2023/01.
+                        if (count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes == 3) {
+
+                            // next we make sure the subdir matches our profile name
+                            if (fullFilename.find(profileName) != string::npos) {
+                                FaubEntry entry(fullFilename);
+                                DEBUG(D_faub) DFMT("loading cache for " << fullFilename << (entry.loadStats() ? ": success" : ": failed"));
+                                backups.insert(backups.end(), pair<string, FaubEntry>(fullFilename, entry));
+                                continue;
+                            }
+                        }
+
+                        dirQueue.push(fullFilename);
+                    }
+                }
             }
-
-            backups.insert(backups.end(), pair<string, FaubEntry>("foo", entry));
         }
-        catch (...) {
-            cerr << "caught stoll() exception" << endl;
-        }
-
-        cacheFile.close();
     }
-    cerr << "RESTORE FAUBCACHE complete" << endl;
+
+    // all backups are loaded; now see which are missing stats and recache them
+    recache("");
 }
 
 
-void FaubCache::saveCache() {
-    ofstream cacheFile;
+void FaubCache::recache(string dir) {
+    map<string, FaubEntry>::iterator prevBackup = backups.end();
 
-    cacheFile.open(cacheFilename);
-    if (cacheFile.is_open()) {
-        FaubEntry entry;
+    for (auto aBackup = backups.begin(); aBackup != backups.end(); ++aBackup) {
+        DEBUG(D_faub) DFMT("cache set has " << aBackup->first << " with size " << aBackup->second.totalSize);
 
-        for (auto &backup: backups) {
-            cacheFile << backup.second.totalSize << "\n";
-            cacheFile << backup.second.totalSaved << "\n";
-            cacheFile << backup.second.finishTime << "\n";
-            cacheFile << backup.second.duration << "\n";
+        if (!aBackup->second.totalSize ||                // if we have no cached data for this backup or
+            ((dir.length() && dir == aBackup->first) &&  // (this is a backup we've specifically been asked to recache
+            !aBackup->second.updated)) {                 // and it hasn't already been updated on this run of the app)
 
-            for (auto &inode: backup.second.inodes)
-                cacheFile << inode << "\n";
+            bool gotPrev = prevBackup != backups.end();
+            if (gotPrev)
+                prevBackup->second.loadInodes();
+
+            set<ino_t> emptySet;
+            auto [totalSize, totalSaved] = dus(aBackup->first, gotPrev ? prevBackup->second.inodes : emptySet, aBackup->second.inodes);
+            DEBUG(D_faub) DFMT("dus(" << aBackup->first << ") returned " << totalSize << " bytes");
+            aBackup->second.totalSize = totalSize;
+            aBackup->second.totalSaved = totalSaved;
+            aBackup->second.updated = true;
         }
 
-        cacheFile.close();
+        prevBackup = aBackup;
     }
 }
-

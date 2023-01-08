@@ -8,15 +8,28 @@
 #include "debug.h"
 #include "globals.h"
 
-tuple<string, time_t> mostRecentBackupDirInternal(string backupDir, string newDir);
+tuple<string, time_t> mostRecentBackupDirSinceInternal(string backupDir, time_t sinceTime);
 
-string mostRecentBackupDir(string backupDir, string newDir) {
-    auto [fname, fmtime] = mostRecentBackupDirInternal(backupDir, newDir);
+
+/*
+ * mostRecentBackupDirSince(backupBaseDir, sinceDir)
+ *
+ * backupBaseDir is the backup dir root (e.g. /tmp/mybackups)
+ * sinceDir is a specific full backup path (e.g. /tmp/mybackups/2023/012/the-backup-20230106)
+ */
+string mostRecentBackupDirSince(string backupBaseDir, string sinceDir) {
+    struct stat statData;
+    time_t sinceTime = 0;
+
+    if (!stat(sinceDir.c_str(), &statData))
+        sinceTime = statData.st_mtime;
+
+    auto [fname, fmtime] = mostRecentBackupDirSinceInternal(backupBaseDir, sinceTime);
     return fname;
 }
 
 
-tuple<string, time_t> mostRecentBackupDirInternal(string backupDir, string newDir) {
+tuple<string, time_t> mostRecentBackupDirSinceInternal(string backupDir, time_t sinceTime) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
     struct stat statData;
@@ -42,20 +55,18 @@ tuple<string, time_t> mostRecentBackupDirInternal(string backupDir, string newDi
                continue;
 
             string fullFilename = backupDir + "/" + string(c_dirEntry->d_name);
-            if (fullFilename == newDir)
-                continue;
 
             if (!stat(fullFilename.c_str(), &statData)) {
 
                 if (S_ISDIR(statData.st_mode)) {
-                    auto [fname, fmtime] = mostRecentBackupDirInternal(fullFilename, newDir);
-                    if (fmtime > recentTime) {
+                    auto [fname, fmtime] = mostRecentBackupDirSinceInternal(fullFilename, sinceTime);
+                    if ((fmtime > recentTime) && ((fmtime < sinceTime) || !sinceTime)) {
                         recentTime = fmtime;
                         recentName = fname;
                     }
                 }
                 else
-                    if (statData.st_mtime > recentTime) {
+                    if ((statData.st_mtime > recentTime) && ((statData.st_mtime < sinceTime) || !sinceTime)) {
                         recentTime = statData.st_mtime;
                         recentName = fullFilename;
                     }
@@ -99,10 +110,10 @@ void fs_startServer(BackupConfig& config) {
         return;
 
     try {
-        DEBUG(D_faub) DFMT("executing: \"" << config.settings[sFaub].value << "\"");
+        DEBUG(D_netproto) DFMT("executing: \"" << config.settings[sFaub].value << "\"");
         faub.execute("faub", false, false, true);
         string newDir = newBackupDir(config);
-        fs_serverProcessing(faub, config, mostRecentBackupDir(config.settings[sDirectory].value, newDir), newDir);
+        fs_serverProcessing(faub, config, mostRecentBackupDirSince(config.settings[sDirectory].value, newDir), newDir);
     }
     catch (string s) {
         cerr << "faub server caught internal exception: " << s << endl;
@@ -138,7 +149,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     string blankspaces = string(screenMessage.length() , ' ');
     NOTQUIET && ANIMATE && cout << screenMessage << flush;
 
-    DEBUG(D_faub) DFMT("faub server ready to receive");
+    DEBUG(D_netproto) DFMT("faub server ready to receive");
     DEBUG(D_faub) DFMT("current: " << currentDir);
     DEBUG(D_faub) DFMT("previous: " << prevDir);
 
@@ -164,7 +175,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             long mtime = client.readProc();
             long mode  = client.readProc();
 
-            DEBUG(D_faub) DFMT("server learned about " << remoteFilename << " (" << to_string(mode) << ")");
+            DEBUG(D_netproto) DFMT("server learned about " << remoteFilename << " (" << to_string(mode) << ")");
 
             localPrevFilename = slashConcat(prevDir, remoteFilename);
             localCurFilename = slashConcat(currentDir, remoteFilename);
@@ -197,8 +208,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 neededFiles.insert(neededFiles.end(), remoteFilename);
         }
  
-        log(config.ifTitle() + " " + fs + " phase 1: client provided " + to_string(fileTotal) + " entries"); 
-        DEBUG(D_faub) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size() 
+        log(config.ifTitle() + " " + fs + " phase 1: client provided " + to_string(fileTotal) + " entr" + ies(fileTotal)); 
+        DEBUG(D_netproto) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size() 
                 << ", willLink:" << linkList.size());
 
         /*
@@ -206,14 +217,14 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
          * because they've changed or are missing from the previous backup
         */
         for (auto &file: neededFiles) {
-            DEBUG(D_faub) DFMT("server requesting " << file);
+            DEBUG(D_netproto) DFMT("server requesting " << file);
             client.writeProc(string(file + NET_DELIM).c_str());
         }
 
         client.writeProc(NET_OVER_DELIM);
 
-        DEBUG(D_faub) DFMT(fs << " server phase 2 complete; told client we need " << neededFiles.size() << " file(s)");
-        log(config.ifTitle() + " " + fs + " phase 2: requested " + to_string(neededFiles.size()) + " entries from client");
+        DEBUG(D_netproto) DFMT(fs << " server phase 2 complete; told client we need " << neededFiles.size() << " file" << s(neededFiles.size()));
+        log(config.ifTitle() + " " + fs + " phase 2: requested " + to_string(neededFiles.size()) + " entr" + ies(neededFiles.size()) + " from client");
 
         /*
          * phase 3 - receive full copies of the files we've requested. they come over
@@ -222,13 +233,13 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         */
         bool incTime = str2bool(config.settings[sIncTime].value);
         for (auto &file: neededFiles) {
-            DEBUG(D_faub) DFMT("server waiting for " << file);
+            DEBUG(D_netproto) DFMT("server waiting for " << file);
             if (!client.readToFile(slashConcat(currentDir, file), !incTime))
                 ++linkErrors;
         }
 
-        DEBUG(D_faub) DFMT(fs << " server phase 3 complete; received " << neededFiles.size() << " files from client");
-        log(config.ifTitle() + " " + fs + " phase 3: received " + to_string(neededFiles.size()) + " entries from client");
+        DEBUG(D_netproto) DFMT(fs << " server phase 3 complete; received " << neededFiles.size() << " file" << s(neededFiles.size()) + " from client");
+        log(config.ifTitle() + " " + fs + " phase 3: received " + to_string(neededFiles.size()) + " entr" + ies(neededFiles.size()) + " from client");
 
         /*
          * phase 4 - create the links for everything that matches the previous backup.
@@ -247,9 +258,9 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 log(config.ifTitle() + " " + fs + " error: unable to link " + links.second + " to " + links.first + " - " + strerror(errno));
             }
         }
-        DEBUG(D_faub) DFMT(fs << " server phase 4 complete; created " << (linkList.size() - linkErrors)  << 
-                " links to previously backed up files" << (linkErrors ? string(" (" + to_string(linkErrors) + " errors)") : ""));
-        log(config.ifTitle() + " " + fs + " phase 4: created " + to_string(linkList.size() - linkErrors) + " links (" + to_string(linkErrors) + " errors)");
+        DEBUG(D_netproto) DFMT(fs << " server phase 4 complete; created " << (linkList.size() - linkErrors)  << 
+                " link" << s(linkList.size() - linkErrors) << " to previously backed up files" << (linkErrors ? string(" (" + to_string(linkErrors) + " error" + s(linkErrors) + ")") : ""));
+        log(config.ifTitle() + " " + fs + " phase 4: created " + to_string(linkList.size() - linkErrors) + " link" + s(linkList.size() - linkErrors) + " (" + to_string(linkErrors) + " error" + s(linkErrors) + ")");
 
         fileModified += neededFiles.size();
         fileLinked += linkList.size();
@@ -260,14 +271,26 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     backupTime.stop();
     NOTQUIET && ANIMATE && cout << backspaces << blankspaces << backspaces << flush;
 
-    FaubCache fcachePrev(prevDir, false);
-    FaubCache fcacheCurrent(currentDir);
-    /*auto [totalSize, totalSaved] = dus(currentDir, fcachePrev.inodes, fcacheCurrent.inodes);
-    fcacheCurrent.duration = backupTime.seconds();
-    fcacheCurrent.finishTime = time(NULL);
-*/
-    int totalSize;
-    int totalSaved;
+    // loading the cache for this baseDir will automatically detect our new backup having
+    // no cached stats and run a dus() on it to determine totalSize/totalSaved.
+    FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
+
+    // the one exception is if this backup was already in the cache and this run is
+    // overwriting that backup.  in that case we may need to recache() the new version.
+    // recache() is smart enough to skip backups its already recached in this run of the
+    // app.  i.e. if this is the first time for this backup and the above fcache() cache
+    // instantiation correctly cached it, recache() will do nothing.
+    fcache.recache(currentDir);
+
+    // we can pull those out to display
+    auto fcacheCurrent = fcache.getBackupByDir(currentDir);
+    auto totalSize = fcacheCurrent->second.totalSize;
+    auto totalSaved = fcacheCurrent->second.totalSaved;
+
+    // and only need to update the duration and finishTime
+    fcacheCurrent->second.duration = backupTime.seconds();
+    fcacheCurrent->second.finishTime = time(NULL);
+    
     string message = "backup completed to " + currentDir + " in " + backupTime.elapsed() + "\n\t\t(total: " +
         to_string(fileTotal) + ", modified: " + to_string(fileModified - unmodDirs) + ", linked: " + to_string(fileLinked) + 
         (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") + 
@@ -298,7 +321,7 @@ void fc_scanToServer(string directory, tcpSocket& server) {
             fileTransport fTrans(server);
             if (!fTrans.statFile(fullFilename)) {
                 fTrans.sendStatInfo();
-                DEBUG(D_faub) DFMT("client provided stats on " << fullFilename);
+                DEBUG(D_netproto) DFMT("client provided stats on " << fullFilename);
 
                 if (fTrans.isDir())
                     fc_scanToServer(fullFilename, server);
@@ -323,14 +346,14 @@ void fc_sendFilesToServer(tcpSocket& server) {
         if (filename == NET_OVER)
             break;
 
-        DEBUG(D_faub) DFMT("client received request for " << filename);
+        DEBUG(D_netproto) DFMT("client received request for " << filename);
         neededFiles.insert(neededFiles.end(), filename);
     }
 
-    DEBUG(D_faub) DFMT("client received requests for " << to_string(neededFiles.size()) << " file(s)");
+    DEBUG(D_netproto) DFMT("client received requests for " << to_string(neededFiles.size()) << " file(s)");
 
     for (auto &file: neededFiles) {
-        DEBUG(D_faub) DFMT("client sending " << file << " to server");
+        DEBUG(D_netproto) DFMT("client sending " << file << " to server");
         fileTransport fTrans(server);
         fTrans.statFile(file);
         fTrans.sendFullContents();
@@ -355,7 +378,7 @@ void fc_mainEngine(vector<string> paths) {
             server.write(end);
         }
         
-        DEBUG(D_faub) DFMT("client complete.");
+        DEBUG(D_netproto) DFMT("client complete.");
     }
     catch (string s) {
         cerr << "faub client caught internal exception: " << s << endl;
