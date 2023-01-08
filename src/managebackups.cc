@@ -145,8 +145,8 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache& cache) 
                             continue;
                         }
                     }
-                    else
-                        cerr << fullFilename << " not found in cache " << cache.size() << endl;
+                    //else
+                    //    cerr << fullFilename << " not found in cache; " << cache.size() << endl;
 
                     // otherwise let's update the cache with everything we just read and
                     // then calculate a new md5

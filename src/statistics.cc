@@ -10,6 +10,7 @@
 #include "util_generic.h"
 #include "globals.h"
 #include "colors.h"
+#include "FaubCache.h"
 
 #define NUMSTATDETAILS        10 
 
@@ -45,6 +46,45 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
     struct summaryStats resultStats;
     int precisionLevel = statDetail > 1 ? 1 : -1;
 
+    // handle faub configs first
+    FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
+    if (fcache.size()) {
+        // set numeric stats
+        auto [totalSize, totalSaved] = fcache.getTotalStats();
+        resultStats.totalBytesUsed = totalSize;
+        resultStats.totalBytesSaved = totalSaved;
+        resultStats.numberOfBackups = resultStats.uniqueBackups = fcache.size();
+        resultStats.lastBackupBytes = fcache.getLastBackup()->second.totalSize;
+        resultStats.lastBackupTime = fcache.getLastBackup()->second.finishTime;
+        resultStats.duration = fcache.getLastBackup()->second.duration;
+        resultStats.success = true;
+
+        // set string stats
+        auto t = localtime(&resultStats.lastBackupTime);
+        char fileTime[20];
+        strftime(fileTime, sizeof(fileTime), "%X", t);
+
+        int saved = floor((1 - ((long double)resultStats.totalBytesUsed / ((long double)resultStats.totalBytesUsed + (long double)resultStats.totalBytesSaved))) * 100 + 0.5);
+
+        string soutput[NUMSTATDETAILS] = { 
+            config.settings[sTitle].value,
+            pathSplit(fcache.getLastBackup()->first).file,
+            fileTime,    
+            seconds2hms(resultStats.duration),
+            (approximate(resultStats.lastBackupBytes, precisionLevel, statDetail > 2) + " (" + approximate(resultStats.totalBytesUsed, precisionLevel, statDetail == 3) + ")"),
+            (to_string(resultStats.uniqueBackups) + " (" + to_string(resultStats.numberOfBackups) + ")"),
+            to_string(saved) + "%",
+            fcache.getFirstBackup()->second.finishTime ? timeDiff(mktimeval(fcache.getFirstBackup()->second.finishTime)) : "?",
+            fcache.getLastBackup()->second.finishTime ? timeDiff(mktimeval(fcache.getLastBackup()->second.finishTime)) : "?",
+            ""};  // processAge.length() ? processAge : GLOBALS.startupTime - fcache.getLastBackup()->second.finishTime > 2*60*60*24 ? oldMessage : ""};
+            
+        for (int i = 0; i < NUMSTATDETAILS; ++i)
+            resultStats.stringOutput[i] = soutput[i];
+
+        return resultStats;
+    }
+
+    // then regular configs
     resultStats.numberOfBackups = config.cache.rawData.size();
     if (resultStats.numberOfBackups < 1)
         return resultStats;
@@ -92,8 +132,8 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
             (approximate(last_it->second.size, precisionLevel, statDetail > 2) + " (" + approximate(resultStats.totalBytesUsed, precisionLevel, statDetail == 3) + ")"),
             (to_string(resultStats.uniqueBackups) + " (" + to_string(resultStats.numberOfBackups) + ")"),
             to_string(saved) + "%",
-            timeDiff(mktimeval(first_it->second.name_mtime)),
-            timeDiff(mktimeval(last_it->second.mtime)),
+            first_it->second.name_mtime ? timeDiff(mktimeval(first_it->second.name_mtime)) : "?",
+            last_it->second.mtime ? timeDiff(mktimeval(last_it->second.mtime)) : "?",
             processAge.length() ? processAge : GLOBALS.startupTime - last_it->second.name_mtime > 2*60*60*24 ? oldMessage : ""};
             
         for (int i = 0; i < NUMSTATDETAILS; ++i)
@@ -148,9 +188,9 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
 
         // add totals into totalStats
         if (!singleConfig) {
-            statStrings.insert(statStrings.end(), "");
-            statStrings.insert(statStrings.end(), "");
-            statStrings.insert(statStrings.end(), "");
+            statStrings.insert(statStrings.end(), "");   // skip profile
+            statStrings.insert(statStrings.end(), "");   // skip most recent backup
+            statStrings.insert(statStrings.end(), "");   // skip finish time
             statStrings.insert(statStrings.end(), seconds2hms(totalStats.duration));
             statStrings.insert(statStrings.end(), approximate(totalStats.lastBackupBytes, precisionLevel, statDetail > 2) + " (" +
                 approximate(totalStats.totalBytesUsed, precisionLevel, statDetail > 2) + ")");

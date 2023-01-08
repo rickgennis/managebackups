@@ -56,7 +56,8 @@ void FaubCache::restoreCache(string profileName) {
                             // next we make sure the subdir matches our profile name
                             if (fullFilename.find(profileName) != string::npos) {
                                 FaubEntry entry(fullFilename);
-                                DEBUG(D_faub) DFMT("loading cache for " << fullFilename << (entry.loadStats() ? ": success" : ": failed"));
+                                auto success = entry.loadStats();
+                                DEBUG(D_faub) DFMT("loading cache for " << fullFilename << (success ? ": success" : ": failed"));
                                 backups.insert(backups.end(), pair<string, FaubEntry>(fullFilename, entry));
                                 continue;
                             }
@@ -78,7 +79,7 @@ void FaubCache::recache(string dir) {
     map<string, FaubEntry>::iterator prevBackup = backups.end();
 
     for (auto aBackup = backups.begin(); aBackup != backups.end(); ++aBackup) {
-        DEBUG(D_faub) DFMT("cache set has " << aBackup->first << " with size " << aBackup->second.totalSize);
+        DEBUG(D_faub) DFMT("cache set has " << aBackup->first << " with size " << aBackup->second.totalSize << ", duration " << aBackup->second.duration);
 
         if (!aBackup->second.totalSize ||                // if we have no cached data for this backup or
             ((dir.length() && dir == aBackup->first) &&  // (this is a backup we've specifically been asked to recache
@@ -99,3 +100,18 @@ void FaubCache::recache(string dir) {
         prevBackup = aBackup;
     }
 }
+
+
+tuple<size_t, size_t> FaubCache::getTotalStats() {
+    size_t totalSize = 0;
+    size_t totalSaved = 0;
+
+    for (auto &aBackup: backups) {
+        totalSize += aBackup.second.totalSize;
+        totalSaved += aBackup.second.totalSaved;
+    }
+
+    return {totalSize, totalSaved};
+}
+
+

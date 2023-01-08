@@ -18,8 +18,13 @@ class FaubCache : public BaseCache {
 
     public:
         void restoreCache(string profileName);
+        tuple<size_t, size_t> getTotalStats();
+        long size() { return backups.size(); }
 
         map<string, FaubEntry>::iterator getBackupByDir(string dir) { return backups.find(dir); }
+        map<string, FaubEntry>::iterator getFirstBackup() { return (backups.begin()); }
+        map<string, FaubEntry>::iterator getLastBackup() { return (backups.size() ? --backups.end() : backups.end()); }
+
         void recache(string dir);
 
         FaubCache(string path, string profileName);
