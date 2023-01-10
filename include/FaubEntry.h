@@ -24,6 +24,10 @@ class FaubEntry {
         set<ino_t> inodes;
         size_t totalSize;
         size_t totalSaved;
+        size_t modifiedFiles;
+        size_t unchangedFiles;
+        size_t dirs;
+        size_t slinks;
         time_t finishTime;
         unsigned long duration;
 

@@ -1,4 +1,6 @@
 
+#include <dirent.h>
+#include <unistd.h>
 #include <fstream>
 #include <pcre++.h>
 #include "globals.h"
@@ -10,9 +12,46 @@
 
 
 FaubEntry::FaubEntry(string dir) {
-    directory = dir;
-    totalSize = totalSaved = finishTime = duration = 0;
-    updated = false;
+    // normal initialization
+    if (dir.length()) {
+        directory = dir;
+        totalSize = totalSaved = finishTime = duration = modifiedFiles = unchangedFiles = dirs = slinks = 0;
+        updated = false;
+        return;
+    }
+
+    // if no directory is given, perform clean up of old cache files instead
+    DIR *c_dir;
+    struct dirent *c_dirEntry;
+    ifstream cacheFile;
+    string backupDir;
+    string cacheFilename;
+    struct stat statData;
+
+    if ((c_dir = opendir(GLOBALS.cacheDir.c_str())) != NULL) {
+        while ((c_dirEntry = readdir(c_dir)) != NULL) {
+
+            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..") ||
+                    strstr(c_dirEntry->d_name, SUFFIX_FAUBSTATS) == NULL)
+                continue;
+
+            cacheFilename = slashConcat(GLOBALS.cacheDir, c_dirEntry->d_name);
+            cacheFile.open(cacheFilename);
+
+            if (cacheFile.is_open()) {
+                cacheFile >> backupDir;
+                cacheFile.close();
+
+                // if the backup directory referenced in the cache file no longer exists
+                // delete the cache file
+                if (stat(backupDir.c_str(), &statData)) {
+                    unlink(cacheFilename.c_str());
+                    cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBSTATS), string(SUFFIX_FAUBSTATS).length(), SUFFIX_FAUBINODES);
+                    unlink(cacheFilename.c_str());
+                }
+            }
+        }
+    }
 }
 
 
@@ -26,19 +65,25 @@ FaubEntry::~FaubEntry() {
 
 
 string FaubEntry::stats2string() {
-    return(to_string(totalSize) + "," + to_string(totalSaved) + "," + to_string(finishTime) + "," + to_string(duration) + ";");
+    return(to_string(totalSize) + "," + to_string(totalSaved) + "," + to_string(finishTime) + "," + to_string(duration) + "," + 
+            to_string(modifiedFiles) + "," + to_string(unchangedFiles) + "," + to_string(dirs) + "," + to_string(slinks) + ";");
 }
 
 
 void FaubEntry::string2stats(string& data) {
-    Pcre regEx("(\\d+),(\\d+),(\\d+),(\\d+);");
+    Pcre regEx("(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+);");
 
     try {
-        if (regEx.search(data) && regEx.matches() > 3) {
+        if (regEx.search(data) && regEx.matches() > 7) {
             totalSize = stoll(regEx.get_match(0));
             totalSaved = stoll(regEx.get_match(1));
             finishTime = stol(regEx.get_match(2));
             duration = stol(regEx.get_match(3));
+            modifiedFiles = stoll(regEx.get_match(4));
+            unchangedFiles = stoll(regEx.get_match(5));
+            dirs = stoll(regEx.get_match(6));
+            slinks = stoll(regEx.get_match(7));
+
         }
         else
             cerr << "error: unable to parse cache line:\n" << data << endl;
@@ -58,7 +103,8 @@ bool FaubEntry::loadStats() {
     if (cacheFile.is_open()) {
         string data;
 
-        cacheFile >> data;
+        cacheFile >> data;  // path in the file; ignore it here
+        cacheFile >> data;  // actual stats
         string2stats(data);
         cacheFile.close();
 
@@ -77,6 +123,7 @@ void FaubEntry::saveStats() {
     if (cacheFile.is_open()) {
         string data = stats2string();
 
+        cacheFile << directory << endl;
         cacheFile << data << endl;
         cacheFile.close();
     }

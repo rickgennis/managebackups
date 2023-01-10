@@ -224,15 +224,10 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                     else
                         hardLinkList.insert(hardLinkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
                 }
-                else {
+                else
                     // if the mtimes don't match or the file doesn't exist in the previous backup, add it to the list of
                     // ones we need the client to send in full
                     neededFiles.insert(neededFiles.end(), remoteFilename);
-                    if (lstat(localPrevFilename.c_str(), &statData))
-                        cerr << RED << "NEED: missing prev file: " << localPrevFilename << RESET << endl;
-                    else
-                        cerr << RED << "NEED: prev file mtime mismatch: " << localPrevFilename << RESET << endl;
-                }
         }
  
         log(config.ifTitle() + " " + fs + " phase 1: client provided " + to_string(fileTotal) + " entr" + ies(fileTotal)); 
@@ -355,9 +350,13 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     auto totalSize = fcacheCurrent->second.totalSize;
     auto totalSaved = fcacheCurrent->second.totalSaved;
 
-    // and only need to update the duration and finishTime
+    // and only need to update the remaining fields
     fcacheCurrent->second.duration = backupTime.seconds();
     fcacheCurrent->second.finishTime = time(NULL);
+    fcacheCurrent->second.modifiedFiles = filesModified - unmodDirs;
+    fcacheCurrent->second.unchangedFiles = filesHardLinked;
+    fcacheCurrent->second.dirs = unmodDirs;
+    fcacheCurrent->second.slinks = filesSymLinked;
     
     string message = "backup completed to " + currentDir + " in " + backupTime.elapsed() + "\n\t\t(total: " +
         to_string(fileTotal) + ", modified: " + to_string(filesModified - unmodDirs) + ", unchanged: " + to_string(filesHardLinked) + ", dirs: " + to_string(unmodDirs) + ", symlinks: " + to_string(filesSymLinked) + 
@@ -365,6 +364,9 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         ", size: " + approximate(totalSize) + ", usage: " + approximate(totalSize - totalSaved) + ")";
     log(config.ifTitle() + " " + message);
     NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message << endl;
+
+    // silently cleanup any old faub caches for backups that are no longer around
+    FaubEntry("");  
 }
 
 
