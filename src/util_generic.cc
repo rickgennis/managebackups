@@ -19,7 +19,6 @@
 #include "globals.h"
 #include "PipeExec.h"
 
-
 using namespace pcrepp;
 
 
@@ -812,25 +811,23 @@ int mkbasedirs(string path) {
     return -1;
 }
 
-tuple<size_t, size_t> dus(string path) {    // du -s
+DiskStats dus(string path) {    // du -s
     set<ino_t> seenInodes;
     set<ino_t> newInodes;
     return dus(path, seenInodes, newInodes);
 }
 
 
-tuple<size_t, size_t>  dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes) {    // du -s
+DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes) {    // du -s
     vector<string> subDirs;
     DIR *dir;
     struct stat statData;
     struct dirent *dirEnt;
-    size_t totalSize = 0;
-    size_t totalSaved = 0;
-    size_t temp = 0;
+    DiskStats ds;
 
     if ((dir = opendir(path.c_str())) == NULL) {
         perror(path.c_str());
-        return {0,0};
+        return DiskStats(0, 0, 0, 0);
     }
 
     while ((dirEnt = readdir(dir)) != NULL) {
@@ -845,10 +842,14 @@ tuple<size_t, size_t>  dus(string path, set<ino_t>& seenInodes, set<ino_t>& newI
                 subDirs.insert(subDirs.end(), fullFilename);    
             else 
                 if (!S_ISLNK(statData.st_mode)) {
-                    if (seenInodes.find(statData.st_ino) != seenInodes.end())
-                        totalSaved += GLOBALS.useBlocks ? (512 * statData.st_blocks) : statData.st_size;
+                    if (seenInodes.find(statData.st_ino) != seenInodes.end()) {
+                        ds.savedInBytes += statData.st_size;
+                        ds.savedInBlocks += (512 * statData.st_blocks);
+                    }
 
-                    totalSize += GLOBALS.useBlocks ? (512 * statData.st_blocks) : statData.st_size;
+                    ds.sizeInBytes += statData.st_size;
+                    ds.sizeInBlocks += (512 * statData.st_blocks);
+
                     seenInodes.insert(statData.st_ino);
                     newInodes.insert(statData.st_ino);
                 }
@@ -857,12 +858,9 @@ tuple<size_t, size_t>  dus(string path, set<ino_t>& seenInodes, set<ino_t>& newI
 
     closedir(dir);
 
-    for (auto &subDir: subDirs) {
-        auto [tSize, tSaved] = dus(subDir, seenInodes, newInodes);
-        totalSize += tSize;
-        totalSaved += tSaved;
-    }
+    for (auto &subDir: subDirs)
+        ds += dus(subDir, seenInodes, newInodes);
     
-    return {totalSize, totalSaved};
+    return ds;
 }
 

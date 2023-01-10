@@ -22,8 +22,11 @@ class FaubEntry {
     public:
         bool updated;
         set<ino_t> inodes;
-        size_t totalSize;
-        size_t totalSaved;
+        DiskStats ds;
+        //size_t sizeInBytes;
+        //size_t sizeInBlocks;
+        //size_t savedInBytes;
+        //size_t savedInBlocks;
         size_t modifiedFiles;
         size_t unchangedFiles;
         size_t dirs;
@@ -42,6 +45,7 @@ class FaubEntry {
         void loadInodes();
         void saveInodes();
 
+        FaubEntry& operator=(const DiskStats& stats);
         FaubEntry(string dir);
         ~FaubEntry();
 };

@@ -11,11 +11,20 @@
 #include "FaubEntry.h"
 
 
+FaubEntry& FaubEntry::operator=(const DiskStats& stats) {
+    ds.sizeInBytes = stats.sizeInBytes;
+    ds.sizeInBlocks = stats.sizeInBlocks;
+    ds.savedInBytes = stats.savedInBytes;
+    ds.savedInBlocks = stats.savedInBlocks;
+    return *this;
+}
+
+
 FaubEntry::FaubEntry(string dir) {
     // normal initialization
     if (dir.length()) {
         directory = dir;
-        totalSize = totalSaved = finishTime = duration = modifiedFiles = unchangedFiles = dirs = slinks = 0;
+        ds.sizeInBytes = ds.sizeInBlocks = ds.savedInBytes = ds.savedInBlocks = finishTime = duration = modifiedFiles = unchangedFiles = dirs = slinks = 0;
         updated = false;
         return;
     }
@@ -65,25 +74,26 @@ FaubEntry::~FaubEntry() {
 
 
 string FaubEntry::stats2string() {
-    return(to_string(totalSize) + "," + to_string(totalSaved) + "," + to_string(finishTime) + "," + to_string(duration) + "," + 
+    return(to_string(ds.sizeInBytes) + "," + to_string(ds.sizeInBlocks) + "," + to_string(ds.savedInBytes) + "," + to_string(ds.savedInBlocks) + "," + to_string(finishTime) + "," + to_string(duration) + "," + 
             to_string(modifiedFiles) + "," + to_string(unchangedFiles) + "," + to_string(dirs) + "," + to_string(slinks) + ";");
 }
 
 
 void FaubEntry::string2stats(string& data) {
-    Pcre regEx("(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+);");
+    Pcre regEx("(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+);");
 
     try {
-        if (regEx.search(data) && regEx.matches() > 7) {
-            totalSize = stoll(regEx.get_match(0));
-            totalSaved = stoll(regEx.get_match(1));
-            finishTime = stol(regEx.get_match(2));
-            duration = stol(regEx.get_match(3));
-            modifiedFiles = stoll(regEx.get_match(4));
-            unchangedFiles = stoll(regEx.get_match(5));
-            dirs = stoll(regEx.get_match(6));
-            slinks = stoll(regEx.get_match(7));
-
+        if (regEx.search(data) && regEx.matches() > 9) {
+            ds.sizeInBytes = stoll(regEx.get_match(0));
+            ds.sizeInBlocks = stoll(regEx.get_match(1));
+            ds.savedInBytes = stoll(regEx.get_match(2));
+            ds.savedInBlocks = stoll(regEx.get_match(3));
+            finishTime = stol(regEx.get_match(4));
+            duration = stol(regEx.get_match(5));
+            modifiedFiles = stoll(regEx.get_match(6));
+            unchangedFiles = stoll(regEx.get_match(7));
+            dirs = stoll(regEx.get_match(8));
+            slinks = stoll(regEx.get_match(9));
         }
         else
             cerr << "error: unable to parse cache line:\n" << data << endl;
@@ -190,7 +200,7 @@ void FaubEntry::loadInodes() {
     else {
         set<ino_t> seenInodes;
         // here we only care about dus() updating 'inodes'
-        auto [totalSize, totalSaved] = dus(directory, seenInodes, inodes);
+        auto ds = dus(directory, seenInodes, inodes);
     }
 }
 

@@ -17,7 +17,7 @@ class FaubCache {
 
     public:
         void restoreCache(string profileName);
-        tuple<size_t, size_t> getTotalStats();
+        DiskStats getTotalStats();
         long size() { return backups.size(); }
 
         map<string, FaubEntry>::iterator getBackupByDir(string dir) { return backups.find(dir); }

@@ -27,8 +27,8 @@ struct summaryStats {
     bool inProcess;
     unsigned long lastBackupBytes;
     time_t lastBackupTime;
-    unsigned long totalBytesUsed;
-    unsigned long totalBytesSaved;
+    unsigned long totalUsed;
+    unsigned long totalSaved;
     long numberOfBackups;
     long uniqueBackups;
     unsigned long duration;
@@ -36,7 +36,7 @@ struct summaryStats {
 
     summaryStats() {
         success = inProcess = false;
-        lastBackupBytes = totalBytesUsed = totalBytesSaved = numberOfBackups = uniqueBackups = duration = 0;
+        lastBackupBytes = totalUsed = totalSaved = numberOfBackups = uniqueBackups = duration = 0;
     }
 };
 
@@ -50,11 +50,11 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
     FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
     if (fcache.size()) {
         // set numeric stats
-        auto [totalSize, totalSaved] = fcache.getTotalStats();
-        resultStats.totalBytesUsed = totalSize;
-        resultStats.totalBytesSaved = totalSaved;
+        auto ds = fcache.getTotalStats();
+        resultStats.totalUsed = GLOBALS.useBlocks ? ds.sizeInBlocks : ds.sizeInBytes;
+        resultStats.totalSaved = GLOBALS.useBlocks ? ds.savedInBlocks : ds.savedInBlocks;
         resultStats.numberOfBackups = resultStats.uniqueBackups = fcache.size();
-        resultStats.lastBackupBytes = fcache.getLastBackup()->second.totalSize;
+        resultStats.lastBackupBytes = GLOBALS.useBlocks ? fcache.getLastBackup()->second.ds.sizeInBlocks : fcache.getLastBackup()->second.ds.sizeInBytes;
         resultStats.lastBackupTime = fcache.getLastBackup()->second.finishTime;
         resultStats.duration = fcache.getLastBackup()->second.duration;
         resultStats.success = true;
@@ -64,14 +64,14 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         char fileTime[20];
         strftime(fileTime, sizeof(fileTime), "%X", t);
 
-        int saved = floor((1 - ((long double)resultStats.totalBytesUsed / ((long double)resultStats.totalBytesUsed + (long double)resultStats.totalBytesSaved))) * 100 + 0.5);
+        int saved = floor((1 - ((long double)resultStats.totalUsed / ((long double)resultStats.totalUsed + (long double)resultStats.totalSaved))) * 100 + 0.5);
 
         string soutput[NUMSTATDETAILS] = { 
             config.settings[sTitle].value,
             pathSplit(fcache.getLastBackup()->first).file,
             fileTime,    
             seconds2hms(resultStats.duration),
-            (approximate(resultStats.lastBackupBytes, precisionLevel, statDetail > 2) + " (" + approximate(resultStats.totalBytesUsed, precisionLevel, statDetail == 3) + ")"),
+            (approximate(resultStats.lastBackupBytes, precisionLevel, statDetail > 2) + " (" + approximate(resultStats.totalUsed, precisionLevel, statDetail == 3) + ")"),
             (to_string(resultStats.uniqueBackups) + " (" + to_string(resultStats.numberOfBackups) + ")"),
             to_string(saved) + "%",
             fcache.getFirstBackup()->second.finishTime ? timeDiff(mktimeval(fcache.getFirstBackup()->second.finishTime)) : "?",
@@ -95,15 +95,15 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         // calculate total bytes used and saved
         if (countedInode.find(raw.second.inode) == countedInode.end()) {
             countedInode.insert(raw.second.inode);
-            resultStats.totalBytesUsed += raw.second.size;
+            resultStats.totalUsed += raw.second.size;
         }
         else
-            resultStats.totalBytesSaved += raw.second.size;
+            resultStats.totalSaved += raw.second.size;
     }
     resultStats.uniqueBackups = config.cache.indexByMD5.size();
 
     // calcuclate percentage saved
-    int saved = floor((1 - ((long double)resultStats.totalBytesUsed / ((long double)resultStats.totalBytesUsed + (long double)resultStats.totalBytesSaved))) * 100 + 0.5);
+    int saved = floor((1 - ((long double)resultStats.totalUsed / ((long double)resultStats.totalUsed + (long double)resultStats.totalSaved))) * 100 + 0.5);
 
     auto firstEntry = config.cache.indexByFilename.begin();
     auto lastEntry = config.cache.indexByFilename.end();
@@ -129,7 +129,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
             pathSplit(last_it->second.filename).file,
             fileTime,    
             seconds2hms(last_it->second.duration),
-            (approximate(last_it->second.size, precisionLevel, statDetail > 2) + " (" + approximate(resultStats.totalBytesUsed, precisionLevel, statDetail == 3) + ")"),
+            (approximate(last_it->second.size, precisionLevel, statDetail > 2) + " (" + approximate(resultStats.totalUsed, precisionLevel, statDetail == 3) + ")"),
             (to_string(resultStats.uniqueBackups) + " (" + to_string(resultStats.numberOfBackups) + ")"),
             to_string(saved) + "%",
             first_it->second.name_mtime ? timeDiff(mktimeval(first_it->second.name_mtime)) : "?",
@@ -173,8 +173,8 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
                 ++nonTempConfigs;
                 perStats = calculateSummaryStats(config, statDetail);
                 totalStats.lastBackupBytes += perStats.lastBackupBytes;
-                totalStats.totalBytesUsed += perStats.totalBytesUsed;
-                totalStats.totalBytesSaved += perStats.totalBytesSaved;
+                totalStats.totalUsed += perStats.totalUsed;
+                totalStats.totalSaved += perStats.totalSaved;
                 totalStats.numberOfBackups += perStats.numberOfBackups;
                 totalStats.uniqueBackups += perStats.uniqueBackups;
                 totalStats.duration += perStats.duration;
@@ -193,11 +193,11 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
             statStrings.insert(statStrings.end(), "");   // skip finish time
             statStrings.insert(statStrings.end(), seconds2hms(totalStats.duration));
             statStrings.insert(statStrings.end(), approximate(totalStats.lastBackupBytes, precisionLevel, statDetail > 2) + " (" +
-                approximate(totalStats.totalBytesUsed, precisionLevel, statDetail > 2) + ")");
+                approximate(totalStats.totalUsed, precisionLevel, statDetail > 2) + ")");
             statStrings.insert(statStrings.end(), to_string(totalStats.uniqueBackups) + " (" + to_string(totalStats.numberOfBackups) + ")");
-            statStrings.insert(statStrings.end(), to_string(int(floor((1 - ((long double)totalStats.totalBytesUsed / ((long double)totalStats.totalBytesUsed + (long double)totalStats.totalBytesSaved))) * 100 + 0.5))) + "%");
-            statStrings.insert(statStrings.end(), totalStats.totalBytesSaved ? string(string("Saved ") + approximate(totalStats.totalBytesSaved, precisionLevel, statDetail > 2) + " from "
-                + approximate(totalStats.totalBytesUsed + totalStats.totalBytesSaved, precisionLevel, statDetail > 2)) : "");
+            statStrings.insert(statStrings.end(), to_string(int(floor((1 - ((long double)totalStats.totalUsed / ((long double)totalStats.totalUsed + (long double)totalStats.totalSaved))) * 100 + 0.5))) + "%");
+            statStrings.insert(statStrings.end(), totalStats.totalSaved ? string(string("Saved ") + approximate(totalStats.totalSaved, precisionLevel, statDetail > 2) + " from "
+                + approximate(totalStats.totalUsed + totalStats.totalSaved, precisionLevel, statDetail > 2)) : "");
             statStrings.insert(statStrings.end(), "");
             statStrings.insert(statStrings.end(), "");
         }
@@ -295,8 +295,9 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
 }
 
 
-bool _displayDetailedFaubStats(BackupConfig& config) {
+bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
     FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
+    int precisionLevel = statDetail > 1 ? 1 : -1;
 
     if (fcache.size()) {
         // determine the backup max filename length
@@ -318,14 +319,18 @@ bool _displayDetailedFaubStats(BackupConfig& config) {
             // print the month header
             if (lastMonthYear != monthYear)
                 cout << endl << BOLDBLUE << onevarsprintf("%-" + to_string(fnameLen+1) + "s  ", monthYear) <<
-                    "Size    Saved   Duration  Type  Age" << RESET << endl;
+                    "Size    Used    Dirs    SymLks  Duration  Type  Age" << RESET << endl;
 
             snprintf(result, sizeof(result), 
                     // filename
                     string(string("%-") + to_string(fnameLen+1) + "s  " +
                     // size
                     "%6s  " +
-                    // saved
+                    // used 
+                    "%6s  " +
+                    // dirs
+                    "%6s  " +
+                    // symlinks
                     "%6s  " +
                     // duration
                     "%s  " +
@@ -333,8 +338,12 @@ bool _displayDetailedFaubStats(BackupConfig& config) {
                     "%-4s  " +
                     // content age
                     "%s").c_str(),
-                        backupIt->first.c_str(), approximate(backupIt->second.totalSize).c_str(),
-                        approximate(backupIt->second.totalSaved).c_str(), seconds2hms(backupIt->second.duration).c_str(),
+                        backupIt->first.c_str(), 
+                        approximate(GLOBALS.useBlocks ? backupIt->second.ds.sizeInBlocks : backupIt->second.ds.sizeInBytes, precisionLevel, statDetail > 2).c_str(),
+                        approximate(GLOBALS.useBlocks ? backupIt->second.ds.sizeInBlocks - backupIt->second.ds.savedInBlocks : 
+                        backupIt->second.ds.sizeInBytes - backupIt->second.ds.savedInBytes, precisionLevel, statDetail > 2).c_str(), 
+                        approximate(backupIt->second.dirs, precisionLevel, statDetail > 2).c_str(), 
+                        approximate(backupIt->second.slinks, precisionLevel, statDetail > 2).c_str(), seconds2hms(backupIt->second.duration).c_str(),
                         timeDetail->tm_mon  == 0 && timeDetail->tm_mday == 1 ? "Year" : timeDetail->tm_mday == 1 ? "Mnth" : timeDetail->tm_wday == 0 ? "Week" : "Day",
                         backupIt->second.finishTime ? timeDiff(mktimeval(backupIt->second.finishTime)).c_str() : "?");
 
@@ -350,13 +359,13 @@ bool _displayDetailedFaubStats(BackupConfig& config) {
 }
 
 
-void _displayDetailedStats(BackupConfig& config) {
+void _displayDetailedStats(BackupConfig& config, int statDetail) {
     int fnameLen = 0;
     double bytesUsed = 0;
     double bytesSaved = 0;
     set<unsigned long> countedInode;
 
-    if (_displayDetailedFaubStats(config))
+    if (_displayDetailedFaubStats(config, statDetail))
         return;
 
     // calcuclate stats from the entire list of backups
@@ -473,9 +482,9 @@ void _displayDetailedStats(BackupConfig& config) {
 }
 
 
-void displayDetailedStatsWrapper(ConfigManager& configManager) {
+void displayDetailedStatsWrapper(ConfigManager& configManager, int statDetail) {
     if (configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp)
-        _displayDetailedStats(configManager.configs[configManager.activeConfig]);
+        _displayDetailedStats(configManager.configs[configManager.activeConfig], statDetail);
     else {
         bool previous = false;
         for (auto &config: configManager.configs) {
@@ -484,7 +493,7 @@ void displayDetailedStatsWrapper(ConfigManager& configManager) {
                 if (previous)
                     cout << "\n\n";
 
-                _displayDetailedStats(config);
+                _displayDetailedStats(config, statDetail);
                 previous = true;
             }
         }

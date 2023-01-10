@@ -1360,7 +1360,7 @@ int main(int argc, char *argv[]) {
                 if (!config.temp)
                     scanConfigToCache(config);
 
-        GLOBALS.cli.count(CLI_STATS1) ? displayDetailedStatsWrapper(configManager) : displaySummaryStatsWrapper(configManager, GLOBALS.cli.count(CLI_STATS2));
+        GLOBALS.cli.count(CLI_STATS1) ? displayDetailedStatsWrapper(configManager, GLOBALS.cli.count(CLI_STATS1)) : displaySummaryStatsWrapper(configManager, GLOBALS.cli.count(CLI_STATS2));
     }
     else {  // "all" profiles locking is handled here; individual profile locking is handled further down in the NORMAL RUN
         if (GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)) {

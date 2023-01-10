@@ -10,6 +10,29 @@
 
 using namespace std;
 
+struct DiskStats {
+    size_t sizeInBytes;
+    size_t sizeInBlocks;
+    size_t savedInBytes;
+    size_t savedInBlocks;
+
+    DiskStats(size_t szBy = 0, size_t szBk = 0, size_t svBy = 0, size_t svBk = 0) {
+        sizeInBytes = szBy;
+        sizeInBlocks = szBk;
+        savedInBytes = svBy;
+        savedInBlocks = svBk;
+    }
+
+    DiskStats& operator+=(const DiskStats& a) {
+        sizeInBytes += a.sizeInBytes;
+        sizeInBlocks += a.sizeInBlocks;
+        savedInBytes += a.savedInBytes;
+        savedInBlocks += a.savedInBlocks;
+        return *this;
+    }
+};
+
+
 #define ifcolor(x) (GLOBALS.color ? x : "")
 
 #define max(a,b) \
@@ -126,8 +149,8 @@ void rmrfdir(string dir);
 
 int mkbasedirs(string path);
 
-tuple<size_t, size_t> dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes);
-tuple<size_t, size_t> dus(string path);
+DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes);
+DiskStats dus(string path);
 
 #endif
 

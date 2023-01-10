@@ -347,8 +347,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
     // we can pull those out to display
     auto fcacheCurrent = fcache.getBackupByDir(currentDir);
-    auto totalSize = fcacheCurrent->second.totalSize;
-    auto totalSaved = fcacheCurrent->second.totalSaved;
+    auto backupSize = GLOBALS.useBlocks ? fcacheCurrent->second.ds.sizeInBlocks : fcacheCurrent->second.ds.sizeInBytes;
+    auto backupSaved = GLOBALS.useBlocks ? fcacheCurrent->second.ds.savedInBlocks : fcacheCurrent->second.ds.savedInBytes;
 
     // and only need to update the remaining fields
     fcacheCurrent->second.duration = backupTime.seconds();
@@ -361,7 +361,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     string message = "backup completed to " + currentDir + " in " + backupTime.elapsed() + "\n\t\t(total: " +
         to_string(fileTotal) + ", modified: " + to_string(filesModified - unmodDirs) + ", unchanged: " + to_string(filesHardLinked) + ", dirs: " + to_string(unmodDirs) + ", symlinks: " + to_string(filesSymLinked) + 
         (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") + 
-        ", size: " + approximate(totalSize) + ", usage: " + approximate(totalSize - totalSaved) + ")";
+        ", size: " + approximate(backupSize) + ", usage: " + approximate(backupSize - backupSaved) + ")";
     log(config.ifTitle() + " " + message);
     NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message << endl;
 

@@ -27,6 +27,7 @@ void FaubCache::restoreCache(string profileName) {
     struct dirent *c_dirEntry;
     queue<string> dirQueue;
     string currentDir;
+    Pcre regEx("-(\\d{4})(\\d{2})(\\d{2})(?:@(\\d{2}):(\\d{2}):(\\d{2}))*");
 
     dirQueue.push(baseDir);
     auto baseSlashes = count(baseDir.begin(), baseDir.end(), '/');
@@ -58,6 +59,35 @@ void FaubCache::restoreCache(string profileName) {
                                 FaubEntry entry(fullFilename);
                                 auto success = entry.loadStats();
                                 DEBUG(D_faub) DFMT("loading cache for " << fullFilename << (success ? ": success" : ": failed"));
+                                if (!success || !entry.finishTime) {
+                                    /* here we have a backup in a directory but no cache file to describe it. all the diskstats
+                                     * for that cache file can be recalculated by traversing the backup.  but the finishTime &
+                                     * duration are lost. let's use the start time (from the filename) as a ballpark to seed
+                                     * the finish time, which will allow the stats output to show an age. */
+                                     
+                                    if (regEx.search(pathSplit(fullFilename).file) && regEx.matches() > 2) {
+                                        struct tm t;
+
+                                        t.tm_year = stoi(regEx.get_match(0)) - 1900;
+                                        t.tm_mon  = stoi(regEx.get_match(1)) - 1;
+                                        t.tm_mday = stoi(regEx.get_match(2));
+                                        t.tm_isdst = -1;
+
+                                        if (regEx.matches() > 5) {
+                                            t.tm_hour = stoi(regEx.get_match(3));
+                                            t.tm_min = stoi(regEx.get_match(4));
+                                            t.tm_sec = stoi(regEx.get_match(5));
+                                        }
+                                        else {
+                                            t.tm_hour = 0;
+                                            t.tm_min = 0;
+                                            t.tm_sec = 0;
+                                        }
+
+                                        entry.finishTime = mktime(&t);
+                                    }
+                                }
+
                                 backups.insert(backups.end(), pair<string, FaubEntry>(fullFilename, entry));
                                 continue;
                             }
@@ -79,21 +109,20 @@ void FaubCache::recache(string dir) {
     map<string, FaubEntry>::iterator prevBackup = backups.end();
 
     for (auto aBackup = backups.begin(); aBackup != backups.end(); ++aBackup) {
-        DEBUG(D_faub) DFMT("cache set has " << aBackup->first << " with size " << aBackup->second.totalSize << ", duration " << aBackup->second.duration);
+        DEBUG(D_faub) DFMT("cache set has " << aBackup->first << " with size " << aBackup->second.ds.sizeInBytes << " bytes, " << aBackup->second.duration << " duration");
 
-        if (!aBackup->second.totalSize ||                // if we have no cached data for this backup or
-            ((dir.length() && dir == aBackup->first) &&  // (this is a backup we've specifically been asked to recache
-            !aBackup->second.updated)) {                 // and it hasn't already been updated on this run of the app)
+        if (!aBackup->second.ds.sizeInBytes ||            // if we have no cached data for this backup or
+            ((dir.length() && dir == aBackup->first) &&   // (this is a backup we've specifically been asked to recache
+            !aBackup->second.updated)) {                  // and it hasn't already been updated on this run of the app)
 
             bool gotPrev = prevBackup != backups.end();
             if (gotPrev) 
                 prevBackup->second.loadInodes();
 
             set<ino_t> emptySet;
-            auto [totalSize, totalSaved] = dus(aBackup->first, gotPrev ? prevBackup->second.inodes : emptySet, aBackup->second.inodes);
-            DEBUG(D_faub) DFMT("dus(" << aBackup->first << ") returned " << totalSize << " bytes");
-            aBackup->second.totalSize = totalSize;
-            aBackup->second.totalSaved = totalSaved;
+            auto ds = dus(aBackup->first, gotPrev ? prevBackup->second.inodes : emptySet, aBackup->second.inodes);
+            DEBUG(D_faub) DFMT("dus(" << aBackup->first << ") returned " << ds.sizeInBytes << " bytes");
+            aBackup->second.ds = ds;
             aBackup->second.updated = true;
         }
 
@@ -102,16 +131,14 @@ void FaubCache::recache(string dir) {
 }
 
 
-tuple<size_t, size_t> FaubCache::getTotalStats() {
-    size_t totalSize = 0;
-    size_t totalSaved = 0;
+DiskStats FaubCache::getTotalStats() {
+    DiskStats ds;
 
     for (auto &aBackup: backups) {
-        totalSize += aBackup.second.totalSize;
-        totalSaved += aBackup.second.totalSaved;
+        ds += aBackup.second.ds;
     }
 
-    return {totalSize, totalSaved};
+    return ds;
 }
 
 
