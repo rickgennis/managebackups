@@ -238,7 +238,7 @@ string approximate(double size, int maxUnits, bool commas) {
     }
 
     char buffer[150];
-    snprintf(buffer, sizeof(buffer), index > 2 ? "%.01f" : "%.0f", index > 2 ? size : floor(size));
+    snprintf(buffer, sizeof(buffer), index > 1 ? "%.01f" : "%.0f", index > 1 ? size : floor(size));
     string unitSuffix(1, unit[index]);
     string result = string(buffer);
 
@@ -839,17 +839,19 @@ tuple<size_t, size_t>  dus(string path, set<ino_t>& seenInodes, set<ino_t>& newI
 
         string fullFilename = path + "/" + dirEnt->d_name;
         if (lstat(fullFilename.c_str(), &statData) < 0)
-            cerr << "dus: stat(" << fullFilename << "): " << strerror(errno) << endl;
+            log("error: stat(" + fullFilename + "): " + strerror(errno));
         else {
-            if (seenInodes.find(statData.st_ino) != seenInodes.end())
-                totalSaved += statData.st_size;
-
-            totalSize += statData.st_size;
-            seenInodes.insert(statData.st_ino);
-            newInodes.insert(statData.st_ino);
-
             if (S_ISDIR(statData.st_mode) && strcmp(dirEnt->d_name, ".") && strcmp(dirEnt->d_name, ".."))
                 subDirs.insert(subDirs.end(), fullFilename);    
+            else 
+                if (!S_ISLNK(statData.st_mode)) {
+                    if (seenInodes.find(statData.st_ino) != seenInodes.end())
+                        totalSaved += GLOBALS.useBlocks ? (512 * statData.st_blocks) : statData.st_size;
+
+                    totalSize += GLOBALS.useBlocks ? (512 * statData.st_blocks) : statData.st_size;
+                    seenInodes.insert(statData.st_ino);
+                    newInodes.insert(statData.st_ino);
+                }
         }
     }
 

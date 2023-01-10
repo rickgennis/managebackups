@@ -318,25 +318,25 @@ bool _displayDetailedFaubStats(BackupConfig& config) {
             // print the month header
             if (lastMonthYear != monthYear)
                 cout << endl << BOLDBLUE << onevarsprintf("%-" + to_string(fnameLen+1) + "s  ", monthYear) <<
-                    "Size    Duration  Type        Age" << RESET << endl;
+                    "Size    Saved   Duration  Type  Age" << RESET << endl;
 
             snprintf(result, sizeof(result), 
                     // filename
                     string(string("%-") + to_string(fnameLen+1) + "s  " +
                     // size
                     "%6s  " +
+                    // saved
+                    "%6s  " +
                     // duration
                     "%s  " +
                     // type
                     "%-4s  " +
-                    // links
-                    "%4s  " +
                     // content age
                     "%s").c_str(),
                         backupIt->first.c_str(), approximate(backupIt->second.totalSize).c_str(),
-                        seconds2hms(backupIt->second.duration).c_str(),
+                        approximate(backupIt->second.totalSaved).c_str(), seconds2hms(backupIt->second.duration).c_str(),
                         timeDetail->tm_mon  == 0 && timeDetail->tm_mday == 1 ? "Year" : timeDetail->tm_mday == 1 ? "Mnth" : timeDetail->tm_wday == 0 ? "Week" : "Day",
-                        "", backupIt->second.finishTime ? timeDiff(mktimeval(backupIt->second.finishTime)).c_str() : "?");
+                        backupIt->second.finishTime ? timeDiff(mktimeval(backupIt->second.finishTime)).c_str() : "?");
 
             cout << result << endl;
             ++backupIt;

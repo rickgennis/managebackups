@@ -115,7 +115,6 @@ void FaubEntry::saveInodes() {
 void FaubEntry::loadInodes() {
     ifstream cacheFile;
     Pcre inodeRE("(\\d+)");
-    size_t pos = 0;
     string match;
 
     if (inodes.size())
@@ -128,13 +127,14 @@ void FaubEntry::loadInodes() {
         while (!cacheFile.eof()) {
             cacheFile >> data;
 
+            size_t pos = 0;
             while (pos <= data.length() && inodeRE.search(data, pos)) {
                 pos = inodeRE.get_match_end(0);
                 match = inodeRE.get_match(0);
                 ++pos;
 
                 if (match.length())
-                    inodes.insert(stol(match)); 
+                    inodes.insert(stoll(match)); 
             }
         }
 

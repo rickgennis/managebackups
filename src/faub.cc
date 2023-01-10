@@ -8,7 +8,7 @@
 #include "debug.h"
 #include "globals.h"
 
-tuple<string, time_t> mostRecentBackupDirSinceInternal(string backupDir, time_t sinceTime);
+tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string backupDir, time_t sinceTime, string profileName);
 
 
 /*
@@ -17,19 +17,21 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(string backupDir, time_t 
  * backupBaseDir is the backup dir root (e.g. /tmp/mybackups)
  * sinceDir is a specific full backup path (e.g. /tmp/mybackups/2023/012/the-backup-20230106)
  */
-string mostRecentBackupDirSince(string backupBaseDir, string sinceDir) {
+string mostRecentBackupDirSince(int baseSlashes, string backupBaseDir, string sinceDir, string profileName) {
     struct stat statData;
     time_t sinceTime = 0;
 
     if (!stat(sinceDir.c_str(), &statData))
         sinceTime = statData.st_mtime;
+    else
+        sinceTime = time(NULL);
 
-    auto [fname, fmtime] = mostRecentBackupDirSinceInternal(backupBaseDir, sinceTime);
+    auto [fname, fmtime] = mostRecentBackupDirSinceInternal(baseSlashes, backupBaseDir, sinceTime, profileName);
     return fname;
 }
 
 
-tuple<string, time_t> mostRecentBackupDirSinceInternal(string backupDir, time_t sinceTime) {
+tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string backupDir, time_t sinceTime, string profileName) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
     struct stat statData;
@@ -47,7 +49,6 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(string backupDir, time_t 
         return {"", 0};
     }
 
-
     if ((c_dir = opendir(backupDir.c_str())) != NULL) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
 
@@ -59,17 +60,28 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(string backupDir, time_t 
             if (!stat(fullFilename.c_str(), &statData)) {
 
                 if (S_ISDIR(statData.st_mode)) {
-                    auto [fname, fmtime] = mostRecentBackupDirSinceInternal(fullFilename, sinceTime);
-                    if ((fmtime > recentTime) && ((fmtime < sinceTime) || !sinceTime)) {
-                        recentTime = fmtime;
-                        recentName = fname;
+                    auto slashDiff = count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes;
+                    cerr << "mostRecent: " << fullFilename << ", count = " << slashDiff << endl;
+
+                    if (slashDiff < 3) {
+                        auto [fname, fmtime] = mostRecentBackupDirSinceInternal(baseSlashes, fullFilename, sinceTime, profileName);
+                        if ((fmtime > recentTime) && ((fmtime < sinceTime) || !sinceTime)) {
+                            recentTime = fmtime;
+                            recentName = fname;
+                        }
+                    }
+                    
+                    if (slashDiff == 3) {
+                        // next we make sure the subdir matches our profile name
+                        if (fullFilename.find(profileName) != string::npos) {
+                           
+                            if ((statData.st_mtime > recentTime) && ((statData.st_mtime < sinceTime) || !sinceTime)) {
+                                recentTime = statData.st_mtime;
+                                recentName = fullFilename;
+                            }
+                        }
                     }
                 }
-                else
-                    if ((statData.st_mtime > recentTime) && ((statData.st_mtime < sinceTime) || !sinceTime)) {
-                        recentTime = statData.st_mtime;
-                        recentName = fullFilename;
-                    }
             }
         }
 
@@ -91,7 +103,8 @@ string newBackupDir(BackupConfig& config) {
     strftime(buffer, sizeof(buffer), "%Y-%m-%d@%X", timeFields);
 
     string setDir = config.settings[sDirectory].value;
-    strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d" : "%Y/%m", localtime(&rawTime));
+    //strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d" : "%Y/%m", localtime(&rawTime));
+    strftime(buffer, sizeof(buffer), "%Y/%m", localtime(&rawTime));
     string subDir = buffer;
 
     strftime(buffer, sizeof(buffer), incTime ? "-%Y%m%d@%H:%M:%S" : "-%Y%m%d", localtime(&rawTime));
@@ -113,7 +126,8 @@ void fs_startServer(BackupConfig& config) {
         DEBUG(D_netproto) DFMT("executing: \"" << config.settings[sFaub].value << "\"");
         faub.execute("faub", false, false, true);
         string newDir = newBackupDir(config);
-        fs_serverProcessing(faub, config, mostRecentBackupDirSince(config.settings[sDirectory].value, newDir), newDir);
+        auto baseSlashes = count(config.settings[sDirectory].value.begin(), config.settings[sDirectory].value.end(), '/');
+        fs_serverProcessing(faub, config, mostRecentBackupDirSince(baseSlashes, config.settings[sDirectory].value, newDir, config.settings[sTitle].value), newDir);
     }
     catch (string s) {
         cerr << "faub server caught internal exception: " << s << endl;
@@ -134,8 +148,9 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     string localCurFilename;
     struct stat statData;
     ssize_t fileTotal = 0;
-    ssize_t fileModified = 0;
-    ssize_t fileLinked = 0;
+    ssize_t filesModified = 0;
+    ssize_t filesHardLinked = 0;
+    ssize_t filesSymLinked = 0;
     ssize_t unmodDirs = 0;
     unsigned int linkErrors = 0;
 
@@ -149,13 +164,15 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     string blankspaces = string(screenMessage.length() , ' ');
     NOTQUIET && ANIMATE && cout << screenMessage << flush;
 
+    DEBUG(D_any) DFMT("\n");
     DEBUG(D_netproto) DFMT("faub server ready to receive");
     DEBUG(D_faub) DFMT("current: " << currentDir);
     DEBUG(D_faub) DFMT("previous: " << prevDir);
 
     do {
         set<string> neededFiles;
-        map<string,string> linkList;
+        map<string,string> hardLinkList;
+        map<string,string> symLinkList;
 
         /*
          * phase 1 - get list of filenames and mtimes from client
@@ -181,36 +198,46 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             localCurFilename = slashConcat(currentDir, remoteFilename);
 
             /*
-             * if the remote file and mtime match with the copy in our most recent
-             * local backup then we want to hard link the current local backup's copy to
-             * that previous backup version. if they don't match or the previous backup's
-             * copy doesn't exist, add the file to the list of ones we need to get
-             * from the remote end. For ones we want to link, add them to a list to do
-             * at the end.  We can't do them now because the subdirectories they live in
-             * may not have come over yet.
-            */
-            if (prevDir.length() && 
-                    !stat(localPrevFilename.c_str(), &statData) && statData.st_mtime == mtime) {
+             * What do we need from the client based on the directory entry they've just described?
+             * The general process is to compare the remote filename to the local filename in the
+             * most recent backup and if both exist, compare their mtimes.  If there's a match we
+             * can assume the data hasn't changed. When they match we hard link the new file to
+             * the previous backup's copy of it.  Because of the order entries come over we can't
+             * guarantee that a parent directory will come over before a file within it.  So we
+             * make a list of all the entries as they come over the wire then go back and create
+             * the links at the end.  Details inline below.
+             */
 
-                if (!S_ISDIR(mode))
-                    linkList.insert(linkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
-                else {
-                    /* 
-                     * directories are special cases because we don't want to link them so
-                     * we always need them sent over. unmodDirs is used just to keep the
-                     * stats clean at the end.
-                     */
-                    neededFiles.insert(neededFiles.end(), remoteFilename);
-                    ++unmodDirs;
-                }
+            // if it's a directory, we need it.  hardlinks don't work for directories.
+            if (S_ISDIR(mode)) {
+                neededFiles.insert(neededFiles.end(), remoteFilename);
+                ++unmodDirs;
             }
             else
-                neededFiles.insert(neededFiles.end(), remoteFilename);
+                // lstat the previous backup's copy of the file and compare the mtimes
+                if (prevDir.length() && !lstat(localPrevFilename.c_str(), &statData) && statData.st_mtime == mtime) {
+
+                    // if they match then add it to the appropriate list to be symlinked or hardlinked, depending
+                    // on whether its a symlink on the remote system
+                    if (S_ISLNK(mode))
+                        symLinkList.insert(symLinkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
+                    else
+                        hardLinkList.insert(hardLinkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
+                }
+                else {
+                    // if the mtimes don't match or the file doesn't exist in the previous backup, add it to the list of
+                    // ones we need the client to send in full
+                    neededFiles.insert(neededFiles.end(), remoteFilename);
+                    if (lstat(localPrevFilename.c_str(), &statData))
+                        cerr << RED << "NEED: missing prev file: " << localPrevFilename << RESET << endl;
+                    else
+                        cerr << RED << "NEED: prev file mtime mismatch: " << localPrevFilename << RESET << endl;
+                }
         }
  
         log(config.ifTitle() + " " + fs + " phase 1: client provided " + to_string(fileTotal) + " entr" + ies(fileTotal)); 
         DEBUG(D_netproto) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size() 
-                << ", willLink:" << linkList.size());
+                << ", willLink:" << hardLinkList.size());
 
         /*
          * phase 2 - send the client the list of files that we need full copies of
@@ -244,7 +271,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         /*
          * phase 4 - create the links for everything that matches the previous backup.
         */
-        for (auto &links: linkList) {
+        for (auto &links: hardLinkList) {
             mkbasedirs(links.second);
 
             // when Time isn't included we're potentially overwriting an existing backup. pre-delete
@@ -258,12 +285,53 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 log(config.ifTitle() + " " + fs + " error: unable to link " + links.second + " to " + links.first + " - " + strerror(errno));
             }
         }
-        DEBUG(D_netproto) DFMT(fs << " server phase 4 complete; created " << (linkList.size() - linkErrors)  << 
-                " link" << s(linkList.size() - linkErrors) << " to previously backed up files" << (linkErrors ? string(" (" + to_string(linkErrors) + " error" + s(linkErrors) + ")") : ""));
-        log(config.ifTitle() + " " + fs + " phase 4: created " + to_string(linkList.size() - linkErrors) + " link" + s(linkList.size() - linkErrors) + " (" + to_string(linkErrors) + " error" + s(linkErrors) + ")");
 
-        fileModified += neededFiles.size();
-        fileLinked += linkList.size();
+        char linkBuf[1000];
+        for (auto &links: symLinkList) {
+            mkbasedirs(links.second);
+
+            // when Time isn't included we're potentially overwriting an existing backup. pre-delete
+            // so we don't get an error.
+            if (!incTime)
+                unlink(links.second.c_str());
+
+            auto bytes = readlink(links.first.c_str(), linkBuf, sizeof(linkBuf));
+            if (bytes >= 0 && bytes < sizeof(linkBuf)) {
+                linkBuf[bytes] = 0;
+                if (!symlink(linkBuf, links.second.c_str())) {
+                    if (!lstat(links.first.c_str(), &statData)) {
+                        if (lchown(links.second.c_str(), statData.st_uid, statData.st_gid)) {
+                            SCREENERR(fs << " error: unable to chown symlink " << links.second << ": " << strerror(errno));
+                            log(config.ifTitle() + " " + fs + " error: unable to chown symlink " + links.second + ": " + strerror(errno));
+                        }
+
+                        struct timeval tv[2];
+                        tv[0].tv_sec  = tv[1].tv_sec  = statData.st_mtime;
+                        tv[0].tv_usec = tv[1].tv_usec = 0;
+                        lutimes(links.second.c_str(), tv);
+                    }
+                }
+                else {
+                    ++linkErrors;
+                    SCREENERR(fs << " error: unable to symlink " << links.second << " to " << links.first << ": " << strerror(errno));
+                    log(config.ifTitle() + " " + fs + " error: unable to symlink " + links.second + " to " + links.first + ": " + strerror(errno));
+                }
+            }
+            else {
+                ++linkErrors;
+                SCREENERR(fs << " error: unable to dereference symlink " << links.first << ": " << strerror(errno));
+                log(config.ifTitle() + " " + fs + " error: unable to dereference symlink " + links.first + ": " + strerror(errno));
+            }
+
+        }
+
+        DEBUG(D_netproto) DFMT(fs << " server phase 4 complete; created " << (hardLinkList.size() - linkErrors)  << 
+                " link" << s(hardLinkList.size() - linkErrors) << " to previously backed up files" << (linkErrors ? string(" (" + to_string(linkErrors) + " error" + s(linkErrors) + ")") : ""));
+        log(config.ifTitle() + " " + fs + " phase 4: created " + to_string(hardLinkList.size() - linkErrors) + " link" + s(hardLinkList.size() - linkErrors) + " (" + to_string(linkErrors) + " error" + s(linkErrors) + ")");
+
+        filesModified += neededFiles.size();
+        filesHardLinked += hardLinkList.size();
+        filesSymLinked += symLinkList.size();
 
     } while (client.readProc());
     
@@ -292,7 +360,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     fcacheCurrent->second.finishTime = time(NULL);
     
     string message = "backup completed to " + currentDir + " in " + backupTime.elapsed() + "\n\t\t(total: " +
-        to_string(fileTotal) + ", modified: " + to_string(fileModified - unmodDirs) + ", linked: " + to_string(fileLinked) + 
+        to_string(fileTotal) + ", modified: " + to_string(filesModified - unmodDirs) + ", unchanged: " + to_string(filesHardLinked) + ", dirs: " + to_string(unmodDirs) + ", symlinks: " + to_string(filesSymLinked) + 
         (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") + 
         ", size: " + approximate(totalSize) + ", usage: " + approximate(totalSize - totalSaved) + ")";
     log(config.ifTitle() + " " + message);
@@ -308,7 +376,6 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 void fc_scanToServer(string directory, tcpSocket& server) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
-    struct stat statData;
 
     if ((c_dir = opendir(directory.c_str())) != NULL) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {

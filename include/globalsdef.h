@@ -80,6 +80,7 @@
 #define CLI_LEAVEOUTPUT "leaveoutput"
 #define CLI_FAUB "faub"
 #define CLI_PATHS "path"
+#define CLI_USEBLOCKS "blocks"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -142,6 +143,7 @@ struct global_vars {
     bool saveErrorSeen;
     string interruptFilename;
     string interruptLock;
+    bool useBlocks;
     int pipes[2][2];
 };
 

@@ -5,13 +5,12 @@
 #include <set>
 #include <map>
 #include <sys/stat.h>
-#include "BaseCache.h"
 #include "FaubEntry.h"
 
 
 using namespace std;
 
-class FaubCache : public BaseCache {
+class FaubCache {
     private:
         string baseDir;
         map<string, FaubEntry> backups;

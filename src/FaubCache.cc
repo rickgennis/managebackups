@@ -86,7 +86,7 @@ void FaubCache::recache(string dir) {
             !aBackup->second.updated)) {                 // and it hasn't already been updated on this run of the app)
 
             bool gotPrev = prevBackup != backups.end();
-            if (gotPrev)
+            if (gotPrev) 
                 prevBackup->second.loadInodes();
 
             set<ino_t> emptySet;

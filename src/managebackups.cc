@@ -1196,6 +1196,7 @@ int main(int argc, char *argv[]) {
         (string("k,") + CLI_CRONS, "Cron", cxxopts::value<bool>()->default_value("false"))
         (string("K,") + CLI_CRONP, "Cron", cxxopts::value<bool>()->default_value("false"))
         (string("h,") + CLI_HELP, "Show help", cxxopts::value<bool>()->default_value("false"))
+        (CLI_USEBLOCKS, "Use blocks disk usage", cxxopts::value<bool>()->default_value("false"))
         (CLI_FAUB, "Faub backup", cxxopts::value<std::string>())
         (CLI_PATHS, "Faub paths", cxxopts::value<std::vector<std::string>>())
         (CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))
@@ -1233,6 +1234,7 @@ int main(int argc, char *argv[]) {
         GLOBALS.cli = options.parse(argc, argv);
         GLOBALS.color = !(GLOBALS.cli[CLI_QUIET].as<bool>() || GLOBALS.cli[CLI_NOCOLOR].as<bool>());
         GLOBALS.stats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2);
+        GLOBALS.useBlocks = GLOBALS.cli.count(CLI_USEBLOCKS);
 
         if (GLOBALS.cli.count(CLI_USER)) 
             setupUserDirectories();
@@ -1260,7 +1262,8 @@ int main(int argc, char *argv[]) {
 
                     if (uarg.substr(0, 2) == "-v" && (op == "=" | op == "-" | op == "+")) {
                         unsigned int selector = D_default;
-                        uschar *usc = (uschar*)uarg.substr(2, string::npos).c_str();
+                        string remainder = uarg.substr(2, string::npos);
+                        uschar *usc = (uschar*)remainder.c_str();
                         decode_bits(&selector, 1, debug_notall, usc, debug_options, ndebug_options);
                         GLOBALS.debugSelector = selector;
                         continue;

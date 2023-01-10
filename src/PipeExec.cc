@@ -528,11 +528,13 @@ bool PipeExec::readToFile(string filename, bool preDelete) {
             return false;
         }
 
-        /*if (chmod(filename.c_str(), mode))
-            showError("error: unable to chmod symlink " + filename + ": " + strerror(errno)); */
-
         if (lchown(filename.c_str(), uid, gid))
             showError("error: unable to chown symlink " + filename + ": " + strerror(errno));
+
+        struct timeval tv[2];
+        tv[0].tv_sec  = tv[1].tv_sec  = mtime;
+        tv[0].tv_usec = tv[1].tv_usec = 0;
+        lutimes(filename.c_str(), tv);
 
         return true;
     }
