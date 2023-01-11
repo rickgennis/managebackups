@@ -52,8 +52,8 @@ void FaubCache::restoreCache(string profileName) {
                         // regardless of the starting (baseDir) directory, we're only interested in subdirs
                         // exactly 2 levels lower because that's where our backups will live. e.g.
                         // baseDir = /tmp/backups then we're looking for things like /tmp/backups/2023/01.
-                        if (count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes == 3) {
-
+                        auto depth = count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes;
+                        if (depth == 3) {
                             // next we make sure the subdir matches our profile name
                             if (fullFilename.find(profileName) != string::npos) {
                                 FaubEntry entry(fullFilename);
@@ -93,7 +93,8 @@ void FaubCache::restoreCache(string profileName) {
                             }
                         }
 
-                        dirQueue.push(fullFilename);
+                        if (depth < 3)
+                            dirQueue.push(fullFilename);
                     }
                 }
             }

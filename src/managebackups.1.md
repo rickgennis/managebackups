@@ -1,6 +1,6 @@
 % MANAGEBACKUPS(1) managebackups 1.3.2
 % Rick Ennis
-% January 2022
+% January 2023
 
 # NAME
 managebackups - Take and manage backups
@@ -12,7 +12,13 @@ managebackups - Take and manage backups
 **managebackups** provides three functions that can be run independently or in combination:
 
 ## Take Backups
-Given a backup command (tar, cpio, dump, etc) **managebackups** will execute the command, saving the output to a file named with the current date (and optionally time).  By default the resulting filename will be of the form *directory*/YYYY/MM/*filename*-YYYYMMDD.*ext*.  When time is included the day of month is also added to the directory structure (*directory*/YYYY/MM/DD/*filename*-YYYYMMDD-HH::MM:SS.*ext*). Note: Without time included (**--time**) multiple backups on the same day taken with the same settings will overwrite each other resulting in a single backup for the day.  With time included each backup is saved separately.
+Backups can be configured in one of two forms:
+
+- *Single file*:
+A single file backup is any of the standard Linux backup commands (tar, cpio, dump) that result in a single compressed file.  Given a backup command (tar, etc) **managebackups** will execute the command, saving the output to a file named with the current date (and optionally time).  By default the resulting filename will be of the form *directory*/YYYY/MM/*filename*-YYYYMMDD.*ext*.  When time is included the day of month is also added to the directory structure (*directory*/YYYY/MM/DD/*filename*-YYYYMMDD-HH::MM:SS.*ext*). Note: Without time included (**--time**) multiple backups on the same day taken with the same settings will overwrite each other resulting in a single backup for the day.  With time included each backup is saved separately.
+
+- *Faubackup*:
+Faub-style backups, similar to the underlying approach of Apple's Time Machine, backs up an entire directory tree to another location without compression. The initial copy is an exact replica of the source. Subsequent copies are made to new directories but are hard-linked back to files in the the previous backup if the data hasn't changed. In effect, you only use disk space for changes but get the advantage of fully traversable directory trees, which allows interrogation via any standard commandline tool. Each backup creates a new directory of the form *directory*/YYYY/MM/*profile*-YYYYMMDD. With the **--time** option @HH:MM:SS gets appended as well.
 
 ## Prune Backups
 **managebackups** deletes old backups that have aged out.  The aging critera is configured on a daily, weekly, monthly and yearly basis.  By default *managebackups* will keep 14 dailies, 4 weeklies, 6 monthlies and 2 yearly backups.
@@ -37,7 +43,9 @@ Options are relative to the three functions of **managebackups**.
         * cache
         * config
         * exec
+        * faub
         * link (default)
+        * netproto
         * notify
         * prune (default)
         * scan (default)
