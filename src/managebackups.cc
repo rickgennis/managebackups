@@ -36,6 +36,7 @@
 #include "debug.h"
 #include "network.h"
 #include "faub.h"
+#include "FaubCache.h"
 
 
 using namespace pcrepp;
@@ -390,6 +391,88 @@ BackupConfig* selectOrSetupConfig(ConfigManager &configManager) {
 }
 
 
+/*******************************************************************************
+ * pruneShoudKeep(...)
+ *
+ * Determine if the current file should be kept for daily/weekly/monthly/yearly
+ * criteria.
+ *******************************************************************************/
+string pruneShouldKeep(BackupConfig& config, string filename, int filenameAge, int filenameDOW, int filenameDay, int filenameMonth, int filenameYear) {
+    //cerr << "in; n:" << filename << ", a:" << filenameAge << ", dw:" << filenameDOW << ", d:" << filenameDay << ", m:" << filenameMonth << ", y:" << filenameYear << endl;
+    // daily
+    if (config.settings[sDays].ivalue() && filenameAge <= config.settings[sDays].ivalue()) {
+        //cerr << "returning keep daily" << endl;
+        return string("keep_daily: ") + filename + " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")";
+    }
+
+    // weekly
+    if (config.settings[sWeeks].ivalue() && filenameAge / 7.0 <= config.settings[sWeeks].ivalue() && filenameDOW == config.settings[sDOW].ivalue())
+        return string("keep_weekly: ") + filename + " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")";
+
+    // monthly
+    struct tm *now = localtime(&GLOBALS.startupTime);
+    auto monthLimit = config.settings[sMonths].ivalue();
+    auto monthAge = (now->tm_year + 1900) * 12 + now->tm_mon + 1 - (filenameYear * 12 + filenameMonth);
+    if (monthLimit && monthAge <= monthLimit && filenameDay == 1) 
+        return string("keep_monthly: ") + filename + " (month_age=" + to_string(monthAge) + ", dow=" + dw(filenameDOW) + ")";
+
+    // yearly
+    auto yearLimit = config.settings[sYears].ivalue();
+    auto yearAge = now->tm_year + 1900 - filenameYear;
+    if (yearLimit && yearAge <= yearLimit && filenameMonth == 1 && filenameDay == 1)
+        return string("keep_yearly: ") + filename + " (year_age=" + to_string(yearAge) + ", dow=" + dw(filenameDOW) + ")";
+
+    return "";
+}
+
+
+/*******************************************************************************
+ * pruneFaubBackups(config)
+ *
+ * Apply the full rentetion policy for Faub configs.  Safety checks are already
+ * handled in pruneBackups() which is what called us here.
+ *******************************************************************************/
+void pruneFaubBackups(BackupConfig& config) {
+    DEBUG(D_prune) DFMT("weeklies set to dow " << dw(config.settings[sDOW].ivalue()));
+
+    FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
+    DEBUG(D_prune) DFMT("examining " << fcache.getNumberOfBackups() << " backup(s) for " << config.settings[sTitle].value);
+
+    auto cacheEntryIt = fcache.getFirstBackup();
+    while (cacheEntryIt != fcache.getEnd()) {
+        auto filenameAge = cacheEntryIt->second.dayAge;
+        auto filenameDOW = cacheEntryIt->second.dow;
+
+        auto shouldKeep = pruneShouldKeep(config, cacheEntryIt->second.getDir(), filenameAge, filenameDOW, 
+                cacheEntryIt->second.startDay, cacheEntryIt->second.startMonth, cacheEntryIt->second.startYear);
+
+        if (shouldKeep.length()) {
+            DEBUG(D_prune) DFMT(shouldKeep);
+            ++cacheEntryIt;
+            continue;
+        }
+
+        if (GLOBALS.cli.count(CLI_TEST))
+            cout << YELLOW << config.ifTitle() << " TESTMODE: would have deleted " <<
+            cacheEntryIt->second.getDir() << " (age=" + to_string(filenameAge) << ", dow=" + dw(filenameDOW) <<
+            ")" << RESET << endl;
+        else {
+            if (rmrfdir(cacheEntryIt->second.getDir())) {
+                NOTQUIET && cout << "\t• removed " << cacheEntryIt->second.getDir() << endl;
+                log(config.ifTitle() + " removed " + cacheEntryIt->second.getDir() +
+                    " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")");
+                DEBUG(D_prune) DFMT("completed removal of " << cacheEntryIt->second.getDir());
+            }
+            else {
+                log(config.ifTitle() + " unable to remove " + cacheEntryIt->second.getDir() + ": " + strerror(errno));
+                SCREENERR("unable to remove " + cacheEntryIt->second.getDir() + ": " + strerror(errno));
+            }
+        }
+        
+        ++cacheEntryIt;
+    }
+
+}
 
 
 /*******************************************************************************
@@ -415,23 +498,44 @@ void pruneBackups(BackupConfig& config) {
     int fb = config.settings[sFailsafeBackups].ivalue();
     int fd = config.settings[sFailsafeDays].ivalue();
 
+    string descrip;
     if (fb > 0 && fd > 0) {
         int minValidBackups = 0;
 
-        string descrip;
-        for (auto &fnameIdx: config.cache.indexByFilename) {
-            auto raw_it = config.cache.rawData.find(fnameIdx.second);
+        if (config.settings[sFaub].value.length()) {
+            FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
 
-            descrip = "";
-            if (raw_it != config.cache.rawData.end() && raw_it->second.day_age <= fd) {
-                ++minValidBackups;
-                descrip = " [valid for fs]";
+            auto cacheEntryIt = fcache.getFirstBackup();
+            while (cacheEntryIt != fcache.getEnd()) {
+
+                descrip = "";
+                if (cacheEntryIt->second.dayAge <= fd) {
+                    ++minValidBackups;
+                    descrip = " [valid for fs]";
+                }
+
+                DEBUG(D_prune) DFMT("failsafe: " << cacheEntryIt->second.getDir() << " (age=" << cacheEntryIt->second.dayAge << ")" << descrip);
+                ++cacheEntryIt;
+
+                if (minValidBackups >= fb)
+                    break;
             }
+        }
+        else {
+            for (auto &fnameIdx: config.cache.indexByFilename) {
+                auto raw_it = config.cache.rawData.find(fnameIdx.second);
 
-            DEBUG(D_prune) DFMT("failsafe: " << raw_it->second.filename << " (age=" << raw_it->second.day_age << ")" << descrip);
+                descrip = "";
+                if (raw_it != config.cache.rawData.end() && raw_it->second.day_age <= fd) {
+                    ++minValidBackups;
+                    descrip = " [valid for fs]";
+                }
 
-            if (minValidBackups >= fb)
-                break;
+                DEBUG(D_prune) DFMT("failsafe: " << raw_it->second.filename << " (age=" << raw_it->second.day_age << ")" << descrip);
+
+                if (minValidBackups >= fb)
+                    break;
+            }
         }
 
         if (minValidBackups < fb) {
@@ -445,8 +549,13 @@ void pruneBackups(BackupConfig& config) {
         DEBUG(D_prune) DFMT("failsafe passed with " << minValidBackups << " backup" << s(minValidBackups) << " (" << fb << " required) in the last " << fd << " day" << s(fd));
     }
 
+    if (config.settings[sFaub].value.length())
+        return pruneFaubBackups(config);
+
+    /* safety checks complete - begin pruning */
+
     set<string> changedMD5s;
-    DEBUG(D_prune) DFMT("weeklies set to dow " << config.settings[sDOW].ivalue());
+    DEBUG(D_prune) DFMT("weeklies set to dow " << dw(config.settings[sDOW].ivalue()));
 
     // loop through the filename index sorted by filename (i.e. all backups by age)
     for (auto fIdx_it = config.cache.indexByFilename.begin(), next_it = fIdx_it; fIdx_it != config.cache.indexByFilename.end(); fIdx_it = next_it) {
@@ -463,32 +572,11 @@ void pruneBackups(BackupConfig& config) {
             int filenameAge = raw_it->second.day_age;
             int filenameDOW = raw_it->second.dow;
 
-            // daily
-            if (config.settings[sDays].ivalue() && filenameAge <= config.settings[sDays].ivalue()) {
-                DEBUG(D_prune) DFMT("keep_daily: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
-                continue;
-            }
+            auto shouldKeep = pruneShouldKeep(config, raw_it->second.filename, filenameAge, filenameDOW, 
+                raw_it->second.date_day, raw_it->second.date_month, raw_it->second.date_year);
 
-            // weekly
-            if (config.settings[sWeeks].ivalue() && filenameAge / 7.0 <= config.settings[sWeeks].ivalue() && filenameDOW == config.settings[sDOW].ivalue()) {
-                DEBUG(D_prune) DFMT("keep_weekly: " << raw_it->second.filename << " (age=" << filenameAge << ", dow=" << dw(filenameDOW) << ")");
-                continue;
-            }
-
-            // monthly
-            struct tm *now = localtime(&GLOBALS.startupTime);
-            auto monthLimit = config.settings[sMonths].ivalue();
-            auto monthAge = (now->tm_year + 1900) * 12 + now->tm_mon + 1 - (raw_it->second.date_year * 12 + raw_it->second.date_month);
-            if (monthLimit && monthAge <= monthLimit && raw_it->second.date_day == 1) {
-                DEBUG(D_prune) DFMT("keep_monthly: " << raw_it->second.filename << " (month_age=" << monthAge << ", dow=" << dw(filenameDOW) << ")");
-                continue;
-            }
-
-            // yearly
-            auto yearLimit = config.settings[sYears].ivalue();
-            auto yearAge = now->tm_year + 1900 - raw_it->second.date_year;
-            if (yearLimit && yearAge <= yearLimit && raw_it->second.date_month == 1 && raw_it->second.date_day == 1) {
-                DEBUG(D_prune) DFMT("keep_yearly: " << raw_it->second.filename << " (year_age=" << yearAge << ", dow=" << dw(filenameDOW) << ")");
+            if (shouldKeep.length()) {
+                DEBUG(D_prune) DFMT(shouldKeep);
                 continue;
             }
 
@@ -508,6 +596,10 @@ void pruneBackups(BackupConfig& config) {
                     config.cache.remove(raw_it->second);
                     config.cache.updated = true;   // updated causes the cache to get saved in the BackupCache destructor
                     DEBUG(D_prune) DFMT("completed removal of file");
+                }
+                else {
+                    log(config.ifTitle() + " unable to remove" + raw_it->second.filename + ": " + strerror(errno));
+                    SCREENERR("unable to remove " + raw_it->second.filename + ": " + strerror(errno));
                 }
             }
         }
@@ -1531,7 +1623,7 @@ int main(int argc, char *argv[]) {
             if (performTripwire(*currentConfig)) {
 
                 if (currentConfig->settings[sFaub].value.length()) {
-                    pruneFaub(*currentConfig);
+                    pruneBackups(*currentConfig);
                     fs_startServer(*currentConfig);
                 }
                 else {

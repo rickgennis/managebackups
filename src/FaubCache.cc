@@ -28,6 +28,8 @@ void FaubCache::restoreCache(string profileName) {
     queue<string> dirQueue;
     string currentDir;
     Pcre regEx("-(\\d{4})(\\d{2})(\\d{2})(?:@(\\d{2}):(\\d{2}):(\\d{2}))*");
+    auto refTime = time(NULL);
+    Pcre tempRE("\\.tmp\\.\\d+$");
 
     dirQueue.push(baseDir);
     auto baseSlashes = count(baseDir.begin(), baseDir.end(), '/');
@@ -55,41 +57,57 @@ void FaubCache::restoreCache(string profileName) {
                         auto depth = count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes;
                         if (depth == 3) {
                             // next we make sure the subdir matches our profile name
-                            if (fullFilename.find(profileName) != string::npos) {
-                                FaubEntry entry(fullFilename);
-                                auto success = entry.loadStats();
-                                DEBUG(D_faub) DFMT("loading cache for " << fullFilename << (success ? ": success" : ": failed"));
-                                if (!success || !entry.finishTime) {
-                                    /* here we have a backup in a directory but no cache file to describe it. all the diskstats
-                                     * for that cache file can be recalculated by traversing the backup.  but the finishTime &
-                                     * duration are lost. let's use the start time (from the filename) as a ballpark to seed
-                                     * the finish time, which will allow the stats output to show an age. */
+                            if (fullFilename.find(string("/") + profileName + "-") != string::npos) {
+                                // check for in process backups
+                                if (tempRE.search(fullFilename))
+                                    inProcessFilename = fullFilename;
+                                else {
+                                    FaubEntry entry(fullFilename);
+                                    auto success = entry.loadStats();
+                                    DEBUG(D_faub) DFMT("loading cache for " << fullFilename << (success ? ": success" : ": failed"));
+                                    if (!success || !entry.finishTime || !entry.startDay) {
+                                        /* here we have a backup in a directory but no cache file to describe it. all the diskstats
+                                        * for that cache file can be recalculated by traversing the backup.  but the finishTime &
+                                        * duration are lost. let's use the start time (from the filename) as a ballpark to seed
+                                        * the finish time, which will allow the stats output to show an age. */
                                      
-                                    if (regEx.search(pathSplit(fullFilename).file) && regEx.matches() > 2) {
-                                        struct tm t;
+                                        if (regEx.search(pathSplit(fullFilename).file) && regEx.matches() > 2) {
+                                            struct tm t;
 
-                                        t.tm_year = stoi(regEx.get_match(0)) - 1900;
-                                        t.tm_mon  = stoi(regEx.get_match(1)) - 1;
-                                        t.tm_mday = stoi(regEx.get_match(2));
-                                        t.tm_isdst = -1;
+                                            t.tm_year = stoi(regEx.get_match(0)) - 1900;
+                                            t.tm_mon  = stoi(regEx.get_match(1)) - 1;
+                                            t.tm_mday = stoi(regEx.get_match(2));
+                                            t.tm_isdst = -1;
 
-                                        if (regEx.matches() > 5) {
-                                            t.tm_hour = stoi(regEx.get_match(3));
-                                            t.tm_min = stoi(regEx.get_match(4));
-                                            t.tm_sec = stoi(regEx.get_match(5));
+                                            if (regEx.matches() > 5) {
+                                                t.tm_hour = stoi(regEx.get_match(3));
+                                                t.tm_min = stoi(regEx.get_match(4));
+                                                t.tm_sec = stoi(regEx.get_match(5));
+                                            }
+                                            else {
+                                                t.tm_hour = 0;
+                                                t.tm_min = 0;
+                                                t.tm_sec = 0;
+                                            }
+
+                                            if (!entry.finishTime)
+                                                entry.finishTime = mktime(&t);
+
+                                            if (!entry.startDay) {
+                                                entry.startDay = t.tm_mday;
+                                                entry.startMonth = t.tm_mon + 1;
+                                                entry.startYear = t.tm_year + 1900;
+                                            }
+
+                                            entry.dayAge = floor((refTime - entry.finishTime) / SECS_PER_DAY);
+                                            auto pFileTime = localtime(&entry.finishTime);
+                                            entry.dow = pFileTime->tm_wday;
                                         }
-                                        else {
-                                            t.tm_hour = 0;
-                                            t.tm_min = 0;
-                                            t.tm_sec = 0;
-                                        }
-
-                                        entry.finishTime = mktime(&t);
                                     }
-                                }
 
-                                backups.insert(backups.end(), pair<string, FaubEntry>(fullFilename, entry));
-                                continue;
+                                    backups.insert(backups.end(), pair<string, FaubEntry>(fullFilename, entry));
+                                    continue;
+                                }
                             }
                         }
 

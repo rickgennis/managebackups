@@ -25,6 +25,7 @@ FaubEntry::FaubEntry(string dir) {
     if (dir.length()) {
         directory = dir;
         ds.sizeInBytes = ds.sizeInBlocks = ds.savedInBytes = ds.savedInBlocks = finishTime = duration = modifiedFiles = unchangedFiles = dirs = slinks = 0;
+        startDay = startMonth = startYear = dayAge = dow = 0;
         updated = false;
         return;
     }

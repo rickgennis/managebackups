@@ -237,7 +237,9 @@ Valid contexts are:
 * cache
 * config
 * exec
+* faub
 * link (default)
+* netproto
 * notify
 * prune (default)
 * scan (default)

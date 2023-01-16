@@ -145,7 +145,7 @@ string blockp(string data, int width);
 
 string catdir(string dir);
 
-void rmrfdir(string dir);
+bool rmrfdir(string dir);
 
 int mkbasedirs(string path);
 

@@ -61,7 +61,6 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
 
                 if (S_ISDIR(statData.st_mode)) {
                     auto slashDiff = count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes;
-                    cerr << "mostRecent: " << fullFilename << ", count = " << slashDiff << endl;
 
                     if (slashDiff < 3) {
                         auto [fname, fmtime] = mostRecentBackupDirSinceInternal(baseSlashes, fullFilename, sinceTime, profileName);
@@ -146,6 +145,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     string remoteFilename;
     string localPrevFilename;
     string localCurFilename;
+    string originalCurrentDir = currentDir;
     struct stat statData;
     ssize_t fileTotal = 0;
     ssize_t filesModified = 0;
@@ -153,18 +153,20 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     ssize_t filesSymLinked = 0;
     ssize_t unmodDirs = 0;
     unsigned int linkErrors = 0;
+    string tempExtension = ".tmp." + to_string(GLOBALS.pid);
 
     // note start time
     timer backupTime;
     backupTime.start();
 
     log(config.ifTitle() + " starting backup to " + currentDir);
-    string screenMessage = config.ifTitle() + " backing up to " + currentDir + "... ";
+    currentDir += tempExtension;
+    string screenMessage = config.ifTitle() + " backing up to temp dir " + currentDir + "... ";
     string backspaces = string(screenMessage.length(), '\b');
     string blankspaces = string(screenMessage.length() , ' ');
     NOTQUIET && ANIMATE && cout << screenMessage << flush;
 
-    DEBUG(D_any) DFMT("\n");
+    DEBUG(D_any) cerr << "\n";
     DEBUG(D_netproto) DFMT("faub server ready to receive");
     DEBUG(D_faub) DFMT("current: " << currentDir);
     DEBUG(D_faub) DFMT("previous: " << prevDir);
@@ -329,10 +331,19 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         filesSymLinked += symLinkList.size();
 
     } while (client.readProc());
-    
+
     // note finish time
     backupTime.stop();
     NOTQUIET && ANIMATE && cout << backspaces << blankspaces << backspaces << flush;
+
+    if (rename(string(currentDir).c_str(), originalCurrentDir.c_str())) {
+        string errorDetail = config.ifTitle() + " unable to rename " + currentDir + " to " + originalCurrentDir + ": " + strerror(errno);
+        log(errorDetail);
+        SCREENERR(errorDetail);
+        return;
+    }
+
+    currentDir = originalCurrentDir;
 
     // loading the cache for this baseDir will automatically detect our new backup having
     // no cached stats and run a dus() on it to determine totalSize/totalSaved.
@@ -461,9 +472,4 @@ void fc_mainEngine(vector<string> paths) {
     exit(1);
 }
 
-
-
-void pruneFaub(BackupConfig& config) {
-
-}
 

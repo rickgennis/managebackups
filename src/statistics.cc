@@ -45,10 +45,20 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
     set<unsigned long> countedInode;
     struct summaryStats resultStats;
     int precisionLevel = statDetail > 1 ? 1 : -1;
+    string processAge;
 
     // handle faub configs first
     FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
-    if (fcache.size()) {
+    if (config.settings[sFaub].value.length()) {
+        string inProcessFilename = fcache.getInProcessFilename();
+        cerr << "in process filename = " << inProcessFilename << endl;
+
+#ifdef __APPLE__
+        struct stat statBuf;
+        if (inProcessFilename.length() && !stat(inProcessFilename.c_str(), &statBuf))
+            processAge = seconds2hms(GLOBALS.startupTime - statBuf.st_birthtime);
+#endif
+
         // set numeric stats
         auto ds = fcache.getTotalStats();
         resultStats.totalUsed = GLOBALS.useBlocks ? ds.sizeInBlocks : ds.sizeInBytes;
@@ -57,6 +67,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         resultStats.lastBackupBytes = GLOBALS.useBlocks ? fcache.getLastBackup()->second.ds.sizeInBlocks : fcache.getLastBackup()->second.ds.sizeInBytes;
         resultStats.lastBackupTime = fcache.getLastBackup()->second.finishTime;
         resultStats.duration = fcache.getLastBackup()->second.duration;
+        resultStats.inProcess = inProcessFilename.length() > 0;
         resultStats.success = true;
 
         // set string stats
@@ -76,7 +87,8 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
             to_string(saved) + "%",
             fcache.getFirstBackup()->second.finishTime ? timeDiff(mktimeval(fcache.getFirstBackup()->second.finishTime)) : "?",
             fcache.getLastBackup()->second.finishTime ? timeDiff(mktimeval(fcache.getLastBackup()->second.finishTime)) : "?",
-            ""};  // processAge.length() ? processAge : GLOBALS.startupTime - fcache.getLastBackup()->second.finishTime > 2*60*60*24 ? oldMessage : ""};
+            processAge.length() ? processAge : GLOBALS.startupTime - fcache.getLastBackup()->second.finishTime > 2*60*60*24 ? oldMessage : ""
+        };
             
         for (int i = 0; i < NUMSTATDETAILS; ++i)
             resultStats.stringOutput[i] = soutput[i];
@@ -299,7 +311,7 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
     FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
     int precisionLevel = statDetail > 1 ? 1 : -1;
 
-    if (fcache.size()) {
+    if (config.settings[sFaub].value.length() && fcache.size()) {
         // determine the backup max filename length
         int fnameLen = 0;
         auto backupIt = fcache.getFirstBackup();

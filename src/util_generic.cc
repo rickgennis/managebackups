@@ -777,7 +777,7 @@ string catdir(string dir) {
 
 // delete an absolute directory (rm -rf).
 // wildcards are not interpreted in the directory name.
-void rmrfdir(string dir) {
+bool rmrfdir(string dir) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
 
@@ -788,19 +788,25 @@ void rmrfdir(string dir) {
 
             struct stat statData;
             string filename = slashConcat(dir, c_dirEntry->d_name);
-            if (!stat(filename.c_str(), &statData)) {
+            if (!lstat(filename.c_str(), &statData)) {
 
                 // recurse into subdirectories
-                if ((statData.st_mode & S_IFMT) == S_IFDIR) 
-                    rmrfdir(filename);
+                if ((statData.st_mode & S_IFMT) == S_IFDIR) {
+                    if (!rmrfdir(filename))
+                        return false;
+                }
                 else
-                    unlink(filename.c_str());
+                    if (unlink(filename.c_str()))
+                        return false;
             }
         }
 
         closedir(c_dir);
-        rmdir(dir.c_str());
+        if (rmdir(dir.c_str()))
+            return false;
     }
+
+    return true;
 }
 
 

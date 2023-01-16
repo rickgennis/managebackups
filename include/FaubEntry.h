@@ -23,18 +23,20 @@ class FaubEntry {
         bool updated;
         set<ino_t> inodes;
         DiskStats ds;
-        //size_t sizeInBytes;
-        //size_t sizeInBlocks;
-        //size_t savedInBytes;
-        //size_t savedInBlocks;
         size_t modifiedFiles;
         size_t unchangedFiles;
         size_t dirs;
         size_t slinks;
         time_t finishTime;
+        char startDay;
+        char startMonth;
+        int startYear;
+        unsigned int dayAge;
         unsigned long duration;
+        int dow;
 
         string cacheFilename(string suffix) { return (GLOBALS.cacheDir + "/" + MD5string(directory) + "." + suffix); }
+        string getDir() { return directory; }
 
         string stats2string();
         void string2stats(string& data);
