@@ -321,6 +321,8 @@ sizes.
 .TP
 \f[B]-1\f[R]
 Provide detail of backups.
+\f[B]-1\f[R] can be specified up to 3 times for different formatting of
+sizes.
 .TP
 \f[B]\[en]test\f[R]
 Run in test mode.

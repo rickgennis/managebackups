@@ -87,7 +87,7 @@ Options are relative to the three functions of **managebackups**.
 : Provide a summary of backups. **-0** can be specified up to 3 times for different formatting of sizes.
 
 **-1**
-: Provide detail of backups.
+: Provide detail of backups. **-1** can be specified up to 3 times for different formatting of sizes.
 
 **--test**
 : Run in test mode. No changes are actually made to disk (no backups, pruning or linking).

@@ -330,7 +330,7 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
             // print the month header
             if (lastMonthYear != monthYear)
                 cout << endl << BOLDBLUE << onevarsprintf("%-" + to_string(fnameLen+1) + "s  ", monthYear) <<
-                    "Size    Used    Dirs    SymLks  Duration  Type  Age" << RESET << endl;
+                    "Size    Used    Dirs    SymLks  Mods    Duration  Type  Age" << RESET << endl;
 
             snprintf(result, sizeof(result), 
                     // filename
@@ -343,6 +343,8 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
                     "%6s  " +
                     // symlinks
                     "%6s  " +
+                    // modifies
+                    "%6s  " +
                     // duration
                     "%s  " +
                     // type
@@ -354,7 +356,9 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
                         approximate(GLOBALS.useBlocks ? backupIt->second.ds.sizeInBlocks - backupIt->second.ds.savedInBlocks : 
                         backupIt->second.ds.sizeInBytes - backupIt->second.ds.savedInBytes, precisionLevel, statDetail > 2).c_str(), 
                         approximate(backupIt->second.dirs, precisionLevel, statDetail > 2).c_str(), 
-                        approximate(backupIt->second.slinks, precisionLevel, statDetail > 2).c_str(), seconds2hms(backupIt->second.duration).c_str(),
+                        approximate(backupIt->second.slinks, precisionLevel, statDetail > 2).c_str(), 
+                        approximate(backupIt->second.modifiedFiles, precisionLevel, statDetail > 2).c_str(),
+                        seconds2hms(backupIt->second.duration).c_str(),
                         timeDetail->tm_mon  == 0 && timeDetail->tm_mday == 1 ? "Year" : timeDetail->tm_mday == 1 ? "Mnth" : timeDetail->tm_wday == 0 ? "Week" : "Day",
                         backupIt->second.finishTime ? timeDiff(mktimeval(backupIt->second.finishTime)).c_str() : "?");
 
