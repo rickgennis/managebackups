@@ -269,6 +269,14 @@ But for that setup \f[B]\[en]user\f[R] must be specified on every
 invocation.
 See \f[B]\[en]user\f[R] for more detail.
 .TP
+\f[B]\[en]installsuid\f[R]
+Install \f[B]managebackups\f[R] in /usr/local/bin as SUID root.
+With this configuration Faub-style backups can set appropriate
+owners/groups from the remote systems being backed up while still
+allowing single-file backups to be saved as the executing user (via
+\[en]uid and \[en]gid parameters).
+Config & cache directories and the man page are also created.
+.TP
 \f[B]\[en]installman\f[R]
 Only install the man page to /usr/local/share/man/man1.
 .TP
@@ -399,6 +407,26 @@ For example, \f[B]\[en]cmd\f[R] \[lq]tar -cz /mydata\[rq] or
 chmod newly created backups to \f[I]mode\f[R], which is specified in
 octal.
 Defaults to 0600.
+.TP
+\f[B]\[en]uid\f[R] [\f[I]uid\f[R]]
+chown newly created backups to \f[I]uid\f[R], which is specified as an
+integer.
+Defaults to the effective executing user.
+Use 0 to specify the real executing user.
+For root, leave it unset and run as root.
+Note: This option only impacts single-file backups; with Faub-style
+backups files are set to the uid/gid of the remote system if possible
+(i.e.\ if run as root or suid), otherwise they remain owned by the
+executing user.
+.TP
+\f[B]\[en]gid\f[R] [\f[I]gid\f[R]]
+chgrp newly created backups to \f[I]gid\f[R], which is specified as an
+integer.
+Defaults to the effective executing user\[cq]s group.
+Note: This option only impacts single-file backups; with Faub-style
+backups files are set to the uid/gid of the remote system if possible
+(i.e.\ if run as root or suid), otherwise they remain owned by the
+executing user.
 .TP
 \f[B]\[en]time\f[R]
 Include the time in the filename of the newly created backup.

@@ -3,7 +3,7 @@
 #define SETUP_H
 
 void installman();
-void install(string myBinary);
+void install(string myBinary, bool suid = false);
 
 #endif
 

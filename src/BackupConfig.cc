@@ -62,6 +62,8 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_LEAVEOUTPUT, RE_LEAVEOUTPUT, BOOL, "false"));
     settings.insert(settings.end(), Setting(CLI_FAUB, RE_FAUB, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_FAUB, RE_PATHS, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_UID, RE_UID, INT, "-1"));
+    settings.insert(settings.end(), Setting(CLI_GID, RE_GID, INT, "-1"));
 }
 
 

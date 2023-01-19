@@ -31,7 +31,9 @@ map<string, int>settingMap =
      { CLI_MAILFROM, sMailFrom },
      { CLI_LEAVEOUTPUT, sLeaveOutput },
      { CLI_FAUB, sFaub },
-     { CLI_PATHS, sPaths }};
+     { CLI_PATHS, sPaths },
+     { CLI_UID, sUID},
+     { CLI_GID, sGID}};
 
 
 

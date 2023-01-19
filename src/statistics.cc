@@ -51,7 +51,6 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
     FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
     if (config.settings[sFaub].value.length()) {
         string inProcessFilename = fcache.getInProcessFilename();
-        cerr << "in process filename = " << inProcessFilename << endl;
 
 #ifdef __APPLE__
         struct stat statBuf;

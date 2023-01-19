@@ -47,7 +47,7 @@ void installman() {
 }
 
 
-void install(string myBinary) {
+void install(string myBinary, bool suid) {
     ifstream groupf;
     int gid = 0;
 
@@ -84,6 +84,7 @@ void install(string myBinary) {
         string destbin = "/usr/local/bin/managebackups";
         string cp = locateBinary("cp");
         mode_t setgidmode = S_ISGID | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
+        mode_t setuidmode = S_ISUID | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 
         // mkdir -p GLOBALS.confDir
         if (stat(GLOBALS.confDir.c_str(), &statBuf)) {
@@ -144,17 +145,26 @@ void install(string myBinary) {
             cout << "installed " << destbin << "\n";
         }
 
-        if (chown(destbin.c_str(), -1, gid)) {
-            SCREENERR("error: unable to chgrp of " << destbin << " to " << to_string(gid));
-            goto bailout;
+        if (suid) {
+            if (chmod(destbin.c_str(), setuidmode | S_IROTH | S_IXOTH)) {
+                SCREENERR("error: unable to chmod 4755 " << destbin);
+                goto bailout;
+            }
+            cout << "chmod 4755 " << destbin << " (success)\n";
         }
-        cout << "chgrp " << to_string(gid) << " " << destbin << " (success)\n";
+        else {
+            if (chown(destbin.c_str(), -1, gid)) {
+                SCREENERR("error: unable to chgrp of " << destbin << " to " << to_string(gid));
+                goto bailout;
+            }
+            cout << "chgrp " << to_string(gid) << " " << destbin << " (success)\n";
 
-        if (chmod(destbin.c_str(), setgidmode | S_IROTH | S_IXOTH)) {
-            SCREENERR("error: unable to chmod 2755 " << destbin);
-            goto bailout;
+            if (chmod(destbin.c_str(), setgidmode | S_IROTH | S_IXOTH)) {
+                SCREENERR("error: unable to chmod 2755 " << destbin);
+                goto bailout;
+            }
+            cout << "chmod 2755 " << destbin << " (success)\n";
         }
-        cout << "chmod 2755 " << destbin << " (success)\n";
 
         {
             string logfile = "/var/log/managebackups.log";

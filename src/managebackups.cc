@@ -1088,6 +1088,17 @@ void performBackup(BackupConfig& config) {
 
             // rename the file
             if (!rename(string(backupFilename + tempExtension).c_str(), backupFilename.c_str())) {
+                auto uid = config.settings[sUID].ivalue();
+                auto gid = config.settings[sGID].ivalue();
+
+                // update the owner: -1 (default) means no change, 0 means set to the calling user,
+                // x means set to user x.  setting to root (uid 0) can be achieved by running as root
+                // (or suid) and setting -1 to make no change.
+                if (uid > -1 || gid > -1)
+                    chown(backupFilename.c_str(), 
+                            uid == 0 ? getuid() : uid,
+                            gid == 0 ? getgid() : gid);
+
                 auto size = approximate(cacheEntry.size);
 
                 string message = "backup completed to " + backupFilename  + " (" + size + ") in " + backupTime.elapsed();
@@ -1317,7 +1328,10 @@ int main(int argc, char *argv[]) {
         (CLI_RECREATE, "Recreate config", cxxopts::value<bool>()->default_value("false"))
         (CLI_INSTALLMAN, "Install man", cxxopts::value<bool>()->default_value("false"))
         (CLI_INSTALL, "Install", cxxopts::value<bool>()->default_value("false"))
+        (CLI_INSTALLSUID, "Install SUID", cxxopts::value<bool>()->default_value("false"))
         (CLI_NOTIFYEVERY, "Notify every", cxxopts::value<int>())
+        (CLI_UID, "Owner UID", cxxopts::value<int>())
+        (CLI_GID, "Owner GID", cxxopts::value<int>())
         (CLI_LEAVEOUTPUT, "Leave output", cxxopts::value<bool>()->default_value("false"))
         (CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
 
@@ -1401,9 +1415,14 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
+    if (GLOBALS.cli.count(CLI_INSTALLSUID)) {
+        install(argv[0], true);
+        exit(0);
+    }
+
     if (GLOBALS.cli.count(CLI_VERSION)) {
         cout << "managebackups " << VERSION << "\n";
-        cout << "(c) 2022 released under GPLv2." << endl;
+        cout << "(c) 2023 released under GPLv2." << endl;
         exit(0);
     }
 

@@ -56,6 +56,9 @@ Options are relative to the three functions of **managebackups**.
 **--install**
 : **managebackups** needs write access under /var to store caches of MD5s and under /etc/managebackups to update configs from commandline parameters. It can run entirely as root. But to facilitate a safer setup, it can be configured to run setgid as group "daemon" and the required directories configured to allow writes from that group. **--install** installs the **managebackups** binary in /usr/local/bin (setgid), creates the config and cache directories (writable by "daemon") and installs the man page in /usr/local/share/man/man1. It's designed for a one-time execution as **sudo managebackups --install** after which root access is no longer required. Alternatively, all files (config, cache, log) can be written under the calling user's home directory via the **--user** option.  But for that setup **--user** must be specified on every invocation.  See **--user** for more detail.
 
+**--installsuid**
+: Install **managebackups** in /usr/local/bin as SUID root. With this configuration Faub-style backups can set appropriate owners/groups from the remote systems being backed up while still allowing single-file backups to be saved as the executing user (via --uid and --gid parameters). Config & cache directories and the man page are also created.
+
 **--installman**
 : Only install the man page to /usr/local/share/man/man1.
 
@@ -129,6 +132,12 @@ Options are relative to the three functions of **managebackups**.
 
 **--mode** [*mode*]
 : chmod newly created backups to *mode*, which is specified in octal. Defaults to 0600.
+
+**--uid** [*uid*]
+: chown newly created backups to *uid*, which is specified as an integer. Defaults to the effective executing user. Use 0 to specify the real executing user. For root, leave it unset and run as root. Note: This option only impacts single-file backups; with Faub-style backups files are set to the uid/gid of the remote system if possible (i.e. if run as root or suid), otherwise they remain owned by the executing user.
+
+**--gid** [*gid*]
+: chgrp newly created backups to *gid*, which is specified as an integer. Defaults to the effective executing user's group. Note: This option only impacts single-file backups; with Faub-style backups files are set to the uid/gid of the remote system if possible (i.e. if run as root or suid), otherwise they remain owned by the executing user.
 
 **--time**
 : Include the time in the filename of the newly created backup.  The day of month will also be included in the subdirectory. Without time included multiple backups on the same day taken with the same settings will overwrite each other resulting in a single backup for the day. With time included each backup is saved separately.

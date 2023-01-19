@@ -57,6 +57,7 @@
 #define CLI_MINSPACE "minspace"
 #define CLI_MINSFTPSPACE "minsftpspace"
 #define CLI_INSTALL "install"
+#define CLI_INSTALLSUID "installsuid"
 #define CLI_INSTALLMAN "installman"
 #define CLI_HELP "help"
 #define CLI_CONFDIR "confdir"
@@ -81,6 +82,8 @@
 #define CLI_FAUB "faub"
 #define CLI_PATHS "path"
 #define CLI_USEBLOCKS "blocks"
+#define CLI_UID "uid"
+#define CLI_GID "gid"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
@@ -116,6 +119,8 @@
 #define RE_LEAVEOUTPUT "(leaveoutput)"
 #define RE_FAUB "(faub)"
 #define RE_PATHS "(path)"
+#define RE_UID "(uid)"
+#define RE_GID "(gid)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"
