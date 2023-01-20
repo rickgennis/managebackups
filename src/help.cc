@@ -438,7 +438,7 @@ same settings will overwrite each other resulting in a single backup for
 the day.
 With time included each backup is saved separately.
 .TP
-\f[B]\[en]notify\f[R] [\f[I]contact1\f[R], \f[I]contact2\f[R], \&...]
+\f[B]\[en]notify\f[R] [\f[I]contact1\f[R],\f[I]contact2\f[R],\&...]
 Notify after a backup completes.
 By default, only failed backups/SFTP/SCP trigger notifications (see
 \f[B]\[en]nos\f[R]).
@@ -707,6 +707,25 @@ limit the output to a single profile.
 Show a one-line summary for each backup profile.
 The summary includes detail on the most recent backup as well as the
 number of backups, age ranges and total disk space.
+.SH PERMISSIONS
+.PP
+Aside from access to read the files being backed up (on a remote server
+or locally) \f[B]managebackups\f[R] requires local write access for
+multiple tasks: - writing to the log file (default
+/var/log/managebackups.log) - writing its cache files (default
+/var/managebackups/caches) - creating the local backup in the configured
+directory - setting owners/groups/perms on faub-style backup files
+.PP
+The first three of these can be achieved by moving the log/cache/backup
+files into a directory that \f[B]managebackups\f[R] has write access to.
+Alternatively, \f[B]managebackups\f[R] can be made suid or sgid (see
+\f[B]\[en]install\f[R] and \f[B]\[en]installsuid\f[R]).
+The fourth permission issue has no workaround.
+If you wish to use faub-style backups \f[B]managebackups\f[R] needs to
+run as root either via \f[B]\[en]installsuid\f[R], sudo or via the root
+user.
+Without root access faub-style backups can be created but all files will
+have the same owner.
 .SH ENVIRONMENT VARIABLES
 .PP
 Environment variables are overriden by \f[B]\[en]user\f[R],

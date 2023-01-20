@@ -793,14 +793,6 @@ string interpolate(string command, string subDir, string fullDirectory, string b
 }
  
 
-// convenience function to consolidate printing screen errors, logging and returning
-// to the notify() function
-string errorcom(string profile, string message) {
-    SCREENERR("\t• " << profile << " " << message);
-    log(profile + " " + message);
-    return("\t• " + message);
-}
-
 
 /*******************************************************************************
  * sCpBackup(config, backupFilename, subDir, sCpParams)

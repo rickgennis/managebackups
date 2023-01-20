@@ -7,6 +7,7 @@
 #include <sys/time.h>
 #include <set>
 #include "globals.h"
+#include "math.h"
 
 using namespace std;
 
@@ -149,8 +150,11 @@ bool rmrfdir(string dir);
 
 int mkbasedirs(string path);
 
+// du -s
 DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes);
 DiskStats dus(string path);
+
+string errorcom(string profile, string message);
 
 #endif
 

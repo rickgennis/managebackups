@@ -8,7 +8,6 @@
 #include <openssl/evp.h>
 #include <algorithm>
 #include <sys/stat.h>
-#include "math.h"
 #include <sys/types.h>
 #include <pwd.h>
 #include <vector>
@@ -868,5 +867,14 @@ DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes) {    /
         ds += dus(subDir, seenInodes, newInodes);
     
     return ds;
+}
+
+
+// convenience function to consolidate printing screen errors, logging and returning
+// to the notify() function
+string errorcom(string profile, string message) {
+    SCREENERR("\t• " << profile << " " << message);
+    log(profile + " " + message);
+    return("\t• " + message);
 }
 

@@ -142,7 +142,7 @@ Options are relative to the three functions of **managebackups**.
 **--time**
 : Include the time in the filename of the newly created backup.  The day of month will also be included in the subdirectory. Without time included multiple backups on the same day taken with the same settings will overwrite each other resulting in a single backup for the day. With time included each backup is saved separately.
 
-**--notify** [*contact1*, *contact2*, ...]
+**--notify** [*contact1*,*contact2*,...]
 : Notify after a backup completes. By default, only failed backups/SFTP/SCP trigger notifications (see **--nos**). A contact can be an email address or the full path to a script to execute. Double-quote the contact string if it contains any spaces. The NOTIFICATIONS section below has more detail.
 
 **--notifyevery** [*count*]
@@ -252,6 +252,15 @@ Profile configuration files are managed by **managebackups** though they can be 
 
 **managebackups -0**
 : Show a one-line summary for each backup profile. The summary includes detail on the most recent backup as well as the number of backups, age ranges and total disk space.
+
+# PERMISSIONS
+Aside from access to read the files being backed up (on a remote server or locally) **managebackups** requires local write access for multiple tasks:
+ - writing to the log file (default /var/log/managebackups.log)
+ - writing its cache files (default /var/managebackups/caches)
+ - creating the local backup in the configured directory
+ - setting owners/groups/perms on faub-style backup files
+
+The first three of these can be achieved by moving the log/cache/backup files into a directory that **managebackups** has write access to. Alternatively, **managebackups** can be made suid or sgid (see **--install** and **--installsuid**). The fourth permission issue has no workaround. If you wish to use faub-style backups **managebackups** needs to run as root either via **--installsuid**, sudo or via the root user.  Without root access faub-style backups can be created but all files will have the same owner.
 
 # ENVIRONMENT VARIABLES
 Environment variables are overriden by **--user**, **--confdir**, **--cachedir**, and **--logdir**.
