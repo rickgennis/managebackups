@@ -6,6 +6,7 @@
 
 #include "network.h"
 #include "util_generic.h"
+#include "exception.h"
 #include "debug.h"
 #include "globals.h"
 
@@ -22,7 +23,8 @@ void tcpSocket::flush() {
 }
 
 
-tcpSocket::tcpSocket(int port, int backlog) {
+tcpSocket::tcpSocket(int port, int backlog, unsigned int timeout) {
+    timeoutSecs = timeout;
     readFd = -1;
 
     if ((socketFd = socket(AF_INET, SOCK_STREAM, 0)) > 0) {
@@ -61,7 +63,8 @@ tcpSocket::tcpSocket(int port, int backlog) {
 }
 
 
-tcpSocket::tcpSocket(string server, int port) {
+tcpSocket::tcpSocket(string server, int port, unsigned int timeout) {
+    timeoutSecs = timeout;
     readFd = -1;
 
     if ((socketFd = socket(AF_INET, SOCK_STREAM, 0)) > 0) {
@@ -88,7 +91,8 @@ tcpSocket::tcpSocket(string server, int port) {
 }
 
 
-tcpSocket::tcpSocket(int fd) {
+tcpSocket::tcpSocket(int fd, unsigned int timeout) {
+    timeoutSecs = timeout;
     readFd = -1;
     socketFd = fd;
     address.sin_family = AF_INET;
@@ -100,7 +104,8 @@ void tcpSocket::setReadFd(int fd) {
 }
 
 
-tcpSocket tcpSocket::accept(int timeoutSecs) {
+tcpSocket tcpSocket::accept(unsigned int timeout) {
+    timeoutSecs = timeout;
     int addrlen = sizeof(address);
 
     fd_set readSet;
@@ -112,8 +117,10 @@ tcpSocket tcpSocket::accept(int timeoutSecs) {
     tv.tv_usec = 0;
     
     int result;
-    if ((result = select(socketFd + 1, &readSet, NULL, NULL, &tv)) < 1)
-        exit(0);
+    if ((result = select(socketFd + 1, &readSet, NULL, NULL, &tv)) < 1) {
+        log("timeout on socket accept()");
+        throw MBException("timeout on socket accept()");
+    }
 
     int newFd;
     if ((newFd = ::accept(socketFd, (struct sockaddr*)&address, (socklen_t*)&addrlen)) > 0) {  
@@ -141,10 +148,6 @@ size_t tcpSocket::write(const void *data, size_t count) {
     ssize_t totalBytesWritten = 0;
 
     while (count && (bytesWritten = ::write(socketFd, (char*)data + totalBytesWritten, count))) {
-
-        //(socketFd > 2 ? ::write(socketFd, (char*)data + totalBytesWritten, count - totalBytesWritten) :
-        //fwrite(data, 1, count, stdout))) > 0) {
-
         count -= bytesWritten;
         totalBytesWritten += bytesWritten;
     }
@@ -179,7 +182,33 @@ ssize_t tcpSocket::read(void *data, size_t count) {
         count -= dataLen;
     }
 
-    return (::read(readFd > -1 ? readFd : socketFd, (char*)data + dataLen, count));
+    auto targetFd = readFd > -1 ? readFd : socketFd;
+
+    fd_set readSet;
+    FD_ZERO(&readSet);
+    FD_SET(targetFd, &readSet);
+
+    fd_set errorSet;
+    FD_ZERO(&errorSet);
+    FD_SET(targetFd, &errorSet);
+
+    struct timeval tv;
+    tv.tv_sec = timeoutSecs;
+    tv.tv_usec = 0;
+
+    int result = select(targetFd + 1, NULL, &readSet, &errorSet, &tv);
+
+    if (result == 0) {
+        log("timeout on socket read()");
+        throw MBException("timeout on socket read()");
+    }
+    else
+        if (result < 0) {
+            log("error on select() of socket");
+            return 0;
+        }
+
+    return (::read(targetFd, (char*)data + dataLen, count));
 }
 
 

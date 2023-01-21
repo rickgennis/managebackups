@@ -15,6 +15,7 @@
 FaubCache::FaubCache(string path, string profileName) {
     baseDir = path;
     restoreCache(profileName);
+    cerr << "*** FaubCache setup for " << path << " - " << profileName << endl;
 }
 
 
@@ -54,6 +55,7 @@ void FaubCache::restoreCache(string profileName) {
                         // regardless of the starting (baseDir) directory, we're only interested in subdirs
                         // exactly 2 levels lower because that's where our backups will live. e.g.
                         // baseDir = /tmp/backups then we're looking for things like /tmp/backups/2023/01.
+                        cerr << "examining " << fullFilename << endl;
                         auto depth = count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes;
                         if (depth == 3) {
                             // next we make sure the subdir matches our profile name
@@ -64,7 +66,7 @@ void FaubCache::restoreCache(string profileName) {
                                 else {
                                     FaubEntry entry(fullFilename);
                                     auto success = entry.loadStats();
-                                    DEBUG(D_faub) DFMT("loading cache for " << fullFilename << (success ? ": success" : ": failed"));
+                                    DEBUG(D_faub|D_cache) DFMT("loading cache for " << fullFilename << (success ? ": success" : ": failed"));
                                     if (!success || !entry.finishTime || !entry.startDay) {
                                         /* here we have a backup in a directory but no cache file to describe it. all the diskstats
                                         * for that cache file can be recalculated by traversing the backup.  but the finishTime &

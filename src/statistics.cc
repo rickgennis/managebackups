@@ -23,7 +23,7 @@ string oldMessage = ">24H old";
  * easy display (stringOutput).
  */
 struct summaryStats {
-    bool success;
+    //bool success;
     bool inProcess;
     unsigned long lastBackupBytes;
     time_t lastBackupTime;
@@ -32,10 +32,11 @@ struct summaryStats {
     long numberOfBackups;
     long uniqueBackups;
     unsigned long duration;
-    string stringOutput[NUMSTATDETAILS];
+    string stringOutput[NUMSTATDETAILS] = {"", "(no backups found)", "-", "00:00:00", "0", "0", "0%"};
 
     summaryStats() {
-        success = inProcess = false;
+        //success = 
+        inProcess = false;
         lastBackupBytes = totalUsed = totalSaved = numberOfBackups = uniqueBackups = duration = 0;
     }
 };
@@ -48,8 +49,13 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
     string processAge;
 
     // handle faub configs first
-    FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
     if (config.settings[sFaub].value.length()) {
+        FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
+        if (fcache.size() < 1) {
+            resultStats.stringOutput[0] = config.settings[sTitle].value;
+            return resultStats;
+        }
+
         string inProcessFilename = fcache.getInProcessFilename();
 
 #ifdef __APPLE__
@@ -67,7 +73,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         resultStats.lastBackupTime = fcache.getLastBackup()->second.finishTime;
         resultStats.duration = fcache.getLastBackup()->second.duration;
         resultStats.inProcess = inProcessFilename.length() > 0;
-        resultStats.success = true;
+        //resultStats.success = true;
 
         // set string stats
         auto t = localtime(&resultStats.lastBackupTime);
@@ -97,8 +103,10 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
 
     // then regular configs
     resultStats.numberOfBackups = config.cache.rawData.size();
-    if (resultStats.numberOfBackups < 1)
+    if (resultStats.numberOfBackups < 1) {
+        resultStats.stringOutput[0] = config.settings[sTitle].value;
         return resultStats;
+    }
 
     // calcuclate stats from the entire list of backups
     for (auto &raw: config.cache.rawData) {
@@ -156,7 +164,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         resultStats.lastBackupTime = last_it->second.mtime;
     }
 
-    resultStats.success = true;
+    //resultStats.success = true;
     return resultStats;
 }
 
@@ -267,6 +275,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
             string msg = statStrings[line * NUMSTATDETAILS + 9];
             bool is_old = msg == oldMessage;
 
+            bool gotAge = statStrings[line * NUMSTATDETAILS + 7].length() || statStrings[line * NUMSTATDETAILS + 8].length();
             snprintf(result, sizeof(result), lineFormat.c_str(), 
                     statStrings[line * NUMSTATDETAILS].c_str(),
                     statStrings[line * NUMSTATDETAILS + 1].c_str(),
@@ -275,8 +284,9 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
                     statStrings[line * NUMSTATDETAILS + 4].c_str(),
                     statStrings[line * NUMSTATDETAILS + 5].c_str(),
                     statStrings[line * NUMSTATDETAILS + 6].c_str(),
-                    string(HIGHLIGHT + BRACKETO + RESET + statStrings[line * NUMSTATDETAILS + 7] +
-                        HIGHLIGHT + string(" -> ") + RESET + statStrings[line * NUMSTATDETAILS + 8] + 
+                    string(HIGHLIGHT + BRACKETO + RESET + 
+                        (gotAge ? statStrings[line * NUMSTATDETAILS + 7] + HIGHLIGHT + 
+                         string(" -> ") + RESET + statStrings[line * NUMSTATDETAILS + 8] : "-") + 
                         HIGHLIGHT + BRACKETC).c_str(),
                     string(is_old ? string(BOLDRED) + msg : msg).c_str());
             cout << result << RESET << "\n";

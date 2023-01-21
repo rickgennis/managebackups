@@ -11,6 +11,7 @@
 #include <utime.h>
 #include "pcre++.h"
 #include "util_generic.h"
+#include "exception.h"
 #include "colors.h"
 #include "globals.h"
 #include "PipeExec.h"
@@ -45,11 +46,12 @@ void showError(string message) {
 string firstAvailIDForDir(string dir);
 
 
-PipeExec::PipeExec(string fullCommand) {
+PipeExec::PipeExec(string fullCommand, unsigned int timeout) {
     errorDir = "";
     origCommand = fullCommand;
     bypassDestructor = false;
     char *data;
+    timeoutSecs = timeout;
 
     data = (char*)malloc(fullCommand.length() + 1);
     strcpy(data, fullCommand.c_str());
@@ -244,7 +246,7 @@ bool PipeExec::execute2file(string toFile, string procName) {
     int bytesWritten;
     int pos;
     bool success = false;
-    char data[16 * 1024];
+    char data[32 * 1024];
 
     DEBUG(D_exec) DFMT("toFile=" << toFile << "; procName=" << procName);
 
@@ -311,7 +313,31 @@ ssize_t PipeExec::readProc(void *buf, size_t count) {
         count -= dataLen;
     }
 
-    return ::read(procs[0].readfd[READ_END], (char*)buf + dataLen, count); 
+    fd_set readSet;
+    FD_ZERO(&readSet);
+    FD_SET(procs[0].fd[READ_END], &readSet);
+
+    fd_set errorSet;
+    FD_ZERO(&errorSet);
+    FD_SET(procs[0].fd[READ_END], &errorSet);
+
+    struct timeval tv;
+    tv.tv_sec = timeoutSecs;
+    tv.tv_usec = 0;
+
+    int result = select(procs[0].fd[READ_END] + 1, NULL, &readSet, &errorSet, &tv);
+
+    if (result == 0) {
+        log("timeout on pipe read()");
+        throw MBException("timeout on pipe read()");
+    }
+    else
+        if (result == -1)
+            log(string("error on select() of pipe read: ") + strerror(errno));
+        else
+            return ::read(procs[0].readfd[READ_END], (char*)buf + dataLen, count); 
+
+    return 0;
 }
 
 
@@ -329,14 +355,23 @@ ssize_t PipeExec::writeProc(const void *buf, size_t count) {
     FD_SET(procs[0].fd[WRITE_END], &errorSet);
 
     struct timeval tv;
-    tv.tv_sec = 10;
+    tv.tv_sec = timeoutSecs;
     tv.tv_usec = 0;
 
     int result = select(procs[0].fd[WRITE_END] + 1, NULL, &writeSet, &errorSet, &tv);
 
-    while (count && ((bytesWritten = write(procs[0].fd[WRITE_END], (char*)buf + totalBytesWritten, count)) > 0)) {
-        count -= bytesWritten;
-        totalBytesWritten += bytesWritten;
+    if (result > 0)
+        while (count && ((bytesWritten = write(procs[0].fd[WRITE_END], (char*)buf + totalBytesWritten, count)) > 0)) {
+            count -= bytesWritten;
+            totalBytesWritten += bytesWritten;
+        }
+    else {
+        if (result == 0) {
+            log("timeout on pipe write()");
+            throw MBException("timeout on pipe write()");
+        }
+        else
+            log(string("error on select() of pipe write: ") + strerror(errno));
     }
 
     return totalBytesWritten;

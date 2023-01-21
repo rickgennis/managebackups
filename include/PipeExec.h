@@ -60,9 +60,10 @@ class PipeExec {
     string errorDir;
     string strBuf;
     char rawBuf[8*1024];
+    unsigned int timeoutSecs;
 
     public:
-        PipeExec(string cmd);
+        PipeExec(string cmd, unsigned int timeout = 0);
         ~PipeExec();
 
         /* execute(procName, leaveFinalOutput, noDestruct, noErrToDisk, noTmpCleanup)

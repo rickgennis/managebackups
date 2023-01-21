@@ -5,6 +5,7 @@
 #include "FaubCache.h"
 #include "faub.h"
 #include "PipeExec.h"
+#include "notify.h"
 #include "debug.h"
 #include "globals.h"
 
@@ -116,7 +117,7 @@ string newBackupDir(BackupConfig& config) {
 
 
 void fs_startServer(BackupConfig& config) {
-    PipeExec faub(config.settings[sFaub].value);
+    PipeExec faub(config.settings[sFaub].value, 60);
 
     if (GLOBALS.cli.count(CLI_NOBACKUP))
         return;
@@ -376,6 +377,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     log(config.ifTitle() + " " + message);
     NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message << endl;
 
+    notify(config, "\t• " + message + "\n", true);
+
     // silently cleanup any old faub caches for backups that are no longer around
     FaubEntry("");  
 }
@@ -443,7 +446,7 @@ void fc_sendFilesToServer(tcpSocket& server) {
 
 void fc_mainEngine(vector<string> paths) {
     try {
-        tcpSocket server(1); // setup socket library to use stdout
+        tcpSocket server(1, 60); // setup socket library to use stdout
         server.setReadFd(0); // and stdin
 
         for (auto it = paths.begin(); it != paths.end(); ++it) {
