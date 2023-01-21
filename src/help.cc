@@ -29,11 +29,14 @@ void showHelp(enum helpType kind) {
             string helpText = "managebackups [options]\n\n"
             + string(BOLDBLUE) + "EXECUTE A BACKUP" + string(RESET) + "\n"
             + "   --directory [dir]   Directory to save to and look for backups in\n"
-            + "   --cmd [command]     Command to take a backup; the backup result should be written to STDOUT.\n" 
+            + "   --cmd [command]     Command to take a single-file backup; the backup result should be written to STDOUT.\n" 
+            + "   --faub [command]    Command to take a faub-style backup; managebackups will be required on the remote server as well.\n"
             + "   --file [filename]   The base filename to save the backup to. The date and, optionally, time will automatically be inserted.\n"
             + "   --time              Include the time in the backup filename; also inserts the day into the subdirectory.\n"
-            + "   --mode [mode]       chmod newly created backups to this octatl mode (default 0600).\n"
-            + "   --minsize [size]    Backups less than this size are considered failures and discarded.\n"
+            + "   --mode [mode]       chmod newly created backups to this octal mode (default 0600).\n"
+            + "   --uid [uid]         chown newly created backups to this numeric UID.\n"
+            + "   --gid [gid]         chgrp newly created backups to this numeric GID.\n"
+            + "   --minsize [size]    Single-file backups less than this size are considered failures and discarded.\n"
             + "   --scp [dest]        SCP the new backup to the destination. Dest can include user@machine:/dir/dirs.\n"
             + "   --sftp [dest]       SFTP the new backup to the destination. Dest can include SCP details plus SFTP flags (like -P for port).\n"
             + "                       SCP & SFTP also support variable interpolation of these strings which will be sustituted with values\n"
@@ -527,6 +530,13 @@ directive from the profile\[cq]s config file.
 {both} Leave the output from any commands that are run to create a
 backup or SFTP one in a file under /tmp/managebackups_output.
 This can help facilitate diagnosing authentication errors.
+.TP
+\f[B]\[en]path\f[R] [\f[I]path\f[R]]
+{FB-remote} Specifies which directories to backup in a faub-style
+backup.
+This option is only used on the REMOTE end, i.e.\ the server being
+backed up.
+See the FAUB-STYLE BACKUPS section below.
 .SS 2. Pruning Options
 .TP
 \f[B]\[en]prune\f[R]
@@ -632,6 +642,147 @@ Commandline arguments are automatically persisted to a configuration
 file when both a profile name (\f[B]\[en]profile\f[R]) and
 \f[B]-save\f[R] are specified.
 Comments (#) are supported.
+.SH PERMISSIONS
+.PP
+Aside from access to read the files being backed up (on a remote server
+or locally) \f[B]managebackups\f[R] requires local write access for
+multiple tasks:
+.IP \[bu] 2
+writing to the log file (default /var/log/managebackups.log)
+.IP \[bu] 2
+writing its cache files (default /var/managebackups/caches)
+.IP \[bu] 2
+creating the local backup in the configured directory
+.IP \[bu] 2
+setting owners/groups/perms on faub-style backup files
+.PP
+The first three of these can be achieved by moving the log/cache/backup
+files into a directory that \f[B]managebackups\f[R] has write access to.
+Alternatively, \f[B]managebackups\f[R] can be made suid or sgid (see
+\f[B]\[en]install\f[R] and \f[B]\[en]installsuid\f[R]).
+The fourth permission issue has no workaround.
+If you wish to use faub-style backups \f[B]managebackups\f[R] needs to
+run as root either via \f[B]\[en]installsuid\f[R], sudo or via the root
+user.
+Without root access faub-style backups can be created but all files will
+have the same owner.
+.SH FAUB-STYLE BACKUPS
+.PP
+Faub-style backups require \f[B]managebackups\f[R] to be installed on
+both the backup server and the server being backed up.
+In most cases, both invocations will need to be run as root in order to
+replicate the file owners/groups/perms from one machine to the other.
+On the server side (the machine doing the backing up), the configuration
+will require:
+.IP \[bu] 2
+\f[B]\[en]directory\f[R]
+.IP \[bu] 2
+\f[B]\[en]faub\f[R]
+.PP
+\f[I]not\f[R] \f[B]\[en]command\f[R] or \f[B]\[en]file\f[R].
+The \f[B]\[en]faub\f[R] parameter is the remote (likely ssh) command
+that invokes \f[B]managebackups\f[R] on the machine to be backed up.
+The only parameter the remote invocation of \f[B]managebackups\f[R]
+requires is \f[B]\[en]path\f[R] to specify the directory to backup.
+\f[B]\[en]path\f[R] can be specified multiple times.
+For a more secure setup, create a new user on the machine that\[cq]s
+being backed up and only allow it to execute \f[B]managebackups\f[R]
+with the exact parameters required.
+For example, if you make `backupuser' on the remote `dataserver', you
+might include something like this in
+\[ti]backupuser/.ssh/authorized_keys2 on dataserver:
+.IP
+.nf
+\f[C]
+from=\[dq]192.168.0.0/24\[dq],command=\[dq]sudo managebackups --path /usr/local/bin\[dq] ssh-rsa........<user\[aq]s ssh key>
+\f[R]
+.fi
+.PP
+to backup /usr/local/bin, assuming your backup server is connecting from
+192.168.0.0/24 and you\[cq]ve allowed backupuser to sudo the command
+with NOPASSWD on dataserver.
+Then the \f[B]\[en]faub\f[R] parameter of your \f[B]managebackups\f[R]
+profile configuration could be as simple as:
+.IP
+.nf
+\f[C]
+--faub \[dq]ssh dataserver\[dq]
+\f[R]
+.fi
+.PP
+Without the authorized_keys2 file you\[cq]ll need the options in your
+faub config directly:
+.IP
+.nf
+\f[C]
+--faub \[dq]ssh dataserver sudo managebackups --path /usr/local/bin\[dq]
+\f[R]
+.fi
+.SH ENVIRONMENT VARIABLES
+.PP
+Environment variables are overriden by \f[B]\[en]user\f[R],
+\f[B]\[en]confdir\f[R], \f[B]\[en]cachedir\f[R], and
+\f[B]\[en]logdir\f[R].
+.TP
+\f[B]MB_CONFDIR\f[R]
+Directory to use for configuration files.
+See also \f[B]\[en]confdir\f[R].
+Defaults to /etc/managebackups.
+.TP
+\f[B]MB_CACHEDIR\f[R]
+Directory to use for cache files.
+See also \f[B]\[en]cachedir\f[R].
+Defaults to /var/managebackups/caches.
+.TP
+\f[B]MB_LOGDIR\f[R]
+Directory to use for logging.
+See also \f[B]\[en]logdir\f[R].
+Defaults to /var/log if writable by the process, otherwise the
+user\[cq]s home directory.
+.SH STATS OUTPUT
+.PP
+Example output from \f[B]managebackups -0\f[R]
+.IP
+.nf
+\f[C]
+Profile        Most Recent Backup           Finish\[at]   Duration  Size (Total)  Uniq (T)  Saved  Age Range
+desktop        desktop-20220403.tgz         08:46:19  00:00:50  199M (2.3G)   11 (21)     43%  [4 months, 3 days -> 33 minutes, 13 seconds]
+firewall_logs  firewall-logs-20220403.tbz2  08:58:39  00:13:11  268M (3.5G)   16 (16)      0%  [6 months, 4 days -> 20 minutes, 53 seconds]
+firewall_main  firewall-main-20220403.tgz   08:46:14  00:00:45  118M (1.7G)   21 (28)     29%  [11 months, 1 week -> 33 minutes, 18 seconds]
+icloud         icloud-drive-20220403.tbz2   02:51:29  00:26:40  2.3G (15.9G)  6 (7)        0%  [3 months, 2 days -> 6 hours, 28 minutes]
+laptop         laptop-details-20220403.tgz  08:45:39  00:00:10  8M (96M)      12 (16)     21%  [6 months, 4 days -> 33 minutes, 53 seconds]
+TOTALS                                                00:41:36  2.9G (23.4G)  66 (88)      9%  Saved 2.5G from 25.9G
+
+199G is the size of the most recent backup of the desktop profile.
+2.3G is the disk space used for all desktop profile backups.
+43% is the percentage saved in desktop profile backups due to hard linking.
+11 is the number of unique desktop profile backups.
+21 is the total number of desktop profile backups (meaning there are 10 dupes).
+
+2.9G is the total used for the most recent backup of all profiles (i.e. one of each).
+23.4G is the total used for all data together (all data managed by managebackups).
+25.9G is the total that would be used if there were no hard linking.
+All size/space numbers are actual used (thanks to hard linking), except for the 25.9G number.
+\f[R]
+.fi
+.PP
+Example output from \f[B]managebackups -1\f[R] specifically for a
+faub-style backup
+.IP
+.nf
+\f[C]
+January 2023                                           Size    Used    Dirs    SymLks  Mods    Duration  Type  Age
+/tmp/mybackups/2023/01/21/firewall-20230121\[at]15:25:03     2.6M    2.6M       0       0      1K  00:00:00  Day   1 hour, 32 minutes
+/tmp/mybackups/2023/01/21/firewall-20230121\[at]15:50:33     2.6M      84     242     723       1  00:00:01  Day   1 hour, 7 minutes
+/tmp/mybackups/2023/01/21/firewall-20230121\[at]16:57:39     2.6M      84     242     723       1  00:00:02  Day   5 seconds
+
+2.6M is the size of the backup (it\[aq]s data)
+84 bytes in the subsequent backups is the amount of disk actually used (due to hard linking)
+Dirs is the number of directories
+SymLks are the number of symlinks made - these equal the number of symlinks on the remote system being backed up
+Mods is the number of modified files in that backup compared to the previous backup
+\f[R]
+.fi
 .SH EXAMPLES
 .TP
 \f[B]managebackups \[en]profile homedirs \[en]directory /var/backups \[en]file homedirs.tgz \[en]cmd \[lq]tar -cz /home\[rq] \[en]weekly 2 \[en]notify me\[at]zmail.com \[en]prune \[en]save\f[R]
@@ -725,72 +876,6 @@ limit the output to a single profile.
 Show a one-line summary for each backup profile.
 The summary includes detail on the most recent backup as well as the
 number of backups, age ranges and total disk space.
-.SH PERMISSIONS
-.PP
-Aside from access to read the files being backed up (on a remote server
-or locally) \f[B]managebackups\f[R] requires local write access for
-multiple tasks: - writing to the log file (default
-/var/log/managebackups.log) - writing its cache files (default
-/var/managebackups/caches) - creating the local backup in the configured
-directory - setting owners/groups/perms on faub-style backup files
-.PP
-The first three of these can be achieved by moving the log/cache/backup
-files into a directory that \f[B]managebackups\f[R] has write access to.
-Alternatively, \f[B]managebackups\f[R] can be made suid or sgid (see
-\f[B]\[en]install\f[R] and \f[B]\[en]installsuid\f[R]).
-The fourth permission issue has no workaround.
-If you wish to use faub-style backups \f[B]managebackups\f[R] needs to
-run as root either via \f[B]\[en]installsuid\f[R], sudo or via the root
-user.
-Without root access faub-style backups can be created but all files will
-have the same owner.
-.SH ENVIRONMENT VARIABLES
-.PP
-Environment variables are overriden by \f[B]\[en]user\f[R],
-\f[B]\[en]confdir\f[R], \f[B]\[en]cachedir\f[R], and
-\f[B]\[en]logdir\f[R].
-.TP
-\f[B]MB_CONFDIR\f[R]
-Directory to use for configuration files.
-See also \f[B]\[en]confdir\f[R].
-Defaults to /etc/managebackups.
-.TP
-\f[B]MB_CACHEDIR\f[R]
-Directory to use for cache files.
-See also \f[B]\[en]cachedir\f[R].
-Defaults to /var/managebackups/caches.
-.TP
-\f[B]MB_LOGDIR\f[R]
-Directory to use for logging.
-See also \f[B]\[en]logdir\f[R].
-Defaults to /var/log if writable by the process, otherwise the
-user\[cq]s home directory.
-.SH STATS OUTPUT
-.PP
-Example output from \f[B]managebackups -0\f[R]
-.IP
-.nf
-\f[C]
-Profile        Most Recent Backup           Finish\[at]   Duration  Size (Total)  Uniq (T)  Saved  Age Range
-desktop        desktop-20220403.tgz         08:46:19  00:00:50  199M (2.3G)   11 (21)     43%  [4 months, 3 days -> 33 minutes, 13 seconds]
-firewall_logs  firewall-logs-20220403.tbz2  08:58:39  00:13:11  268M (3.5G)   16 (16)      0%  [6 months, 4 days -> 20 minutes, 53 seconds]
-firewall_main  firewall-main-20220403.tgz   08:46:14  00:00:45  118M (1.7G)   21 (28)     29%  [11 months, 1 week -> 33 minutes, 18 seconds]
-icloud         icloud-drive-20220403.tbz2   02:51:29  00:26:40  2.3G (15.9G)  6 (7)        0%  [3 months, 2 days -> 6 hours, 28 minutes]
-laptop         laptop-details-20220403.tgz  08:45:39  00:00:10  8M (96M)      12 (16)     21%  [6 months, 4 days -> 33 minutes, 53 seconds]
-TOTALS                                                00:41:36  2.9G (23.4G)  66 (88)      9%  Saved 2.5G from 25.9G
-
-199G is the size of the most recent backup of the desktop profile.
-2.3G is the disk space used for all desktop profile backups.
-43% is the percentage saved in desktop profile backups due to hard linking.
-11 is the number of unique desktop profile backups.
-21 is the total number of desktop profile backups (meaning there are 10 dupes).
-
-2.9G is the total used for the most recent backup of all profiles (i.e. one of each).
-23.4G is the total used for all data together (all data managed by managebackups).
-25.9G is the total that would be used if there were no hard linking.
-All size/space numbers are actual used (thanks to hard linking), except for the 25.9G number.
-\f[R]
-.fi
 .SH AUTHORS
 Rick Ennis.
 )END"); }

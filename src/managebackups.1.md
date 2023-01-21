@@ -176,6 +176,9 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 **--leaveoutput**
 : {both} Leave the output from any commands that are run to create a backup or SFTP one in a file under /tmp/managebackups_output. This can help facilitate diagnosing authentication errors.
 
+**--path** [*path*]
+: {FB-remote} Specifies which directories to backup in a faub-style backup.  This option is only used on the REMOTE end, i.e. the server being backed up. See the FAUB-STYLE BACKUPS section below. 
+
 ## 2. Pruning Options
 
 **--prune**
@@ -220,51 +223,33 @@ Rather than specifying the two settings individually, there's also a Failsafe Pa
 # PROFILE CONFIG FILES
 Profile configuration files are managed by **managebackups** though they can be edited by hand if that's easier than lengthy commandline arguments. Each profile equates to a .conf file under /etc/managebackups. Commandline arguments are automatically persisted to a configuration file when both a profile name (**--profile**) and **-save** are specified. Comments (#) are supported.
 
-# EXAMPLES
-**managebackups --profile homedirs --directory /var/backups --file homedirs.tgz --cmd "tar -cz /home" --weekly 2 --notify me@zmail.com --prune --save**
-: Create a gzipped backup of /home and store it in /var/backups/YYYY/MM/homedirs-YYYYMMDD.tgz. Override the weekly retention to 2 while keeping the daily, monthly and yearly settings at their defaults. This performs pruning and linking with their default settings and emails on failure. Because **--save** is include, all of the settings are associated with the homedirs profile, allowing the same command to be run again (or cron'd) simply as **managebackups -p homedirs**.
-
-**managebackups -p mymac --directory /opt/backups --file mymac.tgz --cmd "tar -cz /Users /var" --scp archiver@vaultserver:/mydata --time --notify "me@zmail.com, /usr/local/bin/push_alert_to_phone.sh" --save**
-: Create a gzipped backup of /Users and /var in /opt/backups/YYYY/MM/DD/mymac-YYYYMMDD-HH:MM:SS.tgz. Upon success copy the file to the vaultserver's /mydata directory. Upon failure notify me with email and via a script that pushes an alert to my phone.
-
-**managebackups -p mymac --daily 10 --prune --fp**
-: Re-run the mymac profile that was saved in the previous example with all of its options, but override the daily retention quota, effectively having **managebackups** delete dailies that are older than 10 days. Also include the Failsafe Paranoid check to make certain a recent backup was taken before removing any older files.  Because **--save** was not specified the **--daily 10** and paranoid setting are only for this run and don't become part of the mymac profile moving forward.
-
-**managebackups -p mymac -q**
-: Re-run the mymac profile with its last saved configuration (i.e. what's in example #2, not #3). Quiet mode disables all screen output except for errors.
-
-**managebackups -a -x**
-: Execute all currently defined profiles.  If the above examples had been run previously two profiles (homedirs & mymac) would have been defined, each with the associated parameters on their respective **--save** runs.  This **-a** invocation would run through each of those profiles sequentially performing the configured pruning, hard linking and backups. **-x** locks each profile as it runs (including "all") so that the same profile can't be kicked off again until this run has finished.
-
-**managebackups -a --nobackup**
-: Execute all currently defined profiles but don't perform backups -- only pruning and linking as configured within each profile.
-
-**managebackups --directory /opt/backups --file pegasus.tgz --cmd "ssh pegasus tar -czf - /home" --scp me@remoteserver:/var/backups/{subdir}/{file} --prune --fp**
-: Tar up /home from the pegasus server and store it in /opt/backups/YYYY/MM/pegasus-YYYYMMDD.tgz. Prune and link with default settings, though only prune if there's a recent backup (failsafe paranoid setting). On success SCP the backup to remoteserver.
-
-**managebackups --directory /my/backups --prune**
-: Prune (via default thresholds) and update links on all backups found in /my/backups. Without **--file** or **--command** no new backup is performed/taken. This can be used to manage backups that are performed by another tool entirely. Note: There may be profiles defined with different retention thresholds for a subset of files in /my/backups (i.e. files that match the **--file** setting); those retention thresholds would be ignored for this run because no **--profile** is specified.
-
-**managebackups -p mymac --recreate --test**
-: Recreate the mymac config file using the standard format. Previously existing comments and formatting is thrown away. The **-test** option skips all primary functions (no backups, pruning or linking is done) so only the config file is updated.
-
-**managebackups -p artemis --directory /opt/backups --faub "ssh artemis managebackups --path /usr/local/bin --path /etc" --prune --fp**
-: Take a new faub-style backup of server artemis' /etc and /usr/local/bin directories, saving them locally to /opt/backups.  Prune older copies of this backup that have aged out.  Note: faub-backups assume **managebackups** is installed on the remote (in this case artemis) server.
-
-**managebackups -1**
-: Show details of all backups taken that are associated with each profile. Additionally **-p** [*profile*] could be specified to limit the output to a single profile.
-
-**managebackups -0**
-: Show a one-line summary for each backup profile. The summary includes detail on the most recent backup as well as the number of backups, age ranges and total disk space.
-
 # PERMISSIONS
 Aside from access to read the files being backed up (on a remote server or locally) **managebackups** requires local write access for multiple tasks:
- - writing to the log file (default /var/log/managebackups.log)
- - writing its cache files (default /var/managebackups/caches)
- - creating the local backup in the configured directory
- - setting owners/groups/perms on faub-style backup files
+
+- writing to the log file (default /var/log/managebackups.log)
+- writing its cache files (default /var/managebackups/caches)
+- creating the local backup in the configured directory
+- setting owners/groups/perms on faub-style backup files
 
 The first three of these can be achieved by moving the log/cache/backup files into a directory that **managebackups** has write access to. Alternatively, **managebackups** can be made suid or sgid (see **--install** and **--installsuid**). The fourth permission issue has no workaround. If you wish to use faub-style backups **managebackups** needs to run as root either via **--installsuid**, sudo or via the root user.  Without root access faub-style backups can be created but all files will have the same owner.
+
+# FAUB-STYLE BACKUPS
+Faub-style backups require **managebackups** to be installed on both the backup server and the server being backed up.  In most cases, both invocations will need to be run as root in order to replicate the file owners/groups/perms from one machine to the other.  On the server side (the machine doing the backing up), the configuration will require:
+
+- **--directory**
+- **--faub**
+
+*not* **--command** or **--file**.  The **--faub** parameter is the remote (likely ssh) command that invokes **managebackups** on the machine to be backed up.  The only parameter the remote invocation of **managebackups** requires is **--path** to specify the directory to backup.  **--path** can be specified multiple times. For a more secure setup, create a new user on the machine that's being backed up and only allow it to execute **managebackups** with the exact parameters required.  For example, if you make 'backupuser' on the remote 'dataserver', you might include something like this in ~backupuser/.ssh/authorized_keys2 on dataserver:
+
+    from="192.168.0.0/24",command="sudo managebackups --path /usr/local/bin" ssh-rsa........<user's ssh key>
+
+to backup /usr/local/bin, assuming your backup server is connecting from 192.168.0.0/24 and you've allowed backupuser to sudo the command with NOPASSWD on dataserver. Then the **--faub** parameter of your **managebackups** profile configuration could be as simple as:
+
+    --faub "ssh dataserver"
+
+Without the authorized_keys2 file you'll need the options in your faub config directly:
+
+    --faub "ssh dataserver sudo managebackups --path /usr/local/bin"
 
 # ENVIRONMENT VARIABLES
 Environment variables are overriden by **--user**, **--confdir**, **--cachedir**, and **--logdir**.
@@ -302,3 +287,52 @@ Example output from **managebackups -0**
     All size/space numbers are actual used (thanks to hard linking), except for the 25.9G number.
 
 
+Example output from **managebackups -1** specifically for a faub-style backup
+
+    January 2023                                           Size    Used    Dirs    SymLks  Mods    Duration  Type  Age
+    /tmp/mybackups/2023/01/21/firewall-20230121@15:25:03     2.6M    2.6M       0       0      1K  00:00:00  Day   1 hour, 32 minutes
+    /tmp/mybackups/2023/01/21/firewall-20230121@15:50:33     2.6M      84     242     723       1  00:00:01  Day   1 hour, 7 minutes
+    /tmp/mybackups/2023/01/21/firewall-20230121@16:57:39     2.6M      84     242     723       1  00:00:02  Day   5 seconds
+
+    2.6M is the size of the backup (it's data)
+    84 bytes in the subsequent backups is the amount of disk actually used (due to hard linking)
+    Dirs is the number of directories
+    SymLks are the number of symlinks made - these equal the number of symlinks on the remote system being backed up
+    Mods is the number of modified files in that backup compared to the previous backup
+
+# EXAMPLES
+**managebackups --profile homedirs --directory /var/backups --file homedirs.tgz --cmd "tar -cz /home" --weekly 2 --notify me@zmail.com --prune --save**
+: Create a gzipped backup of /home and store it in /var/backups/YYYY/MM/homedirs-YYYYMMDD.tgz. Override the weekly retention to 2 while keeping the daily, monthly and yearly settings at their defaults. This performs pruning and linking with their default settings and emails on failure. Because **--save** is include, all of the settings are associated with the homedirs profile, allowing the same command to be run again (or cron'd) simply as **managebackups -p homedirs**.
+
+**managebackups -p mymac --directory /opt/backups --file mymac.tgz --cmd "tar -cz /Users /var" --scp archiver@vaultserver:/mydata --time --notify "me@zmail.com, /usr/local/bin/push_alert_to_phone.sh" --save**
+: Create a gzipped backup of /Users and /var in /opt/backups/YYYY/MM/DD/mymac-YYYYMMDD-HH:MM:SS.tgz. Upon success copy the file to the vaultserver's /mydata directory. Upon failure notify me with email and via a script that pushes an alert to my phone.
+
+**managebackups -p mymac --daily 10 --prune --fp**
+: Re-run the mymac profile that was saved in the previous example with all of its options, but override the daily retention quota, effectively having **managebackups** delete dailies that are older than 10 days. Also include the Failsafe Paranoid check to make certain a recent backup was taken before removing any older files.  Because **--save** was not specified the **--daily 10** and paranoid setting are only for this run and don't become part of the mymac profile moving forward.
+
+**managebackups -p mymac -q**
+: Re-run the mymac profile with its last saved configuration (i.e. what's in example #2, not #3). Quiet mode disables all screen output except for errors.
+
+**managebackups -a -x**
+: Execute all currently defined profiles.  If the above examples had been run previously two profiles (homedirs & mymac) would have been defined, each with the associated parameters on their respective **--save** runs.  This **-a** invocation would run through each of those profiles sequentially performing the configured pruning, hard linking and backups. **-x** locks each profile as it runs (including "all") so that the same profile can't be kicked off again until this run has finished.
+
+**managebackups -a --nobackup**
+: Execute all currently defined profiles but don't perform backups -- only pruning and linking as configured within each profile.
+
+**managebackups --directory /opt/backups --file pegasus.tgz --cmd "ssh pegasus tar -czf - /home" --scp me@remoteserver:/var/backups/{subdir}/{file} --prune --fp**
+: Tar up /home from the pegasus server and store it in /opt/backups/YYYY/MM/pegasus-YYYYMMDD.tgz. Prune and link with default settings, though only prune if there's a recent backup (failsafe paranoid setting). On success SCP the backup to remoteserver.
+
+**managebackups --directory /my/backups --prune**
+: Prune (via default thresholds) and update links on all backups found in /my/backups. Without **--file** or **--command** no new backup is performed/taken. This can be used to manage backups that are performed by another tool entirely. Note: There may be profiles defined with different retention thresholds for a subset of files in /my/backups (i.e. files that match the **--file** setting); those retention thresholds would be ignored for this run because no **--profile** is specified.
+
+**managebackups -p mymac --recreate --test**
+: Recreate the mymac config file using the standard format. Previously existing comments and formatting is thrown away. The **-test** option skips all primary functions (no backups, pruning or linking is done) so only the config file is updated.
+
+**managebackups -p artemis --directory /opt/backups --faub "ssh artemis managebackups --path /usr/local/bin --path /etc" --prune --fp**
+: Take a new faub-style backup of server artemis' /etc and /usr/local/bin directories, saving them locally to /opt/backups.  Prune older copies of this backup that have aged out.  Note: faub-backups assume **managebackups** is installed on the remote (in this case artemis) server.
+
+**managebackups -1**
+: Show details of all backups taken that are associated with each profile. Additionally **-p** [*profile*] could be specified to limit the output to a single profile.
+
+**managebackups -0**
+: Show a one-line summary for each backup profile. The summary includes detail on the most recent backup as well as the number of backups, age ranges and total disk space.
