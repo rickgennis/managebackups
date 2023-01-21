@@ -54,8 +54,13 @@ void FaubCache::restoreCache(string profileName) {
                         // regardless of the starting (baseDir) directory, we're only interested in subdirs
                         // exactly 2 levels lower because that's where our backups will live. e.g.
                         // baseDir = /tmp/backups then we're looking for things like /tmp/backups/2023/01.
+                        // or 3 levels lower if --time is used and hence we get a "day" subdir.
                         auto depth = count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes;
-                        if (depth == 3) {
+                        auto ps = pathSplit(currentDir);
+                        bool dirIsDay = (ps.file.length() == 2 && isdigit(ps.file[0]) && isdigit(ps.file[1]));
+                        bool entIsDay = (string(c_dirEntry->d_name).length() == 2 && isdigit(c_dirEntry->d_name[0]) && isdigit(c_dirEntry->d_name[1]));
+
+                        if (depth == 3 || (depth == 4 && dirIsDay)) {
                             // next we make sure the subdir matches our profile name
                             if (fullFilename.find(string("/") + profileName + "-") != string::npos) {
                                 // check for in process backups
@@ -111,7 +116,7 @@ void FaubCache::restoreCache(string profileName) {
                             }
                         }
 
-                        if (depth < 3)
+                        if (depth < 3 || (depth == 3 && entIsDay))
                             dirQueue.push(fullFilename);
                     }
                 }

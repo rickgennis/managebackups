@@ -34,12 +34,12 @@ class tcpSocket {
     char rawBuf[BUFFER_SIZE];
     
     public:
-        tcpSocket(int port, int backlog, unsigned int timeout = 0);
-        tcpSocket(string server, int port, unsigned int timeout = 0);
-        tcpSocket(int fd, unsigned int timeout = 0);
+        tcpSocket(int port, int backlog, unsigned int timeout = 120);
+        tcpSocket(string server, int port, unsigned int timeout = 120);
+        tcpSocket(int fd, unsigned int timeout = 120);
         ~tcpSocket();
 
-        tcpSocket accept(unsigned int timeout = 0);
+        tcpSocket accept(unsigned int timeout = 120);
 
         void setReadFd(int fd);
         size_t write(const void *data, size_t count);

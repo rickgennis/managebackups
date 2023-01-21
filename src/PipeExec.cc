@@ -315,17 +315,17 @@ ssize_t PipeExec::readProc(void *buf, size_t count) {
 
     fd_set readSet;
     FD_ZERO(&readSet);
-    FD_SET(procs[0].fd[READ_END], &readSet);
+    FD_SET(procs[0].readfd[READ_END], &readSet);
 
     fd_set errorSet;
     FD_ZERO(&errorSet);
-    FD_SET(procs[0].fd[READ_END], &errorSet);
+    FD_SET(procs[0].readfd[READ_END], &errorSet);
 
     struct timeval tv;
     tv.tv_sec = timeoutSecs;
     tv.tv_usec = 0;
 
-    int result = select(procs[0].fd[READ_END] + 1, NULL, &readSet, &errorSet, &tv);
+    int result = select(procs[0].readfd[READ_END] + 1, NULL, &readSet, &errorSet, &tv);
 
     if (result == 0) {
         log("timeout on pipe read()");

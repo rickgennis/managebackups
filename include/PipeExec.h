@@ -63,7 +63,7 @@ class PipeExec {
     unsigned int timeoutSecs;
 
     public:
-        PipeExec(string cmd, unsigned int timeout = 0);
+        PipeExec(string cmd, unsigned int timeout = 120);
         ~PipeExec();
 
         /* execute(procName, leaveFinalOutput, noDestruct, noErrToDisk, noTmpCleanup)

@@ -7,6 +7,8 @@
 #include <set>
 
 #include "BackupEntry.h"
+#include "FaubCache.h"   // for cmpName
+
 
 using namespace std;
 
@@ -14,7 +16,7 @@ class BackupCache {
     public:
         map<unsigned int, BackupEntry> rawData;
         map<string, set<unsigned int> > indexByMD5;
-        map<string, unsigned int> indexByFilename;
+        map<string, unsigned int, cmpName> indexByFilename;
         bool updated;
         string inProcess;
         string cacheFilename;

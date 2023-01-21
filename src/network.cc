@@ -43,22 +43,22 @@ tcpSocket::tcpSocket(int port, int backlog, unsigned int timeout) {
                 }
                 else {
                     socketFd = 0;
-                    throw(string("listen(server): ") + string(strerror(errno)));
+                    throw(MBException(string("listen(server): ") + strerror(errno)));
                 }
             }
             else {
                 socketFd = 0;
-                throw(string("bind(server): ") + string(strerror(errno)));
+                throw(MBException(string("bind(server): ") + string(strerror(errno))));
             }
         }
         else {
             socketFd = 0;
-            throw(string("setsockopt(server): ") + string(strerror(errno)));
+            throw(MBException(string("setsockopt(server): ") + string(strerror(errno))));
         }
     }
     else {
         socketFd = 0;
-        throw(string("socket(server): ") + string(strerror(errno)));
+        throw(MBException(string("socket(server): ") + string(strerror(errno))));
     }
 }
 
@@ -76,17 +76,17 @@ tcpSocket::tcpSocket(string server, int port, unsigned int timeout) {
                 return;
             else {
                 socketFd = 0;
-                throw(string("connect(client): ") + string(strerror(errno)));
+                throw(MBException(string("connect(client): ") + string(strerror(errno))));
             }
         }
         else {
             socketFd = 0;
-            throw(string("inet_pton(client): ") + string(strerror(errno)));
+            throw(MBException(string("inet_pton(client): ") + string(strerror(errno))));
         }
     }
     else {
         socketFd = 0;
-        throw(string("socket(client): ") + string(strerror(errno)));
+        throw(MBException(string("socket(client): ") + string(strerror(errno))));
     }
 }
 
@@ -124,7 +124,7 @@ tcpSocket tcpSocket::accept(unsigned int timeout) {
 
     int newFd;
     if ((newFd = ::accept(socketFd, (struct sockaddr*)&address, (socklen_t*)&addrlen)) > 0) {  
-        tcpSocket client(newFd);
+        tcpSocket client(newFd, timeout);
         return client; 
     }
 

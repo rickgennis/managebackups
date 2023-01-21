@@ -104,7 +104,7 @@ string newBackupDir(BackupConfig& config) {
 
     string setDir = config.settings[sDirectory].value;
     //strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d" : "%Y/%m", localtime(&rawTime));
-    strftime(buffer, sizeof(buffer), "%Y/%m", localtime(&rawTime));
+    strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d" : "%Y/%m", localtime(&rawTime));
     string subDir = buffer;
 
     strftime(buffer, sizeof(buffer), incTime ? "-%Y%m%d@%H:%M:%S" : "-%Y%m%d", localtime(&rawTime));
@@ -122,23 +122,11 @@ void fs_startServer(BackupConfig& config) {
     if (GLOBALS.cli.count(CLI_NOBACKUP))
         return;
 
-    try {
-        DEBUG(D_netproto) DFMT("executing: \"" << config.settings[sFaub].value << "\"");
-        faub.execute("faub", false, false, true);
-        string newDir = newBackupDir(config);
-        auto baseSlashes = count(config.settings[sDirectory].value.begin(), config.settings[sDirectory].value.end(), '/');
-        fs_serverProcessing(faub, config, mostRecentBackupDirSince(baseSlashes, config.settings[sDirectory].value, newDir, config.settings[sTitle].value), newDir);
-    }
-    catch (string s) {
-        cerr << "faub server caught internal exception: " << s << endl;
-        log("error: faub server caught internal exception: " + s);
-        exit(7);
-    }
-    catch (...) {
-        cerr << "faub server caught unknown exception" << endl;
-        log("error: faub server caught unknown exception");
-        exit(7);
-    }
+    DEBUG(D_netproto) DFMT("executing: \"" << config.settings[sFaub].value << "\"");
+    faub.execute("faub", false, false, true);
+    string newDir = newBackupDir(config);
+    auto baseSlashes = count(config.settings[sDirectory].value.begin(), config.settings[sDirectory].value.end(), '/');
+    fs_serverProcessing(faub, config, mostRecentBackupDirSince(baseSlashes, config.settings[sDirectory].value, newDir, config.settings[sTitle].value), newDir);
 }
 
 
