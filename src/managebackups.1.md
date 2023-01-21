@@ -11,26 +11,26 @@ managebackups - Take and manage backups
 # DESCRIPTION
 **managebackups** provides three functions that can be run independently or in combination:
 
-## Take Backups
+## 1. Take Backups
 Backups can be configured in one of two forms:
 
 - *Single file*:
 A single file backup is any of the standard Linux backup commands (tar, cpio, dump) that result in a single compressed file.  Given a backup command (tar, etc) **managebackups** will execute the command, saving the output to a file named with the current date (and optionally time).  By default the resulting filename will be of the form *directory*/YYYY/MM/*filename*-YYYYMMDD.*ext*.  When time is included the day of month is also added to the directory structure (*directory*/YYYY/MM/DD/*filename*-YYYYMMDD-HH::MM:SS.*ext*). Note: Without time included (**--time**) multiple backups on the same day taken with the same settings will overwrite each other resulting in a single backup for the day.  With time included each backup is saved separately.
 
 - *Faubackup*:
-Faub-style backups, similar to the underlying approach of Apple's Time Machine, backs up an entire directory tree to another location without compression. The initial copy is an exact replica of the source. Subsequent copies are made to new directories but are hard-linked back to files in the the previous backup if the data hasn't changed. In effect, you only use disk space for changes but get the advantage of fully traversable directory trees, which allows interrogation via any standard commandline tool. Each backup creates a new directory of the form *directory*/YYYY/MM/*profile*-YYYYMMDD. With the **--time** option @HH:MM:SS gets appended as well.
+Faub-style backups, similar to the underlying approach of Apple's Time Machine, backs up an entire directory tree to another location without compression. The initial copy is an exact replica of the source. Subsequent copies are made to new directories but are hard-linked back to files in the the previous backup if the data hasn't changed. In effect, you only use disk space for changes but get the advantage of fully traversable directory trees, which allows interrogation via any standard commandline tool. Each backup creates a new directory of the form *directory*/YYYY/MM/*profile*-YYYYMMDD. With the **--time** option @HH:MM:SS gets appended as well.  Note: Faub-style backups require that **managebackups** is also installed on the remote server that's being backed up.
 
-## Prune Backups
-**managebackups** deletes old backups that have aged out.  The aging critera is configured on a daily, weekly, monthly and yearly basis.  By default *managebackups* will keep 14 dailies, 4 weeklies, 6 monthlies and 2 yearly backups.
+## 2. Prune Backups
+**managebackups** deletes old backups that have aged out.  The retention critera is configured on a daily, weekly, monthly and yearly basis.  By default *managebackups* will keep 14 dailies, 4 weeklies, 6 monthlies and 2 yearly backups.
 
-## Hard Linking
-In setups where all backups are fulls, and therefore many are potentially identical, *managebackups* can save disk space by hard linking identical copies together.  This is done by default when identical copies are identified. 
+## 3. Hard Linking
+In configurations using a single file backup where all backups are fulls, and therefore many are potentially identical, *managebackups* can save disk space by hard linking identical copies together.  This is done by default when identical copies are identified. 
 
 # PROFILES
 Backup profiles are a collection of settings describing a backup set -- its directory to save backups to, the command to take the backups, how many weekly copies to keep, etc.  Once a profile is associated with a collection of options, all of those options are invoked when the profile is specified, unless an overriding option is also given.
 
 # OPTIONS
-Options are relative to the three functions of **managebackups**.
+Options are relative to the three functions of **managebackups** plus general options.
 
 ## 0. General Options
 **--help**
@@ -120,60 +120,61 @@ Options are relative to the three functions of **managebackups**.
 : The tripwire setting can be used as a rudimentary guard against ransomware or other encryption attacks. It can't protect your local backups but will both alert you immediately and stop processing (no pruning, linking or backing up) if the tripwire check fails.  The check is defined as a filename (or list of filenames) and their MD5 values. If any of the MD5s change, the check fails and the alert is triggered.  For example, if you're backing up /etc you can create a bogus test file such as /etc/tripdata.txt and then configure **managebackups** with **--tripwire "/etc/tripdata.txt: xxx"** where xxx is the correct MD5 of the file. Multiple entries can be separated with commas ("/etc/foo: xxx, /etc/fish: yyy, /usr/local/foo: zzz"). Only local computer tripwire files are supported at this time.
 
 ## 1. Take Backups Options
+Backups options are noted as {1F} for single-file applicable, {FB} for faub-backup applicable, or {both}.
 
 **--directory** [*directory*]
-: Store and look for backups in *directory*.
+: {both} Store and look for backups in *directory*.
 
 **--file** [*filename*]
-: Use *filename* as the base filename to create for new backups.  The date and optionally time are inserted before the extension, or if no extension, at the end.  A filename of mybackup.tgz will become mybackup-YYYYMMDD.tgz.
+: {1F} Use *filename* as the base filename to create for new backups.  The date and optionally time are inserted before the extension, or if no extension, at the end.  A filename of mybackup.tgz will become mybackup-YYYYMMDD.tgz.
 
 **-c**, **--command** [*cmd*]
-: Use *cmd* to perform a backup.  *cmd* should be double-quoted and may include as many pipes as desired. Have the command send the backed up data to its STDOUT.  For example, **--cmd** "tar -cz /mydata" or **--cmd** "/usr/bin/tar -c /opt | /usr/bin/gzip -n".
+: {1F} Use *cmd* to perform a backup.  *cmd* should be double-quoted and may include as many pipes as desired. Have the command send the backed up data to its STDOUT.  For example, **--cmd** "tar -cz /mydata" or **--cmd** "/usr/bin/tar -c /opt | /usr/bin/gzip -n".  **-c** is replaced with **--faub** in a faub-backup configuration.
 
 **--mode** [*mode*]
-: chmod newly created backups to *mode*, which is specified in octal. Defaults to 0600.
+: {1F} chmod newly created backups to *mode*, which is specified in octal. Defaults to 0600.
 
 **--uid** [*uid*]
-: chown newly created backups to *uid*, which is specified as an integer. Defaults to the effective executing user. Use 0 to specify the real executing user. For root, leave it unset and run as root. Note: This option only impacts single-file backups; with Faub-style backups files are set to the uid/gid of the remote system if possible (i.e. if run as root or suid), otherwise they remain owned by the executing user.
+: {1F} chown newly created backups to *uid*, which is specified as an integer. Defaults to the effective executing user. Use 0 to specify the real executing user. For root, leave it unset and run as root. Note: This option only impacts single-file backups; with Faub-style backups files are set to the uid/gid of the remote system if possible (i.e. if run as root or suid), otherwise they remain owned by the executing user.
 
 **--gid** [*gid*]
-: chgrp newly created backups to *gid*, which is specified as an integer. Defaults to the effective executing user's group. Note: This option only impacts single-file backups; with Faub-style backups files are set to the uid/gid of the remote system if possible (i.e. if run as root or suid), otherwise they remain owned by the executing user.
+: {1F} chgrp newly created backups to *gid*, which is specified as an integer. Defaults to the effective executing user's group. Note: This option only impacts single-file backups; with Faub-style backups files are set to the uid/gid of the remote system if possible (i.e. if run as root or suid), otherwise they remain owned by the executing user.
 
 **--time**
-: Include the time in the filename of the newly created backup.  The day of month will also be included in the subdirectory. Without time included multiple backups on the same day taken with the same settings will overwrite each other resulting in a single backup for the day. With time included each backup is saved separately.
+: {both} Include the time in the filename of the newly created backup.  The day of month will also be included in the subdirectory. Without time included multiple backups on the same day taken with the same settings will overwrite each other resulting in a single backup for the day. With time included each backup is saved separately.
 
 **--notify** [*contact1*,*contact2*,...]
-: Notify after a backup completes. By default, only failed backups/SFTP/SCP trigger notifications (see **--nos**). A contact can be an email address or the full path to a script to execute. Double-quote the contact string if it contains any spaces. The NOTIFICATIONS section below has more detail.
+: {both} Notify after a backup completes. By default, only failed backups/SFTP/SCP trigger notifications (see **--nos**). A contact can be an email address or the full path to a script to execute. Double-quote the contact string if it contains any spaces. The NOTIFICATIONS section below has more detail.
 
 **--notifyevery** [*count*]
-: For script notifications, in addition to the initial failure, notify every *count* failures as well.  See the NOTIFICATIONS section.
+: {both} For script notifications, in addition to the initial failure, notify every *count* failures as well.  See the NOTIFICATIONS section.
 
 **--nos**
-: Notify on successful backups also.
+: {both} Notify on successful backups also.
 
 **--mailfrom** [*address*]
-: Use *address* as the sending (i.e. "From") address for outgoing notify email. 
+: {both} Use *address* as the sending (i.e. "From") address for outgoing notify email. 
 
 **--scp** [*destination*]
-: On completion of a successful backup, SCP the newly created backup file to *destination*.  *destination* can include user@ notation and an optional hardcoded filename.  If filename is omitted the newly created date-based filename is used, the same as with a standard cp command. Additionally the strings {fulldir}, {subdir} and {filename} can be used; they'll be automatically replaced with the values relative to the newly created backup.
+: {1F} On completion of a successful backup, SCP the newly created backup file to *destination*.  *destination* can include user@ notation and an optional hardcoded filename.  If filename is omitted the newly created date-based filename is used, the same as with a standard cp command. Additionally the strings {fulldir}, {subdir} and {filename} can be used; they'll be automatically replaced with the values relative to the newly created backup.
 
 **--sftp** [*destination*]
-: On completion of a successful backup, SFTP the newly created backup file to *destination*. *destination* can include user@ notation, machine name and/or directory name. SFTP parameters (such as -P and others) can be included as well. Additionally the strings {fulldir}, {subdir} and {filename} can be used; they'll be automatically replaced with the values relative to the newly created backup. By default, a current year and month subdirectory will be created on the destination after connecting and then the file is "put" into that directory. Use a double-slash anywhere in the *destination* to disable creation and use of the YEAR/MONTH subdirectory structure on the destination server.  For example, **--sftp** "backupuser@vaultserver://data".
+: {1F} On completion of a successful backup, SFTP the newly created backup file to *destination*. *destination* can include user@ notation, machine name and/or directory name. SFTP parameters (such as -P and others) can be included as well. Additionally the strings {fulldir}, {subdir} and {filename} can be used; they'll be automatically replaced with the values relative to the newly created backup. By default, a current year and month subdirectory will be created on the destination after connecting and then the file is "put" into that directory. Use a double-slash anywhere in the *destination* to disable creation and use of the YEAR/MONTH subdirectory structure on the destination server.  For example, **--sftp** "backupuser@vaultserver://data".
 
 **--minsize** [*minsize*]
-: Use *minsize* as the minimum size of a valid backup. Backups created by **--command** that are less than *minsize* are considered failures and deleted. *minsize* is assumed to be in bytes unless a suffix is specified (K, M, G, T, P, E, Z, Y). The default *minsize* is 500.
+: {1F} Use *minsize* as the minimum size of a valid backup. Backups created by **--command** that are less than *minsize* are considered failures and deleted. *minsize* is assumed to be in bytes unless a suffix is specified (K, M, G, T, P, E, Z, Y). The default *minsize* is 500.
 
 **--minspace** [*minspace*]
-: Require *minspace* free space on the local disk (under **--directory**) before beginning a backup. *minspace* is assumed to be in bytes unless a suffix is specified (K, M, G, T, P, E, Z, Y).
+: {1F} Require *minspace* free space on the local disk (under **--directory**) before beginning a backup. *minspace* is assumed to be in bytes unless a suffix is specified (K, M, G, T, P, E, Z, Y).
 
 **--minsftpspace** [*minsftpspace*]
-: Require *minsftpspace* free space on the remote SFTP server before SFTPing a file. *minsftpspace* is assumed to be in bytes unless a suffix is specified (K, M, G, T, P, E, Z, Y).
+: {1F} Require *minsftpspace* free space on the remote SFTP server before SFTPing a file. *minsftpspace* is assumed to be in bytes unless a suffix is specified (K, M, G, T, P, E, Z, Y).
 
 **--nobackup**
-: Disable performing backups for this run. To disable permanently moving forward, remove the "command" directive from the profile's config file.
+: {both} Disable performing backups for this run. To disable permanently moving forward, remove the "command" directive from the profile's config file.
 
 **--leaveoutput**
-: Leave the output from any commands that are run to create a backup or SFTP one in a file under /tmp/managebackups_output. This can help facilitate diagnosing authentication errors.
+: {both} Leave the output from any commands that are run to create a backup or SFTP one in a file under /tmp/managebackups_output. This can help facilitate diagnosing authentication errors.
 
 ## 2. Pruning Options
 
@@ -198,7 +199,7 @@ Options are relative to the three functions of **managebackups**.
 ## 3. Linking Options
 
 **-l**, **--maxlinks** [*links*]
-: Use *links* as the maximum number of links for a backup. For example, if the max is set to 10 and there are 25 identical content backups on disk, the first 10 all share inodes (i.e. there's only one copy of that data on disk for those 10 backups), the next 10 share another set of inodes, and the final 5 share another set of inodes.  From a disk space and allocation perspective those 25 identical copies of data are taking up the space of 3 copies, not 25.  In effect, increasing **--maxlinks** saves disk space. But an accidental mis-edit to one of those files could damage more backups with a higher number. Set **--maxlinks** to 0 or 1 to disable linking. Defaults to 20. 
+: Use *links* as the maximum number of links for a backup. For example, if the max is set to 10 and there are 25 identical content backups on disk, the first 10 all share inodes (i.e. there's only one copy of that data on disk for those 10 backups), the next 10 share another set of inodes, and the final 5 share another set of inodes.  From a disk space and allocation perspective those 25 identical copies of data are taking up the space of 3 copies, not 25.  In effect, increasing **--maxlinks** saves disk space. But an accidental mis-edit to one of those files could damage more backups with a higher number. Set **--maxlinks** to 0 or 1 to disable linking. Defaults to 20.  Note: This options only applies to single-file backups.
 
 # NOTIFICATIONS
 **managebackups** can notify on success or failure of a backup via two methods: email or script. Multiple emails and/or scripts can be specified for the same profile.
@@ -246,6 +247,9 @@ Profile configuration files are managed by **managebackups** though they can be 
 
 **managebackups -p mymac --recreate --test**
 : Recreate the mymac config file using the standard format. Previously existing comments and formatting is thrown away. The **-test** option skips all primary functions (no backups, pruning or linking is done) so only the config file is updated.
+
+**managebackups -p artemis --directory /opt/backups --faub "ssh artemis managebackups --path /usr/local/bin --path /etc" --prune --fp**
+: Take a new faub-style backup of server artemis' /etc and /usr/local/bin directories, saving them locally to /opt/backups.  Prune older copies of this backup that have aged out.  Note: faub-backups assume **managebackups** is installed on the remote (in this case artemis) server.
 
 **managebackups -1**
 : Show details of all backups taken that are associated with each profile. Additionally **-p** [*profile*] could be specified to limit the output to a single profile.

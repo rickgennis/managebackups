@@ -154,7 +154,7 @@ managebackups - Take and manage backups
 .PP
 \f[B]managebackups\f[R] provides three functions that can be run
 independently or in combination:
-.SS Take Backups
+.SS 1. Take Backups
 .PP
 Backups can be configured in one of two forms:
 .IP \[bu] 2
@@ -186,18 +186,21 @@ standard commandline tool.
 Each backup creates a new directory of the form
 \f[I]directory\f[R]/YYYY/MM/\f[I]profile\f[R]-YYYYMMDD.
 With the \f[B]\[en]time\f[R] option \[at]HH:MM:SS gets appended as well.
-.SS Prune Backups
+Note: Faub-style backups require that \f[B]managebackups\f[R] is also
+installed on the remote server that\[cq]s being backed up.
+.SS 2. Prune Backups
 .PP
 \f[B]managebackups\f[R] deletes old backups that have aged out.
-The aging critera is configured on a daily, weekly, monthly and yearly
-basis.
+The retention critera is configured on a daily, weekly, monthly and
+yearly basis.
 By default \f[I]managebackups\f[R] will keep 14 dailies, 4 weeklies, 6
 monthlies and 2 yearly backups.
-.SS Hard Linking
+.SS 3. Hard Linking
 .PP
-In setups where all backups are fulls, and therefore many are
-potentially identical, \f[I]managebackups\f[R] can save disk space by
-hard linking identical copies together.
+In configurations using a single file backup where all backups are
+fulls, and therefore many are potentially identical,
+\f[I]managebackups\f[R] can save disk space by hard linking identical
+copies together.
 This is done by default when identical copies are identified.
 .SH PROFILES
 .PP
@@ -209,7 +212,8 @@ options are invoked when the profile is specified, unless an overriding
 option is also given.
 .SH OPTIONS
 .PP
-Options are relative to the three functions of \f[B]managebackups\f[R].
+Options are relative to the three functions of \f[B]managebackups\f[R]
+plus general options.
 .SS 0. General Options
 .TP
 \f[B]\[en]help\f[R]
@@ -387,32 +391,38 @@ Multiple entries can be separated with commas (\[lq]/etc/foo: xxx,
 /etc/fish: yyy, /usr/local/foo: zzz\[rq]).
 Only local computer tripwire files are supported at this time.
 .SS 1. Take Backups Options
+.PP
+Backups options are noted as {1F} for single-file applicable, {FB} for
+faub-backup applicable, or {both}.
 .TP
 \f[B]\[en]directory\f[R] [\f[I]directory\f[R]]
-Store and look for backups in \f[I]directory\f[R].
+{both} Store and look for backups in \f[I]directory\f[R].
 .TP
 \f[B]\[en]file\f[R] [\f[I]filename\f[R]]
-Use \f[I]filename\f[R] as the base filename to create for new backups.
+{1F} Use \f[I]filename\f[R] as the base filename to create for new
+backups.
 The date and optionally time are inserted before the extension, or if no
 extension, at the end.
 A filename of mybackup.tgz will become mybackup-YYYYMMDD.tgz.
 .TP
 \f[B]-c\f[R], \f[B]\[en]command\f[R] [\f[I]cmd\f[R]]
-Use \f[I]cmd\f[R] to perform a backup.
+{1F} Use \f[I]cmd\f[R] to perform a backup.
 \f[I]cmd\f[R] should be double-quoted and may include as many pipes as
 desired.
 Have the command send the backed up data to its STDOUT.
 For example, \f[B]\[en]cmd\f[R] \[lq]tar -cz /mydata\[rq] or
 \f[B]\[en]cmd\f[R] \[lq]/usr/bin/tar -c /opt | /usr/bin/gzip -n\[rq].
+\f[B]-c\f[R] is replaced with \f[B]\[en]faub\f[R] in a faub-backup
+configuration.
 .TP
 \f[B]\[en]mode\f[R] [\f[I]mode\f[R]]
-chmod newly created backups to \f[I]mode\f[R], which is specified in
-octal.
+{1F} chmod newly created backups to \f[I]mode\f[R], which is specified
+in octal.
 Defaults to 0600.
 .TP
 \f[B]\[en]uid\f[R] [\f[I]uid\f[R]]
-chown newly created backups to \f[I]uid\f[R], which is specified as an
-integer.
+{1F} chown newly created backups to \f[I]uid\f[R], which is specified as
+an integer.
 Defaults to the effective executing user.
 Use 0 to specify the real executing user.
 For root, leave it unset and run as root.
@@ -422,8 +432,8 @@ backups files are set to the uid/gid of the remote system if possible
 executing user.
 .TP
 \f[B]\[en]gid\f[R] [\f[I]gid\f[R]]
-chgrp newly created backups to \f[I]gid\f[R], which is specified as an
-integer.
+{1F} chgrp newly created backups to \f[I]gid\f[R], which is specified as
+an integer.
 Defaults to the effective executing user\[cq]s group.
 Note: This option only impacts single-file backups; with Faub-style
 backups files are set to the uid/gid of the remote system if possible
@@ -431,7 +441,7 @@ backups files are set to the uid/gid of the remote system if possible
 executing user.
 .TP
 \f[B]\[en]time\f[R]
-Include the time in the filename of the newly created backup.
+{both} Include the time in the filename of the newly created backup.
 The day of month will also be included in the subdirectory.
 Without time included multiple backups on the same day taken with the
 same settings will overwrite each other resulting in a single backup for
@@ -439,7 +449,7 @@ the day.
 With time included each backup is saved separately.
 .TP
 \f[B]\[en]notify\f[R] [\f[I]contact1\f[R],\f[I]contact2\f[R],\&...]
-Notify after a backup completes.
+{both} Notify after a backup completes.
 By default, only failed backups/SFTP/SCP trigger notifications (see
 \f[B]\[en]nos\f[R]).
 A contact can be an email address or the full path to a script to
@@ -448,20 +458,20 @@ Double-quote the contact string if it contains any spaces.
 The NOTIFICATIONS section below has more detail.
 .TP
 \f[B]\[en]notifyevery\f[R] [\f[I]count\f[R]]
-For script notifications, in addition to the initial failure, notify
-every \f[I]count\f[R] failures as well.
+{both} For script notifications, in addition to the initial failure,
+notify every \f[I]count\f[R] failures as well.
 See the NOTIFICATIONS section.
 .TP
 \f[B]\[en]nos\f[R]
-Notify on successful backups also.
+{both} Notify on successful backups also.
 .TP
 \f[B]\[en]mailfrom\f[R] [\f[I]address\f[R]]
-Use \f[I]address\f[R] as the sending (i.e.\ \[lq]From\[rq]) address for
-outgoing notify email.
+{both} Use \f[I]address\f[R] as the sending (i.e.\ \[lq]From\[rq])
+address for outgoing notify email.
 .TP
 \f[B]\[en]scp\f[R] [\f[I]destination\f[R]]
-On completion of a successful backup, SCP the newly created backup file
-to \f[I]destination\f[R].
+{1F} On completion of a successful backup, SCP the newly created backup
+file to \f[I]destination\f[R].
 \f[I]destination\f[R] can include user\[at] notation and an optional
 hardcoded filename.
 If filename is omitted the newly created date-based filename is used,
@@ -471,8 +481,8 @@ they\[cq]ll be automatically replaced with the values relative to the
 newly created backup.
 .TP
 \f[B]\[en]sftp\f[R] [\f[I]destination\f[R]]
-On completion of a successful backup, SFTP the newly created backup file
-to \f[I]destination\f[R].
+{1F} On completion of a successful backup, SFTP the newly created backup
+file to \f[I]destination\f[R].
 \f[I]destination\f[R] can include user\[at] notation, machine name
 and/or directory name.
 SFTP parameters (such as -P and others) can be included as well.
@@ -489,7 +499,7 @@ For example, \f[B]\[en]sftp\f[R]
 \[lq]backupuser\[at]vaultserver://data\[rq].
 .TP
 \f[B]\[en]minsize\f[R] [\f[I]minsize\f[R]]
-Use \f[I]minsize\f[R] as the minimum size of a valid backup.
+{1F} Use \f[I]minsize\f[R] as the minimum size of a valid backup.
 Backups created by \f[B]\[en]command\f[R] that are less than
 \f[I]minsize\f[R] are considered failures and deleted.
 \f[I]minsize\f[R] is assumed to be in bytes unless a suffix is specified
@@ -497,25 +507,25 @@ Backups created by \f[B]\[en]command\f[R] that are less than
 The default \f[I]minsize\f[R] is 500.
 .TP
 \f[B]\[en]minspace\f[R] [\f[I]minspace\f[R]]
-Require \f[I]minspace\f[R] free space on the local disk (under
+{1F} Require \f[I]minspace\f[R] free space on the local disk (under
 \f[B]\[en]directory\f[R]) before beginning a backup.
 \f[I]minspace\f[R] is assumed to be in bytes unless a suffix is
 specified (K, M, G, T, P, E, Z, Y).
 .TP
 \f[B]\[en]minsftpspace\f[R] [\f[I]minsftpspace\f[R]]
-Require \f[I]minsftpspace\f[R] free space on the remote SFTP server
+{1F} Require \f[I]minsftpspace\f[R] free space on the remote SFTP server
 before SFTPing a file.
 \f[I]minsftpspace\f[R] is assumed to be in bytes unless a suffix is
 specified (K, M, G, T, P, E, Z, Y).
 .TP
 \f[B]\[en]nobackup\f[R]
-Disable performing backups for this run.
+{both} Disable performing backups for this run.
 To disable permanently moving forward, remove the \[lq]command\[rq]
 directive from the profile\[cq]s config file.
 .TP
 \f[B]\[en]leaveoutput\f[R]
-Leave the output from any commands that are run to create a backup or
-SFTP one in a file under /tmp/managebackups_output.
+{both} Leave the output from any commands that are run to create a
+backup or SFTP one in a file under /tmp/managebackups_output.
 This can help facilitate diagnosing authentication errors.
 .SS 2. Pruning Options
 .TP
@@ -561,6 +571,7 @@ But an accidental mis-edit to one of those files could damage more
 backups with a higher number.
 Set \f[B]\[en]maxlinks\f[R] to 0 or 1 to disable linking.
 Defaults to 20.
+Note: This options only applies to single-file backups.
 .SH NOTIFICATIONS
 .PP
 \f[B]managebackups\f[R] can notify on success or failure of a backup via
@@ -697,6 +708,13 @@ Recreate the mymac config file using the standard format.
 Previously existing comments and formatting is thrown away.
 The \f[B]-test\f[R] option skips all primary functions (no backups,
 pruning or linking is done) so only the config file is updated.
+.TP
+\f[B]managebackups -p artemis \[en]directory /opt/backups \[en]faub \[lq]ssh artemis managebackups \[en]path /usr/local/bin \[en]path /etc\[rq] \[en]prune \[en]fp\f[R]
+Take a new faub-style backup of server artemis\[cq] /etc and
+/usr/local/bin directories, saving them locally to /opt/backups.
+Prune older copies of this backup that have aged out.
+Note: faub-backups assume \f[B]managebackups\f[R] is installed on the
+remote (in this case artemis) server.
 .TP
 \f[B]managebackups -1\f[R]
 Show details of all backups taken that are associated with each profile.

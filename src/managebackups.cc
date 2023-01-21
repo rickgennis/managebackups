@@ -81,7 +81,7 @@ void verifyTripwireParams(string param)
 }
 
 /*******************************************************************************
- * parseDirToCache(directory, fnamePattern, cache)
+ * parseDirToCache(directory, fnamePattern, cache, baseSlashes)
  *
  * Recursively walk the given directory looking for all files that match the
  * fnamePattern (all directories are considered, regardless of their name matching
@@ -95,7 +95,7 @@ void verifyTripwireParams(string param)
  *
  *  (c) if a file isn't in the cache create the entry and treat it as (b) above
  *******************************************************************************/
-void parseDirToCache(string directory, string fnamePattern, BackupCache &cache)
+void parseDirToCache(string directory, string fnamePattern, BackupCache &cache, int baseSlashes)
 {
     DIR *c_dir;
     struct dirent *c_dirEntry;
@@ -108,13 +108,21 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache)
             if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..")) continue;
 
             string fullFilename = slashConcat(directory, c_dirEntry->d_name);
+            auto slashDiff = count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes;
 
             ++GLOBALS.statsCount;
             struct stat statData;
             if (!stat(fullFilename.c_str(), &statData)) {
                 // recurse into subdirectories
                 if ((statData.st_mode & S_IFMT) == S_IFDIR) {
-                    parseDirToCache(fullFilename, fnamePattern, cache);
+
+                    // to avoid walking into any faub-style backup directories we only go 2 level deeper than
+                    // the starting directory (x/2023/01) or 3 levels deeper if the last subdir is a two-digit int
+                    // for day (x/2023/01/03).
+                    if (slashDiff < 3 ||
+                            (slashDiff == 3 && string(c_dirEntry->d_name).length() == 2 &&
+                             isdigit(c_dirEntry->d_name[0]) && isdigit(c_dirEntry->d_name[1])))
+                        parseDirToCache(fullFilename, fnamePattern, cache, baseSlashes);
                 }
                 else {
                     // filter for filename if specified
@@ -201,11 +209,11 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache)
  *******************************************************************************/
 void scanConfigToCache(BackupConfig &config)
 {
-    if (config.settings[sFaub].value.length()) return;
+    if (config.settings[sFaub].value.length()) 
+        return;
 
-    string directory = "";
     string fnamePattern = "";
-    if (config.settings[sDirectory].value.length()) directory = config.settings[sDirectory].value;
+    string directory = config.settings[sDirectory].value;
 
     // if there's a fnamePattern convert it into a wildcard version to match
     // backups with a date/time inserted.  i.e.
@@ -219,7 +227,8 @@ void scanConfigToCache(BackupConfig &config)
     else
         fnamePattern = DATE_REGEX;
 
-    parseDirToCache(directory, fnamePattern, config.cache);
+    auto baseSlashes = count(directory.begin(), directory.end(), '/');
+    parseDirToCache(directory, fnamePattern, config.cache, baseSlashes);
 }
 
 /*******************************************************************************
@@ -1755,11 +1764,13 @@ int main(int argc, char *argv[])
 
                 scanConfigToCache(*currentConfig);
                 if (performTripwire(*currentConfig)) {
+
+                    /* faub configurations */
                     if (currentConfig->settings[sFaub].value.length()) {
                         pruneBackups(*currentConfig);
                         fs_startServer(*currentConfig);
                     }
-                    else {
+                    else {  /* single file configurations */
                         pruneBackups(*currentConfig);
                         updateLinks(*currentConfig);
                         if (enoughLocalSpace(*currentConfig)) {
