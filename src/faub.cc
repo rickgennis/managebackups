@@ -437,7 +437,11 @@ void fc_mainEngine(vector<string> paths) {
         tcpSocket server(1, 60); // setup socket library to use stdout
         server.setReadFd(0); // and stdin
 
+        DEBUG(D_faub) DFMT("faub client starting with " << paths.size() << " request(s)");
+
         for (auto it = paths.begin(); it != paths.end(); ++it) {
+            log("faub client request for path: " + *it);
+
             server.write(string(*it + NET_DELIM).c_str());
 
             fc_scanToServer(*it, server);

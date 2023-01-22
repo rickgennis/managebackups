@@ -37,10 +37,8 @@ tcpSocket::tcpSocket(int port, int backlog, unsigned int timeout) {
             address.sin_port = htons(port);
 
             if (::bind(socketFd, (struct sockaddr*)&address, sizeof(address)) == 0) {
-                if (!listen(socketFd, backlog))  {
-                    cout << "[server] listening on *:" << port << endl;
+                if (!listen(socketFd, backlog)) 
                     return;
-                }
                 else {
                     socketFd = 0;
                     throw(MBException(string("listen(server): ") + strerror(errno)));
@@ -196,7 +194,7 @@ ssize_t tcpSocket::read(void *data, size_t count) {
     tv.tv_sec = timeoutSecs;
     tv.tv_usec = 0;
 
-    int result = select(targetFd + 1, NULL, &readSet, &errorSet, &tv);
+    int result = select(targetFd + 1, &readSet, NULL, &errorSet, &tv);
 
     if (result == 0) {
         log("timeout on socket read()");

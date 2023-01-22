@@ -34,9 +34,9 @@ class tcpSocket {
     char rawBuf[BUFFER_SIZE];
     
     public:
-        tcpSocket(int port, int backlog, unsigned int timeout = 120);
-        tcpSocket(string server, int port, unsigned int timeout = 120);
-        tcpSocket(int fd, unsigned int timeout = 120);
+        tcpSocket(int port, int backlog, unsigned int timeout);
+        tcpSocket(string server, int port, unsigned int timeout);
+        tcpSocket(int fd, unsigned int timeout);
         ~tcpSocket();
 
         tcpSocket accept(unsigned int timeout = 120);

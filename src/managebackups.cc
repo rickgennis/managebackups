@@ -392,7 +392,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
         currentConf = &configManager.configs[configManager.activeConfig];
     }
 
-    // user doesn't want to show stats & this isn't a faub client run via --paths
+    // user doesn't want to show stats & this isn't a faub client run via --path
     if (!GLOBALS.stats && !GLOBALS.cli.count(CLI_PATHS) &&
 
         // & the current profile (either via -p or full config spelled out in CLI) doesn't have a
