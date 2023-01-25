@@ -158,9 +158,8 @@ void FaubCache::recache(string dir) {
 DiskStats FaubCache::getTotalStats() {
     DiskStats ds;
 
-    for (auto &aBackup: backups) {
+    for (auto &aBackup: backups)
         ds += aBackup.second.ds;
-    }
 
     return ds;
 }

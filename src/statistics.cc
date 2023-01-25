@@ -67,9 +67,10 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         // set numeric stats
         auto ds = fcache.getTotalStats();
         resultStats.totalUsed = GLOBALS.useBlocks ? ds.sizeInBlocks : ds.sizeInBytes;
-        resultStats.totalSaved = GLOBALS.useBlocks ? ds.savedInBlocks : ds.savedInBlocks;
+        resultStats.totalSaved = GLOBALS.useBlocks ? ds.savedInBlocks : ds.savedInBytes;
         resultStats.numberOfBackups = resultStats.uniqueBackups = fcache.size();
-        resultStats.lastBackupBytes = GLOBALS.useBlocks ? fcache.getLastBackup()->second.ds.sizeInBlocks : fcache.getLastBackup()->second.ds.sizeInBytes;
+        resultStats.lastBackupBytes = GLOBALS.useBlocks ? fcache.getLastBackup()->second.ds.sizeInBlocks - fcache.getLastBackup()->second.ds.savedInBlocks 
+            : fcache.getLastBackup()->second.ds.sizeInBytes - fcache.getLastBackup()->second.ds.savedInBytes;
         resultStats.lastBackupTime = fcache.getLastBackup()->second.finishTime;
         resultStats.duration = fcache.getLastBackup()->second.duration;
         resultStats.inProcess = inProcessFilename.length() > 0;
@@ -87,7 +88,8 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
             pathSplit(fcache.getLastBackup()->first).file,
             fileTime,    
             seconds2hms(resultStats.duration),
-            (approximate(resultStats.lastBackupBytes, precisionLevel, statDetail > 2) + " (" + approximate(resultStats.totalUsed, precisionLevel, statDetail == 3) + ")"),
+            (approximate(resultStats.lastBackupBytes, precisionLevel, statDetail > 2) + 
+             " (" + approximate(resultStats.totalUsed - resultStats.totalSaved, precisionLevel, statDetail == 3) + ")"),
             (to_string(resultStats.uniqueBackups) + " (" + to_string(resultStats.numberOfBackups) + ")"),
             to_string(saved) + "%",
             fcache.getFirstBackup()->second.finishTime ? timeDiff(mktimeval(fcache.getFirstBackup()->second.finishTime)) : "?",

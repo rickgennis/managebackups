@@ -1395,7 +1395,7 @@ int main(int argc, char *argv[])
         string("k,") + CLI_CRONS, "Cron", cxxopts::value<bool>()->default_value("false"))(
         string("K,") + CLI_CRONP, "Cron", cxxopts::value<bool>()->default_value("false"))(
         string("h,") + CLI_HELP, "Show help", cxxopts::value<bool>()->default_value("false"))(
-        CLI_USEBLOCKS, "Use blocks disk usage", cxxopts::value<bool>()->default_value("false"))(
+        string("b,") + CLI_USEBLOCKS, "Use blocks disk usage", cxxopts::value<bool>()->default_value("false"))(
         CLI_FAUB, "Faub backup", cxxopts::value<std::string>())(
         CLI_PATHS, "Faub paths", cxxopts::value<std::vector<std::string>>())(
         CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))(
