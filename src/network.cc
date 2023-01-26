@@ -350,9 +350,11 @@ void tcpSocket::sendRawFile(fileInfo& fi) {
     FILE *dataf;
 
     if ((dataf = fopen(fi.filename.c_str(), "rb")) != NULL) {
+        cerr << "sendRawFile(" << fi.filename << ") size " << fi.size << endl;
         write(fi.size);
         auto readRemaining = fi.size;
         auto bufSize = sizeof(rawBuf);
+
         while (readRemaining) {
             size_t readSize = readRemaining < bufSize ? readRemaining : bufSize;
             auto bytesRead = fread(rawBuf, 1, readSize, dataf);

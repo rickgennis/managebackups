@@ -59,7 +59,7 @@ class PipeExec {
     bool dontCleanup;
     string errorDir;
     string strBuf;
-    char rawBuf[1024 * 64];
+    char rawBuf[1024 * 32];
     unsigned int timeoutSecs;
 
     public:

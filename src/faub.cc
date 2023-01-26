@@ -276,8 +276,9 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         */
         bool incTime = str2bool(config.settings[sIncTime].value);
         for (auto &file: neededFiles) {
-            DEBUG(D_netproto) DFMT("server waiting for " << file);
+            DEBUG(D_netproto) DFMTNOENDL("server waiting for " << file);
             auto fmode = client.readToFile(slashConcat(currentDir, file), !incTime);
+            DEBUG(D_netproto) DFMTNOPREFIX(" : got mode " << fmode);
 
             if (fmode == -1)
                 ++linkErrors;
@@ -471,8 +472,8 @@ void fc_sendFilesToServer(tcpSocket& server) {
 
 void fc_mainEngine(vector<string> paths) {
     try {
-        tcpSocket server(1, 60); // setup socket library to use stdout
-        server.setReadFd(0); // and stdin
+        tcpSocket server(1, 60);    // setup socket library to use stdout
+        server.setReadFd(0);        // and stdin
 
         DEBUG(D_faub) DFMT("faub client starting with " << paths.size() << " request(s)");
 

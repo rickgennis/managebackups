@@ -246,7 +246,7 @@ bool PipeExec::execute2file(string toFile, string procName) {
     int bytesWritten;
     int pos;
     bool success = false;
-    char data[64 * 1024];
+    char data[32 * 1024];
 
     DEBUG(D_exec) DFMT("toFile=" << toFile << "; procName=" << procName);
 
@@ -275,7 +275,7 @@ bool PipeExec::execute2file(string toFile, string procName) {
 
 void PipeExec::readAndTrash() {
     int bytesRead;
-    char buffer[64 * 1024];
+    char buffer[32 * 1024];
 
     while ((bytesRead = readProc(&buffer, sizeof(buffer))));
         // throw away bytes read until fd is closed on the other end
@@ -284,7 +284,7 @@ void PipeExec::readAndTrash() {
 
 bool PipeExec::readAndMatch(string matchStr) {
     int bytesRead;
-    char buffer[64 * 1024 + 1];
+    char buffer[32 * 1024 + 1];
     bool found = false;
 
     while ((bytesRead = readProc(&buffer, sizeof(buffer) - 1))) {
@@ -620,6 +620,7 @@ int PipeExec::readToFile(string filename, bool preDelete) {
         struct utimbuf timeBuf;
         timeBuf.actime = timeBuf.modtime = mtime;
         utime(filename.c_str(), &timeBuf);
+        DEBUG(D_netproto) cerr << " [" << bytesRemaining << " remaining of " << totalBytes << "]" << flush;
         return mode;
     }
 
