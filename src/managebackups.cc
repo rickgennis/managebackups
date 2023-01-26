@@ -101,7 +101,6 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache, 
     struct dirent *c_dirEntry;
     Pcre fnameRE(fnamePattern);
     Pcre tempRE("\\.tmp\\.\\d+$");
-    bool testMode = GLOBALS.cli.count(CLI_TEST);
 
     if ((c_dir = opendir(directory.c_str())) != NULL) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
@@ -590,10 +589,10 @@ void pruneBackups(BackupConfig &config)
                                      << fb << " required) in the last " << fd << " day" << s(fd));
     }
 
+    /* safety checks complete - begin pruning */
+
     if (config.settings[sFaub].value.length()) 
         return pruneFaubBackups(config);
-
-    /* safety checks complete - begin pruning */
 
     set<string> changedMD5s;
     DEBUG(D_prune) DFMT("weeklies set to dow " << dw(config.settings[sDOW].ivalue()));
@@ -1396,8 +1395,8 @@ int main(int argc, char *argv[])
         string("K,") + CLI_CRONP, "Cron", cxxopts::value<bool>()->default_value("false"))(
         string("h,") + CLI_HELP, "Show help", cxxopts::value<bool>()->default_value("false"))(
         string("b,") + CLI_USEBLOCKS, "Use blocks disk usage", cxxopts::value<bool>()->default_value("false"))(
+        string("s,") + CLI_PATHS, "Faub paths", cxxopts::value<std::vector<std::string>>())(
         CLI_FAUB, "Faub backup", cxxopts::value<std::string>())(
-        CLI_PATHS, "Faub paths", cxxopts::value<std::vector<std::string>>())(
         CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))(
         CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))(
         CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())(CLI_FS_DAYS, "Failsafe Days",
@@ -1518,17 +1517,19 @@ int main(int argc, char *argv[])
     }
 
     if ((GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR) ||
-         GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)) &&
+        GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)) &&
         GLOBALS.cli.count(CLI_PROFILE)) {
         SCREENERR("error: all, cron and profile are mutually-exclusive options");
         exit(1);
     }
 
-    if ((GLOBALS.cli.count(CLI_DIR) || GLOBALS.cli.count(CLI_FAUB)) &&
-        GLOBALS.cli.count(CLI_PATHS)) {
-        SCREENERR(
-            "error: --directory and --faub are mutually-exclusive with --paths.  --paths is only "
-            "used in the configuration of the remote command");
+    if (GLOBALS.cli.count(CLI_PATHS) &&
+        (GLOBALS.cli.count(CLI_DIR) || GLOBALS.cli.count(CLI_FAUB) ||
+        GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR) ||
+        GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ||
+        GLOBALS.cli.count(CLI_PROFILE) || GLOBALS.cli.count(CLI_FILE) || GLOBALS.cli.count(CLI_COMMAND) ||
+        GLOBALS.cli.count(CLI_SAVE) || GLOBALS.cli.count(CLI_SCPTO) || GLOBALS.cli.count(CLI_SFTPTO))) {
+        SCREENERR("error: --path (or -s) is mutually-exclusive with all other options");
         exit(1);
     }
 

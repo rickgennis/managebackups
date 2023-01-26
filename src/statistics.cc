@@ -23,7 +23,6 @@ string oldMessage = ">24H old";
  * easy display (stringOutput).
  */
 struct summaryStats {
-    //bool success;
     bool inProcess;
     unsigned long lastBackupBytes;
     time_t lastBackupTime;
@@ -35,7 +34,6 @@ struct summaryStats {
     string stringOutput[NUMSTATDETAILS] = {"", "(no backups found)", "-", "00:00:00", "0", "0", "0%"};
 
     summaryStats() {
-        //success = 
         inProcess = false;
         lastBackupBytes = totalUsed = totalSaved = numberOfBackups = uniqueBackups = duration = 0;
     }
@@ -69,12 +67,10 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         resultStats.totalUsed = GLOBALS.useBlocks ? ds.sizeInBlocks : ds.sizeInBytes;
         resultStats.totalSaved = GLOBALS.useBlocks ? ds.savedInBlocks : ds.savedInBytes;
         resultStats.numberOfBackups = resultStats.uniqueBackups = fcache.size();
-        resultStats.lastBackupBytes = GLOBALS.useBlocks ? fcache.getLastBackup()->second.ds.sizeInBlocks - fcache.getLastBackup()->second.ds.savedInBlocks 
-            : fcache.getLastBackup()->second.ds.sizeInBytes - fcache.getLastBackup()->second.ds.savedInBytes;
+        resultStats.lastBackupBytes = GLOBALS.useBlocks ? fcache.getLastBackup()->second.ds.sizeInBlocks : fcache.getLastBackup()->second.ds.sizeInBytes;
         resultStats.lastBackupTime = fcache.getLastBackup()->second.finishTime;
         resultStats.duration = fcache.getLastBackup()->second.duration;
         resultStats.inProcess = inProcessFilename.length() > 0;
-        //resultStats.success = true;
 
         // set string stats
         auto t = localtime(&resultStats.lastBackupTime);
@@ -166,7 +162,6 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         resultStats.lastBackupTime = last_it->second.mtime;
     }
 
-    //resultStats.success = true;
     return resultStats;
 }
 

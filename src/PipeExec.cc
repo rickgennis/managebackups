@@ -246,7 +246,7 @@ bool PipeExec::execute2file(string toFile, string procName) {
     int bytesWritten;
     int pos;
     bool success = false;
-    char data[32 * 1024];
+    char data[64 * 1024];
 
     DEBUG(D_exec) DFMT("toFile=" << toFile << "; procName=" << procName);
 
@@ -275,7 +275,7 @@ bool PipeExec::execute2file(string toFile, string procName) {
 
 void PipeExec::readAndTrash() {
     int bytesRead;
-    char buffer[1024*8];
+    char buffer[64 * 1024];
 
     while ((bytesRead = readProc(&buffer, sizeof(buffer))));
         // throw away bytes read until fd is closed on the other end
@@ -284,7 +284,7 @@ void PipeExec::readAndTrash() {
 
 bool PipeExec::readAndMatch(string matchStr) {
     int bytesRead;
-    char buffer[1024*2+1];
+    char buffer[64 * 1024 + 1];
     bool found = false;
 
     while ((bytesRead = readProc(&buffer, sizeof(buffer) - 1))) {
@@ -524,7 +524,7 @@ string firstAvailIDForDir(string dir) {
 }
 
 
-bool PipeExec::readToFile(string filename, bool preDelete) {
+int PipeExec::readToFile(string filename, bool preDelete) {
     long uid = readProc();
     long gid = readProc();
     long mode = readProc();
@@ -545,7 +545,7 @@ bool PipeExec::readToFile(string filename, bool preDelete) {
         timeBuf.actime = timeBuf.modtime = mtime;
         utime(filename.c_str(), &timeBuf);
 
-        return true;
+        return mode;
     }
 
     // handle symlinks
@@ -560,7 +560,7 @@ bool PipeExec::readToFile(string filename, bool preDelete) {
 
         if (symlink(target, filename.c_str())) {
             showError("error: unable to create symlink (" + filename + "): " + strerror(errno));
-            return false;
+            return -1;
         }
 
         if (lchown(filename.c_str(), uid, gid))
@@ -571,7 +571,7 @@ bool PipeExec::readToFile(string filename, bool preDelete) {
         tv[0].tv_usec = tv[1].tv_usec = 0;
         lutimes(filename.c_str(), tv);
 
-        return true;
+        return mode;
     }
 
     // handle directories that are inherent in the filename
@@ -620,10 +620,10 @@ bool PipeExec::readToFile(string filename, bool preDelete) {
         struct utimbuf timeBuf;
         timeBuf.actime = timeBuf.modtime = mtime;
         utime(filename.c_str(), &timeBuf);
-        return true;
+        return mode;
     }
 
-    return false;
+    return -2;
 }
 
 

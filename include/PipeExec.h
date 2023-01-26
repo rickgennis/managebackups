@@ -59,7 +59,7 @@ class PipeExec {
     bool dontCleanup;
     string errorDir;
     string strBuf;
-    char rawBuf[8*1024];
+    char rawBuf[1024 * 64];
     unsigned int timeoutSecs;
 
     public:
@@ -93,9 +93,9 @@ class PipeExec {
 
         void readAndTrash();
         bool readAndMatch(string matchStr);
-        string statefulReadAndMatchRegex(string regex, int buffSize = 1024 * 2);
+        string statefulReadAndMatchRegex(string regex, int buffSize = 1024 * 32);
         string readTo(string delimiter);
-        bool readToFile(string filename, bool preDelete = false);
+        int readToFile(string filename, bool preDelete = false);
         
         string errorOutput();
         void flushErrors();

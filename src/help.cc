@@ -346,9 +346,11 @@ Quiet mode is to minimize output; useful for cron invocations where
 important messages will be seen in the log or via \f[B]\[en]notify\f[R].
 .TP
 \f[B]-b\f[R], \f[B]\[en]blocks\f[R]
-By default all size values are displayed in bytes (KB, MB, GB, etc).
+By default faub backup size values are displayed in bytes (KB, MB, GB,
+etc).
 Use \f[B]\[en]blocks\f[R] to instead display disk usage in terms of
 blocks, like the the `du' command.
+This is only relevant for faub-style backups.
 .TP
 \f[B]\[en]confdir\f[R] [\f[I]dir\f[R]]
 Use \f[I]dir\f[R] for all configuration files.
@@ -536,7 +538,7 @@ directive from the profile\[cq]s config file.
 backup or SFTP one in a file under /tmp/managebackups_output.
 This can help facilitate diagnosing authentication errors.
 .TP
-\f[B]\[en]path\f[R] [\f[I]path\f[R]]
+\f[B]-s\f[R], \f[B]\[en]path\f[R] [\f[I]path\f[R]]
 {FB-remote} Specifies which directories to backup in a faub-style
 backup.
 This option is only used on the REMOTE end, i.e.\ the server being
@@ -750,34 +752,24 @@ Example output from \f[B]managebackups -0\f[R]
 .IP
 .nf
 \f[C]
-Profile        Most Recent Backup               Finish\[at]   Duration  Size (Total)  Uniq (T)  Saved  Age Range
-desktop        desktop-20220403.tgz             08:46:19  00:00:50  199M (2.3G)   11 (21)     43%  [4 months, 3 days -> 33 minutes, 13 seconds]
-#firewall_faub  firewall-faub-20230125\[at]11:20:02  11:20:07  00:00:05  2.6M (52.2M)  20 (20)     66%  [4 days, 2 hours -> 2 hours, 9 minutes]
-firewall_logs  firewall-logs-20220403.tbz2      08:58:39  00:13:11  268M (3.5G)   16 (16)      0%  [6 months, 4 days -> 20 minutes, 53 seconds]
-firewall_main  firewall-main-20220403.tgz       08:46:14  00:00:45  118M (1.7G)   21 (28)     29%  [11 months, 1 week -> 33 minutes, 18 seconds]
-icloud         icloud-drive-20220403.tbz2       02:51:29  00:26:40  2.3G (15.9G)  6 (7)        0%  [3 months, 2 days -> 6 hours, 28 minutes]
-laptop         laptop-details-20220403.tgz      08:45:39  00:00:10  8M (96M)      12 (16)     21%  [6 months, 4 days -> 33 minutes, 53 seconds]
-TOTALS                                                    00:41:41  2.9G (23.4G)  86 (108)     9%  Saved 2.5G from 25.9G
+Profile        Most Recent Backup           Finish\[at]   Duration  Size (Total)     Uniq (T)  Saved  Age Range
+desktop        desktop-20230125.tgz         17:20:43  00:00:38  229.3M (4.0G)    18 (22)     18%  [6 months, 4 weeks -> 5 hours, 35 minutes]
+firewall_logs  firewall-logs-20230125.tbz2  17:30:36  00:10:32  227.3M (3.4G)    14 (14)      0%  [1 year, 3 weeks -> 5 hours, 26 minutes]
+firewall_main  firewall-main-20230125.tgz   17:21:01  00:00:57  188.7M (3.6G)    21 (27)     24%  [1 year, 3 weeks -> 5 hours, 35 minutes]
+fw_faub        fw_faub-20230125\[at]22:23:35    22:23:40  00:00:04  777.4M (777.4M)  5 (5)       44%  [40 minutes, 25 seconds -> 32 minutes, 58 seconds]
+icloud         icloud-drive-20230125.tbz2   17:38:17  00:18:13  2.3G (16.0G)     7 (9)       22%  [1 year, 3 weeks -> 5 hours, 18 minutes]
+laptop         laptop-details-20230125.tgz  17:20:06  00:00:02  4.6M (86.8M)     19 (25)     22%  [1 year, 3 weeks -> 5 hours, 36 minutes]
+TOTALS                                                00:30:26  3.7G (30.8G)     84 (102)    24%  Saved 9.6G from 40.4G
 
-Profile        Most Recent Backup               Finish\[at]   Duration  Size (Total)   Uniq (T)   Saved  Age Range
-desktop        desktop-20230125.tgz             17:20:43  00:00:38  229.3M (4.0G)  18 (22)      18%  [6 months, 4 weeks -> 22 minutes, 2 seconds]
-firewall_faub  firewall-faub-20230125\[at]17:20:04  17:20:11  00:00:07  99K (5.5M)     22 (22)      47%  [4 days, 6 hours -> 22 minutes, 34 seconds]
-firewall_logs  firewall-logs-20230125.tbz2      17:30:36  00:10:32  227.3M (3.4G)  14 (14)       0%  [1 year, 3 weeks -> 12 minutes, 9 seconds]
-firewall_main  firewall-main-20230125.tgz       17:21:01  00:00:57  188.7M (3.6G)  21 (27)      24%  [1 year, 3 weeks -> 21 minutes, 44 seconds]
-icloud         icloud-drive-20230125.tbz2       17:38:17  00:18:13  2.3G (16.0G)   7 (9)        22%  [1 year, 3 weeks -> 4 minutes, 28 seconds]
-laptop         laptop-details-20230125.tgz      17:20:06  00:00:02  4.6M (86.8M)   19 (25)      22%  [1 year, 3 weeks -> 22 minutes, 39 seconds]
-TOTALS                                                    00:30:29  2.9G (27.0G)   101 (119)    20%  Saved 6.7G from 33.7G
-
-229.3M is the size of the most recent backup of the desktop profile.
-4.0G is the disk space used for all desktop profile backups.
+229.3M is the data size of the most recent backup of the desktop profile (as if there were no hard linking).
+4.0G is the actual disk space used for all desktop profile backups (with hard linking).
 18% is the percentage saved in desktop profile backups due to hard linking.
 18 is the number of unique desktop profile backups (only significant for single-file backups; not faub).
 22 is the total number of desktop profile backups (meaning there are 4 dupes).
 
-2.9G is the total used for the most recent backup of all profiles (i.e. one of each).
-27.0G is the total used for all data together (all data managed by managebackups).
-33.7G is the total that would be used if there were no hard linking.
-All size/space numbers are actual used (thanks to hard linking), except for the 33.7G number.
+3.7G is the total used for the most recent backup of all profiles (i.e. one of each, as if no hard linking).
+30.8G is the total used for all data managed by managebackups together (with hard linking).
+40.4G is the total that would be used if there were no hard linking.
 \f[R]
 .fi
 .PP

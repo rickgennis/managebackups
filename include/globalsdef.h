@@ -13,6 +13,9 @@
 
 
 #define DFMT(x) cerr << BOLDGREEN << __FUNCTION__ << ": " << RESET << GREEN << x << RESET << endl
+#define DFMTNOENDL(x) cerr << BOLDGREEN << __FUNCTION__ << ": " << RESET << GREEN << x << RESET
+#define DFMTNOPREFIX(x) cerr << GREEN << x << RESET << endl
+
 #define NOTQUIET (!(GLOBALS.cli.count(CLI_QUIET) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)))
 #define ANIMATE (!GLOBALS.cli.count(CLI_ZERO))
 #define SCREENERR(x) cerr << RED << x << RESET << endl;

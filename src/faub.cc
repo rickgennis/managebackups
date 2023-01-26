@@ -44,6 +44,7 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
     if (matchSpec.search(backupDir)) {
 
         if (!stat(backupDir.c_str(), &statData)) {
+            DEBUG(D_faub) DFMT("returning " << backupDir);
             return {backupDir, statData.st_mtime};
         }
 
@@ -63,7 +64,9 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
                 if (S_ISDIR(statData.st_mode)) {
                     auto slashDiff = count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes;
 
-                    if (slashDiff < 3) {
+                    if (slashDiff < 3 || (slashDiff == 3 && 
+                                string(c_dirEntry->d_name).length() == 2 && isdigit(c_dirEntry->d_name[0]) && isdigit(c_dirEntry->d_name[1]))) {
+                        DEBUG(D_faub) DFMT("recursing into " << fullFilename);
                         auto [fname, fmtime] = mostRecentBackupDirSinceInternal(baseSlashes, fullFilename, sinceTime, profileName);
                         if ((fmtime > recentTime) && ((fmtime < sinceTime) || !sinceTime)) {
                             recentTime = fmtime;
@@ -71,11 +74,13 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
                         }
                     }
                     
-                    if (slashDiff == 3) {
+                    if (slashDiff > 2 && slashDiff < 5) {
                         // next we make sure the subdir matches our profile name
                         if (fullFilename.find(profileName) != string::npos) {
+                            DEBUG(D_faub) DFMT("name match on " << fullFilename << ", checking times");
                            
                             if ((statData.st_mtime > recentTime) && ((statData.st_mtime < sinceTime) || !sinceTime)) {
+                                DEBUG(D_faub) DFMT("valid times on " << fullFilename << ", noting");
                                 recentTime = statData.st_mtime;
                                 recentName = fullFilename;
                             }
@@ -122,11 +127,20 @@ void fs_startServer(BackupConfig& config) {
     if (GLOBALS.cli.count(CLI_NOBACKUP))
         return;
 
+    auto baseSlashes = count(config.settings[sDirectory].value.begin(), config.settings[sDirectory].value.end(), '/');
+    string newDir = newBackupDir(config);
+    string prevDir = mostRecentBackupDirSince(baseSlashes, config.settings[sDirectory].value, newDir, config.settings[sTitle].value);
+
+    if (GLOBALS.cli.count(CLI_TEST)) {
+        cout << YELLOW << config.ifTitle() << " TESTMODE: would have begun backup by executing \"" << config.settings[sFaub].value << "\"" << endl;
+        cout << "saving to " << newDir << endl;
+        cout << "comparing to previous " << prevDir << RESET << endl;
+        return;
+    }
+
     DEBUG(D_netproto) DFMT("executing: \"" << config.settings[sFaub].value << "\"");
     faub.execute("faub", false, false, true);
-    string newDir = newBackupDir(config);
-    auto baseSlashes = count(config.settings[sDirectory].value.begin(), config.settings[sDirectory].value.end(), '/');
-    fs_serverProcessing(faub, config, mostRecentBackupDirSince(baseSlashes, config.settings[sDirectory].value, newDir, config.settings[sTitle].value), newDir);
+    fs_serverProcessing(faub, config, prevDir, newDir);
 }
 
 
@@ -140,6 +154,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     ssize_t filesModified = 0;
     ssize_t filesHardLinked = 0;
     ssize_t filesSymLinked = 0;
+    ssize_t receivedSymLinks = 0;
     ssize_t unmodDirs = 0;
     unsigned int linkErrors = 0;
     string tempExtension = ".tmp." + to_string(GLOBALS.pid);
@@ -148,17 +163,19 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     timer backupTime;
     backupTime.start();
 
-    log(config.ifTitle() + " starting backup to " + currentDir);
-    currentDir += tempExtension;
-    string screenMessage = config.ifTitle() + " backing up to temp dir " + currentDir + "... ";
-    string backspaces = string(screenMessage.length(), '\b');
-    string blankspaces = string(screenMessage.length() , ' ');
-    NOTQUIET && ANIMATE && cout << screenMessage << flush;
-
-    DEBUG(D_any) cerr << "\n";
-    DEBUG(D_netproto) DFMT("faub server ready to receive");
     DEBUG(D_faub) DFMT("current: " << currentDir);
     DEBUG(D_faub) DFMT("previous: " << prevDir);
+
+    currentDir += tempExtension;
+    string screenMessage = config.ifTitle() + " backing up to temp dir " + currentDir + " (phase 1/4)... ";
+    string backspaces = string(screenMessage.length(), '\b');
+    string phaseback = string(8, '\b');
+    string blankspaces = string(screenMessage.length() , ' ');
+    NOTQUIET && ANIMATE && cout << screenMessage << flush;
+    DEBUG(D_any) cerr << "\n";
+    DEBUG(D_netproto) DFMT("faub server ready to receive");
+
+    log(config.ifTitle() + " starting backup to " + currentDir);
 
     do {
         set<string> neededFiles;
@@ -183,7 +200,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             long mtime = client.readProc();
             long mode  = client.readProc();
 
-            DEBUG(D_netproto) DFMT("server learned about " << remoteFilename << " (" << to_string(mode) << ")");
+            DEBUG(D_netproto) DFMTNOENDL("server learned about " << remoteFilename << " (" << to_string(mode) << ") ");
 
             localPrevFilename = slashConcat(prevDir, remoteFilename);
             localCurFilename = slashConcat(currentDir, remoteFilename);
@@ -203,24 +220,36 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             if (S_ISDIR(mode)) {
                 neededFiles.insert(neededFiles.end(), remoteFilename);
                 ++unmodDirs;
+                DEBUG(D_netproto) DFMTNOPREFIX("[dir]");
             }
-            else
+            else {
                 // lstat the previous backup's copy of the file and compare the mtimes
-                if (prevDir.length() && !lstat(localPrevFilename.c_str(), &statData) && statData.st_mtime == mtime) {
+                int statResult = lstat(localPrevFilename.c_str(), &statData);
 
+                if (prevDir.length() && !statResult && statData.st_mtime == mtime) {
                     // if they match then add it to the appropriate list to be symlinked or hardlinked, depending
                     // on whether its a symlink on the remote system
-                    if (S_ISLNK(mode))
+                    if (S_ISLNK(mode)) {
                         symLinkList.insert(symLinkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
-                    else
+                        DEBUG(D_netproto) DFMTNOPREFIX("[remote symlink]");
+                    }
+                    else {
                         hardLinkList.insert(hardLinkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
+                        DEBUG(D_netproto) DFMTNOPREFIX("[matches, can hardlink]");
+                    }
                 }
-                else
+                else {
                     // if the mtimes don't match or the file doesn't exist in the previous backup, add it to the list of
                     // ones we need the client to send in full
                     neededFiles.insert(neededFiles.end(), remoteFilename);
+                    DEBUG(D_netproto) DFMTNOPREFIX("[" << (!prevDir.length() ? "no prev dir" : statResult < 0 ? "unable to stat" : 
+                            string("mtime mismatch (") + to_string(statData.st_mtime) + "; " + to_string(mtime)) << "]");
+                }
+            }
+                
         }
  
+        NOTQUIET && ANIMATE && cout << phaseback << "2/4)... " << flush;
         log(config.ifTitle() + " " + fs + " phase 1: client provided " + to_string(fileTotal) + " entr" + ies(fileTotal)); 
         DEBUG(D_netproto) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size() 
                 << ", willLink:" << hardLinkList.size());
@@ -236,7 +265,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
         client.writeProc(NET_OVER_DELIM);
 
-        DEBUG(D_netproto) DFMT(fs << " server phase 2 complete; told client we need " << neededFiles.size() << " file" << s(neededFiles.size()));
+        NOTQUIET && ANIMATE && cout << phaseback << "3/4)... " << flush;
+        DEBUG(D_netproto) DFMT(fs << " server phase 2 complete; told client we need " << neededFiles.size() << " of " << fileTotal);
         log(config.ifTitle() + " " + fs + " phase 2: requested " + to_string(neededFiles.size()) + " entr" + ies(neededFiles.size()) + " from client");
 
         /*
@@ -247,10 +277,16 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         bool incTime = str2bool(config.settings[sIncTime].value);
         for (auto &file: neededFiles) {
             DEBUG(D_netproto) DFMT("server waiting for " << file);
-            if (!client.readToFile(slashConcat(currentDir, file), !incTime))
+            auto fmode = client.readToFile(slashConcat(currentDir, file), !incTime);
+
+            if (fmode == -1)
                 ++linkErrors;
+            else
+                if (S_ISLNK(fmode))
+                    ++receivedSymLinks;
         }
 
+        NOTQUIET && ANIMATE && cout << phaseback << "4/4)... " << flush;
         DEBUG(D_netproto) DFMT(fs << " server phase 3 complete; received " << neededFiles.size() << " file" << s(neededFiles.size()) + " from client");
         log(config.ifTitle() + " " + fs + " phase 3: received " + to_string(neededFiles.size()) + " entr" + ies(neededFiles.size()) + " from client");
 
@@ -356,10 +392,11 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     fcacheCurrent->second.modifiedFiles = filesModified - unmodDirs;
     fcacheCurrent->second.unchangedFiles = filesHardLinked;
     fcacheCurrent->second.dirs = unmodDirs;
-    fcacheCurrent->second.slinks = filesSymLinked;
+    fcacheCurrent->second.slinks = filesSymLinked + receivedSymLinks;
     
     string message = "backup completed to " + currentDir + " in " + backupTime.elapsed() + "\n\t\t(total: " +
-        to_string(fileTotal) + ", modified: " + to_string(filesModified - unmodDirs) + ", unchanged: " + to_string(filesHardLinked) + ", dirs: " + to_string(unmodDirs) + ", symlinks: " + to_string(filesSymLinked) + 
+        to_string(fileTotal) + ", modified: " + to_string(filesModified - unmodDirs) + ", unchanged: " + to_string(filesHardLinked) + ", dirs: " + 
+        to_string(unmodDirs) + ", symlinks: " + to_string(filesSymLinked + receivedSymLinks) + 
         (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") + 
         ", size: " + approximate(backupSize) + ", usage: " + approximate(backupSize - backupSaved) + ")";
     log(config.ifTitle() + " " + message);
