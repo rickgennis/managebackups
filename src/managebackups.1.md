@@ -273,7 +273,7 @@ Example output from **managebackups -0**
     desktop        desktop-20230125.tgz         17:20:43  00:00:38  229.3M (4.0G)    18 (22)     18%  [6 months, 4 weeks -> 5 hours, 35 minutes]
     firewall_logs  firewall-logs-20230125.tbz2  17:30:36  00:10:32  227.3M (3.4G)    14 (14)      0%  [1 year, 3 weeks -> 5 hours, 26 minutes]
     firewall_main  firewall-main-20230125.tgz   17:21:01  00:00:57  188.7M (3.6G)    21 (27)     24%  [1 year, 3 weeks -> 5 hours, 35 minutes]
-    fw_faub        fw_faub-20230125@22:23:35    22:23:40  00:00:04  777.4M (777.4M)  5 (5)       44%  [40 minutes, 25 seconds -> 32 minutes, 58 seconds]
+    fw_faub        fw_faub-20230125@22:23:35    22:23:40  00:00:04  777.4M (777.4M)  5           44%  [40 minutes, 25 seconds -> 32 minutes, 58 seconds]
     icloud         icloud-drive-20230125.tbz2   17:38:17  00:18:13  2.3G (16.0G)     7 (9)       22%  [1 year, 3 weeks -> 5 hours, 18 minutes]
     laptop         laptop-details-20230125.tgz  17:20:06  00:00:02  4.6M (86.8M)     19 (25)     22%  [1 year, 3 weeks -> 5 hours, 36 minutes]
     TOTALS                                                00:30:26  3.7G (30.8G)     84 (102)    24%  Saved 9.6G from 40.4G

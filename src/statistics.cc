@@ -77,7 +77,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         char fileTime[20];
         strftime(fileTime, sizeof(fileTime), "%X", t);
 
-        int saved = floor((1 - ((long double)resultStats.totalUsed / ((long double)resultStats.totalUsed + (long double)resultStats.totalSaved))) * 100 + 0.5);
+        int saved = floor((1 - ((long double)resultStats.totalUsed - (long double)resultStats.totalSaved) / (long double)resultStats.totalUsed) * 100 + 0.5);
 
         string soutput[NUMSTATDETAILS] = { 
             config.settings[sTitle].value,
@@ -86,7 +86,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
             seconds2hms(resultStats.duration),
             (approximate(resultStats.lastBackupBytes, precisionLevel, statDetail > 2) + 
              " (" + approximate(resultStats.totalUsed - resultStats.totalSaved, precisionLevel, statDetail == 3) + ")"),
-            (to_string(resultStats.uniqueBackups) + " (" + to_string(resultStats.numberOfBackups) + ")"),
+            to_string(resultStats.uniqueBackups),
             to_string(saved) + "%",
             fcache.getFirstBackup()->second.finishTime ? timeDiff(mktimeval(fcache.getFirstBackup()->second.finishTime)) : "?",
             fcache.getLastBackup()->second.finishTime ? timeDiff(mktimeval(fcache.getLastBackup()->second.finishTime)) : "?",
@@ -318,6 +318,20 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
     int precisionLevel = statDetail > 1 ? 1 : -1;
 
     if (config.settings[sFaub].value.length() && fcache.size()) {
+    
+        auto line = horizontalLine(60);
+        auto bkups = fcache.getNumberOfBackups();
+        auto stats = fcache.getTotalStats();
+        int saved = floor((1 - (long double)(stats.getSize() - stats.getSaved()) / (stats.getSize())) * 100 + 0.5);
+
+        // print top summary of backups
+        cout << line << "\n";
+        if (config.settings[sTitle].value.length()) cout << "Profile: " << config.settings[sTitle].value << "\n";
+        cout << "Directory: " << config.settings[sDirectory].value << "\n";
+        cout << bkups << " backup" << s(bkups) << "\n";
+        cout << approximate(stats.getSize()) << " using " << approximate(stats.getSize() - stats.getSaved()) << " on disk (saved " << saved << "%)\n";
+        cout << line << endl;
+
         // determine the backup max filename length
         int fnameLen = 0;
         auto backupIt = fcache.getFirstBackup();

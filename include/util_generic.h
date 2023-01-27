@@ -33,6 +33,9 @@ struct DiskStats {
         savedInBlocks += a.savedInBlocks;
         return *this;
     }
+
+    size_t getSize() { return (GLOBALS.useBlocks ? sizeInBlocks : sizeInBytes); }
+    size_t getSaved() { return (GLOBALS.useBlocks ? savedInBlocks : savedInBytes); }
 };
 
 
