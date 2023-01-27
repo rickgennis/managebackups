@@ -17,7 +17,7 @@
 #include "util_generic.h"
 #include "globals.h"
 #include "byteswap.h"
-#include "PipeExec.h"
+#include "ipc.h"
 
 using namespace pcrepp;
 
@@ -722,9 +722,9 @@ void sendEmail(string from, string recipients, string subject, string message) {
     mail.execute();
 
     if (headers.length())
-        mail.writeProc(headers.c_str(), headers.length());
+        mail.ipcWrite(headers.c_str(), headers.length());
 
-    mail.writeProc(message.c_str(), message.length());
+    mail.ipcWrite(message.c_str(), message.length());
     mail.closeWrite();
 }
 
@@ -892,3 +892,33 @@ string errorcom(string profile, string message) {
 }
 
 
+
+int simpleSelect(int rFd, int wFd, int timeoutSecs) {
+    fd_set dataSet;
+    FD_ZERO(&dataSet);
+
+    fd_set errorSet;
+    FD_ZERO(&errorSet);
+
+    if (rFd) {
+        FD_SET(rFd, &dataSet);
+        FD_SET(rFd, &errorSet);
+    }
+
+    if (wFd) {
+        FD_SET(wFd, &dataSet);
+        FD_SET(wFd, &errorSet);
+    }
+
+    struct timeval tv;
+    tv.tv_sec = timeoutSecs;
+    tv.tv_usec = 0;
+
+    return select(max(rFd, wFd) + 1, rFd ? &dataSet : NULL, wFd ? &dataSet : NULL, &dataSet, &tv);
+}
+
+
+void showError(string message) {
+    SCREENERR(message + "\n");
+    log(message);
+}

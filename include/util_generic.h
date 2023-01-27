@@ -158,5 +158,9 @@ DiskStats dus(string path);
 
 string errorcom(string profile, string message);
 
+int simpleSelect(int rFd, int wFd, int timeoutSecs);
+
+void showError(string message);
+
 #endif
 

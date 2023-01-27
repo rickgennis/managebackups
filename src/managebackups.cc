@@ -26,8 +26,8 @@
 #include "BackupConfig.h"
 #include "BackupEntry.h"
 #include "ConfigManager.h"
+//include "ipc.h"
 #include "FaubCache.h"
-#include "PipeExec.h"
 #include "colors.h"
 #include "cxxopts.hpp"
 #include "debug.h"
@@ -35,7 +35,6 @@
 #include "faub.h"
 #include "globalsdef.h"
 #include "help.h"
-#include "network.h"
 #include "notify.h"
 #include "setup.h"
 #include "statistics.h"
@@ -956,23 +955,25 @@ methodStatus sFtpBackup(BackupConfig &config, string backupFilename, string subD
             path += p + string("/");
             command = "mkdir " + path + "\n";
             DEBUG(D_transfer) DFMT("SFTP: " << command);
-            sFtp.writeProc(command.c_str(), command.length());
+            sFtp.ipcWrite(command.c_str(), command.length());
             p = strtok(NULL, "/");
         }
 
         // cd to the new subdirectory
         command = "cd " + subDir + "\n";
         DEBUG(D_transfer) DFMT("SFTP: " << command);
-        sFtp.writeProc(command.c_str(), command.length());
+        sFtp.ipcWrite(command.c_str(), command.length());
     }
 
     // check disk space
     auto requiredSpace = approx2bytes(config.settings[sMinSFTPSpace].value);
     if (requiredSpace) {
         command = "df .\n";
-        sFtp.writeProc(command.c_str(), command.length());
+        DEBUG(D_transfer) DFMT("SFTP: " << command);
+        sFtp.ipcWrite(command.c_str(), command.length());
         auto freeSpace = sFtp.statefulReadAndMatchRegex(
             "Avail.*%Capacity\n\\s*\\d+\\s+\\d+\\s+(\\d+)\\s+\\d+\\s+\\d+%");
+        DEBUG(D_transfer) DFMT("SFTP: disk free returned [" << freeSpace << "]");
 
         if (freeSpace.length()) {
             auto availSpace = approx2bytes(freeSpace + "K");
@@ -1002,12 +1003,15 @@ methodStatus sFtpBackup(BackupConfig &config, string backupFilename, string subD
 
     // upload the backup file
     command = "put " + backupFilename + "\n";
-    sFtp.writeProc(command.c_str(), command.length());
+    DEBUG(D_transfer) DFMT("SFTP: " << command);
+    sFtp.ipcWrite(command.c_str(), command.length());
 
     command = string("quit\n");
-    sFtp.writeProc(command.c_str(), command.length());
+    DEBUG(D_transfer) DFMT("SFTP: " << command);
+    sFtp.ipcWrite(command.c_str(), command.length());
 
     bool success = sFtp.readAndMatch("Uploading");
+    DEBUG(D_transfer) DFMT("SFTP readAndMatch returned " << success);
     sFtp.closeAll();
     sFtpTime.stop();
     NOTQUIET &&ANIMATE &&cout << backspaces << blankspaces << backspaces << flush;

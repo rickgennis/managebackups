@@ -4,7 +4,7 @@
 #include <set>
 #include "help.h"
 #include "BackupConfig.h"
-#include "PipeExec.h"
+#include "ipc.h"
 #include "globals.h"
 #include "util_generic.h"
 

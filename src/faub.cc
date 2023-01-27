@@ -1,10 +1,11 @@
-#include "dirent.h"
-#include "sys/stat.h"
+#include <dirent.h>
+#include <sys/stat.h>
 #include <netinet/tcp.h>
+#include <unistd.h>
 
 #include "FaubCache.h"
 #include "faub.h"
-#include "PipeExec.h"
+#include "ipc.h"
 #include "notify.h"
 #include "debug.h"
 #include "globals.h"
@@ -189,17 +190,17 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
          * have locally in the most recent backup.
         */
 
-        string fs = client.readTo(NET_DELIM);
+        string fs = client.ipcReadTo(NET_DELIM);
 
         while (1) {
-            remoteFilename = client.readTo(NET_DELIM);
+            remoteFilename = client.ipcReadTo(NET_DELIM);
             if (remoteFilename == NET_OVER) {
                 break;
             }
 
             ++fileTotal;
-            long mtime = client.readProc();
-            long mode  = client.readProc();
+            long mtime = client.ipcRead();
+            long mode  = client.ipcRead();
 
             DEBUG(D_netproto) DFMTNOENDL("server learned about " << remoteFilename << " (" << to_string(mode) << ") ");
 
@@ -261,10 +262,10 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         */
         for (auto &file: neededFiles) {
             DEBUG(D_netproto) DFMT("server requesting " << file);
-            client.writeProc(string(file + NET_DELIM).c_str());
+            client.ipcWrite(string(file + NET_DELIM).c_str());
         }
 
-        client.writeProc(NET_OVER_DELIM);
+        client.ipcWrite(NET_OVER_DELIM);
 
         NOTQUIET && ANIMATE && cout << phaseback << "3/4)... " << flush;
         DEBUG(D_netproto) DFMT(fs << " server phase 2 complete; told client we need " << neededFiles.size() << " of " << fileTotal);
@@ -278,13 +279,18 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         bool incTime = str2bool(config.settings[sIncTime].value);
         for (auto &file: neededFiles) {
             DEBUG(D_netproto) DFMTNOENDL("server waiting for " << file);
-            auto fmode = client.readToFile(slashConcat(currentDir, file), !incTime);
-            DEBUG(D_netproto) DFMTNOPREFIX(" :mode " << fmode);
+            auto [errorMsg, mode] = client.ipcReadToFile(slashConcat(currentDir, file), !incTime);
+            DEBUG(D_netproto) DFMTNOPREFIX(" :mode " << mode);
 
-            if (fmode == -1)
+            if (errorMsg.length()) {
+                SCREENERR(fs << " " << errorMsg);
+                log(config.ifTitle() + " " + fs + errorMsg);
+            }
+
+            if (mode < 1)
                 ++linkErrors;
             else
-                if (S_ISLNK(fmode))
+                if (S_ISLNK(mode))
                     ++receivedSymLinks;
         }
 
@@ -357,7 +363,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         filesHardLinked += hardLinkList.size();
         filesSymLinked += symLinkList.size();
 
-    } while (client.readProc());
+    } while (client.ipcRead());
 
     // note finish time
     backupTime.stop();
@@ -417,7 +423,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
  * Scan a filesystem, sending the filenames and their associated mtime's back
  * to the remote server. This is the client's side of phase 1.
  */
-void fc_scanToServer(string directory, tcpSocket& server) {
+void fc_scanToServer(string directory, IPC_Base& server) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
 
@@ -429,12 +435,14 @@ void fc_scanToServer(string directory, tcpSocket& server) {
 
             string fullFilename = directory + "/" + string(c_dirEntry->d_name);
 
-            fileTransport fTrans(server);
-            if (!fTrans.statFile(fullFilename)) {
-                fTrans.sendStatInfo();
+            struct stat statData;
+            if (!lstat(fullFilename.c_str(), &statData)) {
+                server.ipcWrite(string(fullFilename + NET_DELIM).c_str());
+                server.ipcWrite(statData.st_mtime);
+                server.ipcWrite(statData.st_mode);
                 DEBUG(D_netproto) DFMT("client provided stats on " << fullFilename);
 
-                if (fTrans.isDir())
+                if (S_ISDIR(statData.st_mode))
                     fc_scanToServer(fullFilename, server);
             }
         }
@@ -448,11 +456,11 @@ void fc_scanToServer(string directory, tcpSocket& server) {
  * Receive a list of files from the server (client side of phase 2) and
  * send each file back to the server (client side of phase 3).
  */
-void fc_sendFilesToServer(tcpSocket& server) {
+void fc_sendFilesToServer(IPC_Base& server) {
     vector<string> neededFiles;
 
     while (1) {
-        string filename = server.readTo(NET_DELIM);
+        string filename = server.ipcReadTo(NET_DELIM);
 
         if (filename == NET_OVER)
             break;
@@ -465,32 +473,29 @@ void fc_sendFilesToServer(tcpSocket& server) {
 
     for (auto &file: neededFiles) {
         DEBUG(D_netproto) DFMT("client sending " << file << " to server");
-        fileTransport fTrans(server);
-        fTrans.statFile(file);
-        fTrans.sendFullContents();
+        server.ipcSendDirEntry(file);
     }
 }
 
 
 void fc_mainEngine(vector<string> paths) {
     try {
-        tcpSocket server(1, 60);    // setup socket library to use stdout
-        server.setReadFd(0);        // and stdin
+        IPC_Base server(0, 1, 60);  // use stdin and stdout
 
         DEBUG(D_faub) DFMT("faub client starting with " << paths.size() << " request(s)");
 
         for (auto it = paths.begin(); it != paths.end(); ++it) {
             log("faub client request for path: " + *it);
 
-            server.write(string(*it + NET_DELIM).c_str());
+            server.ipcWrite(string(*it + NET_DELIM).c_str());
 
             fc_scanToServer(*it, server);
 
-            server.write(NET_OVER_DELIM);
+            server.ipcWrite(NET_OVER_DELIM);
             fc_sendFilesToServer(server);
 
-            long end = (it+1) != paths.end();
-            server.write(end);
+            __int64_t end = (it+1) != paths.end();
+            server.ipcWrite(end);
         }
         
         DEBUG(D_netproto) DFMT("client complete.");
