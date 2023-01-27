@@ -8,6 +8,8 @@
 #include <set>
 #include "globals.h"
 #include "math.h"
+#include "globals.h"
+
 
 using namespace std;
 

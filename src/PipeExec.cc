@@ -246,7 +246,7 @@ bool PipeExec::execute2file(string toFile, string procName) {
     int bytesWritten;
     int pos;
     bool success = false;
-    char data[32 * 1024];
+    char data[64 * 1024];
 
     DEBUG(D_exec) DFMT("toFile=" << toFile << "; procName=" << procName);
 
@@ -275,7 +275,7 @@ bool PipeExec::execute2file(string toFile, string procName) {
 
 void PipeExec::readAndTrash() {
     int bytesRead;
-    char buffer[32 * 1024];
+    char buffer[64 * 1024];
 
     while ((bytesRead = readProc(&buffer, sizeof(buffer))));
         // throw away bytes read until fd is closed on the other end
@@ -284,7 +284,7 @@ void PipeExec::readAndTrash() {
 
 bool PipeExec::readAndMatch(string matchStr) {
     int bytesRead;
-    char buffer[32 * 1024 + 1];
+    char buffer[64 * 1024 + 1];
     bool found = false;
 
     while ((bytesRead = readProc(&buffer, sizeof(buffer) - 1))) {
@@ -383,15 +383,20 @@ ssize_t PipeExec::writeProc(const char *data) {
 }
 
 
-ssize_t PipeExec::writeProc(long data) {
-    long netLong = htonl(data);
+ssize_t PipeExec::writeProc(__int64_t data) {
+#if defined(__linux__)
+    __int64_t netLong = htobe64(data);
+#else
+    __int64_t netLong = htonll(data);
+#endif
+
     return writeProc(&netLong, 8);
 }
 
 
-// read 8-bytes and return it as a long
-long PipeExec::readProc() {
-    long data;
+// read 8-bytes and return it as a 64-bit int
+__int64_t PipeExec::readProc() {
+    __int64_t data;
     int bytes = 0;
     auto bufLen = strBuf.length();
 
@@ -411,7 +416,12 @@ long PipeExec::readProc() {
             bytes += readProc((char*)&data + bytes, 8 - bytes);
     } while (false);
 
-    long temp = ntohl(data);
+#if defined(__linux__)
+    __int64_t temp = be64toh(data);
+#else
+    __int64_t temp = ntohll(data);
+#endif
+
     return temp;
 }
 
@@ -620,10 +630,11 @@ int PipeExec::readToFile(string filename, bool preDelete) {
         struct utimbuf timeBuf;
         timeBuf.actime = timeBuf.modtime = mtime;
         utime(filename.c_str(), &timeBuf);
-        DEBUG(D_netproto) cerr << " [" << bytesRemaining << " remaining of " << totalBytes << "]" << flush;
+        DEBUG(D_netproto) cerr << " [" << totalBytes << " bytes]" << flush;
         return mode;
     }
 
+    DEBUG(D_netproto) cerr << " [" << totalBytes << " bytes] can't write file" << flush;
     return -2;
 }
 

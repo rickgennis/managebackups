@@ -176,6 +176,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     DEBUG(D_netproto) DFMT("faub server ready to receive");
 
     log(config.ifTitle() + " starting backup to " + currentDir);
+    GLOBALS.interruptFilename = currentDir;  // interruptFilename gets cleaned up on SIGTERM & SIGINT
 
     do {
         set<string> neededFiles;
@@ -278,7 +279,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         for (auto &file: neededFiles) {
             DEBUG(D_netproto) DFMTNOENDL("server waiting for " << file);
             auto fmode = client.readToFile(slashConcat(currentDir, file), !incTime);
-            DEBUG(D_netproto) DFMTNOPREFIX(" : got mode " << fmode);
+            DEBUG(D_netproto) DFMTNOPREFIX(" :mode " << fmode);
 
             if (fmode == -1)
                 ++linkErrors;
@@ -369,6 +370,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         return;
     }
 
+    GLOBALS.interruptFilename = "";
     currentDir = originalCurrentDir;
 
     // loading the cache for this baseDir will automatically detect our new backup having

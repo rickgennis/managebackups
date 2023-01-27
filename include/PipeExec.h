@@ -5,6 +5,9 @@
 #include <string>
 #include <vector>
 
+#include "globals.h"
+
+
 /****************************************************************
  * PipeExec
  *
@@ -59,7 +62,7 @@ class PipeExec {
     bool dontCleanup;
     string errorDir;
     string strBuf;
-    char rawBuf[1024 * 32];
+    char rawBuf[1024 * 64];
     unsigned int timeoutSecs;
 
     public:
@@ -86,14 +89,14 @@ class PipeExec {
         bool execute2file(string toFile, string procName = "");
 
         ssize_t readProc(void *buf, size_t count);
-        long readProc(); // 8 byte long
+        __int64_t readProc(); // 8 bytes 
         ssize_t writeProc(const void *buf, size_t count);
         ssize_t writeProc(const char *data);
-        ssize_t writeProc(long data);  // 8 byte long
+        ssize_t writeProc(__int64_t data);  // 8 bytes 
 
         void readAndTrash();
         bool readAndMatch(string matchStr);
-        string statefulReadAndMatchRegex(string regex, int buffSize = 1024 * 32);
+        string statefulReadAndMatchRegex(string regex, int buffSize = 1024 * 64);
         string readTo(string delimiter);
         int readToFile(string filename, bool preDelete = false);
         

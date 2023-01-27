@@ -9,7 +9,7 @@
 
 using std::string;
 
-#define BUFFER_SIZE     (1024 * 32)
+#define BUFFER_SIZE     (1024 * 64)
 #define NET_DELIM   ";\n"
 #define NET_OVER    "///;/"
 #define NET_OVER_DELIM    string(string(NET_OVER) + string(NET_DELIM)).c_str()
@@ -20,7 +20,7 @@ struct fileInfo {
     long mode;
     long uid;
     long gid;
-    long size;
+    __int64_t size;
 };
 
 
@@ -44,11 +44,11 @@ class tcpSocket {
         void setReadFd(int fd);
         size_t write(const void *data, size_t count);
         size_t write(const char *data);
-        size_t write(long data);
+        size_t write(__int64_t data);
         void sendRawFile(fileInfo& fi);
 
         ssize_t read(void *data, size_t count);
-        long read();
+        __int64_t read();
         string readTo(string delimiter);
         void readToFile(string filename);
 

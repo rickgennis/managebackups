@@ -1285,7 +1285,15 @@ void sigTermHandler(int sig)
 {
     if (GLOBALS.interruptFilename.length()) {
         cerr << "\ninterrupt: aborting backup, cleaning up " << GLOBALS.interruptFilename << "... ";
-        unlink(GLOBALS.interruptFilename.c_str());
+
+        struct stat statData;
+        if (!stat(GLOBALS.interruptFilename.c_str(), &statData)) {
+            if (S_ISDIR(statData.st_mode)) 
+                rmrfdir(GLOBALS.interruptFilename);          // faub-style
+            else
+                unlink(GLOBALS.interruptFilename.c_str());   // single-file
+        }
+
         cerr << "done." << endl;
         log("error: operation aborted on signal " + to_string(sig) + " (" +
             GLOBALS.interruptFilename + ")");

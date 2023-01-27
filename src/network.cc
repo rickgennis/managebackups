@@ -159,8 +159,12 @@ size_t tcpSocket::write(const char *data) {
 }
 
 
-size_t tcpSocket::write(long data) {
-    long netLong = htonl(data);
+size_t tcpSocket::write(__int64_t data) {
+#if defined(__linux__)
+    __int64_t netLong = htobe64(data);
+#else
+    __int64_t netLong = htonll(data);
+#endif
     return (write(&netLong, 8));
 }
 
@@ -210,8 +214,8 @@ ssize_t tcpSocket::read(void *data, size_t count) {
 }
 
 
-long tcpSocket::read() {
-    long data;
+__int64_t tcpSocket::read() {
+    __int64_t data;
     int bytes = 0;
     auto bufLen = strBuf.length();
 
@@ -231,7 +235,11 @@ long tcpSocket::read() {
             bytes += read((char*)&data + bytes, 8 - bytes);
     } while (false);
 
-    long temp = ntohl(data);
+#if defined(__linux__)
+    __int64_t temp = be64toh(data);
+#else
+    __int64_t temp = ntohll(data);
+#endif
     return(temp);
 }
 
@@ -292,7 +300,7 @@ void tcpSocket::readToFile(string filename) {
                                                               
     if (S_ISLNK(mode)) {
         char target[1025];
-        long bytes = read();
+        __int64_t bytes = read();
         read(target, bytes);
         target[bytes] = 0;
         if (symlink(target, filename.c_str())) {
@@ -365,7 +373,7 @@ void tcpSocket::sendRawFile(fileInfo& fi) {
         fclose(dataf);
     }
     else {
-        write((long)0);
+        write((__int64_t)0);
         cerr << "error: unable to read " << fi.filename << endl;
     }
 }
@@ -380,7 +388,7 @@ void fileTransport::sendFullContents() {
 
         if (isSymLink()) {
             char target[1024];
-            long bytes = readlink(fi.filename.c_str(), target, sizeof(target));
+            __int64_t bytes = readlink(fi.filename.c_str(), target, sizeof(target));
             server.write(bytes);
             server.write(target, bytes);
         }
@@ -390,7 +398,7 @@ void fileTransport::sendFullContents() {
             }
     }
     else
-        server.write((long)0);
+        server.write((__int64_t)0);
 }
 
 
