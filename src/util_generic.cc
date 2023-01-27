@@ -16,7 +16,6 @@
 #include "pcre++.h"
 #include "util_generic.h"
 #include "globals.h"
-#include "byteswap.h"
 #include "ipc.h"
 
 using namespace pcrepp;
