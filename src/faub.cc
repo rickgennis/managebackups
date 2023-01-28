@@ -403,15 +403,17 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     fcacheCurrent->second.dirs = unmodDirs;
     fcacheCurrent->second.slinks = filesSymLinked + receivedSymLinks;
     
-    string message = "backup completed to " + currentDir + " in " + backupTime.elapsed() + "\n\t\t(total: " +
+    string message1 = "backup completed to " + currentDir + " in " + backupTime.elapsed();
+    string message2 = "(total: " +
         to_string(fileTotal) + ", modified: " + to_string(filesModified - unmodDirs) + ", unchanged: " + to_string(filesHardLinked) + ", dirs: " + 
         to_string(unmodDirs) + ", symlinks: " + to_string(filesSymLinked + receivedSymLinks) + 
         (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") + 
         ", size: " + approximate(backupSize) + ", usage: " + approximate(backupSize - backupSaved) + ")";
-    log(config.ifTitle() + " " + message);
-    NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message << endl;
+    log(config.ifTitle() + " " + message1);
+    log(config.ifTitle() + " " + message2);
+    NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message1 << "\n\t\t" << message2 << endl;
 
-    notify(config, "\t• " + message + "\n", true);
+    notify(config, "\t• " + message1 + "\n\t\t" + message2 + "\n", true);
 
     // silently cleanup any old faub caches for backups that are no longer around
     FaubEntry("");  

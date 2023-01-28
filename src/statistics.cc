@@ -26,8 +26,8 @@ struct summaryStats {
     bool inProcess;
     unsigned long lastBackupBytes;
     time_t lastBackupTime;
-    unsigned long totalUsed;
-    unsigned long totalSaved;
+    size_t totalUsed;
+    size_t totalSaved;
     long numberOfBackups;
     long uniqueBackups;
     unsigned long duration;
@@ -41,7 +41,7 @@ struct summaryStats {
 
 
 summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
-    set<unsigned long> countedInode;
+    set<ino_t> countedInode;
     struct summaryStats resultStats;
     int precisionLevel = statDetail > 1 ? 1 : -1;
     string processAge;
@@ -64,10 +64,10 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
 
         // set numeric stats
         auto ds = fcache.getTotalStats();
-        resultStats.totalUsed = GLOBALS.useBlocks ? ds.sizeInBlocks : ds.sizeInBytes;
-        resultStats.totalSaved = GLOBALS.useBlocks ? ds.savedInBlocks : ds.savedInBytes;
+        resultStats.totalUsed = ds.getSize();
+        resultStats.totalSaved = ds.getSaved();
         resultStats.numberOfBackups = resultStats.uniqueBackups = fcache.size();
-        resultStats.lastBackupBytes = GLOBALS.useBlocks ? fcache.getLastBackup()->second.ds.sizeInBlocks : fcache.getLastBackup()->second.ds.sizeInBytes;
+        resultStats.lastBackupBytes = fcache.getLastBackup()->second.ds.getSize();
         resultStats.lastBackupTime = fcache.getLastBackup()->second.finishTime;
         resultStats.duration = fcache.getLastBackup()->second.duration;
         resultStats.inProcess = inProcessFilename.length() > 0;
@@ -373,9 +373,8 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
                     // content age
                     "%s").c_str(),
                         backupIt->first.c_str(), 
-                        approximate(GLOBALS.useBlocks ? backupIt->second.ds.sizeInBlocks : backupIt->second.ds.sizeInBytes, precisionLevel, statDetail > 2).c_str(),
-                        approximate(GLOBALS.useBlocks ? backupIt->second.ds.sizeInBlocks - backupIt->second.ds.savedInBlocks : 
-                        backupIt->second.ds.sizeInBytes - backupIt->second.ds.savedInBytes, precisionLevel, statDetail > 2).c_str(), 
+                        approximate(backupIt->second.ds.getSize(), precisionLevel, statDetail > 2).c_str(),
+                        approximate(backupIt->second.ds.getSize() - backupIt->second.ds.getSaved(), precisionLevel, statDetail > 2).c_str(), 
                         approximate(backupIt->second.dirs, precisionLevel, statDetail > 2).c_str(), 
                         approximate(backupIt->second.slinks, precisionLevel, statDetail > 2).c_str(), 
                         approximate(backupIt->second.modifiedFiles, precisionLevel, statDetail > 2).c_str(),
@@ -397,9 +396,9 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
 
 void _displayDetailedStats(BackupConfig& config, int statDetail) {
     int fnameLen = 0;
-    double bytesUsed = 0;
-    double bytesSaved = 0;
-    set<unsigned long> countedInode;
+    size_t bytesUsed = 0;
+    size_t bytesSaved = 0;
+    set<ino_t> countedInode;
 
     if (_displayDetailedFaubStats(config, statDetail))
         return;
