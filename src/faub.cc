@@ -252,7 +252,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         }
  
         NOTQUIET && ANIMATE && cout << phaseback << "2/4)... " << flush;
-        log(config.ifTitle() + " " + fs + " phase 1: client provided " + to_string(fileTotal) + " entr" + ies(fileTotal)); 
+        log(config.ifTitle() + " " + fs + " phase 1: client detailed " + to_string(fileTotal) + " entr" + ies(fileTotal));
         DEBUG(D_netproto) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size() 
                 << ", willLink:" << hardLinkList.size());
 
@@ -392,8 +392,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
     // we can pull those out to display
     auto fcacheCurrent = fcache.getBackupByDir(currentDir);
-    auto backupSize = GLOBALS.useBlocks ? fcacheCurrent->second.ds.sizeInBlocks : fcacheCurrent->second.ds.sizeInBytes;
-    auto backupSaved = GLOBALS.useBlocks ? fcacheCurrent->second.ds.savedInBlocks : fcacheCurrent->second.ds.savedInBytes;
+    auto backupSize = fcacheCurrent->second.ds.getSize();
+    auto backupSaved = fcacheCurrent->second.ds.getSaved();
 
     // and only need to update the remaining fields
     fcacheCurrent->second.duration = backupTime.seconds();
@@ -405,10 +405,10 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     
     string message1 = "backup completed to " + currentDir + " in " + backupTime.elapsed();
     string message2 = "(total: " +
-        to_string(fileTotal) + ", modified: " + to_string(filesModified - unmodDirs) + ", unchanged: " + to_string(filesHardLinked) + ", dirs: " + 
+        to_string(fileTotal) + ", modified: " + to_string(filesModified - unmodDirs) + ", unmodified: " + to_string(filesHardLinked) + ", dirs: " + 
         to_string(unmodDirs) + ", symlinks: " + to_string(filesSymLinked + receivedSymLinks) + 
         (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") + 
-        ", size: " + approximate(backupSize) + ", usage: " + approximate(backupSize - backupSaved) + ")";
+        ", size: " + approximate(backupSize + backupSaved) + ", usage: " + approximate(backupSize) + ")";
     log(config.ifTitle() + " " + message1);
     log(config.ifTitle() + " " + message2);
     NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message1 << "\n\t\t" << message2 << endl;

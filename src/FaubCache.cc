@@ -135,7 +135,8 @@ void FaubCache::recache(string dir) {
     for (auto aBackup = backups.begin(); aBackup != backups.end(); ++aBackup) {
         DEBUG(D_faub) DFMT("cache set has " << aBackup->first << " with size " << aBackup->second.ds.sizeInBytes << " bytes, " << aBackup->second.duration << " duration");
 
-        if (!aBackup->second.ds.sizeInBytes ||            // if we have no cached data for this backup or
+        if ((!aBackup->second.ds.sizeInBytes &&
+             !aBackup->second.ds.savedInBytes) ||         // if we have no cached data for this backup or
             ((dir.length() && dir == aBackup->first) &&   // (this is a backup we've specifically been asked to recache
             !aBackup->second.updated)) {                  // and it hasn't already been updated on this run of the app)
 

@@ -863,9 +863,10 @@ DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes) {    /
                         ds.savedInBytes += statData.st_size;
                         ds.savedInBlocks += (512 * statData.st_blocks);
                     }
-
-                    ds.sizeInBytes += statData.st_size;
-                    ds.sizeInBlocks += (512 * statData.st_blocks);
+                    else {
+                        ds.sizeInBytes += statData.st_size;
+                        ds.sizeInBlocks += (512 * statData.st_blocks);
+                    }
 
                     seenInodes.insert(statData.st_ino);
                     newInodes.insert(statData.st_ino);

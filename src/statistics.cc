@@ -77,7 +77,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         char fileTime[20];
         strftime(fileTime, sizeof(fileTime), "%X", t);
 
-        int saved = floor((1 - ((long double)resultStats.totalUsed - (long double)resultStats.totalSaved) / (long double)resultStats.totalUsed) * 100 + 0.5);
+        int saved = floor((1 - (long double)resultStats.totalUsed / ((long double)resultStats.totalUsed + (long double)resultStats.totalSaved)) * 100 + 0.5);
 
         string soutput[NUMSTATDETAILS] = { 
             config.settings[sTitle].value,
@@ -85,7 +85,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
             fileTime,    
             seconds2hms(resultStats.duration),
             (approximate(resultStats.lastBackupBytes, precisionLevel, statDetail > 2) + 
-             " (" + approximate(resultStats.totalUsed - resultStats.totalSaved, precisionLevel, statDetail == 3) + ")"),
+             " (" + approximate(resultStats.totalUsed, precisionLevel, statDetail == 3) + ")"),
             to_string(resultStats.uniqueBackups),
             to_string(saved) + "%",
             fcache.getFirstBackup()->second.finishTime ? timeDiff(mktimeval(fcache.getFirstBackup()->second.finishTime)) : "?",
@@ -322,14 +322,14 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
         auto line = horizontalLine(60);
         auto bkups = fcache.getNumberOfBackups();
         auto stats = fcache.getTotalStats();
-        int saved = floor((1 - (long double)(stats.getSize() - stats.getSaved()) / (stats.getSize())) * 100 + 0.5);
+        int saved = floor((1 - (long double)stats.getSize() / (stats.getSize() + stats.getSaved())) * 100 + 0.5);
 
         // print top summary of backups
         cout << line << "\n";
         if (config.settings[sTitle].value.length()) cout << "Profile: " << config.settings[sTitle].value << "\n";
         cout << "Directory: " << config.settings[sDirectory].value << "\n";
         cout << bkups << " backup" << s(bkups) << "\n";
-        cout << approximate(stats.getSize()) << " using " << approximate(stats.getSize() - stats.getSaved()) << " on disk (saved " << saved << "%)\n";
+        cout << approximate(stats.getSize() + stats.getSaved()) << " using " << approximate(stats.getSize()) << " on disk (saved " << saved << "%)\n";
         cout << line << endl;
 
         // determine the backup max filename length
@@ -373,8 +373,8 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
                     // content age
                     "%s").c_str(),
                         backupIt->first.c_str(), 
-                        approximate(backupIt->second.ds.getSize(), precisionLevel, statDetail > 2).c_str(),
-                        approximate(backupIt->second.ds.getSize() - backupIt->second.ds.getSaved(), precisionLevel, statDetail > 2).c_str(), 
+                        approximate(backupIt->second.ds.getSize() + backupIt->second.ds.getSaved(), precisionLevel, statDetail > 2).c_str(),
+                        approximate(backupIt->second.ds.getSize(), precisionLevel, statDetail > 2).c_str(), 
                         approximate(backupIt->second.dirs, precisionLevel, statDetail > 2).c_str(), 
                         approximate(backupIt->second.slinks, precisionLevel, statDetail > 2).c_str(), 
                         approximate(backupIt->second.modifiedFiles, precisionLevel, statDetail > 2).c_str(),
