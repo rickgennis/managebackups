@@ -67,7 +67,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         resultStats.totalUsed = ds.getSize();
         resultStats.totalSaved = ds.getSaved();
         resultStats.numberOfBackups = resultStats.uniqueBackups = fcache.size();
-        resultStats.lastBackupBytes = fcache.getLastBackup()->second.ds.getSize();
+        resultStats.lastBackupBytes = fcache.getLastBackup()->second.ds.getSize() + fcache.getLastBackup()->second.ds.getSaved();
         resultStats.lastBackupTime = fcache.getLastBackup()->second.finishTime;
         resultStats.duration = fcache.getLastBackup()->second.duration;
         resultStats.inProcess = inProcessFilename.length() > 0;

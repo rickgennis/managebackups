@@ -59,7 +59,7 @@ void showHelp(enum helpType kind) {
             + "   --fs_days [d]       FAILSAFE: within the last d days.\n"
             + "   --fp                FAILSAFE: Paranoid mode; sets --fs_backups 1 --fs_days 2\n"
             + "\n" + string(BOLDBLUE) + "HARD LINKING\n" + RESET
-            + "   --maxlinks [x]      Max number of links to a file (default 20).\n"
+            + "   -l, --maxlinks [x]  Max number of links to a file (default 20).\n"
             + "\n" + string(BOLDBLUE) + "GENERAL\n" + RESET
             + "   --profile [name]    Use the specified profile for the current run.\n"
             + "   --save              Save all the specified settings to the specified profile.\n"
@@ -587,8 +587,7 @@ In effect, increasing \f[B]\[en]maxlinks\f[R] saves disk space.
 But an accidental mis-edit to one of those files could damage more
 backups with a higher number.
 Set \f[B]\[en]maxlinks\f[R] to 0 or 1 to disable linking.
-Defaults to 20.
-Note: This options only applies to single-file backups.
+Defaults to 100.
 .SH NOTIFICATIONS
 .PP
 \f[B]managebackups\f[R] can notify on success or failure of a backup via
@@ -708,8 +707,10 @@ from=\[dq]192.168.0.0/24\[dq],command=\[dq]sudo managebackups --path /usr/local/
 to backup /usr/local/bin, assuming your backup server is connecting from
 192.168.0.0/24 and you\[cq]ve allowed backupuser to sudo the command
 with NOPASSWD on dataserver.
-Then the \f[B]\[en]faub\f[R] parameter of your \f[B]managebackups\f[R]
-profile configuration could be as simple as:
+Alternatively, if you\[cq]ve run \f[B]managebackups
+\[en]installsuid\f[R] on dataserver the `sudo' can be omitted.
+With this setup the \f[B]\[en]faub\f[R] parameter of your
+\f[B]managebackups\f[R] profile configuration could be as simple as:
 .IP
 .nf
 \f[C]
@@ -717,7 +718,7 @@ profile configuration could be as simple as:
 \f[R]
 .fi
 .PP
-Without the authorized_keys2 file you\[cq]ll need the options in your
+Without the authorized_keys2 file you would need the options in your
 faub config directly:
 .IP
 .nf
@@ -752,24 +753,25 @@ Example output from \f[B]managebackups -0\f[R]
 .IP
 .nf
 \f[C]
-Profile        Most Recent Backup           Finish\[at]   Duration  Size (Total)     Uniq (T)  Saved  Age Range
-desktop        desktop-20230125.tgz         17:20:43  00:00:38  229.3M (4.0G)    18 (22)     18%  [6 months, 4 weeks -> 5 hours, 35 minutes]
-firewall_logs  firewall-logs-20230125.tbz2  17:30:36  00:10:32  227.3M (3.4G)    14 (14)      0%  [1 year, 3 weeks -> 5 hours, 26 minutes]
-firewall_main  firewall-main-20230125.tgz   17:21:01  00:00:57  188.7M (3.6G)    21 (27)     24%  [1 year, 3 weeks -> 5 hours, 35 minutes]
-fw_faub        fw_faub-20230125\[at]22:23:35    22:23:40  00:00:04  777.4M (777.4M)  5           44%  [40 minutes, 25 seconds -> 32 minutes, 58 seconds]
-icloud         icloud-drive-20230125.tbz2   17:38:17  00:18:13  2.3G (16.0G)     7 (9)       22%  [1 year, 3 weeks -> 5 hours, 18 minutes]
-laptop         laptop-details-20230125.tgz  17:20:06  00:00:02  4.6M (86.8M)     19 (25)     22%  [1 year, 3 weeks -> 5 hours, 36 minutes]
-TOTALS                                                00:30:26  3.7G (30.8G)     84 (102)    24%  Saved 9.6G from 40.4G
+Profile        Most Recent Backup           Finish\[at]   Duration  Size (Total)   Uniq (T)  Saved  Age Range
+desktop        desktop-20230128.tgz         06:41:07  00:00:06  229.4M (4.0G)  18 (21)     14%  [7 months, 1 day -> 7 hours, 26 minutes]
+firewall_logs  firewall-logs-20230128.tbz2  06:52:00  00:10:58  212.7M (3.3G)  14 (14)      0%  [1 year, 3 weeks -> 7 hours, 15 minutes]
+firewall_main  firewall-main-20230128.tgz   06:48:32  00:07:31  4.5G (12.4G)   22 (26)      6%  [1 year, 3 weeks -> 7 hours, 19 minutes]
+fw_faub        fw_faub-20230128\[at]13:34:03    13:34:15  00:00:11  1.2G (5.5G)    6           79%  [4 hours, 17 minutes -> 33 minutes, 20 seconds]
+icloud         icloud-drive-20230128.tbz2   06:44:52  00:03:50  2.3G (18.3G)   7 (8)        0%  [1 year, 3 weeks -> 7 hours, 22 minutes]
+laptop         laptop-details-20230128.tgz  07:03:51  00:00:00  8.0M (103.3M)  21 (25)     14%  [1 year, 3 weeks -> 7 hours, 3 minutes]
+TOTALS                                                00:22:36  8.4G (43.6G)   88 (100)    34%  Saved 22.4G from 66.0G
 
-229.3M is the data size of the most recent backup of the desktop profile (as if there were no hard linking).
+229.4M is the data size of the most recent backup of the desktop profile (full size, as if there were no hard linking).
 4.0G is the actual disk space used for all desktop profile backups (with hard linking).
-18% is the percentage saved in desktop profile backups due to hard linking.
+14% is the percentage saved in desktop profile backups due to hard linking.
 18 is the number of unique desktop profile backups (only significant for single-file backups; not faub).
-22 is the total number of desktop profile backups (meaning there are 4 dupes).
+21 is the total number of desktop profile backups (meaning there are 3 dupes).
+Age Range is the age of the oldest backup to the age of the most recent backup.
 
-3.7G is the total used for the most recent backup of all profiles (i.e. one of each, as if no hard linking).
-30.8G is the total used for all data managed by managebackups together (with hard linking).
-40.4G is the total that would be used if there were no hard linking.
+8.4G is the total used for the most recent backup of all profiles (i.e. one of each, as if no hard linking).
+43.6G is the total used for all data managed by managebackups together (with hard linking).
+66.0G is the total that would be used if there were no hard linking.
 \f[R]
 .fi
 .PP
@@ -778,16 +780,18 @@ backup example)
 .IP
 .nf
 \f[C]
-January 2023                                                Size    Used    Dirs    SymLks  Mods    Duration  Type  Age
-/tmp/mybackups/2023/01/21/firewall-faub-20230121\[at]15:25:03     2.6M    2.6M       0       0      1K  00:00:00  Day   1 hour, 32 minutes
-/tmp/mybackups/2023/01/21/firewall-faub-20230121\[at]15:50:33     2.6M      84     242     723       1  00:00:01  Day   1 hour, 7 minutes
-/tmp/mybackups/2023/01/21/firewall-faub-20230121\[at]16:57:39     2.6M      84     242     723       1  00:00:02  Day   5 seconds
+January 2023                                          Size    Used    Dirs    SymLks  Mods    Duration  Type  Age
+/var/mybackups/2023/01/28/fw_faub-20230128\[at]09:48:29     5.0G    5.0G      1K     815      9K  00:02:03  Day   4 hours, 27 minutes
+/var/mybackups/2023/01/28/fw_faub-20230128\[at]09:50:53     5.0G       0      1K     815       0  00:00:05  Day   4 hours, 26 minutes
+/var/mybackups/2023/01/28/fw_faub-20230128\[at]09:57:15     5.0G       0      1K     815       0  00:00:05  Day   4 hours, 19 minutes
+/var/mybackups/2023/01/28/fw_faub-20230128\[at]09:59:06     5.0G       0      1K     815       0  00:00:05  Day   4 hours, 17 minutes
+/var/mybackups/2023/01/28/fw_faub-20230128\[at]10:00:32     5.0G       0      1K     815       0  00:00:05  Day   4 hours, 16 minutes
+/var/mybackups/2023/01/28/fw_faub-20230128\[at]13:34:03     1.2G  488.3M      1K     815       3  00:00:11  Day   42 minutes, 45 seconds
 
-2.6M is the size of the backup (it\[aq]s data)
-84 bytes in the subsequent backups is the amount of disk actually used (due to hard linking)
-Dirs is the number of directories
-SymLks are the number of symlinks made - these equal the number of symlinks on the remote system being backed up
-Mods is the number of modified files in that backup compared to the previous backup
+Size is the full size of the data in that backup. Used is is the actual disk space used to store it.
+Dirs is the number of directories.
+SymLks are the number of symlinks made - these equal the number of symlinks on the remote system being backed up.
+Mods is the number of modified files in that backup compared to the previous backup.
 \f[R]
 .fi
 .SH EXAMPLES

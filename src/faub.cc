@@ -178,11 +178,13 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
     log(config.ifTitle() + " starting backup to " + currentDir);
     GLOBALS.interruptFilename = currentDir;  // interruptFilename gets cleaned up on SIGTERM & SIGINT
+    bool incTime = str2bool(config.settings[sIncTime].value);
 
     do {
         set<string> neededFiles;
         map<string,string> hardLinkList;
         map<string,string> symLinkList;
+        map<string,string> duplicateList;
 
         /*
          * phase 1 - get list of filenames and mtimes from client
@@ -191,6 +193,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         */
 
         string fs = client.ipcReadTo(NET_DELIM);
+
+        unsigned int maxLinksAllowed = config.settings[sMaxLinks].ivalue();
 
         while (1) {
             remoteFilename = client.ipcReadTo(NET_DELIM);
@@ -229,15 +233,29 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 int statResult = lstat(localPrevFilename.c_str(), &statData);
 
                 if (prevDir.length() && !statResult && statData.st_mtime == mtime) {
-                    // if they match then add it to the appropriate list to be symlinked or hardlinked, depending
-                    // on whether its a symlink on the remote system
-                    if (S_ISLNK(mode)) {
-                        symLinkList.insert(symLinkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
-                        DEBUG(D_netproto) DFMTNOPREFIX("[remote symlink]");
+
+                    /* check that hard links aren't maxed out against the configured limit.
+                     * if we're at the limit & the backup includes the Time field OR
+                     * if we're at the limit & the backup doesn't include Time & the new file doesn't exist
+                     * then we mark this as a dup.  i.e. one we have to copy instead of hardlink.
+                     */
+                    struct stat statData2;
+                    if ((statData.st_nlink >= maxLinksAllowed) &&
+                       ((!incTime && lstat(localCurFilename.c_str(), &statData2)) || incTime)) {
+                        duplicateList.insert(duplicateList.end(), pair<string, string>(localPrevFilename, localCurFilename));
+                        DEBUG(D_netproto) DFMTNOPREFIX("[matches, but links maxed]");
                     }
                     else {
-                        hardLinkList.insert(hardLinkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
-                        DEBUG(D_netproto) DFMTNOPREFIX("[matches, can hardlink]");
+                        // if they match then add it to the appropriate list to be symlinked or hardlinked, depending
+                        // on whether its a symlink on the remote system
+                        if (S_ISLNK(mode)) {
+                            symLinkList.insert(symLinkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
+                            DEBUG(D_netproto) DFMTNOPREFIX("[remote symlink]");
+                        }
+                        else {
+                            hardLinkList.insert(hardLinkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
+                            DEBUG(D_netproto) DFMTNOPREFIX("[matches, can hardlink]");
+                        }
                     }
                 }
                 else {
@@ -248,7 +266,6 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                             string("mtime mismatch (") + to_string(statData.st_mtime) + "; " + to_string(mtime)) << "]");
                 }
             }
-                
         }
  
         NOTQUIET && ANIMATE && cout << phaseback << "2/4)... " << flush;
@@ -276,7 +293,6 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
          * in the order we've requested in the format of 8 bytes for 'size' and then
          * the 'size' number of bytes of data.
         */
-        bool incTime = str2bool(config.settings[sIncTime].value);
         for (auto &file: neededFiles) {
             DEBUG(D_netproto) DFMTNOENDL("server waiting for " << file);
             auto [errorMsg, mode] = client.ipcReadToFile(slashConcat(currentDir, file), !incTime);
@@ -313,6 +329,35 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 ++linkErrors;
                 SCREENERR(fs << " error: unable to link " << links.second << " to " << links.first << " - " << strerror(errno));
                 log(config.ifTitle() + " " + fs + " error: unable to link " + links.second + " to " + links.first + " - " + strerror(errno));
+            }
+        }
+
+        for (auto &dups: duplicateList) {
+            mkbasedirs(dups.second);
+
+            if (!copyFile(dups.first, dups.second)) {
+                ++linkErrors;
+                SCREENERR(fs << " error: unable to copy (due to maxed out links) " << dups.first << " to " << dups.second << " - " << strerror(errno));
+                log(config.ifTitle() + " " + fs + " error: unable to copy (due to maxed out links) " + dups.first + " to " + dups.second + " - " + strerror(errno));
+            }
+            else {
+                struct stat statData;
+                if (!lstat(dups.first.c_str(), &statData)) {
+                    if (lchown(dups.second.c_str(), statData.st_uid, statData.st_gid)) {
+                        SCREENERR(fs << " error: unable to chown " << dups.second << ": " << strerror(errno));
+                        log(config.ifTitle() + " " + fs + " error: unable to chown " + dups.second + ": " + strerror(errno));
+                    }
+
+                    if (lchmod(dups.second.c_str(), statData.st_mode)) {
+                        SCREENERR(fs << " error: unable to chmod " << dups.second << ": " << strerror(errno));
+                        log(config.ifTitle() + " " + fs + " error: unable to chmod " + dups.second + ": " + strerror(errno));
+                    }
+
+                    struct timeval tv[2];
+                    tv[0].tv_sec  = tv[1].tv_sec  = statData.st_mtime;
+                    tv[0].tv_usec = tv[1].tv_usec = 0;
+                    lutimes(dups.second.c_str(), tv);
+                }
             }
         }
 

@@ -165,5 +165,7 @@ int simpleSelect(int rFd, int wFd, int timeoutSecs);
 
 void showError(string message);
 
+int copyFile(string srcFile, string destFile);
+
 #endif
 

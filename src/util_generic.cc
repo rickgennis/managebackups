@@ -922,3 +922,25 @@ void showError(string message) {
     SCREENERR(message + "\n");
     log(message);
 }
+
+
+int copyFile(string srcFile, string destFile) {
+    std::ifstream inF(srcFile, ios_base::in | ios_base::binary);
+    if (!inF) return 0;
+
+    std::ofstream outF(destFile, ios_base::out | ios_base::binary);
+    if (!outF) return 0;
+
+    char buffer[32 * 1024];
+    do {
+        inF.read(buffer, sizeof(buffer));
+        outF.write(buffer, inF.gcount());
+    } while (inF.gcount() > 0);
+
+    inF.close();
+    outF.close();
+        
+    return 1;
+}
+
+

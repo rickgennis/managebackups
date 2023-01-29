@@ -205,7 +205,7 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 ## 3. Linking Options
 
 **-l**, **--maxlinks** [*links*]
-: Use *links* as the maximum number of links for a backup. For example, if the max is set to 10 and there are 25 identical content backups on disk, the first 10 all share inodes (i.e. there's only one copy of that data on disk for those 10 backups), the next 10 share another set of inodes, and the final 5 share another set of inodes.  From a disk space and allocation perspective those 25 identical copies of data are taking up the space of 3 copies, not 25.  In effect, increasing **--maxlinks** saves disk space. But an accidental mis-edit to one of those files could damage more backups with a higher number. Set **--maxlinks** to 0 or 1 to disable linking. Defaults to 20.  Note: This options only applies to single-file backups.
+: Use *links* as the maximum number of links for a backup. For example, if the max is set to 10 and there are 25 identical content backups on disk, the first 10 all share inodes (i.e. there's only one copy of that data on disk for those 10 backups), the next 10 share another set of inodes, and the final 5 share another set of inodes.  From a disk space and allocation perspective those 25 identical copies of data are taking up the space of 3 copies, not 25.  In effect, increasing **--maxlinks** saves disk space. But an accidental mis-edit to one of those files could damage more backups with a higher number. Set **--maxlinks** to 0 or 1 to disable linking. Defaults to 100.
 
 # NOTIFICATIONS
 **managebackups** can notify on success or failure of a backup via two methods: email or script. Multiple emails and/or scripts can be specified for the same profile.
@@ -246,11 +246,11 @@ Faub-style backups require **managebackups** to be installed on both the backup 
 
     from="192.168.0.0/24",command="sudo managebackups --path /usr/local/bin" ssh-rsa........<user's ssh key>
 
-to backup /usr/local/bin, assuming your backup server is connecting from 192.168.0.0/24 and you've allowed backupuser to sudo the command with NOPASSWD on dataserver. Then the **--faub** parameter of your **managebackups** profile configuration could be as simple as:
+to backup /usr/local/bin, assuming your backup server is connecting from 192.168.0.0/24 and you've allowed backupuser to sudo the command with NOPASSWD on dataserver. Alternatively, if you've run **managebackups --installsuid** on dataserver the 'sudo' can be omitted. With this setup the **--faub** parameter of your **managebackups** profile configuration could be as simple as:
 
     --faub "ssh dataserver"
 
-Without the authorized_keys2 file you'll need the options in your faub config directly:
+Without the authorized_keys2 file you would need the options in your faub config directly:
 
     --faub "ssh dataserver sudo managebackups --path /usr/local/bin"
 
@@ -269,38 +269,40 @@ Environment variables are overriden by **--user**, **--confdir**, **--cachedir**
 # STATS OUTPUT
 Example output from **managebackups -0**
 
-    Profile        Most Recent Backup           Finish@   Duration  Size (Total)     Uniq (T)  Saved  Age Range
-    desktop        desktop-20230125.tgz         17:20:43  00:00:38  229.3M (4.0G)    18 (22)     18%  [6 months, 4 weeks -> 5 hours, 35 minutes]
-    firewall_logs  firewall-logs-20230125.tbz2  17:30:36  00:10:32  227.3M (3.4G)    14 (14)      0%  [1 year, 3 weeks -> 5 hours, 26 minutes]
-    firewall_main  firewall-main-20230125.tgz   17:21:01  00:00:57  188.7M (3.6G)    21 (27)     24%  [1 year, 3 weeks -> 5 hours, 35 minutes]
-    fw_faub        fw_faub-20230125@22:23:35    22:23:40  00:00:04  777.4M (777.4M)  5           44%  [40 minutes, 25 seconds -> 32 minutes, 58 seconds]
-    icloud         icloud-drive-20230125.tbz2   17:38:17  00:18:13  2.3G (16.0G)     7 (9)       22%  [1 year, 3 weeks -> 5 hours, 18 minutes]
-    laptop         laptop-details-20230125.tgz  17:20:06  00:00:02  4.6M (86.8M)     19 (25)     22%  [1 year, 3 weeks -> 5 hours, 36 minutes]
-    TOTALS                                                00:30:26  3.7G (30.8G)     84 (102)    24%  Saved 9.6G from 40.4G
+    Profile        Most Recent Backup           Finish@   Duration  Size (Total)   Uniq (T)  Saved  Age Range
+    desktop        desktop-20230128.tgz         06:41:07  00:00:06  229.4M (4.0G)  18 (21)     14%  [7 months, 1 day -> 7 hours, 26 minutes]
+    firewall_logs  firewall-logs-20230128.tbz2  06:52:00  00:10:58  212.7M (3.3G)  14 (14)      0%  [1 year, 3 weeks -> 7 hours, 15 minutes]
+    firewall_main  firewall-main-20230128.tgz   06:48:32  00:07:31  4.5G (12.4G)   22 (26)      6%  [1 year, 3 weeks -> 7 hours, 19 minutes]
+    fw_faub        fw_faub-20230128@13:34:03    13:34:15  00:00:11  1.2G (5.5G)    6           79%  [4 hours, 17 minutes -> 33 minutes, 20 seconds]
+    icloud         icloud-drive-20230128.tbz2   06:44:52  00:03:50  2.3G (18.3G)   7 (8)        0%  [1 year, 3 weeks -> 7 hours, 22 minutes]
+    laptop         laptop-details-20230128.tgz  07:03:51  00:00:00  8.0M (103.3M)  21 (25)     14%  [1 year, 3 weeks -> 7 hours, 3 minutes]
+    TOTALS                                                00:22:36  8.4G (43.6G)   88 (100)    34%  Saved 22.4G from 66.0G
 
-    229.3M is the data size of the most recent backup of the desktop profile (as if there were no hard linking).
+    229.4M is the data size of the most recent backup of the desktop profile (full size, as if there were no hard linking).
     4.0G is the actual disk space used for all desktop profile backups (with hard linking).
-    18% is the percentage saved in desktop profile backups due to hard linking.
+    14% is the percentage saved in desktop profile backups due to hard linking.
     18 is the number of unique desktop profile backups (only significant for single-file backups; not faub).
-    22 is the total number of desktop profile backups (meaning there are 4 dupes).
+    21 is the total number of desktop profile backups (meaning there are 3 dupes).
+    Age Range is the age of the oldest backup to the age of the most recent backup.
 
-    3.7G is the total used for the most recent backup of all profiles (i.e. one of each, as if no hard linking).
-    30.8G is the total used for all data managed by managebackups together (with hard linking).
-    40.4G is the total that would be used if there were no hard linking.
-
+    8.4G is the total used for the most recent backup of all profiles (i.e. one of each, as if no hard linking).
+    43.6G is the total used for all data managed by managebackups together (with hard linking).
+    66.0G is the total that would be used if there were no hard linking.
 
 Example output from **managebackups -1 -p faub** (faub-style backup example)
 
-    January 2023                                                Size    Used    Dirs    SymLks  Mods    Duration  Type  Age
-    /tmp/mybackups/2023/01/21/firewall-faub-20230121@15:25:03     2.6M    2.6M       0       0      1K  00:00:00  Day   1 hour, 32 minutes
-    /tmp/mybackups/2023/01/21/firewall-faub-20230121@15:50:33     2.6M      84     242     723       1  00:00:01  Day   1 hour, 7 minutes
-    /tmp/mybackups/2023/01/21/firewall-faub-20230121@16:57:39     2.6M      84     242     723       1  00:00:02  Day   5 seconds
+    January 2023                                          Size    Used    Dirs    SymLks  Mods    Duration  Type  Age
+    /var/mybackups/2023/01/28/fw_faub-20230128@09:48:29     5.0G    5.0G      1K     815      9K  00:02:03  Day   4 hours, 27 minutes
+    /var/mybackups/2023/01/28/fw_faub-20230128@09:50:53     5.0G       0      1K     815       0  00:00:05  Day   4 hours, 26 minutes
+    /var/mybackups/2023/01/28/fw_faub-20230128@09:57:15     5.0G       0      1K     815       0  00:00:05  Day   4 hours, 19 minutes
+    /var/mybackups/2023/01/28/fw_faub-20230128@09:59:06     5.0G       0      1K     815       0  00:00:05  Day   4 hours, 17 minutes
+    /var/mybackups/2023/01/28/fw_faub-20230128@10:00:32     5.0G       0      1K     815       0  00:00:05  Day   4 hours, 16 minutes
+    /var/mybackups/2023/01/28/fw_faub-20230128@13:34:03     1.2G  488.3M      1K     815       3  00:00:11  Day   42 minutes, 45 seconds
 
-    2.6M is the size of the backup (it's data)
-    84 bytes in the subsequent backups is the amount of disk actually used (due to hard linking)
-    Dirs is the number of directories
-    SymLks are the number of symlinks made - these equal the number of symlinks on the remote system being backed up
-    Mods is the number of modified files in that backup compared to the previous backup
+    Size is the full size of the data in that backup. Used is is the actual disk space used to store it.
+    Dirs is the number of directories.
+    SymLks are the number of symlinks made - these equal the number of symlinks on the remote system being backed up.
+    Mods is the number of modified files in that backup compared to the previous backup.
 
 # EXAMPLES
 **managebackups --profile homedirs --directory /var/backups --file homedirs.tgz --cmd "tar -cz /home" --weekly 2 --notify me@zmail.com --prune --save**

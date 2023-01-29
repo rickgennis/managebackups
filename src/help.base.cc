@@ -59,7 +59,7 @@ void showHelp(enum helpType kind) {
             + "   --fs_days [d]       FAILSAFE: within the last d days.\n"
             + "   --fp                FAILSAFE: Paranoid mode; sets --fs_backups 1 --fs_days 2\n"
             + "\n" + string(BOLDBLUE) + "HARD LINKING\n" + RESET
-            + "   --maxlinks [x]      Max number of links to a file (default 20).\n"
+            + "   -l, --maxlinks [x]  Max number of links to a file (default 20).\n"
             + "\n" + string(BOLDBLUE) + "GENERAL\n" + RESET
             + "   --profile [name]    Use the specified profile for the current run.\n"
             + "   --save              Save all the specified settings to the specified profile.\n"

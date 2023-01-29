@@ -46,7 +46,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_SFTPTO, RE_SFTP, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_PRUNE, RE_PRUNE, BOOL, "false"));
     settings.insert(settings.end(), Setting(CLI_NOTIFY, RE_NOTIFY, STRING, ""));
-    settings.insert(settings.end(), Setting(CLI_MAXLINKS, RE_MAXLINKS, INT, "20"));
+    settings.insert(settings.end(), Setting(CLI_MAXLINKS, RE_MAXLINKS, INT, "100"));
     settings.insert(settings.end(), Setting(CLI_TIME, RE_TIME, BOOL, "false"));
     settings.insert(settings.end(), Setting(CLI_NOS, RE_NOS, BOOL, "false"));
     settings.insert(settings.end(), Setting(CLI_MINSIZE, RE_MINSIZE, SIZE, "500"));
