@@ -1287,8 +1287,10 @@ void setupUserDirectories()
  *******************************************************************************/
 void sigTermHandler(int sig)
 {
+    string reason = (sig ? "interrupt" : "timeout");
+
     if (GLOBALS.interruptFilename.length()) {
-        cerr << "\ninterrupt: aborting backup, cleaning up " << GLOBALS.interruptFilename << "... ";
+        cerr << "\n" << reason << ": aborting backup, cleaning up " << GLOBALS.interruptFilename << "... ";
 
         struct stat statData;
         if (!stat(GLOBALS.interruptFilename.c_str(), &statData)) {
@@ -1299,11 +1301,11 @@ void sigTermHandler(int sig)
         }
 
         cerr << "done." << endl;
-        log("error: operation aborted on signal " + to_string(sig) + " (" +
+        log("error: operation aborted on " + reason + (sig ? " " + to_string(sig) : "") + " (" +
             GLOBALS.interruptFilename + ")");
     }
     else
-        log("error: operation aborted on signal");
+        log("error: operation aborted on " + reason);
 
     if (GLOBALS.interruptLock.length()) unlink(GLOBALS.interruptLock.c_str());
 
@@ -1795,6 +1797,7 @@ int main(int argc, char *argv[])
         }
         catch (MBException &e) {
             log("aborting due to " + e.detail());
+            sigTermHandler(0);
         }
 
         DEBUG(D_any) DFMT("completed primary tasks");
