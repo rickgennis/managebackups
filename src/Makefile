@@ -3,7 +3,7 @@ MAKEFLAGS := -j
 
 IDIR =../include
 CC=c++
-CFLAGS=-I../include -I/opt/homebrew/include -I/opt/homebrew/Cellar/openssl@3/3.0.5/include -Wno-c++11-extensions -fno-stack-protector -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-math-errno -fno-unroll-loops -fmerge-all-constants
+CFLAGS=-I../include -I/opt/homebrew/include -I/opt/homebrew/Cellar/openssl@3/3.0.5/include -fno-stack-protector -ffunction-sections -fdata-sections -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-math-errno -fno-unroll-loops -fmerge-all-constants
 ODIR=../obj
 LDIR =../lib
 
@@ -18,11 +18,11 @@ OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 UNAME_S := $(shell uname -s)
 
 ifeq ($(UNAME_S),Linux)
-	CFLAGS += -Os
+	CFLAGS += -Os -Wno-return-local-addr
 endif
 
 ifeq ($(UNAME_S),Darwin)
-	CFLAGS += -Oz
+	CFLAGS += -Oz -Wno-c++11-extensions
 endif
 
 managebackups: $(OBJ)

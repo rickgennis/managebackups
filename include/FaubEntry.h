@@ -12,6 +12,7 @@ using namespace std;
 
 #define SUFFIX_FAUBSTATS     "faub_stats"
 #define SUFFIX_FAUBINODES    "faub_inodes"
+#define SUFFIX_FAUBDIFF      "faub_diff"
 
 
 class FaubEntry {
@@ -46,6 +47,9 @@ class FaubEntry {
 
         void loadInodes();
         void saveInodes();
+
+        void updateDiffFiles(set<string> files);
+        void displayDiffFiles();
 
         FaubEntry& operator=(const DiskStats& stats);
         FaubEntry(string dir);

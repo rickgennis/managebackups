@@ -180,6 +180,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     GLOBALS.interruptFilename = currentDir;  // interruptFilename gets cleaned up on SIGTERM & SIGINT
     bool incTime = str2bool(config.settings[sIncTime].value);
 
+    set<string> modifiedFiles;
+
     do {
         set<string> neededFiles;
         map<string,string> hardLinkList;
@@ -262,6 +264,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                     // if the mtimes don't match or the file doesn't exist in the previous backup, add it to the list of
                     // ones we need the client to send in full
                     neededFiles.insert(neededFiles.end(), remoteFilename);
+                    modifiedFiles.insert(modifiedFiles.end(), remoteFilename);
                     DEBUG(D_netproto) DFMTNOPREFIX("[" << (!prevDir.length() ? "no prev dir" : statResult < 0 ? "unable to stat" : 
                             string("mtime mismatch (") + to_string(statData.st_mtime) + "; " + to_string(mtime)) << "]");
                 }
@@ -348,7 +351,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                         log(config.ifTitle() + " " + fs + " error: unable to chown " + dups.second + ": " + strerror(errno));
                     }
 
-                    if (lchmod(dups.second.c_str(), statData.st_mode)) {
+                    if (chmod(dups.second.c_str(), statData.st_mode)) {
                         SCREENERR(fs << " error: unable to chmod " << dups.second << ": " << strerror(errno));
                         log(config.ifTitle() + " " + fs + " error: unable to chmod " + dups.second + ": " + strerror(errno));
                     }
@@ -427,6 +430,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     // loading the cache for this baseDir will automatically detect our new backup having
     // no cached stats and run a dus() on it to determine totalSize/totalSaved.
     FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
+    fcache.updateDiffFiles(currentDir, modifiedFiles);
 
     // the one exception is if this backup was already in the cache and this run is
     // overwriting that backup.  in that case we may need to recache() the new version.

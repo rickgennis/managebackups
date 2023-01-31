@@ -39,7 +39,7 @@ class BackupConfig {
         tuple<int, time_t> getLockPID();
 
         string ifTitle();
-        unsigned int removeEmptyDirs(string dir = "");
+        unsigned int removeEmptyDirs(string dir = "", int baseSlashes = 0);
 
         friend bool operator<(const BackupConfig& b1, const BackupConfig&b2);
         friend bool operator>(const BackupConfig& b1, const BackupConfig&b2);

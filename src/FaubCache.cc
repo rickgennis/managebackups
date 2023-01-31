@@ -166,3 +166,43 @@ DiskStats FaubCache::getTotalStats() {
 }
 
 
+void FaubCache::updateDiffFiles(string backupDir, set<string> files) {
+    auto backupIt = backups.find(backupDir);
+    if (backupIt != backups.end())
+        backupIt->second.updateDiffFiles(files);
+    else
+        cerr << "unable to find " << backupDir << " in cache." << endl;
+}
+
+
+void FaubCache::displayDiffFiles(string backupDir) {
+    set<string> contenders;
+    auto backupIt = backups.find(backupDir);
+
+    if (backupIt != backups.end())
+        backupIt->second.displayDiffFiles();
+    else {
+        Pcre regex(backupDir);
+        map<string, FaubEntry, cmpName>::iterator match;
+
+        for (auto it = backups.begin(); it != backups.end(); ++it) {
+            if (regex.search(it->first)) {
+                contenders.insert(contenders.end(), it->first);
+                match = it;
+            }
+        }
+
+        if (contenders.size() == 1)
+            match->second.displayDiffFiles();
+        else
+            if (contenders.size() > 1) {
+                cout << "error: multiple backups match -" << endl;
+                for (auto &bkup: contenders)
+                    cout << "\t" << bkup << endl;
+                cout << "be more specific." << endl;
+            }
+            else
+                cerr << "unable to find " << backupDir << " in cache." << endl;
+    }
+}
+

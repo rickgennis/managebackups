@@ -315,11 +315,13 @@ void BackupConfig::fullDump() {
 }
 
 
-unsigned int BackupConfig::removeEmptyDirs(string directory) {
+unsigned int BackupConfig::removeEmptyDirs(string directory, int baseSlashes) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
-
     string dir = directory.length() ? directory : settings[sDirectory].value;
+
+    auto numBaseSlashes = baseSlashes ? baseSlashes : count(dir.begin(), dir.end(), '/');
+
     if ((c_dir = opendir(dir.c_str())) != NULL) {
         unsigned int entryCount = 0;
 
@@ -332,11 +334,16 @@ unsigned int BackupConfig::removeEmptyDirs(string directory) {
             ++GLOBALS.statsCount;
             struct stat statData;
             string fullFilename = slashConcat(dir, c_dirEntry->d_name);
-            if (!stat(fullFilename.c_str(), &statData)) {
 
-                // recurse into subdirectories
+            auto depth = count(fullFilename.begin(), fullFilename.end(), '/') - numBaseSlashes;
+            bool entIsDay = (string(c_dirEntry->d_name).length() == 2 && isdigit(c_dirEntry->d_name[0]) && isdigit(c_dirEntry->d_name[1]));
+
+            if ((depth < 3 || (depth == 3 && entIsDay)) && !stat(fullFilename.c_str(), &statData)) {
                 if ((statData.st_mode & S_IFMT) == S_IFDIR) {
-                    if (!removeEmptyDirs(fullFilename)) {
+
+                    // recurse into subdirectories
+                    if (!removeEmptyDirs(fullFilename, numBaseSlashes)) {
+
                         if (!rmdir(fullFilename.c_str())) {    // remove empty subdirectory
                             NOTQUIET && cout << ifTitle() << " removing empty directory " << fullFilename << endl;
                             log(ifTitle() + " removing empty directory " + fullFilename);

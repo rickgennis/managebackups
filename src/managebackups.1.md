@@ -122,6 +122,9 @@ Options are relative to the three functions of **managebackups** plus general op
 **--tripwire** [*string*]
 : The tripwire setting can be used as a rudimentary guard against ransomware or other encryption attacks. It can't protect your local backups but will both alert you immediately and stop processing (no pruning, linking or backing up) if the tripwire check fails.  The check is defined as a filename (or list of filenames) and their MD5 values. If any of the MD5s change, the check fails and the alert is triggered.  For example, if you're backing up /etc you can create a bogus test file such as /etc/tripdata.txt and then configure **managebackups** with **--tripwire "/etc/tripdata.txt: xxx"** where xxx is the correct MD5 of the file. Multiple entries can be separated with commas ("/etc/foo: xxx, /etc/fish: yyy, /usr/local/foo: zzz"). Only local computer tripwire files are supported at this time.
 
+**--diff** [*string*]
+: With faub-style backups, **managebackups** tracks the files that have changed between each subsequent backup. The **--diff** option, when given the directory name of a specific backup, will display the changed files between it and the previous backup. The specified backup name can be partial. 
+
 ## 1. Take Backups Options
 Backups options are noted as {1F} for single-file applicable, {FB} for faub-backup applicable, or {both}.
 

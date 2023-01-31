@@ -400,6 +400,14 @@ xxx\[rq]\f[R] where xxx is the correct MD5 of the file.
 Multiple entries can be separated with commas (\[lq]/etc/foo: xxx,
 /etc/fish: yyy, /usr/local/foo: zzz\[rq]).
 Only local computer tripwire files are supported at this time.
+.TP
+\f[B]\[en]diff\f[R] [\f[I]string\f[R]]
+With faub-style backups, \f[B]managebackups\f[R] tracks the files that
+have changed between each subsequent backup.
+The \f[B]\[en]diff\f[R] option, when given the directory name of a
+specific backup, will display the changed files between it and the
+previous backup.
+The specified backup name can be partial.
 .SS 1. Take Backups Options
 .PP
 Backups options are noted as {1F} for single-file applicable, {FB} for

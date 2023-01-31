@@ -590,8 +590,16 @@ void pruneBackups(BackupConfig &config)
 
     /* safety checks complete - begin pruning */
 
-    if (config.settings[sFaub].value.length()) 
-        return pruneFaubBackups(config);
+    if (config.settings[sFaub].value.length()) {
+        pruneFaubBackups(config);
+
+        if (!GLOBALS.cli.count(CLI_TEST)) {
+            DEBUG(D_prune) DFMT("removing empty directories");
+            config.removeEmptyDirs();
+        }
+
+        return;
+    }
 
     set<string> changedMD5s;
     DEBUG(D_prune) DFMT("weeklies set to dow " << dw(config.settings[sDOW].ivalue()));
@@ -1410,6 +1418,7 @@ int main(int argc, char *argv[])
         string("h,") + CLI_HELP, "Show help", cxxopts::value<bool>()->default_value("false"))(
         string("b,") + CLI_USEBLOCKS, "Use blocks disk usage", cxxopts::value<bool>()->default_value("false"))(
         string("s,") + CLI_PATHS, "Faub paths", cxxopts::value<std::vector<std::string>>())(
+        CLI_DIFF, "Faub diff", cxxopts::value<std::string>())(
         CLI_FAUB, "Faub backup", cxxopts::value<std::string>())(
         CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))(
         CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))(
@@ -1567,6 +1576,24 @@ int main(int argc, char *argv[])
     DEBUG(D_any) DFMT("about to setup config...");
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager);
+
+    if (GLOBALS.cli.count(CLI_DIFF)) {
+        if (GLOBALS.cli.count(CLI_PROFILE)) {
+            if (currentConfig->settings[sFaub].value.length()) {
+                FaubCache fcache(currentConfig->settings[sDirectory].value, currentConfig->settings[sTitle].value);
+                fcache.displayDiffFiles(GLOBALS.cli[CLI_DIFF].as<string>());
+                exit(1);
+            }
+            else {
+                SCREENERR("error: --diff is only valid with a faub-backup profile");
+                exit(1);
+            }
+        }
+        else {
+            SCREENERR("error: --diff is only valid with a profile (use -p)");
+            exit(1);
+        }
+    }
 
     // if displaying stats and --profile hasn't been specified (or matched successfully)
     // then rescan all configs;  otherwise just scan the --profile config

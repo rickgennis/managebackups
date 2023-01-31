@@ -41,6 +41,9 @@ class FaubCache {
         map<string, FaubEntry>::iterator getLastBackup() { return (backups.size() ? --backups.end() : backups.end()); }
         map<string, FaubEntry>::iterator getEnd() { return backups.end(); }
 
+        void updateDiffFiles(string backupDir, set<string> files);
+        void displayDiffFiles(string backupDir);
+
         void recache(string dir);
         string getInProcessFilename() { return inProcessFilename; }
 

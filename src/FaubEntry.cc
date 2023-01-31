@@ -58,6 +58,8 @@ FaubEntry::FaubEntry(string dir) {
                     unlink(cacheFilename.c_str());
                     cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBSTATS), string(SUFFIX_FAUBSTATS).length(), SUFFIX_FAUBINODES);
                     unlink(cacheFilename.c_str());
+                    cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBINODES), string(SUFFIX_FAUBINODES).length(), SUFFIX_FAUBDIFF);
+                    unlink(cacheFilename.c_str());
                 }
             }
         }
@@ -206,4 +208,42 @@ void FaubEntry::loadInodes() {
 }
 
 
+void FaubEntry::updateDiffFiles(set<string> files) {
+    ofstream cacheFile;
 
+    if (files.size()) {
+        cacheFile.open(cacheFilename(SUFFIX_FAUBDIFF));
+        if (cacheFile.is_open()) {
+            for (auto &aFile: files)
+                cacheFile << aFile << endl;
+
+            cacheFile.close();
+        }
+        else {
+            string error = "error: unable to create " + cacheFilename(SUFFIX_FAUBDIFF);
+            log(error);
+            SCREENERR(error);
+        }
+    }
+}
+
+
+void FaubEntry::displayDiffFiles() {
+    ifstream cacheFile;
+    string data;
+
+    cacheFile.open(cacheFilename(SUFFIX_FAUBDIFF));
+    if (cacheFile.is_open()) {
+        while (1) {
+            cacheFile >> data;
+             if (cacheFile.eof())
+                 break;
+
+            cout << data << endl;
+        }
+
+        cacheFile.close();
+    }
+    else
+        cout << "no diff files found." << endl;
+}
