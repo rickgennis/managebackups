@@ -26,7 +26,6 @@
 #include "BackupConfig.h"
 #include "BackupEntry.h"
 #include "ConfigManager.h"
-//include "ipc.h"
 #include "FaubCache.h"
 #include "colors.h"
 #include "cxxopts.hpp"
@@ -246,15 +245,22 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
 
     // if --profile is specified on the command line set the active config
     if (bProfile) {
-        if (int configNumber = configManager.findConfig(GLOBALS.cli[CLI_PROFILE].as<string>())) {
+        int configNumber;
+        if ((configNumber = configManager.findConfig(GLOBALS.cli[CLI_PROFILE].as<string>())) > 0) {
             configManager.activeConfig = configNumber - 1;
             currentConf = &configManager.configs[configManager.activeConfig];
         }
-        else if (!bSave) {
-            SCREENERR("error: profile not found; try -0 or -1 with no profile to see all backups\n"
-                      << "or use --save to create this profile.");
-            exit(1);
-        }
+        else
+            if (configNumber == -1) {
+                SCREENERR("error: more than one profile matches selection.");
+                exit(1);
+            }
+            else 
+                if (!bSave) {
+                    SCREENERR("error: profile not found; try -0 or -1 with no profile to see all backups\n"
+                          << "or use --save to create this profile.");
+                    exit(1);
+                }
 
         currentConf->loadConfigsCache();
     }
@@ -464,9 +470,8 @@ void pruneFaubBackups(BackupConfig &config)
     DEBUG(D_prune) DFMT("weeklies set to dow " << dw(config.settings[sDOW].ivalue()));
 
     FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
-    DEBUG(D_prune)
-    DFMT("examining " << fcache.getNumberOfBackups() << " backup(s) for "
-                      << config.settings[sTitle].value);
+    DEBUG(D_prune) DFMT("examining " << fcache.getNumberOfBackups() << " backup(s) for "
+        << config.settings[sTitle].value);
 
     auto cacheEntryIt = fcache.getFirstBackup();
     while (cacheEntryIt != fcache.getEnd()) {
@@ -1683,9 +1688,30 @@ int main(int argc, char *argv[])
         if (GLOBALS.debugSelector) commonSwitches += " -v=" + to_string(GLOBALS.debugSelector);
 
         try {
-            // start faub client-side
             if (GLOBALS.cli.count(CLI_PATHS)) {
+                // get the list of --path "foo" --path "bar" parameters that are set
                 auto paths = GLOBALS.cli[CLI_PATHS].as<vector<string>>();
+                vector<string> newPaths;
+
+                // loop through to see if any are space-delimited containing multiple paths in one
+                for (auto &p: paths) {
+                    Pcre pathRE("((?:([\'\"])(?:(?!\\g2).|(?:(?<=\\\\)[\'\"]))+(?<!\\\\)\\g2)|(?:\\S|(?:(?<=\\\\)\\s))+)", "g");
+                    size_t pos = 0;
+                    string match;
+
+                    while (pos <= p.length() && pathRE.search(p, pos)) {
+                        pos = pathRE.get_match_end(0);
+                        ++pos;
+                        match = pathRE.get_match(0);
+
+                        if (match.length())
+                            newPaths.insert(newPaths.end(), trimQuotes(match));
+                    }
+
+                    paths = newPaths;
+                }
+
+                // start faub client-side
                 fc_mainEngine(paths);
                 exit(1);
             }

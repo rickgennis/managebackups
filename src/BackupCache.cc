@@ -147,10 +147,8 @@ BackupCache::~BackupCache() {
             set<unsigned int> md5_list;
 
             // is there an index (set) of files for this MD5?
-            if (md5_it != indexByMD5.end()) {
-                auto set_it = md5_it->second.find(index);
+            if (md5_it != indexByMD5.end())
                 md5_it->second.insert(index);
-            }
             else {
                 set<unsigned int> newSet; 
                 newSet.insert(index);

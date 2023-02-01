@@ -109,7 +109,6 @@ string newBackupDir(BackupConfig& config) {
     strftime(buffer, sizeof(buffer), "%Y-%m-%d@%X", timeFields);
 
     string setDir = config.settings[sDirectory].value;
-    //strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d" : "%Y/%m", localtime(&rawTime));
     strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d" : "%Y/%m", localtime(&rawTime));
     string subDir = buffer;
 
@@ -416,6 +415,10 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     // note finish time
     backupTime.stop();
     NOTQUIET && ANIMATE && cout << backspaces << blankspaces << backspaces << flush;
+
+    // if time isn't included we may be about to overwrite a previous backup for this date
+    if (!incTime)
+        rmrfdir(originalCurrentDir.c_str());
 
     if (rename(string(currentDir).c_str(), originalCurrentDir.c_str())) {
         string errorDetail = config.ifTitle() + " unable to rename " + currentDir + " to " + originalCurrentDir + ": " + strerror(errno);

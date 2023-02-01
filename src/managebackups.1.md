@@ -183,7 +183,7 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 : {both} Leave the output from any commands that are run to create a backup or SFTP one in a file under /tmp/managebackups_output. This can help facilitate diagnosing authentication errors.
 
 **-s**, **--path** [*path*]
-: {FB-remote} Specifies which directories to backup in a faub-style backup.  This option is only used on the REMOTE end, i.e. the server being backed up. See the FAUB-STYLE BACKUPS section below. 
+: {FB-remote} Specifies which directories to backup in a faub-style backup.  This option is only used on the REMOTE end, i.e. the server being backed up. See the FAUB-STYLE BACKUPS section below. Multiple paths can be specified via quoted parameters that are space delimited (--path "/usr /usr/local /root") or multiple directives (--path /usr --path /usr/local).
 
 ## 2. Pruning Options
 

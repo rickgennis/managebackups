@@ -207,7 +207,6 @@ string MD5file(string filename, bool quiet) {
 
 
 string MD5string(string origString) {
-        unsigned char data[65536];
         EVP_MD_CTX *md5Context;
         unsigned char *md5Digest;
         unsigned int md5DigestLen = EVP_MD_size(EVP_md5());

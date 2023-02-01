@@ -552,6 +552,9 @@ backup.
 This option is only used on the REMOTE end, i.e.\ the server being
 backed up.
 See the FAUB-STYLE BACKUPS section below.
+Multiple paths can be specified via quoted parameters that are space
+delimited (\[en]path \[lq]/usr /usr/local /root\[rq]) or multiple
+directives (\[en]path /usr \[en]path /usr/local).
 .SS 2. Pruning Options
 .TP
 \f[B]\[en]prune\f[R]

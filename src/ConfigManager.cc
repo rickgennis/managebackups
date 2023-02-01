@@ -21,9 +21,8 @@ int ConfigManager::findConfig(string title) {
             return index;
 
         if (config.settings[sTitle].value.find(title) != string::npos) {
-            if (partialMatchIdx) {
-                return 0;
-            }
+            if (partialMatchIdx)
+                return -1;
             else
                 partialMatchIdx = index;
         }
