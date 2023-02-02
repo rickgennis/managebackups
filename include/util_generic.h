@@ -167,5 +167,8 @@ void showError(string message);
 
 int copyFile(string srcFile, string destFile);
 
+// unescape
+string ue(string file);
+
 #endif
 

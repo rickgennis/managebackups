@@ -100,7 +100,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache, 
     Pcre fnameRE(fnamePattern);
     Pcre tempRE("\\.tmp\\.\\d+$");
 
-    if ((c_dir = opendir(directory.c_str())) != NULL) {
+    if ((c_dir = opendir(ue(directory).c_str())) != NULL) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
             if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..")) continue;
 
@@ -291,8 +291,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
     for (auto &setting : currentConf->settings)
         if (GLOBALS.cli.count(setting.display_name)) {
             DEBUG(D_config)
-            DFMT("command line param: " << setting.display_name << " (" << setting.data_type
-                                        << ")");
+            DFMT("command line param: " << setting.display_name << " (type " << setting.data_type << ")");
 
             switch (setting.data_type) {
                 case INT:
@@ -305,7 +304,14 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
 
                 case STRING:
                 default:
-                    if (setting.display_name == CLI_PROFILE) break;
+                    // the rest of this STRING block will update the value of Profile with anything
+                    // specified after -p on the commandline.  we only require -p to be precise when
+                    // creating a new profile (i.e. when --save is also given).  otherwise -p can be
+                    // a partial string used to match an existing profile.  so if there's no --save
+                    // and therefore we may have a partial match value given on the commandline,
+                    // don't update the value of our setting with the commandline specification.
+                    // instead, break.
+                    if ((setting.display_name == CLI_PROFILE) && !bSave) break;
 
                     if (bSave && (setting.value != GLOBALS.cli[setting.display_name].as<string>()))
                         currentConf->modified = 1;
@@ -425,8 +431,6 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
 string pruneShouldKeep(BackupConfig &config, string filename, int filenameAge, int filenameDOW,
                        int filenameDay, int filenameMonth, int filenameYear)
 {
-    // cerr << "in; n:" << filename << ", a:" << filenameAge << ", dw:" << filenameDOW << ", d:" <<
-    // filenameDay << ", m:" << filenameMonth << ", y:" << filenameYear << endl;
     //  daily
     if (config.settings[sDays].ivalue() && filenameAge <= config.settings[sDays].ivalue()) {
         // cerr << "returning keep daily" << endl;
@@ -1708,8 +1712,9 @@ int main(int argc, char *argv[])
                             newPaths.insert(newPaths.end(), trimQuotes(match));
                     }
 
-                    paths = newPaths;
                 }
+
+                paths = newPaths;
 
                 // start faub client-side
                 fc_mainEngine(paths);

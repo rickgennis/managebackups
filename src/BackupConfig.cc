@@ -61,9 +61,11 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_MAILFROM, RE_MAILFROM, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_LEAVEOUTPUT, RE_LEAVEOUTPUT, BOOL, "false"));
     settings.insert(settings.end(), Setting(CLI_FAUB, RE_FAUB, STRING, ""));
-    settings.insert(settings.end(), Setting(CLI_FAUB, RE_PATHS, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_UID, RE_UID, INT, "-1"));
     settings.insert(settings.end(), Setting(CLI_GID, RE_GID, INT, "-1"));
+    // CLI_PATHS is intentionally left out because its only accessed via CLI
+    // and never as a Setting.  to implement it as a Setting would require a new
+    // type (vector<string>) to be setup and parse and there's really no benefit.
 }
 
 
@@ -322,7 +324,7 @@ unsigned int BackupConfig::removeEmptyDirs(string directory, int baseSlashes) {
 
     auto numBaseSlashes = baseSlashes ? baseSlashes : count(dir.begin(), dir.end(), '/');
 
-    if ((c_dir = opendir(dir.c_str())) != NULL) {
+    if ((c_dir = opendir(ue(dir).c_str())) != NULL) {
         unsigned int entryCount = 0;
 
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
@@ -367,7 +369,7 @@ unsigned int BackupConfig::removeEmptyDirs(string directory, int baseSlashes) {
 
 
 tuple<int, time_t> BackupConfig::getLockPID() {
-    string lockFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".lock";
+    string lockFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value + settings[sTitle].value) + ".lock";
     unsigned int pid = 0;
 
     ifstream lockFile;
@@ -390,7 +392,7 @@ tuple<int, time_t> BackupConfig::getLockPID() {
 
 
 string BackupConfig::setLockPID(unsigned int pid) {
-    string lockFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".lock";
+    string lockFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value + settings[sTitle].value) + ".lock";
     mkdirp(GLOBALS.cacheDir);
 
     if (pid) {

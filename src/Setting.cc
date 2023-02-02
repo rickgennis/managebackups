@@ -31,9 +31,11 @@ map<string, int>settingMap =
      { CLI_MAILFROM, sMailFrom },
      { CLI_LEAVEOUTPUT, sLeaveOutput },
      { CLI_FAUB, sFaub },
-     { CLI_PATHS, sPaths },
      { CLI_UID, sUID},
      { CLI_GID, sGID}};
+// CLI_PATHS is excluded because it's only accessed as a commandline option
+// and never as a Setting. And because its a vector<> that's one less special-
+// case selectOrSetupConfig() needs to address.
 
 
 

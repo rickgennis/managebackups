@@ -1,6 +1,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <netinet/tcp.h>
+#include <algorithm>
 #include <unistd.h>
 
 #include "FaubCache.h"
@@ -44,7 +45,7 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
     Pcre matchSpec("-\\d{8}($|-\\d{2}:)");
     if (matchSpec.search(backupDir)) {
 
-        if (!stat(backupDir.c_str(), &statData)) {
+        if (!stat(ue(backupDir).c_str(), &statData)) {
             DEBUG(D_faub) DFMT("returning " << backupDir);
             return {backupDir, statData.st_mtime};
         }
@@ -52,7 +53,7 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
         return {"", 0};
     }
 
-    if ((c_dir = opendir(backupDir.c_str())) != NULL) {
+    if ((c_dir = opendir(ue(backupDir).c_str())) != NULL) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
 
             if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
@@ -481,7 +482,9 @@ void fc_scanToServer(string directory, IPC_Base& server) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
 
-    if ((c_dir = opendir(directory.c_str())) != NULL) {
+    directory.erase(remove(directory.begin(), directory.end(), '\\'), directory.end());
+
+    if ((c_dir = opendir(ue(directory).c_str())) != NULL) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
 
             if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
@@ -499,10 +502,14 @@ void fc_scanToServer(string directory, IPC_Base& server) {
                 if (S_ISDIR(statData.st_mode))
                     fc_scanToServer(fullFilename, server);
             }
+            else
+                log("error: stat failed for " + fullFilename);
         }
 
         closedir(c_dir);
     }
+    else
+        log("error: can't open " + directory);
 }
 
 /*

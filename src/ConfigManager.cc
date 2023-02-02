@@ -39,7 +39,7 @@ ConfigManager::ConfigManager() {
     DIR *c_dir;
     struct dirent *c_dirEntry;
 
-    if ((c_dir = opendir(GLOBALS.confDir.c_str())) != NULL ) {
+    if ((c_dir = opendir(ue(GLOBALS.confDir).c_str())) != NULL ) {
         Pcre regEx(".*\\.conf$");
 
         // loop through *.conf files

@@ -943,3 +943,7 @@ int copyFile(string srcFile, string destFile) {
 }
 
 
+string ue(string file) {
+    file.erase(remove(file.begin(), file.end(), '\\'), file.end());
+    return file;
+}

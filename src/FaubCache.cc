@@ -38,7 +38,7 @@ void FaubCache::restoreCache(string profileName) {
         currentDir = dirQueue.front();
         dirQueue.pop();
 
-        if ((c_dir = opendir(currentDir.c_str())) != NULL) {
+        if ((c_dir = opendir(ue(currentDir).c_str())) != NULL) {
             while ((c_dirEntry = readdir(c_dir)) != NULL) {
 
                 if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
