@@ -145,6 +145,7 @@ void fs_startServer(BackupConfig& config) {
 }
 
 
+#define PB(x) string(5 + to_string(x).length(), '\b')
 void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir, string currentDir) {
     string remoteFilename;
     string localPrevFilename;
@@ -167,10 +168,12 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     DEBUG(D_faub) DFMT("current: " << currentDir);
     DEBUG(D_faub) DFMT("previous: " << prevDir);
 
+    // record number of filesystems the client is going to send
+    auto nfs = client.ipcRead();
+
     currentDir += tempExtension;
-    string screenMessage = config.ifTitle() + " backing up to temp dir " + currentDir + " (phase 1/4)... ";
+    string screenMessage = config.ifTitle() + " backing up to temp dir " + currentDir + " (" + to_string(nfs * 4) +  ")... ";
     string backspaces = string(screenMessage.length(), '\b');
-    string phaseback = string(8, '\b');
     string blankspaces = string(screenMessage.length() , ' ');
     NOTQUIET && ANIMATE && cout << screenMessage << flush;
     DEBUG(D_any) cerr << "\n";
@@ -202,6 +205,12 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             remoteFilename = client.ipcReadTo(NET_DELIM);
             if (remoteFilename == NET_OVER) {
                 break;
+            }
+
+            // log errors sent by the client
+            if (remoteFilename.substr(0, 4) == "##* ") {
+                remoteFilename.erase(0, 4);
+                log(config.ifTitle() + " " + fs + " " + remoteFilename);
             }
 
             ++fileTotal;
@@ -271,7 +280,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             }
         }
  
-        NOTQUIET && ANIMATE && cout << phaseback << "2/4)... " << flush;
+        NOTQUIET && ANIMATE && cout << PB(nfs * 4) << to_string(nfs * 4 - 1) << ")... " << flush;
         log(config.ifTitle() + " " + fs + " phase 1: client detailed " + to_string(fileTotal) + " entr" + ies(fileTotal));
         DEBUG(D_netproto) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size() 
                 << ", willLink:" << hardLinkList.size());
@@ -287,7 +296,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
         client.ipcWrite(NET_OVER_DELIM);
 
-        NOTQUIET && ANIMATE && cout << phaseback << "3/4)... " << flush;
+        NOTQUIET && ANIMATE && cout << PB(nfs * 4 - 1) << to_string(nfs * 4 - 2) << ")... " << flush;
         DEBUG(D_netproto) DFMT(fs << " server phase 2 complete; told client we need " << neededFiles.size() << " of " << fileTotal);
         log(config.ifTitle() + " " + fs + " phase 2: requested " + to_string(neededFiles.size()) + " entr" + ies(neededFiles.size()) + " from client");
 
@@ -313,7 +322,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                     ++receivedSymLinks;
         }
 
-        NOTQUIET && ANIMATE && cout << phaseback << "4/4)... " << flush;
+        NOTQUIET && ANIMATE && cout << PB(nfs * 4 - 2) << to_string(nfs * 4 - 3) << ")... " << flush;
         DEBUG(D_netproto) DFMT(fs << " server phase 3 complete; received " << neededFiles.size() << " file" << s(neededFiles.size()) + " from client");
         log(config.ifTitle() + " " + fs + " phase 3: received " + to_string(neededFiles.size()) + " entr" + ies(neededFiles.size()) + " from client");
 
@@ -410,6 +419,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         filesModified += neededFiles.size();
         filesHardLinked += hardLinkList.size();
         filesSymLinked += symLinkList.size();
+        --nfs;
 
     } while (client.ipcRead());
 
@@ -508,8 +518,11 @@ void fc_scanToServer(string directory, IPC_Base& server) {
 
         closedir(c_dir);
     }
-    else
+    else {
         log("error: can't open " + directory);
+        server.ipcWrite(string(string("##* error: client instance unable to read directory ") + directory + NET_DELIM).c_str());
+        exit(5);
+    }
 }
 
 /*
@@ -544,6 +557,9 @@ void fc_mainEngine(vector<string> paths) {
         IPC_Base server(0, 1, 60);  // use stdin and stdout
 
         DEBUG(D_faub) DFMT("faub client starting with " << paths.size() << " request(s)");
+
+        // tell server the number of filesystems we're going to process
+        server.ipcWrite((__int64_t)paths.size());
 
         for (auto it = paths.begin(); it != paths.end(); ++it) {
             log("faub client request for path: " + *it);

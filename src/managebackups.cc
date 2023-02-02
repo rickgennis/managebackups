@@ -432,11 +432,9 @@ string pruneShouldKeep(BackupConfig &config, string filename, int filenameAge, i
                        int filenameDay, int filenameMonth, int filenameYear)
 {
     //  daily
-    if (config.settings[sDays].ivalue() && filenameAge <= config.settings[sDays].ivalue()) {
-        // cerr << "returning keep daily" << endl;
+    if (config.settings[sDays].ivalue() && filenameAge <= config.settings[sDays].ivalue())
         return string("keep_daily: ") + filename + " (age=" + to_string(filenameAge) +
                ", dow=" + dw(filenameDOW) + ")";
-    }
 
     // weekly
     if (config.settings[sWeeks].ivalue() && filenameAge / 7.0 <= config.settings[sWeeks].ivalue() &&
