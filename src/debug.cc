@@ -56,15 +56,14 @@ static inline uschar skip_whitespace(const uschar ** sp) {
 
 void decode_bits(unsigned int *selector, size_t selsize, int *notall,
   uschar *parsestring, bit_table *options, int count) {
-    uschar *errmsg;
-
+    
     if (!parsestring)
         return;
 
     if (*parsestring == '=') {
         char *end;    /* Not uschar */
         memset(selector, 0, sizeof(*selector)*selsize);
-        *selector = strtoul(CS parsestring+1, &end, 0);
+        *selector = (int)strtoul(CS parsestring+1, &end, 0);
 
         if (!*end)
             return;

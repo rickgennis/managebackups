@@ -62,7 +62,7 @@ vector<string> perlSplit(string regex, string haystack) {
     size_t dataStart = 0;
     size_t dataEnd = 0;
 
-    while (pos <= haystack.length() && theRE.search(haystack, pos)) {
+    while (pos <= haystack.length() && theRE.search(haystack, (int)pos)) {
         pos = theRE.get_match_end(0);
         string delimiter = theRE.get_match(0);
 
@@ -172,7 +172,7 @@ string MD5file(string filename, bool quiet) {
             cout << message << flush;
 
         unsigned char data[65536];
-        int bytesRead;
+        unsigned long bytesRead;
         EVP_MD_CTX *md5Context;
         unsigned char *md5Digest;
         unsigned int md5DigestLen = EVP_MD_size(EVP_md5());
@@ -291,7 +291,7 @@ unsigned long approx2bytes(string approx) {
 
             if (it != units.end()) {
                 // determine its index and calculate the result
-                int index = it - units.begin();
+                auto index = it - units.begin();
                 return floor(pow(1024, index) * numericVal);
             }
         }
@@ -352,8 +352,8 @@ string timeDiff(struct timeval start, struct timeval end, int maxUnits, int prec
 
     for (auto unit_it = units.rbegin(); unit_it != units.rend(); ++unit_it) {
         if (offset >= unit_it->first) {
-            int value = floor(offset / unit_it->first);
-            int leftover = offset % unit_it->first;
+            unsigned long value = floor(offset / unit_it->first);
+            unsigned long leftover = offset % unit_it->first;
 
             result += (result.length() ? ", " : "") + to_string(value) + " " + unit_it->second + (value == 1 ? "" : "s");
             offset = leftover;
@@ -453,7 +453,7 @@ int varexec(string fullCommand) {
     string match;
 
     int index = 0;
-    size_t pos = 0;
+    int pos = 0;
     while (pos <= fullCommand.length() && cmdRE.search(fullCommand, pos)) {
         pos = cmdRE.get_match_end(0);
         ++pos;

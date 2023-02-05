@@ -151,7 +151,8 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
             to_string(saved) + "%",
             first_it->second.name_mtime ? timeDiff(mktimeval(first_it->second.name_mtime)) : "?",
             last_it->second.mtime ? timeDiff(mktimeval(last_it->second.mtime)) : "?",
-            processAge.length() ? processAge : GLOBALS.startupTime - last_it->second.name_mtime > 2*60*60*24 ? oldMessage : ""};
+            processAge.length() ? processAge : GLOBALS.startupTime - last_it->second.name_mtime > 2*60*60*24 ? oldMessage : ""
+        };
             
         for (int i = 0; i < NUMSTATDETAILS; ++i)
             resultStats.stringOutput[i] = soutput[i];
@@ -220,19 +221,19 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
 
         // determine the longest length entry of each column to allow consistent horizontal formatting
         int colLen[NUMSTATDETAILS] = {};
-        int numberStatStrings = statStrings.size();
+        int numberStatStrings = (int)statStrings.size();
         for (int column = 0; column < NUMSTATDETAILS - 1; ++column) {
             int line = 0;
 
             while (NUMSTATDETAILS * line + column < numberStatStrings) {
                 if (column == 7)  // cols 7 and 8 get combined
-                    colLen[column] = max(colLen[column],
+                    colLen[column] = (int)max(colLen[column],
                             statStrings[NUMSTATDETAILS * line + column].length() +
                             statStrings[NUMSTATDETAILS * line + column+1].length() + 6);
                 else if (column > 7)
-                    colLen[column] = max(colLen[column], statStrings[NUMSTATDETAILS * line + column+1].length());
+                    colLen[column] = (int)max(colLen[column], statStrings[NUMSTATDETAILS * line + column+1].length());
                 else
-                    colLen[column] = max(colLen[column], statStrings[NUMSTATDETAILS * line + column].length());
+                    colLen[column] = (int)max(colLen[column], statStrings[NUMSTATDETAILS * line + column].length());
 
                 ++line;
             }
@@ -328,7 +329,7 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
         cout << line << "\n";
         if (config.settings[sTitle].value.length()) cout << "Profile: " << config.settings[sTitle].value << "\n";
         cout << "Directory: " << config.settings[sDirectory].value << "\n";
-        cout << bkups << " backup" << s(bkups) << "\n";
+        cout << bkups << " backup" << s((int)bkups) << "\n";
         cout << approximate(stats.getSize() + stats.getSaved()) << " using " << approximate(stats.getSize()) << " on disk (saved " << saved << "%)\n";
         cout << line << endl;
 
@@ -336,7 +337,7 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
         int fnameLen = 0;
         auto backupIt = fcache.getFirstBackup();
         while (backupIt != fcache.getEnd()) {
-            fnameLen = max(fnameLen, backupIt->first.length());
+            fnameLen = (int)max(fnameLen, backupIt->first.length());
             ++backupIt;
         }
 
@@ -407,7 +408,7 @@ void _displayDetailedStats(BackupConfig& config, int statDetail) {
     for (auto &raw: config.cache.rawData) {
 
         // track the length of the longest filename for formatting
-        fnameLen = max(fnameLen, raw.second.filename.length());
+        fnameLen = (int)max(fnameLen, raw.second.filename.length());
 
         // calculate total bytes used and saved
         if (countedInode.find(raw.second.inode) == countedInode.end()) {
@@ -429,7 +430,7 @@ void _displayDetailedStats(BackupConfig& config, int statDetail) {
     cout << line << "\n";
     if (config.settings[sTitle].value.length()) cout << "Profile: " << config.settings[sTitle].value << "\n";
     cout << "Directory: " << config.settings[sDirectory].value << " (" << config.settings[sBackupFilename].value << ")\n";
-    cout << rawSize << " backup" << s(rawSize) << ", " << md5Size << " unique" << s(md5Size) << "\n";
+    cout << rawSize << " backup" << s((int)rawSize) << ", " << md5Size << " unique" << s((int)md5Size) << "\n";
     cout << approximate(bytesUsed + bytesSaved) << " using " << approximate(bytesUsed) << " on disk (saved " << saved << "%)\n";
     cout << line << endl;
 

@@ -11,6 +11,8 @@
 #include "debug.h"
 #include "globals.h"
 
+extern void sigTermHandler(int sig);
+
 tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string backupDir, time_t sinceTime, string profileName);
 
 
@@ -128,7 +130,7 @@ void fs_startServer(BackupConfig& config) {
     if (GLOBALS.cli.count(CLI_NOBACKUP))
         return;
 
-    auto baseSlashes = count(config.settings[sDirectory].value.begin(), config.settings[sDirectory].value.end(), '/');
+    auto baseSlashes = (int)count(config.settings[sDirectory].value.begin(), config.settings[sDirectory].value.end(), '/');
     string newDir = newBackupDir(config);
     string prevDir = mostRecentBackupDirSince(baseSlashes, config.settings[sDirectory].value, newDir, config.settings[sTitle].value);
 
@@ -281,7 +283,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         }
  
         NOTQUIET && ANIMATE && cout << PB(nfs * 4) << to_string(nfs * 4 - 1) << ")... " << flush;
-        log(config.ifTitle() + " " + fs + " phase 1: client detailed " + to_string(fileTotal) + " entr" + ies(fileTotal));
+        log(config.ifTitle() + " " + fs + " phase 1: client detailed " + to_string(fileTotal) + " entr" + ies((int)fileTotal));
         DEBUG(D_netproto) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size() 
                 << ", willLink:" << hardLinkList.size());
 
@@ -298,7 +300,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
         NOTQUIET && ANIMATE && cout << PB(nfs * 4 - 1) << to_string(nfs * 4 - 2) << ")... " << flush;
         DEBUG(D_netproto) DFMT(fs << " server phase 2 complete; told client we need " << neededFiles.size() << " of " << fileTotal);
-        log(config.ifTitle() + " " + fs + " phase 2: requested " + to_string(neededFiles.size()) + " entr" + ies(neededFiles.size()) + " from client");
+        log(config.ifTitle() + " " + fs + " phase 2: requested " + to_string(neededFiles.size()) + " entr" + ies((int)neededFiles.size()) + " from client");
 
         /*
          * phase 3 - receive full copies of the files we've requested. they come over
@@ -323,8 +325,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         }
 
         NOTQUIET && ANIMATE && cout << PB(nfs * 4 - 2) << to_string(nfs * 4 - 3) << ")... " << flush;
-        DEBUG(D_netproto) DFMT(fs << " server phase 3 complete; received " << neededFiles.size() << " file" << s(neededFiles.size()) + " from client");
-        log(config.ifTitle() + " " + fs + " phase 3: received " + to_string(neededFiles.size()) + " entr" + ies(neededFiles.size()) + " from client");
+        DEBUG(D_netproto) DFMT(fs << " server phase 3 complete; received " << neededFiles.size() << " file" << s((int)neededFiles.size()) + " from client");
+        log(config.ifTitle() + " " + fs + " phase 3: received " + to_string(neededFiles.size()) + " entr" + ies((int)neededFiles.size()) + " from client");
 
         /*
          * phase 4 - create the links for everything that matches the previous backup.
@@ -413,8 +415,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         }
 
         DEBUG(D_netproto) DFMT(fs << " server phase 4 complete; created " << (hardLinkList.size() - linkErrors)  << 
-                " link" << s(hardLinkList.size() - linkErrors) << " to previously backed up files" << (linkErrors ? string(" (" + to_string(linkErrors) + " error" + s(linkErrors) + ")") : ""));
-        log(config.ifTitle() + " " + fs + " phase 4: created " + to_string(hardLinkList.size() - linkErrors) + " link" + s(hardLinkList.size() - linkErrors) + " (" + to_string(linkErrors) + " error" + s(linkErrors) + ")");
+                " link" << s((int)hardLinkList.size() - linkErrors) << " to previously backed up files" << (linkErrors ? string(" (" + to_string(linkErrors) + " error" + s(linkErrors) + ")") : ""));
+        log(config.ifTitle() + " " + fs + " phase 4: created " + to_string(hardLinkList.size() - linkErrors) + " link" + s((int)hardLinkList.size() - linkErrors) + " (" + to_string(linkErrors) + " error" + s(linkErrors) + ")");
 
         filesModified += neededFiles.size();
         filesHardLinked += hardLinkList.size();
@@ -488,40 +490,54 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
  * Scan a filesystem, sending the filenames and their associated mtime's back
  * to the remote server. This is the client's side of phase 1.
  */
-void fc_scanToServer(string directory, IPC_Base& server) {
+void fc_scanToServer(string entryName, IPC_Base& server) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
-
-    directory.erase(remove(directory.begin(), directory.end(), '\\'), directory.end());
-
-    if ((c_dir = opendir(ue(directory).c_str())) != NULL) {
-        while ((c_dirEntry = readdir(c_dir)) != NULL) {
-
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
-               continue;
-
-            string fullFilename = directory + "/" + string(c_dirEntry->d_name);
-
-            struct stat statData;
-            if (!lstat(fullFilename.c_str(), &statData)) {
-                server.ipcWrite(string(fullFilename + NET_DELIM).c_str());
-                server.ipcWrite(statData.st_mtime);
-                server.ipcWrite(statData.st_mode);
-                DEBUG(D_netproto) DFMT("client provided stats on " << fullFilename);
-
-                if (S_ISDIR(statData.st_mode))
-                    fc_scanToServer(fullFilename, server);
+    struct stat statData;
+    
+    entryName.erase(remove(entryName.begin(), entryName.end(), '\\'), entryName.end());
+    
+    if (!lstat(entryName.c_str(), &statData)) {
+        if (S_ISDIR(statData.st_mode)) {
+            
+            if ((c_dir = opendir(ue(entryName).c_str())) != NULL) {
+                while ((c_dirEntry = readdir(c_dir)) != NULL) {
+                    
+                    if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+                        continue;
+                    
+                    string fullFilename = entryName + "/" + string(c_dirEntry->d_name);
+                    
+                    if (!lstat(fullFilename.c_str(), &statData)) {
+                        server.ipcWrite(string(fullFilename + NET_DELIM).c_str());
+                        server.ipcWrite(statData.st_mtime);
+                        server.ipcWrite(statData.st_mode);
+                        DEBUG(D_netproto) DFMT("client provided stats on " << fullFilename);
+                        
+                        if (S_ISDIR(statData.st_mode))
+                            fc_scanToServer(fullFilename, server);
+                    }
+                    else
+                        log("error: stat failed for " + fullFilename);
+                }
+                
+                closedir(c_dir);
             }
-            else
-                log("error: stat failed for " + fullFilename);
+            else {
+                log("error: can't open " + entryName);
+                server.ipcWrite(string(string("##* error: client instance unable to read ") + entryName + NET_DELIM).c_str());
+                sigTermHandler(0);
+                exit(5);
+            }
         }
-
-        closedir(c_dir);
-    }
-    else {
-        log("error: can't open " + directory);
-        server.ipcWrite(string(string("##* error: client instance unable to read directory ") + directory + NET_DELIM).c_str());
-        exit(5);
+        else {
+            // if one of the top-level "filesystems" / "directories" given to --path on the client
+            // isn't a directory but instead a file, handle it here
+            server.ipcWrite(string(entryName + NET_DELIM).c_str());
+            server.ipcWrite(statData.st_mtime);
+            server.ipcWrite(statData.st_mode);
+            DEBUG(D_netproto) DFMT("client provided stats on " << entryName);
+        }
     }
 }
 

@@ -188,7 +188,7 @@ void FaubEntry::loadInodes() {
             cacheFile >> data;
 
             size_t pos = 0;
-            while (pos <= data.length() && inodeRE.search(data, pos)) {
+            while (pos <= data.length() && inodeRE.search(data, (int)pos)) {
                 pos = inodeRE.get_match_end(0);
                 match = inodeRE.get_match(0);
                 ++pos;
@@ -203,7 +203,7 @@ void FaubEntry::loadInodes() {
     else {
         set<ino_t> seenInodes;
         // here we only care about dus() updating 'inodes'
-        auto ds = dus(directory, seenInodes, inodes);
+        dus(directory, seenInodes, inodes);
     }
 }
 

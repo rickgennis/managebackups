@@ -224,7 +224,7 @@ void scanConfigToCache(BackupConfig &config)
     else
         fnamePattern = DATE_REGEX;
 
-    auto baseSlashes = count(directory.begin(), directory.end(), '/');
+    auto baseSlashes = (int)count(directory.begin(), directory.end(), '/');
     parseDirToCache(directory, fnamePattern, config.cache, baseSlashes);
 }
 
@@ -290,8 +290,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
     // comprised only of defaults
     for (auto &setting : currentConf->settings)
         if (GLOBALS.cli.count(setting.display_name)) {
-            DEBUG(D_config)
-            DFMT("command line param: " << setting.display_name << " (type " << setting.data_type << ")");
+            DEBUG(D_config) DFMT("command line param: " << setting.display_name << " (type " << setting.data_type << ")");
 
             switch (setting.data_type) {
                 case INT:
@@ -327,7 +326,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
                     try {
                         setting.value = GLOBALS.cli[setting.display_name].as<string>();
                         setting.execParam = "--" + setting.display_name + " " + setting.value;
-                        auto ignored = stol(setting.value, NULL, 8);  // throws on error
+                        stol(setting.value, NULL, 8);  // throws on error
                     }
                     catch (...) {
                         log("error: invalid octal value specified for --" + setting.display_name +
@@ -344,7 +343,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
                     try {
                         setting.value = GLOBALS.cli[setting.display_name].as<string>();
                         setting.execParam = "--" + setting.display_name + " " + setting.value;
-                        auto ignored = approx2bytes(setting.value);  // throws on error
+                        approx2bytes(setting.value);  // throws on error
                     }
                     catch (...) {
                         log("error: invalid size value specified for --" + setting.display_name +
@@ -398,7 +397,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
 
         // if we're using a new/temp config, insert it into the list for configManager
         configManager.configs.insert(configManager.configs.end(), tempConfig);
-        configManager.activeConfig = configManager.configs.size() - 1;
+        configManager.activeConfig = (int)configManager.configs.size() - 1;
         currentConf = &configManager.configs[configManager.activeConfig];
     }
 
@@ -624,10 +623,10 @@ void pruneBackups(BackupConfig &config)
         auto raw_it = config.cache.rawData.find(fIdx_it->second);
 
         if (raw_it != config.cache.rawData.end()) {
-            int filenameAge = raw_it->second.day_age;
+            unsigned long filenameAge = raw_it->second.day_age;
             int filenameDOW = raw_it->second.dow;
 
-            auto shouldKeep = pruneShouldKeep(config, raw_it->second.filename, filenameAge,
+            auto shouldKeep = pruneShouldKeep(config, raw_it->second.filename, (int)filenameAge,
                                               filenameDOW, raw_it->second.date_day,
                                               raw_it->second.date_month, raw_it->second.date_year);
 
@@ -1200,7 +1199,7 @@ void performBackup(BackupConfig &config)
                 NOTQUIET &&cout << "\t• " << config.ifTitle() << " " << message << endl;
 
                 try {  // could get an exception converting settings[sMode] to an octal number
-                    int mode = strtol(config.settings[sMode].value.c_str(), NULL, 8);
+                    int mode = (int)strtol(config.settings[sMode].value.c_str(), NULL, 8);
 
                     if (chmod(backupFilename.c_str(), mode)) {
                         SCREENERR("error: unable to chmod " << config.settings[sMode].value
@@ -1402,10 +1401,10 @@ int main(int argc, char *argv[])
     cxxopts::Options options("managebackups", "Create and manage backups");
 
     options.add_options()(string("p,") + CLI_PROFILE, "Profile", cxxopts::value<std::string>())(
-        string("d,") + CLI_DAYS, "Days", cxxopts::value<int>())(string("w,") + CLI_WEEKS, "Weeks",
-                                                                cxxopts::value<int>())(
-        string("m,") + CLI_MONTHS, "Months", cxxopts::value<int>())(string("y,") + CLI_YEARS,
-                                                                    "Years", cxxopts::value<int>())(
+        string("d,") + CLI_DAYS, "Days", cxxopts::value<int>())(
+        string("w,") + CLI_WEEKS, "Weeks", cxxopts::value<int>())(
+        string("m,") + CLI_MONTHS, "Months", cxxopts::value<int>())(
+        string("y,") + CLI_YEARS, "Years", cxxopts::value<int>())(
         string("f,") + CLI_FILE, "Filename", cxxopts::value<std::string>())(
         string("c,") + CLI_COMMAND, "Command", cxxopts::value<std::string>())(
         string("n,") + CLI_NOTIFY, "Notify", cxxopts::value<std::string>())(
@@ -1413,11 +1412,9 @@ int main(int argc, char *argv[])
         string("q,") + CLI_QUIET, "No output", cxxopts::value<bool>()->default_value("false"))(
         string("l,") + CLI_MAXLINKS, "Max hard links", cxxopts::value<int>())(
         string("u,") + CLI_USER, "User", cxxopts::value<bool>()->default_value("false"))(
-        string("a,") + CLI_ALLSEQ, "All sequential",
-        cxxopts::value<bool>()->default_value("false"))(
+        string("a,") + CLI_ALLSEQ, "All sequential", cxxopts::value<bool>()->default_value("false"))(
         string("A,") + CLI_ALLPAR, "All parallel", cxxopts::value<bool>()->default_value("false"))(
-        string("z,") + CLI_ZERO, "No animation (internal)",
-        cxxopts::value<bool>()->default_value("false"))(
+        string("z,") + CLI_ZERO, "No animation (internal)", cxxopts::value<bool>()->default_value("false"))(
         string("t,") + CLI_TEST, "Test only mode", cxxopts::value<bool>()->default_value("false"))(
         string("x,") + CLI_LOCK, "Lock profile", cxxopts::value<bool>()->default_value("false"))(
         string("k,") + CLI_CRONS, "Cron", cxxopts::value<bool>()->default_value("false"))(
@@ -1425,16 +1422,17 @@ int main(int argc, char *argv[])
         string("h,") + CLI_HELP, "Show help", cxxopts::value<bool>()->default_value("false"))(
         string("b,") + CLI_USEBLOCKS, "Use blocks disk usage", cxxopts::value<bool>()->default_value("false"))(
         string("s,") + CLI_PATHS, "Faub paths", cxxopts::value<std::vector<std::string>>())(
+        CLI_FORCE, "Force, override lock", cxxopts::value<bool>()->default_value("false"))(
         CLI_DIFF, "Faub diff", cxxopts::value<std::string>())(
         CLI_FAUB, "Faub backup", cxxopts::value<std::string>())(
         CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))(
         CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))(
-        CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())(CLI_FS_DAYS, "Failsafe Days",
-                                                                   cxxopts::value<int>())(
+        CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())(
+        CLI_FS_DAYS, "Failsafe Days", cxxopts::value<int>())(
         CLI_FS_FP, "Failsafe Paranoid", cxxopts::value<bool>()->default_value("false"))(
         CLI_DIR, "Directory", cxxopts::value<std::string>())(
-        CLI_SCPTO, "SCP to", cxxopts::value<std::string>())(CLI_SFTPTO, "SFTP to",
-                                                            cxxopts::value<std::string>())(
+        CLI_SCPTO, "SCP to", cxxopts::value<std::string>())(
+        CLI_SFTPTO, "SFTP to", cxxopts::value<std::string>())(
         CLI_STATS1, "Stats summary", cxxopts::value<bool>()->default_value("false"))(
         CLI_STATS2, "Stats detail", cxxopts::value<bool>()->default_value("false"))(
         CLI_PRUNE, "Enable pruning", cxxopts::value<bool>()->default_value("false"))(
@@ -1447,15 +1445,16 @@ int main(int argc, char *argv[])
         CLI_CACHEDIR, "Cache directory", cxxopts::value<std::string>())(
         CLI_LOGDIR, "Log directory", cxxopts::value<std::string>())(
         CLI_DOW, "Day of week for weeklies", cxxopts::value<int>())(
-        CLI_MODE, "File mode", cxxopts::value<std::string>())(CLI_MINSPACE, "Minimum local space",
-                                                              cxxopts::value<std::string>())(
+        CLI_MODE, "File mode", cxxopts::value<std::string>())(
+        CLI_MINSPACE, "Minimum local space", cxxopts::value<std::string>())(
         CLI_MINSFTPSPACE, "Minimum SFTP space", cxxopts::value<std::string>())(
         CLI_RECREATE, "Recreate config", cxxopts::value<bool>()->default_value("false"))(
         CLI_INSTALLMAN, "Install man", cxxopts::value<bool>()->default_value("false"))(
         CLI_INSTALL, "Install", cxxopts::value<bool>()->default_value("false"))(
         CLI_INSTALLSUID, "Install SUID", cxxopts::value<bool>()->default_value("false"))(
         CLI_NOTIFYEVERY, "Notify every", cxxopts::value<int>())(
-        CLI_UID, "Owner UID", cxxopts::value<int>())(CLI_GID, "Owner GID", cxxopts::value<int>())(
+        CLI_UID, "Owner UID", cxxopts::value<int>())(
+        CLI_GID, "Owner GID", cxxopts::value<int>())(
         CLI_LEAVEOUTPUT, "Leave output", cxxopts::value<bool>()->default_value("false"))(
         CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
 
@@ -1616,8 +1615,8 @@ int main(int argc, char *argv[])
                 if (!config.temp) scanConfigToCache(config);
 
         GLOBALS.cli.count(CLI_STATS1)
-            ? displayDetailedStatsWrapper(configManager, GLOBALS.cli.count(CLI_STATS1))
-            : displaySummaryStatsWrapper(configManager, GLOBALS.cli.count(CLI_STATS2));
+            ? displayDetailedStatsWrapper(configManager, (int)GLOBALS.cli.count(CLI_STATS1))
+            : displaySummaryStatsWrapper(configManager, (int)GLOBALS.cli.count(CLI_STATS2));
     }
     else {  // "all" profiles locking is handled here; individual profile locking is handled further
             // down in the NORMAL RUN
@@ -1630,6 +1629,13 @@ int main(int argc, char *argv[])
 
             if (pid) {
                 if (!kill(pid, 0)) {
+                    if (GLOBALS.cli.count(CLI_FORCE)) {
+                        kill(pid, 15);
+                        NOTQUIET && cerr << "[ALL] previous profile lock (running as pid " << pid <<
+                        ") released due to --force" << endl;
+                        log("[ALL] previous lock (pid " + to_string(pid) + ") released due to --force");
+                        currentConfig->setLockPID(0);
+                    }
                     if (GLOBALS.startupTime - lockTime < 60 * 60 * 24) {
                         NOTQUIET &&cerr << "[ALL] profile is locked while previous invocation is "
                                            "still running (pid "
@@ -1640,6 +1646,7 @@ int main(int argc, char *argv[])
                         exit(1);
                     }
                     else
+                        kill(pid, 15);
                         notify(*currentConfig,
                                errorcom("ALL",
                                         "abandoning previous lock because its over 24 hours old"),
@@ -1648,7 +1655,6 @@ int main(int argc, char *argv[])
                 else {
                     log("[ALL] abandoning previous lock because pid " + to_string(pid) +
                         " has vanished");
-                    kill(pid, 15);
                 }
             }
 
@@ -1660,16 +1666,16 @@ int main(int argc, char *argv[])
 
 #define BoolParamIfSpecified(x) (GLOBALS.cli.count(x) ? string(" --") + x : "")
 #define ValueParamIfSpecified(x) \
-    (GLOBALS.cli.count(x) ? currentConfig->settings[settingMap[x]].execParam : "")
+    (GLOBALS.cli.count(x) ? " " + currentConfig->settings[settingMap[x]].execParam : "")
         string commonSwitches =
             string(NOTQUIET ? "" : " -q") + BoolParamIfSpecified(CLI_TEST) +
             BoolParamIfSpecified(CLI_NOBACKUP) + BoolParamIfSpecified(CLI_NOPRUNE) +
             BoolParamIfSpecified(CLI_PRUNE) +
-            (GLOBALS.cli.count(CLI_CONFDIR) ? string("--") + CLI_CONFDIR + " " + GLOBALS.confDir
+            (GLOBALS.cli.count(CLI_CONFDIR) ? string("--") + CLI_CONFDIR + " '" + GLOBALS.confDir +"'"
                                             : "") +
-            (GLOBALS.cli.count(CLI_CACHEDIR) ? string("--") + CLI_CACHEDIR + " " + GLOBALS.cacheDir
+            (GLOBALS.cli.count(CLI_CACHEDIR) ? string("--") + CLI_CACHEDIR + " '" + GLOBALS.cacheDir + "'"
                                              : "") +
-            (GLOBALS.cli.count(CLI_LOGDIR) ? string("--") + CLI_LOGDIR + " " + GLOBALS.logDir
+            (GLOBALS.cli.count(CLI_LOGDIR) ? string("--") + CLI_LOGDIR + " '" + GLOBALS.logDir + "'"
                                            : "") +
             ValueParamIfSpecified(CLI_FAUB) + ValueParamIfSpecified(CLI_PATHS) +
             ValueParamIfSpecified(CLI_FS_FP) + ValueParamIfSpecified(CLI_FS_BACKUPS) +
@@ -1681,10 +1687,7 @@ int main(int argc, char *argv[])
             ValueParamIfSpecified(CLI_WEEKS) + ValueParamIfSpecified(CLI_MONTHS) +
             ValueParamIfSpecified(CLI_TRIPWIRE) + ValueParamIfSpecified(CLI_NOTIFYEVERY) +
             ValueParamIfSpecified(CLI_YEARS) +
-            (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) ||
-                     GLOBALS.cli.count(CLI_CRONP)
-                 ? " -x"
-                 : "") +
+            (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ? " -x" : "") +
             ValueParamIfSpecified(CLI_MAXLINKS);
 
         if (GLOBALS.debugSelector) commonSwitches += " -v=" + to_string(GLOBALS.debugSelector);
@@ -1701,7 +1704,7 @@ int main(int argc, char *argv[])
                     size_t pos = 0;
                     string match;
 
-                    while (pos <= p.length() && pathRE.search(p, pos)) {
+                    while (pos <= p.length() && pathRE.search(p, (int)pos)) {
                         pos = pathRE.get_match_end(0);
                         ++pos;
                         match = pathRE.get_match(0);
@@ -1735,7 +1738,7 @@ int main(int argc, char *argv[])
                                         << RESET << "\n";
                         PipeExec miniMe(string(argv[0]) + " -p " + config.settings[sTitle].value +
                                         commonSwitches);
-                        auto childPID = miniMe.execute("", true);
+                        miniMe.execute("", true);
                         miniMe.closeAll();
                         wait(NULL);
                     }
@@ -1800,11 +1803,17 @@ int main(int argc, char *argv[])
 
                 if (pid) {
                     if (!kill(pid, 0)) {
+                        if (GLOBALS.cli.count(CLI_FORCE)) {
+                            kill(pid, 15);
+                            NOTQUIET && cerr << currentConfig->ifTitle() << " previous profile lock (running as pid " << pid <<
+                            ") released due to --force" << endl;
+                            log("[ALL] previous lock (pid " + to_string(pid) + ") released due to --force");
+                            currentConfig->setLockPID(0);
+                        }
                         if (GLOBALS.startupTime - lockTime < 60 * 60 * 24) {
-                            NOTQUIET &&cerr << currentConfig->ifTitle() +
-                                                   " profile is locked while previous invocation "
-                                                   "is still running (pid "
-                                            << pid << "); skipping this run." << endl;
+                            NOTQUIET &&cerr << currentConfig->ifTitle() <<
+                                " profile is locked while previous invocation is still running (pid "
+                                << pid << "); skipping this run." << endl;
                             log(currentConfig->ifTitle() +
                                 " skipped run due to profile lock while previous invocation is "
                                 "still running (pid " +

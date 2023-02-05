@@ -89,6 +89,7 @@
 #define CLI_UID "uid"
 #define CLI_GID "gid"
 #define CLI_DIFF "diff"
+#define CLI_FORCE "force"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")

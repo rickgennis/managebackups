@@ -233,12 +233,12 @@ bool BackupConfig::loadConfig(string filename) {
                         setting.value = setting.regex.get_match(2);
 
                         if (setting.data_type == INT)
-                            auto ignored = stoi(setting.value);    // will throw on invalid value
+                            stoi(setting.value);    // will throw on invalid value
                         else 
                             if (setting.data_type == OCTAL)
                                 try {
                                     // validate mode -- will throw on invalid value
-                                    int ignored = stol(setting.value, NULL, 8);
+                                    stol(setting.value, NULL, 8);
                                 }
                                 catch (...) {
                                     configFile.close();
@@ -251,7 +251,7 @@ bool BackupConfig::loadConfig(string filename) {
                             if (setting.data_type == SIZE)
                                 try {
                                     // validate size -- will throw on invalid value
-                                    auto ignored = approx2bytes(setting.value);
+                                    approx2bytes(setting.value);
                                 }
                                 catch (...) {
                                     configFile.close();
@@ -322,7 +322,7 @@ unsigned int BackupConfig::removeEmptyDirs(string directory, int baseSlashes) {
     struct dirent *c_dirEntry;
     string dir = directory.length() ? directory : settings[sDirectory].value;
 
-    auto numBaseSlashes = baseSlashes ? baseSlashes : count(dir.begin(), dir.end(), '/');
+    int numBaseSlashes = baseSlashes ? baseSlashes : (int)count(dir.begin(), dir.end(), '/');
 
     if ((c_dir = opendir(ue(dir).c_str())) != NULL) {
         unsigned int entryCount = 0;

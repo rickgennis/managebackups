@@ -35,7 +35,7 @@ class FaubCache {
         DiskStats getTotalStats();
         long size() { return backups.size(); }
 
-        unsigned int getNumberOfBackups() { return backups.size(); }
+        unsigned long getNumberOfBackups() { return backups.size(); }
         map<string, FaubEntry>::iterator getBackupByDir(string dir) { return backups.find(dir); }
         map<string, FaubEntry>::iterator getFirstBackup() { return (backups.begin()); }
         map<string, FaubEntry>::iterator getLastBackup() { return (backups.size() ? --backups.end() : backups.end()); }
