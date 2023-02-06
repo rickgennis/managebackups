@@ -84,10 +84,10 @@ Options are relative to the three functions of **managebackups** plus general op
 : Parallel cron execution.  Equivalent to "-A -x -q".
 
 **-0**
-: Provide a summary of backups. **-0** can be specified up to 3 times for different formatting of sizes.
+: Provide a summary of backups. **-0** can be specified up to 3 times for different formatting of sizes. It can also be combined with -p to limit output to a single profile.
 
 **-1**
-: Provide detail of backups. **-1** can be specified up to 3 times for different formatting of sizes.
+: Provide detail of backups. **-1** can be specified up to 3 times for different formatting of sizes. It can also be combined with -p to limit output to a single profile.
 
 **--test**
 : Run in test mode. No changes are actually made to disk (no backups, pruning or linking).
@@ -118,6 +118,9 @@ Options are relative to the three functions of **managebackups** plus general op
 
 **-x**, **--lock**
 : Lock the specified profile (or all profiles if **-a** or **-A**) for the duration of this run.  All subsequent attempts to run this profile while the first one is still running will be skipped.  The profile is automatically unlocked when the first invocation finishes. Locks are respected on every run but only taken out when **-x** or **--lock** is specified.  i.e. a **-x** run will successfully lock the profile even for other invocations that fail to specify **-x**.
+
+**--force**
+: Override any existing lock and force the backup to start.
 
 **--tripwire** [*string*]
 : The tripwire setting can be used as a rudimentary guard against ransomware or other encryption attacks. It can't protect your local backups but will both alert you immediately and stop processing (no pruning, linking or backing up) if the tripwire check fails.  The check is defined as a filename (or list of filenames) and their MD5 values. If any of the MD5s change, the check fails and the alert is triggered.  For example, if you're backing up /etc you can create a bogus test file such as /etc/tripdata.txt and then configure **managebackups** with **--tripwire "/etc/tripdata.txt: xxx"** where xxx is the correct MD5 of the file. Multiple entries can be separated with commas ("/etc/foo: xxx, /etc/fish: yyy, /usr/local/foo: zzz"). Only local computer tripwire files are supported at this time.
@@ -335,7 +338,7 @@ Example output from **managebackups -1 -p faub** (faub-style backup example)
 **managebackups -p mymac --recreate --test**
 : Recreate the mymac config file using the standard format. Previously existing comments and formatting is thrown away. The **-test** option skips all primary functions (no backups, pruning or linking is done) so only the config file is updated.
 
-**managebackups -p artemis --directory /opt/backups --faub "ssh artemis managebackups --path /usr/local/bin --path /etc" --prune --fp**
+**managebackups -p artemis --directory /opt/backups --faub "ssh artemis managebackups --path /usr/local/bin --path /etc" --prune --fp --save**
 : Take a new faub-style backup of server artemis' /etc and /usr/local/bin directories, saving them locally to /opt/backups.  Prune older copies of this backup that have aged out.  Note: faub-backups assume **managebackups** is installed on the remote (in this case artemis) server.
 
 **managebackups -1**
@@ -343,3 +346,11 @@ Example output from **managebackups -1 -p faub** (faub-style backup example)
 
 **managebackups -0**
 : Show a one-line summary for each backup profile. The summary includes detail on the most recent backup as well as the number of backups, age ranges and total disk space.
+
+# DEPENDENCIES
+**managebackups** uses three open-source libraries that are statically compiled in:
+
+- OpenSSL (1.1.1s) for calculation of MD5s
+- pcre (8.45) for support of regular expressions
+- pcre++ (0.9.5) as a C++ interface to pcre
+

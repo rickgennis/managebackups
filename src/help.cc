@@ -27,22 +27,24 @@ void showHelp(enum helpType kind) {
 
         case hOptions: {
             string helpText = "managebackups [options]\n\n"
-            + string(BOLDBLUE) + "EXECUTE A BACKUP" + string(RESET) + "\n"
-            + "   --directory [dir]   Directory to save to and look for backups in\n"
+            + string(BOLDBLUE) + "EXECUTE A BACKUP (single file)" + string(RESET) + "\n"
             + "   --cmd [command]     Command to take a single-file backup; the backup result should be written to STDOUT.\n" 
-            + "   --faub [command]    Command to take a faub-style backup; managebackups will be required on the remote server as well.\n"
             + "   --file [filename]   The base filename to save the backup to. The date and, optionally, time will automatically be inserted.\n"
-            + "   --time              Include the time in the backup filename; also inserts the day into the subdirectory.\n"
             + "   --mode [mode]       chmod newly created backups to this octal mode (default 0600).\n"
             + "   --uid [uid]         chown newly created backups to this numeric UID.\n"
             + "   --gid [gid]         chgrp newly created backups to this numeric GID.\n"
             + "   --minsize [size]    Single-file backups less than this size are considered failures and discarded.\n"
+            + "   --minspace [size]   Minimum local free space required before taking a backup\n"          
             + "   --scp [dest]        SCP the new backup to the destination. Dest can include user@machine:/dir/dirs.\n"
             + "   --sftp [dest]       SFTP the new backup to the destination. Dest can include SCP details plus SFTP flags (like -P for port).\n"
             + "                       SCP & SFTP also support variable interpolation of these strings which will be sustituted with values\n"
             + "                       relative to the newly created backup: {fulldir}, {subdir}, {filename}.\n"
-            + "   --minspace [size]   Minimum local free space required before taking a backup\n"          
-            + "   --minsftpspace [sz] Minimum free space required on the remote SFTP server before transfering a backup\n"          
+            + "   --minsftpspace [sz] Minimum free space required on the remote SFTP server before transfering a backup\n\n"
+            + string(BOLDBLUE) + "EXECUTE A BACKUP (faub-style)" + string(RESET) + "\n"
+            + "   --faub [command]    Command to take a faub-style backup; managebackups will be required on the remote server as well.\n\n"
+            + string(BOLDBLUE) + "EXECUTE A BACKUP (both)" + string(RESET) + "\n"
+            + "   --directory [dir]   Directory to save to and look for backups in\n"
+            + "   --time              Include the time in the backup filename; also inserts the day into the subdirectory.\n"
             + "   --notify [contact]  Notify after a backup completes; can be email addresses and/or script names (failures only).\n"
             + "   --notifyevery [x]   Notify on every x failure (plus the first one).\n"
             + "   --nos               Notify on success also.\n"
@@ -59,31 +61,33 @@ void showHelp(enum helpType kind) {
             + "   --fs_days [d]       FAILSAFE: within the last d days.\n"
             + "   --fp                FAILSAFE: Paranoid mode; sets --fs_backups 1 --fs_days 2\n"
             + "\n" + string(BOLDBLUE) + "HARD LINKING\n" + RESET
-            + "   -l, --maxlinks [x]  Max number of links to a file (default 20).\n"
+            + "   -l, --maxlinks [x]  Max number of links to a file (default 100).\n"
             + "\n" + string(BOLDBLUE) + "GENERAL\n" + RESET
-            + "   --profile [name]    Use the specified profile for the current run.\n"
+            + "   -p, --profile [p]   Use the specified profile for the current run; can be a partial name\n"
             + "   --save              Save all the specified settings to the specified profile.\n"
             + "   --recreate          Delete any existing .conf file for this profile and recreate it in the standard format\n\n"
             + "   -a, --all           Execute all profiles sequentially\n"
             + "   -A, --All           Execute all profiles in parallel\n"
             + "   -k, --cron          Execute all profiles sequentially for cron (equivalent to '-a -x -q')\n"
             + "   -K, --Cron          Execute all profiles in parallel for cron (equivalent to '-A -x -q')\n\n"
-            + "   -0                  Provide a summary of backups.\n"
-            + "   -1                  Provide detail of backups.\n\n"
-            + "   --install           Install this binary in /usr/local/bin, update directory perms and create the man page.\n"
-            + "   --installman        Only create and install the man page.\n\n"
-            + "   --confdir [dir]     Use dir for the configuration directory (default /etc/managebackups).\n"
-            + "   --cachedir [dir]    Use dir for the cache directory (default /var/managebackups/cache).\n"
-            + "   --logdir [dir]      Use dir for the log directory (default /var/log).\n"
-            + "   --user              Set directories (config, cache and log) to the calling user's home directory (~/managebackups/).\n\n"
-            + "   --nocolor           Disable color output.\n"
-            + "   --test              Run in test mode. No changes are persisted to disk except for caches.\n"
-            + "   --leaveoutput       Leave command (backups, SFTP, etc) output in /tmp/managebackups_output.\n"
+            + "   -0                  Provide a summary of backups; can be combined with -p to limit output\n"
+            + "   -1                  Provide detail of backups; can be combined with -p to limit output\n\n"
+            + "   --install           Install this binary in /usr/local/bin, update directory perms and create the man page\n"
+            + "   --installsuid       Install this binary in /usr/local/bin with SUID to run as root; create the man page\n"
+            + "   --installman        Only create and install the man page\n\n"
+            + "   --confdir [dir]     Use dir for the configuration directory (default /etc/managebackups)\n"
+            + "   --cachedir [dir]    Use dir for the cache directory (default /var/managebackups/cache)\n"
+            + "   --logdir [dir]      Use dir for the log directory (default /var/log)\n"
+            + "   --user              Set directories (config, cache and log) to the calling user's home directory (~/managebackups/)\n\n"
+            + "   --nocolor           Disable color output\n"
+            + "   --test              Run in test mode. No changes are persisted to disk except for caches\n"
+            + "   --leaveoutput       Leave command (backup execution, SFTP, etc) output in /tmp/managebackups_output\n"
             + "   -q                  Quiet mode -- limit output, for use in scripts.\n"
-            + "   -v[options]         Verbose debugging output. See 'man managebackups' for details.\n"
-            + "   --defaults          Display the default settings for all profiles.\n"
-            + "   -x, --lock          Lock the current profile for the duration of the run so only one copy can run at a time.\n"
-            + "   --tripwire [string] Define tripwire files of the form 'filename: md5, filename: md5'.\n"
+            + "   -v[options]         Verbose debugging output. See 'man managebackups' for details\n"
+            + "   --defaults          Display the default settings for all profiles\n"
+            + "   -x, --lock          Lock the current profile for the duration of the run so only one copy can run at a time\n"
+            + "   --force             Override any existing lock and force the backup to start\n"
+            + "   --tripwire [string] Define tripwire files of the form 'filename: md5, filename: md5'\n"
             + "\nSee 'man managebackups' for more detail.\n";
 
             /*
@@ -325,11 +329,13 @@ Equivalent to \[lq]-A -x -q\[rq].
 Provide a summary of backups.
 \f[B]-0\f[R] can be specified up to 3 times for different formatting of
 sizes.
+It can also be combined with -p to limit output to a single profile.
 .TP
 \f[B]-1\f[R]
 Provide detail of backups.
 \f[B]-1\f[R] can be specified up to 3 times for different formatting of
 sizes.
+It can also be combined with -p to limit output to a single profile.
 .TP
 \f[B]\[en]test\f[R]
 Run in test mode.
@@ -383,6 +389,9 @@ Locks are respected on every run but only taken out when \f[B]-x\f[R] or
 \f[B]\[en]lock\f[R] is specified.
 i.e.\ a \f[B]-x\f[R] run will successfully lock the profile even for
 other invocations that fail to specify \f[B]-x\f[R].
+.TP
+\f[B]\[en]force\f[R]
+Override any existing lock and force the backup to start.
 .TP
 \f[B]\[en]tripwire\f[R] [\f[I]string\f[R]]
 The tripwire setting can be used as a rudimentary guard against
@@ -882,7 +891,7 @@ Previously existing comments and formatting is thrown away.
 The \f[B]-test\f[R] option skips all primary functions (no backups,
 pruning or linking is done) so only the config file is updated.
 .TP
-\f[B]managebackups -p artemis \[en]directory /opt/backups \[en]faub \[lq]ssh artemis managebackups \[en]path /usr/local/bin \[en]path /etc\[rq] \[en]prune \[en]fp\f[R]
+\f[B]managebackups -p artemis \[en]directory /opt/backups \[en]faub \[lq]ssh artemis managebackups \[en]path /usr/local/bin \[en]path /etc\[rq] \[en]prune \[en]fp \[en]save\f[R]
 Take a new faub-style backup of server artemis\[cq] /etc and
 /usr/local/bin directories, saving them locally to /opt/backups.
 Prune older copies of this backup that have aged out.
@@ -898,6 +907,16 @@ limit the output to a single profile.
 Show a one-line summary for each backup profile.
 The summary includes detail on the most recent backup as well as the
 number of backups, age ranges and total disk space.
+.SH DEPENDENCIES
+.PP
+\f[B]managebackups\f[R] uses three open-source libraries that are
+statically compiled in:
+.IP \[bu] 2
+OpenSSL (1.1.1s) for calculation of MD5s
+.IP \[bu] 2
+pcre (8.45) for support of regular expressions
+.IP \[bu] 2
+pcre++ (0.9.5) as a C++ interface to pcre
 .SH AUTHORS
 Rick Ennis.
 )END"); }

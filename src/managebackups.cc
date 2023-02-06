@@ -408,6 +408,9 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
         // dir specified
         !currentConf->settings[sDirectory].value.length() &&
 
+        // user hasn't specified --diff (that condition is handled after this function returns)
+        !GLOBALS.cli.count(CLI_DIFF) &&
+
         // & user hasn't selected --all/--All where there's a dir configured in at least one (first)
         // profile
         !((GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR) ||
