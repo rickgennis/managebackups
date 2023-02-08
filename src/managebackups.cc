@@ -1,3 +1,47 @@
+/*
+ * Copyright (C) 2023 Rick Ennis
+ * This file is part of managebackups.
+ *
+ * managebackups is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * managebackups is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with managebackups.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ *  managebackups
+ *  2022 - 2023  Rick Ennis
+ *
+ *  managebackups provides 3 primary functions.  Each function can be run individually
+ *  or all together:
+ *
+ *  1. Take backups
+ *
+ *     A. Single-file backups:  tar/dump/cpio/etc backups can be taken of local
+ *        or remote filesystems.  Backups are automatically cataloged and indexed.
+ *
+ *     B. Faub-style backups:  Fully filesystem (or dir) backups can be taken where
+ *        the result is laid out on disk for easy inspection via standard linux tools.
+ *
+ *  2. Pruning
+ *
+ *     A retention policy can be configured and applied per backup setup (profile).
+ *     The policy is specified as the number of daily, weekly, monthly and yearly
+ *     backups to keep.  Backups aged out of the policy are deleted.
+ *
+ *  3. Hard links
+ *
+ *     Regardless of the type of backup, hard-links can replace identical copies of
+ *     files so that additional backups of files that haven't changed don't take up
+ *     any additional disk space.
+ */
 
 #include <dirent.h>
 #include <pcre++.h>

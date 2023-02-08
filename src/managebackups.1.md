@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.3.3
+% MANAGEBACKUPS(1) managebackups 1.3.4
 % Rick Ennis
 % January 2023
 
@@ -21,10 +21,10 @@ A single file backup is any of the standard Linux backup commands (tar, cpio, du
 Faub-style backups, similar to the underlying approach of Apple's Time Machine, backs up an entire directory tree to another location without compression. The initial copy is an exact replica of the source. Subsequent copies are made to new directories but are hard-linked back to files in the the previous backup if the data hasn't changed. In effect, you only use disk space for changes but get the advantage of fully traversable directory trees, which allows interrogation via any standard commandline tool. Each backup creates a new directory of the form *directory*/YYYY/MM/*profile*-YYYYMMDD. With the **--time** option @HH:MM:SS gets appended as well.  Note: Faub-style backups require that **managebackups** is also installed on the remote server that's being backed up.
 
 ## 2. Prune Backups
-**managebackups** deletes old backups that have aged out.  The retention critera is configured on a daily, weekly, monthly and yearly basis.  By default *managebackups* will keep 14 dailies, 4 weeklies, 6 monthlies and 2 yearly backups.
+**managebackups** deletes old backups that have aged out.  The retention critera is configured on a daily, weekly, monthly and yearly basis.  By default *managebackups* will keep 14 daily, 4 weekly, 6 monthly and 2 yearly backups.
 
 ## 3. Hard Linking
-In configurations using a single file backup where all backups are fulls, and therefore many are potentially identical, *managebackups* can save disk space by hard linking identical copies together.  This is done by default when identical copies are identified. 
+In configurations using a single file backup where all backups are fulls, and therefore many are potentially identical, *managebackups* can save disk space by hard linking identical copies together.  This is done by default when identical copies are identified. In Faub-style backups hard linking is automatically implemented on a per-file basis.
 
 # PROFILES
 Backup profiles are a collection of settings describing a backup set -- its directory to save backups to, the command to take the backups, how many weekly copies to keep, etc.  Once a profile is associated with a collection of options, all of those options are invoked when the profile is specified, unless an overriding option is also given.
@@ -126,7 +126,7 @@ Options are relative to the three functions of **managebackups** plus general op
 : The tripwire setting can be used as a rudimentary guard against ransomware or other encryption attacks. It can't protect your local backups but will both alert you immediately and stop processing (no pruning, linking or backing up) if the tripwire check fails.  The check is defined as a filename (or list of filenames) and their MD5 values. If any of the MD5s change, the check fails and the alert is triggered.  For example, if you're backing up /etc you can create a bogus test file such as /etc/tripdata.txt and then configure **managebackups** with **--tripwire "/etc/tripdata.txt: xxx"** where xxx is the correct MD5 of the file. Multiple entries can be separated with commas ("/etc/foo: xxx, /etc/fish: yyy, /usr/local/foo: zzz"). Only local computer tripwire files are supported at this time.
 
 **--diff** [*string*]
-: With faub-style backups, **managebackups** tracks the files that have changed between each subsequent backup. The **--diff** option, when given the directory name of a specific backup, will display the changed files between it and the previous backup. The specified backup name can be partial. 
+: With faub-style backups, **managebackups** tracks the files that have changed between each subsequent backup. The **--diff** option, when given the directory name of a specific backup, will display the changed files between it and the previous backup. The specified backup name can be partial. Note: diff data is cached per backup relative to the previous one.  For example, if you have backups 1, 2, 3, and delete backup 2, a "--diff 3" will not be relative to backup 1.  It'll still show the diff to backup 2, as if 2 were still there.
 
 ## 1. Take Backups Options
 Backups options are noted as {1F} for single-file applicable, {FB} for faub-backup applicable, or {both}.
