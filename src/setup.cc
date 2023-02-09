@@ -6,6 +6,7 @@
 #include <string>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <pwd.h>
 
 #include "globals.h"
 #include "util_generic.h"
@@ -210,6 +211,165 @@ void install(string myBinary, bool suid) {
     }
 
     return;
+}
+
+
+string getPlistHeader(string& appPath) {
+    string text = R"EOF(<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>Label</key>
+            <string>com.local.managebackups</string>
+        <key>Program</key>
+                <string>APPPATH</string>
+        <key>ProgramArguments</key>
+            <array>
+                <string>APPPATH</string>
+                <string>-K</string>
+            </array>
+        <key>ProcessType</key>
+            <string>Background</string>
+        <key>StartCalendarInterval</key>
+            <array>
+)EOF";
+
+    // replace both occurances of apppath
+    text.replace(text.find("APPPATH"), 7, appPath);
+    text.replace(text.find("APPPATH"), 7, appPath);
+
+    return text;
+}
+
+
+string getPlistTimeBlock(int hour, int minute) {
+    string text = R"EOF(            <dict>
+                <key>Hour</key>
+                <integer>HOUR></integer>
+                <key>Minute</key>
+                <integer>MINUTE</integer>
+            </dict>
+)EOF";
+    
+    // replace hour and minute
+    text.replace(text.find("HOUR"), 4, to_string(hour));
+    text.replace(text.find("MINUTE"), 6, to_string(minute));
+    return text;
+}
+
+
+void scheduleLaunchCtl(string& appPath) {
+    string userHomeDir = getUserHomeDir();
+    string plistPath = slashConcat(userHomeDir, "Library/LaunchAgents/com.local.managebackups.plist");
+
+    // create the plist file
+    // *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+    ofstream plistFile;
+    plistFile.open(plistPath);
+    
+    if (plistFile.is_open()) {
+        
+        // write header portion
+        plistFile << getPlistHeader(appPath);
+        
+        int offset = GLOBALS.cli[CLI_SCHED].as<int>();
+        int minute = GLOBALS.cli.count(CLI_SCHEDMIN) ? GLOBALS.cli[CLI_SCHEDMIN].as<int>() : 15;
+
+        if (offset == 0 || offset == 24) {
+            int hour = GLOBALS.cli.count(CLI_SCHEDHOUR) ? GLOBALS.cli[CLI_SCHEDHOUR].as<int>() : 0;
+            plistFile << getPlistTimeBlock(hour, minute);
+        }
+        else {
+            int hour = 0;
+            while (hour < 24) {
+                plistFile << getPlistTimeBlock(hour, minute);
+                hour += offset;
+            }
+        }
+        
+        plistFile << R"EOF(        </array>
+    </dict>
+</plist>
+)EOF";
+        
+        plistFile.close();
+
+        // execute launchctl to activate the file
+        // *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+        auto uid = getuid();
+        string plistFn = slashConcat(userHomeDir, "Library/LaunchAgents/com.local.managebackups.plist");
+        string devnull = " 2> /dev/null";
+        
+        string command = "/bin/launchctl bootout gui/UID/com.local.managebackups 2> /dev/null";
+        command.replace(command.find("UID"), 3, to_string(uid));
+        system(command.c_str());
+        
+        command = "/bin/launchctl bootstrap gui/UID " + plistFn;
+        command.replace(command.find("UID"), 3, to_string(uid));
+        if (!system(string(command + devnull).c_str())) {
+            
+            command = "/bin/launchctl enable gui/UID/com.local.managebackups";
+            command.replace(command.find("UID"), 3, to_string(uid));
+            if (!system(string(command + devnull).c_str())) {
+
+                cout << "successfully created property file (" << plistFn << ")\n";
+                cout << "successfully scheduled to run ";
+                if (offset == 0 || offset == 24)
+                    cout << "daily." << endl;
+                else
+                    cout << "every " << offset << " hour" << (offset == 1 ? "" : "s") << ".\n";
+                cout << "use \"launchctl disable gui/" << uid << "/com.local.managebackups\" to disable." << endl;
+            }
+            else {
+                SCREENERR("error enabling service. Try \"" << command << "\"")
+                exit(1);
+            }
+        }
+        else {
+            SCREENERR("error loading service. Try \"" << command << "\"");
+            exit(1);
+        }
+    }
+    else {
+        SCREENERR("error: unable to write to " << plistPath)
+        exit(1);
+    }
+}
+
+
+void scheduleCron(string& appPath) {
+    
+}
+
+
+void scheduleRun() {
+    string appName = "managebackups";
+    
+    // make sure we're working with a full path to the app not just its dir
+    string appPath = GLOBALS.cli.count(CLI_SCHEDPATH) ? GLOBALS.cli[CLI_SCHEDPATH].as<string>() : ("/usr/local/bin/" + appName);
+    if (!(appPath.length() >= appName.length() && appPath.substr(appPath.length() - appName.length()) == appName))
+        appPath = slashConcat(appPath, appName);
+
+    // verify --sched is a valid number of hours
+    int offset = GLOBALS.cli[CLI_SCHED].as<int>();
+    if (offset != 0 && 24 % offset) {
+        SCREENERR("error: --sched specifies the number of hours between runs; it needs to be\n" <<
+                  "a number that divides evenly into 24 (i.e. 0, 1, 2, 3, 4, 6, 8, 12, 24)");
+        exit(1);
+    }
+    
+    if ((offset != 0 && offset != 24) && GLOBALS.cli.count(CLI_SCHEDHOUR)) {
+        SCREENERR("error: --schedhour is only valid with --sched set to 0 or 24; meaning you can\n"
+                  << "only specify the hour to run when setting to run only once a day.");
+        exit(1);
+    }
+
+#ifdef __APPLE__
+    scheduleLaunchCtl(appPath);
+#elif __linux__
+    scheduleCron(appPath);
+#endif
+    
 }
 
 #endif

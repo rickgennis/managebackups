@@ -90,6 +90,11 @@
 #define CLI_GID "gid"
 #define CLI_DIFF "diff"
 #define CLI_FORCE "force"
+#define CLI_SCHED "sched"
+#define CLI_SCHEDHOUR "schedhour"
+#define CLI_SCHEDMIN "schedminute"
+#define CLI_SCHEDPATH "schedpath"
+
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")

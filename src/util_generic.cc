@@ -947,3 +947,19 @@ string ue(string file) {
     file.erase(remove(file.begin(), file.end(), '\\'), file.end());
     return file;
 }
+
+
+inline bool exists(const std::string& name) {
+    struct stat statBuffer;
+    return (stat(name.c_str(), &statBuffer) == 0);
+}
+
+
+string getUserHomeDir() {
+    char *homeDir;
+    
+    if ((homeDir = getenv("HOME")) == NULL)
+        homeDir = getpwuid(getuid())->pw_dir;
+
+    return homeDir;
+}

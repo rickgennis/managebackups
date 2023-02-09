@@ -128,6 +128,18 @@ Options are relative to the three functions of **managebackups** plus general op
 **--diff** [*string*]
 : With faub-style backups, **managebackups** tracks the files that have changed between each subsequent backup. The **--diff** option, when given the directory name of a specific backup, will display the changed files between it and the previous backup. The specified backup name can be partial. Note: diff data is cached per backup relative to the previous one.  For example, if you have backups 1, 2, 3, and delete backup 2, a "--diff 3" will not be relative to backup 1.  It'll still show the diff to backup 2, as if 2 were still there.
 
+**--sched** [*hours*]
+: Schedule (via LaunchCtl on MacOS or cron on Linux) **managebackups** to run every *hours* hours with the "-K" option.  If *hours* is 0 or 24 it's interpreted as once a day and will default to 00:15 in the morning.  If set to run once a day **--schedhour** can be specified to use a different single hour. **--schedminute** can be used to specify a different minute offset. **--schedpath** can be used to specify an alternative location if **managebackups** isn't installed in /usr/local/bin.
+
+**--schedhour** [*hour*]
+: Specify which hour to run at.  See **--sched**.
+
+**--schedminute** [*minute*]
+: Specify which minute offset to run at.  See **--sched**.
+
+**--schedpath** [*path*]
+: Specify the path to **managebackups** if it isn't installed in /usr/local/bin.  See **--sched**.
+
 ## 1. Take Backups Options
 Backups options are noted as {1F} for single-file applicable, {FB} for faub-backup applicable, or {both}.
 

@@ -1503,6 +1503,10 @@ int main(int argc, char *argv[])
         CLI_UID, "Owner UID", cxxopts::value<int>())(
         CLI_GID, "Owner GID", cxxopts::value<int>())(
         CLI_LEAVEOUTPUT, "Leave output", cxxopts::value<bool>()->default_value("false"))(
+        CLI_SCHED, "Schedule runs", cxxopts::value<int>())(
+        CLI_SCHEDHOUR, "Schedule hour", cxxopts::value<int>())(
+        CLI_SCHEDMIN, "Schedule minute", cxxopts::value<int>())(
+        CLI_SCHEDPATH, "Schedule path", cxxopts::value<string>())(
         CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
 
     try {
@@ -1584,6 +1588,16 @@ int main(int argc, char *argv[])
     if (GLOBALS.cli.count(CLI_INSTALLSUID)) {
         install(argv[0], true);
         exit(0);
+    }
+    
+    if (GLOBALS.cli.count(CLI_SCHED)) {
+        scheduleRun();
+        exit(0);
+    }
+    
+    if ((GLOBALS.cli.count(CLI_SCHEDHOUR) || GLOBALS.cli.count(CLI_SCHEDMIN) || GLOBALS.cli.count(CLI_SCHEDPATH)) && !GLOBALS.cli.count(CLI_SCHED)) {
+        SCREENERR("error: --schedhour, --schedmin and --schedpath all require --sched")
+        exit(1);
     }
 
     if (GLOBALS.cli.count(CLI_VERSION)) {
