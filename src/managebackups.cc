@@ -1602,7 +1602,7 @@ int main(int argc, char *argv[])
 
     if (GLOBALS.cli.count(CLI_VERSION)) {
         cout << "managebackups " << VERSION << "\n";
-        cout << "(c) 2023 released under GPLv2." << endl;
+        cout << "(c) 2023 released under GPLv3." << endl;
         exit(0);
     }
 
