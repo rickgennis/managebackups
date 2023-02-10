@@ -509,9 +509,8 @@ PipeExec::~PipeExec() {
 
 
 void PipeExec::flushErrors() {
-    if (errorDir.length()) {
+    if (errorDir.length())
         rmrfdir(errorDir);
-    }
 }
 
 
@@ -542,6 +541,17 @@ int PipeExec::closeWrite() {
     return 0;
 }
 
+void redirectStdError(string filename) {
+    int errorFd = open(filename.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (errorFd > 0)
+        DUP2(errorFd, 2);
+    else {
+        string msg = "warning: unable to redirect STDERR of subprocess to " + filename + " (" + strerror(errno) + ")";
+        SCREENERR("\n" << msg);
+        log(msg);
+    }
+}
+
 
 int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, bool noErrToDisk, bool noTmpCleanup) {
     bypassDestructor = noDestruct;
@@ -567,17 +577,9 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
             DEBUG(D_exec) DFMT("executing final command [" << proc_it->command << "]");
 
             // redirect stderr to a file
-            if (!noErrToDisk) {
-                int errorFd = open(stderrFname.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-                if (errorFd > 0)
-                    DUP2(errorFd, 2);
-                else {
-                    string msg = "warning: unable to redirect STDERR of subprocess to " + stderrFname + " (A: " + strerror(errno) + ")";
-                    SCREENERR("\n" << msg);
-                    log(msg);
-                }
-            }
-
+            if (!noErrToDisk)
+                redirectStdError(stderrFname);
+        
             // dup and close remaining fds
             auto back_it = proc_it - 1;
             DUP2(back_it->writefd[READ_END], READ_END);
@@ -604,16 +606,8 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
                     DEBUG(D_exec) DFMT("executing mid command [" << proc_it->command << "] with pipes " << proc_it->writefd[0] << " & " << proc_it->writefd[1]);
 
                     // redirect stderr to a file
-                    if (!noErrToDisk) {
-                        int errorFd = open(stderrFname.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-                        if (errorFd > 0)
-                            DUP2(errorFd, 2);
-                        else {
-                            string msg = "warning: unable to redirect STDERR of subprocess to " + stderrFname + " (B: " + strerror(errno) + ")";
-                            SCREENERR("\n" << msg);
-                            log(msg);
-                        }
-                    }
+                    if (!noErrToDisk)
+                        redirectStdError(stderrFname);
 
                     // close fds from two procs back
                     if (procs.size() > 2 && *proc_it != procs[1]) {

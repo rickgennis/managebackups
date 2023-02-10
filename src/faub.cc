@@ -416,7 +416,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
         DEBUG(D_netproto) DFMT(fs << " server phase 4 complete; created " << (hardLinkList.size() - linkErrors)  << 
                 " link" << s((int)hardLinkList.size() - linkErrors) << " to previously backed up files" << (linkErrors ? string(" (" + to_string(linkErrors) + " error" + s(linkErrors) + ")") : ""));
-        log(config.ifTitle() + " " + fs + " phase 4: created " + to_string(hardLinkList.size() - linkErrors) + " link" + s((int)hardLinkList.size() - linkErrors) + " (" + to_string(linkErrors) + " error" + s(linkErrors) + ")");
+        log(config.ifTitle() + " " + fs + " phase 4: created " + to_string(hardLinkList.size() - linkErrors) + " link" + s((int)hardLinkList.size() - linkErrors) + (linkErrors ? " (" + to_string(linkErrors) + " error" + s(linkErrors) + ")" : ""));
 
         filesModified += neededFiles.size();
         filesHardLinked += hardLinkList.size();
@@ -455,7 +455,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     // instantiation correctly cached it, recache() will do nothing.
     fcache.recache(currentDir);
 
-    // we can pull those out to display
+    // we can pull these out to display
     auto fcacheCurrent = fcache.getBackupByDir(currentDir);
     auto backupSize = fcacheCurrent->second.ds.getSize();
     auto backupSaved = fcacheCurrent->second.ds.getSaved();
@@ -490,10 +490,11 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
  * Scan a filesystem, sending the filenames and their associated mtime's back
  * to the remote server. This is the client's side of phase 1.
  */
-void fc_scanToServer(string entryName, IPC_Base& server) {
+size_t fc_scanToServer(string entryName, IPC_Base& server) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
     struct stat statData;
+    size_t totalEntries = 0;
     
     entryName.erase(remove(entryName.begin(), entryName.end(), '\\'), entryName.end());
     
@@ -509,13 +510,14 @@ void fc_scanToServer(string entryName, IPC_Base& server) {
                     string fullFilename = entryName + "/" + string(c_dirEntry->d_name);
                     
                     if (!lstat(fullFilename.c_str(), &statData)) {
+                        ++totalEntries;
                         server.ipcWrite(string(fullFilename + NET_DELIM).c_str());
                         server.ipcWrite(statData.st_mtime);
                         server.ipcWrite(statData.st_mode);
                         DEBUG(D_netproto) DFMT("client provided stats on " << fullFilename);
                         
                         if (S_ISDIR(statData.st_mode))
-                            fc_scanToServer(fullFilename, server);
+                            totalEntries += fc_scanToServer(fullFilename, server);
                     }
                     else
                         log("error: stat failed for " + fullFilename);
@@ -533,12 +535,15 @@ void fc_scanToServer(string entryName, IPC_Base& server) {
         else {
             // if one of the top-level "filesystems" / "directories" given to --path on the client
             // isn't a directory but instead a file, handle it here
+            ++totalEntries;
             server.ipcWrite(string(entryName + NET_DELIM).c_str());
             server.ipcWrite(statData.st_mtime);
             server.ipcWrite(statData.st_mode);
             DEBUG(D_netproto) DFMT("client provided stats on " << entryName);
         }
     }
+    
+    return totalEntries;
 }
 
 /*
@@ -546,25 +551,27 @@ void fc_scanToServer(string entryName, IPC_Base& server) {
  * Receive a list of files from the server (client side of phase 2) and
  * send each file back to the server (client side of phase 3).
  */
-void fc_sendFilesToServer(IPC_Base& server) {
+size_t fc_sendFilesToServer(IPC_Base& server) {
     vector<string> neededFiles;
-
+    
     while (1) {
         string filename = server.ipcReadTo(NET_DELIM);
-
+        
         if (filename == NET_OVER)
             break;
-
+        
         DEBUG(D_netproto) DFMT("client received request for " << filename);
         neededFiles.insert(neededFiles.end(), filename);
     }
-
+    
     DEBUG(D_netproto) DFMT("client received requests for " << to_string(neededFiles.size()) << " file(s)");
-
+    
     for (auto &file: neededFiles) {
         DEBUG(D_netproto) DFMT("client sending " << file << " to server");
         server.ipcSendDirEntry(file);
     }
+
+    return neededFiles.size();
 }
 
 
@@ -578,14 +585,18 @@ void fc_mainEngine(vector<string> paths) {
         server.ipcWrite((__int64_t)paths.size());
 
         for (auto it = paths.begin(); it != paths.end(); ++it) {
-            log("faub client request for path: " + *it);
-
+            timer clientTime;
+            clientTime.start();
+            
             server.ipcWrite(string(*it + NET_DELIM).c_str());
-
-            fc_scanToServer(*it, server);
+            auto entries = fc_scanToServer(*it, server);
 
             server.ipcWrite(NET_OVER_DELIM);
-            fc_sendFilesToServer(server);
+            auto changes = fc_sendFilesToServer(server);
+
+            clientTime.stop();
+            log("faub_client request for " + *it + " served " + to_string(entries) + " entr" + ies(entries) +
+                ", " + to_string(changes) + " change" + s(changes) + " in " + clientTime.elapsed());
 
             __int64_t end = (it+1) != paths.end();
             server.ipcWrite(end);
