@@ -4,16 +4,22 @@
 
 #include <fstream>
 #include <string>
+#include <iostream>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <pwd.h>
+#include <time.h>
 
 #include "globals.h"
 #include "util_generic.h"
 #include "help.h"
+#include "ipc.h"
+#include <pcre++.h>
 
 
+using namespace pcrepp;
 using namespace std;
+
 
 void installman() {
     string manPath = "/usr/local/share/man/man1";
@@ -317,7 +323,7 @@ void scheduleLaunchCtl(string& appPath) {
                 if (offset == 0 || offset == 24)
                     cout << "daily." << endl;
                 else
-                    cout << "every " << offset << " hour" << (offset == 1 ? "" : "s") << ".\n";
+                    cout << "every " << offset << " hour" << s(offset) << ".\n";
                 cout << "use \"launchctl disable gui/" << uid << "/com.local.managebackups\" to disable." << endl;
             }
             else {
@@ -337,8 +343,78 @@ void scheduleLaunchCtl(string& appPath) {
 }
 
 
-void scheduleCron(string& appPath) {
+string newCronTimes() {
+    int offset = GLOBALS.cli[CLI_SCHED].as<int>();
+    int minute = GLOBALS.cli.count(CLI_SCHEDMIN) ? GLOBALS.cli[CLI_SCHEDMIN].as<int>() : 15;
+
+    if (offset == 0 || offset == 24) {
+        int hour = GLOBALS.cli.count(CLI_SCHEDHOUR) ? GLOBALS.cli[CLI_SCHEDHOUR].as<int>() : 0;
+        return(to_string(minute) + " " + to_string(hour) + " * * *");
+    }
     
+    return (to_string(minute) + " */" + to_string(offset) + " * * *");
+}
+
+
+void scheduleCron(string& appPath) {
+    string crontabCmd = exists("/usr/bin/crontab") ? "/usr/bin/crontab" : "crontab";
+    
+    PipeExec cronOutput(crontabCmd + " -l");
+    cronOutput.execute();
+    
+    int bytesRead;
+    char data[1024 * 64];
+    string oldUserTab;
+    
+    while ((bytesRead = (int)cronOutput.ipcRead(data, sizeof(data))) > 0)
+        oldUserTab += string(data, bytesRead);
+    
+    cronOutput.closeAll();
+    
+    Pcre commentRE("^\\s*#");
+    Pcre lineRE("\\s*\\S+\\s+\\S+\\s+\\S+\\s+\\S+\\s+\\S+\\s+(.+)");
+    string line, newUserTab;
+    size_t index;
+    istringstream iss(oldUserTab);
+
+    bool found = false;
+    while (getline(iss, line)) {
+        if (((index = line.find("managebackups")) != string::npos) && !commentRE.search(line)) {
+            if (lineRE.search(line) && lineRE.matches()) {
+                line = newCronTimes() + "  " + lineRE.get_match(0);
+                found = true;
+            }
+        }
+        
+        newUserTab += line + "\n";
+    }
+
+    if (!found) {
+        newUserTab += "\n# managebackups cron'd on " + string(asctime(localtime(&GLOBALS.startupTime)));
+        newUserTab += newCronTimes() + "  " + appPath + " -K\n";
+    }
+    
+    PipeExec cronEdit(crontabCmd + " -");
+    cronEdit.execute();
+    
+    istringstream iss2(newUserTab);
+    
+    bool success = true;
+    while (getline(iss2, line)) {
+        line += "\n";
+        if (cronEdit.ipcWrite(line.c_str(), line.length()) < line.length())
+            success = false;
+    }
+    
+    cronEdit.closeAll();
+    
+    if (success) {
+        int offset = GLOBALS.cli[CLI_SCHED].as<int>();
+        cout << "successfully scheduled cron job for every " << offset << " hour" << s(offset) << "." << endl;
+        cout << "use 'crontab -e' to make changes." << endl;
+    }
+    else
+        cout << "error attempting to update crontab; use 'crontab -e' to edit manually.";
 }
 
 

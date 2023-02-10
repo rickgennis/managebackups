@@ -170,7 +170,7 @@ int copyFile(string srcFile, string destFile);
 // unescape
 string ue(string file);
 
-inline bool exists(const std::string& name);
+bool exists(const std::string& name);
 
 string getUserHomeDir();
 

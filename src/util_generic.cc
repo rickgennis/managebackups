@@ -949,7 +949,7 @@ string ue(string file) {
 }
 
 
-inline bool exists(const std::string& name) {
+bool exists(const std::string& name) {
     struct stat statBuffer;
     return (stat(name.c_str(), &statBuffer) == 0);
 }

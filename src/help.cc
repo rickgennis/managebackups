@@ -88,6 +88,11 @@ void showHelp(enum helpType kind) {
             + "   -x, --lock          Lock the current profile for the duration of the run so only one copy can run at a time\n"
             + "   --force             Override any existing lock and force the backup to start\n"
             + "   --tripwire [string] Define tripwire files of the form 'filename: md5, filename: md5'\n"
+            + "\n" + string(BOLDBLUE) + "SCHEDULING (via cron on Linux and launchctl on MacOS)\n" + RESET
+            + "   --sched [h]         Schedule managebackups to run every h hours\n"
+            + "   --schedhour [h]     If scheduled for once a day (--sched 24), specify which hour to run on; defaults to 0\n"
+            + "   --schedminute [m]   Specify which minute to run on; defaults to 15\n"
+            + "   --schedpath [p]     If managebackups isn't installed in /usr/local/bin, specify its altnernative location\n"
             + "\nSee 'man managebackups' for more detail.\n";
 
             /*
