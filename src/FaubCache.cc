@@ -64,8 +64,16 @@ void FaubCache::restoreCache(string profileName) {
                             // next we make sure the subdir matches our profile name
                             if (fullFilename.find(string("/") + profileName + "-") != string::npos) {
                                 // check for in process backups
-                                if (tempRE.search(fullFilename))
+                                if (tempRE.search(fullFilename)) {
                                     inProcessFilename = fullFilename;
+
+                                    if (GLOBALS.startupTime - statData.st_mtime > 60*60*5) {
+                                        if (rmrfdir(fullFilename))
+                                            log("warning: cleaned up abandoned in-process backup at " + fullFilename + " (" + timeDiff(mktimeval(statData.st_mtime)) + ")");
+                                        else
+                                            log("error: unable to remove abandoned in-process backup at " + fullFilename);
+                                    }
+                                }
                                 else {
                                     FaubEntry entry(fullFilename);
                                     auto success = entry.loadStats();
