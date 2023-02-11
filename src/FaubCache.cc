@@ -44,10 +44,10 @@ void FaubCache::restoreCache(string profileName) {
                 if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
                     continue;
 
-                ++GLOBALS.statsCount;
                 struct stat statData;
                 string fullFilename = slashConcat(currentDir, c_dirEntry->d_name);
 
+                ++GLOBALS.statsCount;
                 if (!stat(fullFilename.c_str(), &statData)) {
 
                     if ((statData.st_mode & S_IFMT) == S_IFDIR) {
@@ -68,10 +68,13 @@ void FaubCache::restoreCache(string profileName) {
                                     inProcessFilename = fullFilename;
 
                                     if (GLOBALS.startupTime - statData.st_mtime > 60*60*5) {
-                                        if (rmrfdir(fullFilename))
-                                            log("warning: cleaned up abandoned in-process backup at " + fullFilename + " (" + timeDiff(mktimeval(statData.st_mtime)) + ")");
+                                        if (GLOBALS.cli.count(CLI_TEST))
+                                            cout << YELLOW << " TESTMODE: would have cleaned up abandoned in-process backup at " + fullFilename + " (" + timeDiff(mktimeval(statData.st_mtime)) + ")" << RESET << endl;
                                         else
-                                            log("error: unable to remove abandoned in-process backup at " + fullFilename);
+                                            if (rmrf(fullFilename))
+                                                log("warning: cleaned up abandoned in-process backup at " + fullFilename + " (" + timeDiff(mktimeval(statData.st_mtime)) + ")");
+                                            else
+                                                log("error: unable to remove abandoned in-process backup at " + fullFilename);
                                     }
                                 }
                                 else {

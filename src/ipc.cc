@@ -510,7 +510,7 @@ PipeExec::~PipeExec() {
 
 void PipeExec::flushErrors() {
     if (errorDir.length())
-        rmrfdir(errorDir);
+        rmrf(errorDir);
 }
 
 

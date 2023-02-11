@@ -38,6 +38,8 @@ class FaubEntry {
 
         string cacheFilename(string suffix) { return (GLOBALS.cacheDir + "/" + MD5string(directory) + "." + suffix); }
         string getDir() { return directory; }
+    
+        int filenameDayAge();
 
         string stats2string();
         void string2stats(string& data);

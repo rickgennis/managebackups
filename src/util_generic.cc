@@ -787,35 +787,43 @@ string catdir(string dir) {
 
 // delete an absolute directory (rm -rf).
 // wildcards are not interpreted in the directory name.
-bool rmrfdir(string dir) {
+bool rmrf(string item) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
+    struct stat statData;
 
-    if ((c_dir = opendir(dir.c_str())) != NULL) {
-        while ((c_dirEntry = readdir(c_dir)) != NULL) {
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
-                continue;
-
-            struct stat statData;
-            string filename = slashConcat(dir, c_dirEntry->d_name);
-            if (!lstat(filename.c_str(), &statData)) {
-
-                // recurse into subdirectories
-                if ((statData.st_mode & S_IFMT) == S_IFDIR) {
-                    if (!rmrfdir(filename))
-                        return false;
+    if (!lstat(item.c_str(), &statData)) {
+        if (S_ISDIR(statData.st_mode)) {
+            
+            if ((c_dir = opendir(item.c_str())) != NULL) {
+                while ((c_dirEntry = readdir(c_dir)) != NULL) {
+                    if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+                        continue;
+                    
+                    string filename = slashConcat(item, c_dirEntry->d_name);
+                    if (!lstat(filename.c_str(), &statData)) {
+                        
+                        // recurse into subdirectories
+                        if (S_ISDIR(statData.st_mode)) {
+                            if (!rmrf(filename))
+                                return false;
+                        }
+                        else
+                            if (unlink(filename.c_str()))
+                                return false;
+                    }
                 }
-                else
-                    if (unlink(filename.c_str()))
-                        return false;
+                
+                closedir(c_dir);
+                if (rmdir(item.c_str()))
+                    return false;
             }
         }
-
-        closedir(c_dir);
-        if (rmdir(dir.c_str()))
-            return false;
+        else
+            if (unlink(item.c_str()))
+                return false;
     }
-
+    
     return true;
 }
 
@@ -851,6 +859,7 @@ DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes) {    /
             continue;
 
         string fullFilename = path + "/" + dirEnt->d_name;
+        ++GLOBALS.statsCount;
         if (lstat(fullFilename.c_str(), &statData) < 0)
             log("error: stat(" + fullFilename + "): " + strerror(errno));
         else {
@@ -951,6 +960,7 @@ string ue(string file) {
 
 bool exists(const std::string& name) {
     struct stat statBuffer;
+    ++GLOBALS.statsCount;
     return (stat(name.c_str(), &statBuffer) == 0);
 }
 

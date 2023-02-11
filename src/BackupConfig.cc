@@ -31,7 +31,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     config_filename = "";
 
     // define settings and their defaults
-    // order of these inserts matter because they're accessed by position via the SetSpecifier enum
+    // *** order *** of these inserts matter because they're accessed by position via the SetSpecifier enum
     settings.insert(settings.end(), Setting(CLI_PROFILE, RE_PROFILE, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_DIR, RE_DIR, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_FILE, RE_FILE, STRING, ""));
@@ -63,6 +63,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_FAUB, RE_FAUB, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_UID, RE_UID, INT, "-1"));
     settings.insert(settings.end(), Setting(CLI_GID, RE_GID, INT, "-1"));
+    settings.insert(settings.end(), Setting(CLI_CONSOLIDATE, RE_CONSOLIDATE, INT, "0"));
     // CLI_PATHS is intentionally left out because its only accessed via CLI
     // and never as a Setting.  to implement it as a Setting would require a new
     // type (vector<string>) to be setup and parse and there's really no benefit.
@@ -297,12 +298,10 @@ void BackupConfig::loadConfigsCache() {
         cache.cacheFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value);
         struct stat statBuf;
 
-        if (!stat(cache.cacheFilename.c_str(), &statBuf)) {
+        if (!stat(cache.cacheFilename.c_str(), &statBuf))
             cache.restoreCache();
-        }
-        else {
+        else
             mkdirp(GLOBALS.cacheDir);
-        }
     }
 }
 

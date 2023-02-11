@@ -7,10 +7,34 @@
 #include "cxxopts.hpp"
 #include "colors.h"
 
+/*
+ Adding a commandline option vs adding a backup config setting.
+ 
+ All settings have CLI options but not all CLI options have an equivalent setting.
+ 
+ (A) To add a CLI option:
+    (1) add a defined constant for its name #define CLI_xxxx in globalsdef.h
+    (2) add the constant along with its type to options.add_options() in managebackups.cc
+ 
+ (B) To add a backup config setting:
+    (1) add a defined constant for its regex #define RE_xxxx in globalsdef.h
+    (2) add an enum constant to reference it in Setting.h (order matters, at at end of list)
+    (3) add a map entry between the defined const and the enum in Setting.cc
+    (4) add it to the settings vector with its default in BackupConfig::BackupConfig(bool) in BackupConfig.cc
+    (5) do everything under the CLI option list above because you need a matching CLI option to
+      override the config setting
+ 
+ Settings are accessed as config.settings[ENUM].value or config.settings[ENUM].length()
+ Because CLI options are already mapped to settings (via B3 above) config.settings[] will already
+ have handled reading the settings from the config and overriding it if the CLI option was specified.
+ i.e. no need to check the CLI option for a setting.
+ 
+ */
+
+
 #define CONF_DIR "/etc/managebackups"
 #define CACHE_DIR "/var/managebackups/caches"
 #define TMP_OUTPUT_DIR "/tmp/managebackups_output"
-
 
 #define DFMT(x) cerr << BOLDGREEN << __FUNCTION__ << ": " << RESET << GREEN << x << RESET << endl
 #define DFMTNOENDL(x) cerr << BOLDGREEN << __FUNCTION__ << ": " << RESET << GREEN << x << RESET
@@ -94,6 +118,7 @@
 #define CLI_SCHEDHOUR "schedhour"
 #define CLI_SCHEDMIN "schedminute"
 #define CLI_SCHEDPATH "schedpath"
+#define CLI_CONSOLIDATE "consolidate"
 
 
 // conf file regexes
@@ -132,6 +157,7 @@
 #define RE_PATHS "(path)"
 #define RE_UID "(uid)"
 #define RE_GID "(gid)"
+#define RE_CONSOLIDATE "(consolidate)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"

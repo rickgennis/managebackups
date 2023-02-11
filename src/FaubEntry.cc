@@ -247,3 +247,33 @@ void FaubEntry::displayDiffFiles() {
     else
         cout << "no diff files found." << endl;
 }
+
+
+int FaubEntry::filenameDayAge() {
+    Pcre dateRE = Pcre("-(20\\d{2})(\\d{2})(\\d{2})\\D");
+    int date_year, date_month, date_day;
+    time_t refTime;
+    time(&refTime);
+
+    if (dateRE.search(directory) && dateRE.matches() > 2) {
+        date_year  = stoi(dateRE.get_match(0));
+        date_month = stoi(dateRE.get_match(1));
+        date_day   = stoi(dateRE.get_match(2));
+    }
+    else {   // should never get here due to a similar regex limiting filenames getting initially added to the cache
+        SCREENERR("error: cannot parse date/time from backup directory (" << directory << ")");
+        exit(1);
+    }
+
+    struct tm fileTime;
+    fileTime.tm_sec  = 0;
+    fileTime.tm_min  = 0;
+    fileTime.tm_hour = 0;
+    fileTime.tm_mday = date_day;
+    fileTime.tm_mon  = date_month - 1;
+    fileTime.tm_year = date_year - 1900;
+    fileTime.tm_isdst = -1;
+
+    auto fileMTime = mktime(&fileTime);
+    return floor((refTime - fileMTime) / SECS_PER_DAY);
+}

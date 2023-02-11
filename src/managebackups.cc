@@ -521,37 +521,56 @@ void pruneFaubBackups(BackupConfig &config)
     DEBUG(D_prune) DFMT("examining " << fcache.getNumberOfBackups() << " backup(s) for "
         << config.settings[sTitle].value);
 
+    size_t backupAge = 0, backupCountOnDay = 0;
+    
     auto cacheEntryIt = fcache.getFirstBackup();
     while (cacheEntryIt != fcache.getEnd()) {
         auto filenameAge = cacheEntryIt->second.dayAge;
         auto filenameDOW = cacheEntryIt->second.dow;
-
+        auto filenameDayAge = cacheEntryIt->second.filenameDayAge();
+        
         auto shouldKeep =
-            pruneShouldKeep(config, cacheEntryIt->second.getDir(), filenameAge, filenameDOW,
-                            cacheEntryIt->second.startDay, cacheEntryIt->second.startMonth,
-                            cacheEntryIt->second.startYear);
+        pruneShouldKeep(config, cacheEntryIt->second.getDir(), filenameAge, filenameDOW,
+                        cacheEntryIt->second.startDay, cacheEntryIt->second.startMonth,
+                        cacheEntryIt->second.startYear);
+        
+        if (backupAge != filenameDayAge) {
+            backupAge = filenameDayAge;
+            backupCountOnDay = 1;
+        }
+        else
+            backupCountOnDay += 1;
+        
+        // if standard retention pruning deletes this backup and there's only one other
+        // backup on this day, we don't want consolidation to delete the other one
+        if (!shouldKeep.length()) backupCountOnDay -= 1;
+        
+        auto shouldConsolidate = config.settings[sConsolidate].ivalue() && backupAge >= config.settings[sConsolidate].ivalue() && backupCountOnDay > 1;
+        
+        //cerr << "consolidate: " << (shouldConsolidate ? "LOSE" : "KEEP") << ", " << backupAge << " (" << config.settings[sConsolidate].ivalue() << "); countonday=" << backupCountOnDay << " [" << "] " << cacheEntryIt->second.getDir() << endl;
 
-        if (shouldKeep.length()) {
+        if (shouldKeep.length() && !shouldConsolidate) {
             DEBUG(D_prune) DFMT(shouldKeep);
             ++cacheEntryIt;
             continue;
         }
-
+        
+        
         if (GLOBALS.cli.count(CLI_TEST))
             cout << YELLOW << config.ifTitle() << " TESTMODE: would have deleted "
                  << cacheEntryIt->second.getDir() << " (age=" + to_string(filenameAge)
-                 << ", dow=" + dw(filenameDOW) << ")" << RESET << endl;
+                 << ", dow=" + dw(filenameDOW) << ")" << (shouldConsolidate ? " consolidation" : "" ) << RESET << endl;
         else {
-            if (rmrfdir(cacheEntryIt->second.getDir())) {
-                NOTQUIET &&cout << "\t• removed " << cacheEntryIt->second.getDir() << endl;
+            if (rmrf(cacheEntryIt->second.getDir())) {
+                NOTQUIET &&cout << "\t• removed " << cacheEntryIt->second.getDir() << (shouldConsolidate ? " (consolidation)" : "" ) << endl;
                 log(config.ifTitle() + " removed " + cacheEntryIt->second.getDir() +
-                    " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")");
-                DEBUG(D_prune) DFMT("completed removal of " << cacheEntryIt->second.getDir());
+                    " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")" + (shouldConsolidate ? " consolidation" : "" ));
+                DEBUG(D_prune) DFMT("completed removal of " << cacheEntryIt->second.getDir() << (shouldConsolidate ? " (consolidation)" : "" ));
             }
             else {
-                log(config.ifTitle() + " unable to remove " + cacheEntryIt->second.getDir() + ": " +
+                log(config.ifTitle() + " unable to remove " + (shouldConsolidate ? " (consolidation) " : "" ) + cacheEntryIt->second.getDir() + ": " +
                     strerror(errno));
-                SCREENERR("unable to remove " + cacheEntryIt->second.getDir() + ": " +
+                SCREENERR(string("unable to remove ") + (shouldConsolidate ? " (consolidation) " : "" ) + cacheEntryIt->second.getDir() + ": " +
                           strerror(errno));
             }
         }
@@ -657,6 +676,8 @@ void pruneBackups(BackupConfig &config)
     set<string> changedMD5s;
     DEBUG(D_prune) DFMT("weeklies set to dow " << dw(config.settings[sDOW].ivalue()));
 
+    size_t backupAge, backupCountOnDay;
+    
     // loop through the filename index sorted by filename (i.e. all backups by age)
     for (auto fIdx_it = config.cache.indexByFilename.begin(), next_it = fIdx_it;
          fIdx_it != config.cache.indexByFilename.end(); fIdx_it = next_it) {
@@ -672,12 +693,26 @@ void pruneBackups(BackupConfig &config)
         if (raw_it != config.cache.rawData.end()) {
             unsigned long filenameAge = raw_it->second.day_age;
             int filenameDOW = raw_it->second.dow;
-
+            
             auto shouldKeep = pruneShouldKeep(config, raw_it->second.filename, (int)filenameAge,
                                               filenameDOW, raw_it->second.date_day,
                                               raw_it->second.date_month, raw_it->second.date_year);
+            
+            if (backupAge != filenameAge) {
+                backupAge = filenameAge;
+                backupCountOnDay = 1;
+            }
+            else
+                backupCountOnDay += 1;
 
-            if (shouldKeep.length()) {
+            // if standard retention pruning deletes this backup and there's only one other
+            // backup on this day, we don't want consolidation to delete the other one
+            if (!shouldKeep.length()) backupCountOnDay -= 1;
+            
+            auto shouldConsolidate = config.settings[sConsolidate].ivalue() && backupAge >= config.settings[sConsolidate].ivalue() && backupCountOnDay > 1;
+            
+
+            if (shouldKeep.length() && !shouldConsolidate) {
                 DEBUG(D_prune) DFMT(shouldKeep);
                 continue;
             }
@@ -685,24 +720,23 @@ void pruneBackups(BackupConfig &config)
             if (GLOBALS.cli.count(CLI_TEST))
                 cout << YELLOW << config.ifTitle() << " TESTMODE: would have deleted "
                      << raw_it->second.filename << " (age=" + to_string(filenameAge)
-                     << ", dow=" + dw(filenameDOW) << ")" << RESET << endl;
+                     << ", dow=" + dw(filenameDOW) << ")" << (shouldConsolidate ? " consolidation" : "") << RESET << endl;
             else {
                 // delete the file and remove it from all caches
                 if (!unlink(raw_it->second.filename.c_str())) {
-                    NOTQUIET &&cout << "\t• removed " << raw_it->second.filename << endl;
+                    NOTQUIET && cout << "\t• removed " << raw_it->second.filename << (shouldConsolidate ? " (consolidation)" : "") << endl;
                     log(config.ifTitle() + " removed " + raw_it->second.filename +
-                        " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")");
+                        " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")" + (shouldConsolidate ? " consolidation" : ""));
 
                     changedMD5s.insert(raw_it->second.md5);
                     config.cache.remove(raw_it->second);
-                    config.cache.updated = true;  // updated causes the cache to get saved in the
-                                                  // BackupCache destructor
-                    DEBUG(D_prune) DFMT("completed removal of file");
+                    config.cache.updated = true;  // updated causes the cache to get saved in the BackupCache destructor
+                    DEBUG(D_prune) DFMT("completed removal of " << raw_it->second.filename);
                 }
                 else {
-                    log(config.ifTitle() + " unable to remove" + raw_it->second.filename + ": " +
+                    log(config.ifTitle() + " unable to remove " + (shouldConsolidate ? " (consolidation) " : "") + raw_it->second.filename + ": " +
                         strerror(errno));
-                    SCREENERR("unable to remove " + raw_it->second.filename + ": " +
+                    SCREENERR(string("unable to remove ") + (shouldConsolidate ? " (consolidation) " : "") + raw_it->second.filename + ": " +
                               strerror(errno));
                 }
             }
@@ -780,12 +814,9 @@ void updateLinks(BackupConfig &config)
                          << ", found=" << maxLinksFound << ", max=" << maxLinksAllowed
                          << ", age=" << raw_it->second.day_age << ")");
 
-                    if (raw_it->second.links >
-                            maxLinksFound &&  // more links than previous files for this md5
-                        raw_it->second.links <
-                            maxLinksAllowed &&  // still less than the configured max
-                        raw_it->second
-                            .day_age) {  // at least a day old (i.e. don't relink today's file)
+                    if (raw_it->second.links > maxLinksFound &&   // more links than previous files for this md5
+                        raw_it->second.links < maxLinksAllowed && // still less than the configured max
+                        raw_it->second.day_age) {                 // at least a day old (i.e. don't relink today's file)
 
                         referenceFile = &raw_it->second;
                         maxLinksFound = raw_it->second.links;
@@ -1356,7 +1387,7 @@ void sigTermHandler(int sig)
         struct stat statData;
         if (!stat(GLOBALS.interruptFilename.c_str(), &statData)) {
             if (S_ISDIR(statData.st_mode)) 
-                rmrfdir(GLOBALS.interruptFilename);          // faub-style
+                rmrf(GLOBALS.interruptFilename);             // faub-style
             else
                 unlink(GLOBALS.interruptFilename.c_str());   // single-file
         }
@@ -1507,6 +1538,7 @@ int main(int argc, char *argv[])
         CLI_SCHEDHOUR, "Schedule hour", cxxopts::value<int>())(
         CLI_SCHEDMIN, "Schedule minute", cxxopts::value<int>())(
         CLI_SCHEDPATH, "Schedule path", cxxopts::value<string>())(
+        CLI_CONSOLIDATE, "Consolidate backups after days", cxxopts::value<int>())(
         CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
 
     try {

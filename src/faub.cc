@@ -26,6 +26,7 @@ string mostRecentBackupDirSince(int baseSlashes, string backupBaseDir, string si
     struct stat statData;
     time_t sinceTime = 0;
 
+    ++GLOBALS.statsCount;
     if (!stat(sinceDir.c_str(), &statData))
         sinceTime = statData.st_mtime;
     else
@@ -47,6 +48,7 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
     Pcre matchSpec("-\\d{8}($|-\\d{2}:)");
     if (matchSpec.search(backupDir)) {
 
+        ++GLOBALS.statsCount;
         if (!stat(ue(backupDir).c_str(), &statData)) {
             DEBUG(D_faub) DFMT("returning " << backupDir);
             return {backupDir, statData.st_mtime};
@@ -63,6 +65,7 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
 
             string fullFilename = backupDir + "/" + string(c_dirEntry->d_name);
 
+            ++GLOBALS.statsCount;
             if (!stat(fullFilename.c_str(), &statData)) {
 
                 if (S_ISDIR(statData.st_mode)) {
@@ -243,6 +246,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             }
             else {
                 // lstat the previous backup's copy of the file and compare the mtimes
+                ++GLOBALS.statsCount;
                 int statResult = lstat(localPrevFilename.c_str(), &statData);
 
                 if (prevDir.length() && !statResult && statData.st_mtime == mtime) {
@@ -255,6 +259,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                     struct stat statData2;
                     if ((statData.st_nlink >= maxLinksAllowed) &&
                        ((!incTime && lstat(localCurFilename.c_str(), &statData2)) || incTime)) {
+                        if (!incTime) ++GLOBALS.statsCount;
                         duplicateList.insert(duplicateList.end(), pair<string, string>(localPrevFilename, localCurFilename));
                         DEBUG(D_netproto) DFMTNOPREFIX("[matches, but links maxed]");
                     }
@@ -356,6 +361,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             }
             else {
                 struct stat statData;
+                ++GLOBALS.statsCount;
                 if (!lstat(dups.first.c_str(), &statData)) {
                     if (lchown(dups.second.c_str(), statData.st_uid, statData.st_gid)) {
                         SCREENERR(fs << " error: unable to chown " << dups.second << ": " << strerror(errno));
@@ -388,6 +394,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             if (bytes >= 0 && bytes < sizeof(linkBuf)) {
                 linkBuf[bytes] = 0;
                 if (!symlink(linkBuf, links.second.c_str())) {
+                    ++GLOBALS.statsCount;
                     if (!lstat(links.first.c_str(), &statData)) {
                         if (lchown(links.second.c_str(), statData.st_uid, statData.st_gid)) {
                             SCREENERR(fs << " error: unable to chown symlink " << links.second << ": " << strerror(errno));
@@ -431,7 +438,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
     // if time isn't included we may be about to overwrite a previous backup for this date
     if (!incTime)
-        rmrfdir(originalCurrentDir.c_str());
+        rmrf(originalCurrentDir.c_str());
 
     if (rename(string(currentDir).c_str(), originalCurrentDir.c_str())) {
         string errorDetail = config.ifTitle() + " unable to rename " + currentDir + " to " + originalCurrentDir + ": " + strerror(errno);
@@ -498,6 +505,7 @@ size_t fc_scanToServer(string entryName, IPC_Base& server) {
     
     entryName.erase(remove(entryName.begin(), entryName.end(), '\\'), entryName.end());
     
+    ++GLOBALS.statsCount;
     if (!lstat(entryName.c_str(), &statData)) {
         if (S_ISDIR(statData.st_mode)) {
             
@@ -509,6 +517,7 @@ size_t fc_scanToServer(string entryName, IPC_Base& server) {
                     
                     string fullFilename = entryName + "/" + string(c_dirEntry->d_name);
                     
+                    ++GLOBALS.statsCount;
                     if (!lstat(fullFilename.c_str(), &statData)) {
                         ++totalEntries;
                         server.ipcWrite(string(fullFilename + NET_DELIM).c_str());
