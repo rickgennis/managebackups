@@ -57,6 +57,7 @@ void showHelp(enum helpType kind) {
             + "   --months [x]        Keep x monthly backups\n"
             + "   --years [x]         Keep x yearly backups\n"
             + "   --dow [x]           Day of week to save for weeklies (0=Sunday, 1=Monday, etc); defaults to Sunday.\n"
+            + "   --consolidate [x]   Prune down to a single backups of the profilel per day after its x days old.\n"
             + "   --fs_backups [b]    FAILSAFE: Require b backups before pruning\n"
             + "   --fs_days [d]       FAILSAFE: within the last d days.\n"
             + "   --fp                FAILSAFE: Paranoid mode; sets --fs_backups 1 --fs_days 2\n"

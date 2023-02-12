@@ -57,6 +57,7 @@ void showHelp(enum helpType kind) {
             + "   --months [x]        Keep x monthly backups\n"
             + "   --years [x]         Keep x yearly backups\n"
             + "   --dow [x]           Day of week to save for weeklies (0=Sunday, 1=Monday, etc); defaults to Sunday.\n"
+            + "   --consolidate [x]   Prune down to a single backups of the profilel per day after its x days old.\n"
             + "   --fs_backups [b]    FAILSAFE: Require b backups before pruning\n"
             + "   --fs_days [d]       FAILSAFE: within the last d days.\n"
             + "   --fp                FAILSAFE: Paranoid mode; sets --fs_backups 1 --fs_days 2\n"
@@ -428,6 +429,14 @@ Note: diff data is cached per backup relative to the previous one.
 For example, if you have backups 1, 2, 3, and delete backup 2, a
 \[lq]\[en]diff 3\[rq] will not be relative to backup 1.
 It\[cq]ll still show the diff to backup 2, as if 2 were still there.
+.TP
+**\[en]consolidate [\f[I]days\f[R]]
+Prune backups down to a single backups per day once they\[cq]re
+\f[I]days\f[R] days old.
+If you take multiple backups of the same profile in the same day (with
+\f[B]\[en]time\f[R]), this allows you to keep only a single one after
+they age to \f[I]days\f[R] days but haven\[cq]t reached the full
+retention policy to be completely deleted.
 .TP
 \f[B]\[en]sched\f[R] [\f[I]hours\f[R]]
 Schedule (via LaunchCtl on MacOS or cron on Linux)
