@@ -115,7 +115,7 @@ void FaubCache::restoreCache(string profileName) {
                                                 entry.startYear = t.tm_year + 1900;
                                             }
 
-                                            entry.dayAge = floor((refTime - entry.finishTime) / SECS_PER_DAY);
+                                            entry.mtimeDayAge = floor((refTime - entry.finishTime) / SECS_PER_DAY);
                                             auto pFileTime = localtime(&entry.finishTime);
                                             entry.dow = pFileTime->tm_wday;
                                         }

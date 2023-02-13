@@ -525,12 +525,12 @@ void pruneFaubBackups(BackupConfig &config)
     
     auto cacheEntryIt = fcache.getFirstBackup();
     while (cacheEntryIt != fcache.getEnd()) {
-        auto filenameAge = cacheEntryIt->second.dayAge;
+        auto mtimeDayAge = cacheEntryIt->second.mtimeDayAge;
         auto filenameDOW = cacheEntryIt->second.dow;
         auto filenameDayAge = cacheEntryIt->second.filenameDayAge();
         
         auto shouldKeep =
-        pruneShouldKeep(config, cacheEntryIt->second.getDir(), filenameAge, filenameDOW,
+        pruneShouldKeep(config, cacheEntryIt->second.getDir(), mtimeDayAge, filenameDOW,
                         cacheEntryIt->second.startDay, cacheEntryIt->second.startMonth,
                         cacheEntryIt->second.startYear);
         
@@ -558,13 +558,13 @@ void pruneFaubBackups(BackupConfig &config)
         
         if (GLOBALS.cli.count(CLI_TEST))
             cout << YELLOW << config.ifTitle() << " TESTMODE: would have deleted "
-                 << cacheEntryIt->second.getDir() << " (age=" + to_string(filenameAge)
+                 << cacheEntryIt->second.getDir() << " (age=" + to_string(mtimeDayAge)
                  << ", dow=" + dw(filenameDOW) << ")" << (shouldConsolidate ? " consolidation" : "" ) << RESET << endl;
         else {
             if (rmrf(cacheEntryIt->second.getDir())) {
                 NOTQUIET &&cout << "\t• removed " << cacheEntryIt->second.getDir() << (shouldConsolidate ? " (consolidation)" : "" ) << endl;
                 log(config.ifTitle() + " removed " + cacheEntryIt->second.getDir() +
-                    " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")" + (shouldConsolidate ? " consolidation" : "" ));
+                    " (age=" + to_string(mtimeDayAge) + ", dow=" + dw(filenameDOW) + ")" + (shouldConsolidate ? " consolidation" : "" ));
                 DEBUG(D_prune) DFMT("completed removal of " << cacheEntryIt->second.getDir() << (shouldConsolidate ? " (consolidation)" : "" ));
             }
             else {
@@ -614,14 +614,14 @@ void pruneBackups(BackupConfig &config)
             auto cacheEntryIt = fcache.getFirstBackup();
             while (cacheEntryIt != fcache.getEnd()) {
                 descrip = "";
-                if (cacheEntryIt->second.dayAge <= fd) {
+                if (cacheEntryIt->second.mtimeDayAge <= fd) {
                     ++minValidBackups;
                     descrip = " [valid for fs]";
                 }
 
                 DEBUG(D_prune)
                 DFMT("failsafe: " << cacheEntryIt->second.getDir()
-                                  << " (age=" << cacheEntryIt->second.dayAge << ")" << descrip);
+                                  << " (age=" << cacheEntryIt->second.mtimeDayAge << ")" << descrip);
                 ++cacheEntryIt;
 
                 if (minValidBackups >= fb) break;
@@ -632,13 +632,13 @@ void pruneBackups(BackupConfig &config)
                 auto raw_it = config.cache.rawData.find(fnameIdx.second);
 
                 descrip = "";
-                if (raw_it != config.cache.rawData.end() && raw_it->second.day_age <= fd) {
+                if (raw_it != config.cache.rawData.end() && raw_it->second.fnameDayAge <= fd) {
                     ++minValidBackups;
                     descrip = " [valid for fs]";
                 }
 
                 DEBUG(D_prune)
-                DFMT("failsafe: " << raw_it->second.filename << " (age=" << raw_it->second.day_age
+                DFMT("failsafe: " << raw_it->second.filename << " (age=" << raw_it->second.fnameDayAge
                                   << ")" << descrip);
 
                 if (minValidBackups >= fb) break;
@@ -676,7 +676,7 @@ void pruneBackups(BackupConfig &config)
     set<string> changedMD5s;
     DEBUG(D_prune) DFMT("weeklies set to dow " << dw(config.settings[sDOW].ivalue()));
 
-    size_t backupAge, backupCountOnDay;
+    size_t backupAge = 0, backupCountOnDay= 0;
     
     // loop through the filename index sorted by filename (i.e. all backups by age)
     for (auto fIdx_it = config.cache.indexByFilename.begin(), next_it = fIdx_it;
@@ -691,7 +691,7 @@ void pruneBackups(BackupConfig &config)
         auto raw_it = config.cache.rawData.find(fIdx_it->second);
 
         if (raw_it != config.cache.rawData.end()) {
-            unsigned long filenameAge = raw_it->second.day_age;
+            unsigned long filenameAge = raw_it->second.fnameDayAge;
             int filenameDOW = raw_it->second.dow;
             
             auto shouldKeep = pruneShouldKeep(config, raw_it->second.filename, (int)filenameAge,
@@ -812,11 +812,11 @@ void updateLinks(BackupConfig &config)
                     DFMT("ref loop - considering for ref file "
                          << raw_it->second.filename << " (links=" << raw_it->second.links
                          << ", found=" << maxLinksFound << ", max=" << maxLinksAllowed
-                         << ", age=" << raw_it->second.day_age << ")");
+                         << ", age=" << raw_it->second.fnameDayAge << ")");
 
                     if (raw_it->second.links > maxLinksFound &&   // more links than previous files for this md5
                         raw_it->second.links < maxLinksAllowed && // still less than the configured max
-                        raw_it->second.day_age) {                 // at least a day old (i.e. don't relink today's file)
+                        raw_it->second.fnameDayAge) {                 // at least a day old (i.e. don't relink today's file)
 
                         referenceFile = &raw_it->second;
                         maxLinksFound = raw_it->second.links;
@@ -856,7 +856,7 @@ void updateLinks(BackupConfig &config)
                     }
 
                     // skip today's file as it could still be being updated
-                    if (!raw_it->second.day_age && !includeTime) {
+                    if (!raw_it->second.fnameDayAge && !includeTime) {
                         DEBUG(D_link) DFMT("\t\ttoday's file");
                         continue;
                     }

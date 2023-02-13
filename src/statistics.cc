@@ -469,7 +469,7 @@ void _displayDetailedStats(BackupConfig& config, int statDetail) {
             // if the mtime and the name_mtime refer to completely different days then go non-precise and use
             // the name_mtime.
             bool prectime = mtimesAreSameDay(raw_it->second.mtime, raw_it->second.name_mtime) && 
-                (raw_it->second.links == 1 || !raw_it->second.day_age);
+                (raw_it->second.links == 1 || !raw_it->second.fnameDayAge);
 
             // format the detail for output
             char result[1000];

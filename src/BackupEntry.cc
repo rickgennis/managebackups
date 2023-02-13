@@ -16,7 +16,7 @@ using namespace std;
 BackupEntry::BackupEntry() {
     dateRE = Pcre(DATE_REGEX);
     md5 = filename = "";
-    links = mtime = size = inode = day_age = dow = date_day = duration = current = name_mtime = 0;
+    links = mtime = size = inode = fnameDayAge = dow = date_day = duration = current = name_mtime = 0;
 }
 
 string BackupEntry::class2string() {
@@ -78,7 +78,7 @@ BackupEntry* BackupEntry::updateAges(time_t refTime) {
     auto fileMTime = mktime(&fileTime);
 
     name_mtime = fileMTime;
-    day_age = floor((refTime - fileMTime) / SECS_PER_DAY);
+    fnameDayAge = floor((refTime - fileMTime) / SECS_PER_DAY);
 
     auto pFileTime = localtime(&fileMTime);
     dow = pFileTime->tm_wday;

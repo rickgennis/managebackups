@@ -25,7 +25,7 @@ FaubEntry::FaubEntry(string dir) {
     if (dir.length()) {
         directory = dir;
         ds.sizeInBytes = ds.sizeInBlocks = ds.savedInBytes = ds.savedInBlocks = finishTime = duration = modifiedFiles = unchangedFiles = dirs = slinks = 0;
-        startDay = startMonth = startYear = dayAge = dow = 0;
+        startDay = startMonth = startYear = mtimeDayAge = dow = 0;
         updated = false;
         return;
     }
@@ -250,7 +250,7 @@ void FaubEntry::displayDiffFiles() {
 
 
 int FaubEntry::filenameDayAge() {
-    Pcre dateRE = Pcre("-(20\\d{2})(\\d{2})(\\d{2})\\D");
+    Pcre dateRE = Pcre(DATE_REGEX);
     int date_year, date_month, date_day;
     time_t refTime;
     time(&refTime);

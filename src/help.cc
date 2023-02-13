@@ -208,6 +208,12 @@ The retention critera is configured on a daily, weekly, monthly and
 yearly basis.
 By default \f[I]managebackups\f[R] will keep 14 daily, 4 weekly, 6
 monthly and 2 yearly backups.
+Additionally, \f[B]managebackups\f[R] can perform a second level of
+pruning called consolidation.
+If elected, multiple backups taken on the same day can be consolidated
+down to a single per day backup after said backup has reached a
+specified age.
+The default is no consolidation.
 .SS 3. Hard Linking
 .PP
 In configurations using a single file backup where all backups are

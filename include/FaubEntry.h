@@ -32,7 +32,7 @@ class FaubEntry {
         char startDay;
         char startMonth;
         int startYear;
-        unsigned int dayAge;
+        unsigned int mtimeDayAge;
         unsigned long duration;
         int dow;
 

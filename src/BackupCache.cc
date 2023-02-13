@@ -257,7 +257,7 @@ BackupCache::~BackupCache() {
                 ", md5:" + raw.second.md5 + 
                 ", size:" + to_string(raw.second.size) + 
                 ", inod:" + to_string(raw.second.inode) + 
-                ", dage:" + to_string(raw.second.day_age) + 
+                ", dage:" + to_string(raw.second.fnameDayAge) + 
                 ", dow:" + dw(raw.second.dow) + 
                 ", day:" + to_string(raw.second.date_day) + 
                 ", lnks:" + to_string(raw.second.links) + 

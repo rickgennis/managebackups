@@ -26,7 +26,7 @@ class BackupEntry {
            that are all hardlinked together (due to having identical content) and that means they
            share the same inode and same single mtime entry.  mtime won't show when they were taken. */
 
-        unsigned long   day_age;
+        unsigned long   fnameDayAge;
         int             dow;
         int             date_month;
         int             date_day;

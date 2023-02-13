@@ -46,7 +46,7 @@
 #define DUP2(x,y) while (dup2(x,y) < 0 && errno == EINTR)
 
 #define SECS_PER_DAY (60*60*24)
-#define DATE_REGEX "-(20\\d{2})[-.]*(\\d{2})[-.]*(\\d{2})[-.]"
+#define DATE_REGEX "-(20\\d{2})[-.]*(\\d{2})[-.]*(\\d{2})[-.@]"
 
 /* CLI_ and RE_
  * The CLI_ constants are commandline switches while the RE_ are regex patterns
