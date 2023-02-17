@@ -522,6 +522,7 @@ void pruneFaubBackups(BackupConfig &config)
         << config.settings[sTitle].value);
 
     size_t backupAge = 0, backupCountOnDay = 0;
+    bool removedPrevious = false;
     
     auto cacheEntryIt = fcache.getFirstBackup();
     while (cacheEntryIt != fcache.getEnd()) {
@@ -547,14 +548,22 @@ void pruneFaubBackups(BackupConfig &config)
         
         auto shouldConsolidate = config.settings[sConsolidate].ivalue() && backupAge >= config.settings[sConsolidate].ivalue() && backupCountOnDay > 1;
         
-        //cerr << "consolidate: " << (shouldConsolidate ? "LOSE" : "KEEP") << ", " << backupAge << " (" << config.settings[sConsolidate].ivalue() << "); countonday=" << backupCountOnDay << " [" << "] " << cacheEntryIt->second.getDir() << endl;
-
+        // should we keep this backup?
         if (shouldKeep.length() && !shouldConsolidate) {
+
+            /* here we know we're keeping this backup. if the previous (or series of
+               previous backups) were deleted, then we need to recalculate the size (du -s)
+               this backup to determine how much space it's actually using. */
+            if (removedPrevious) {
+                DEBUG(D_prune) DFMT("previous backup removed; re-dusing " << cacheEntryIt->second.getDir());
+                fcache.recache(cacheEntryIt->second.getDir());
+                removedPrevious = false;
+            }
+
             DEBUG(D_prune) DFMT(shouldKeep);
             ++cacheEntryIt;
             continue;
         }
-        
         
         if (GLOBALS.cli.count(CLI_TEST))
             cout << YELLOW << config.ifTitle() << " TESTMODE: would have deleted "
@@ -566,6 +575,7 @@ void pruneFaubBackups(BackupConfig &config)
                 log(config.ifTitle() + " removed " + cacheEntryIt->second.getDir() +
                     " (age=" + to_string(mtimeDayAge) + ", dow=" + dw(filenameDOW) + ")" + (shouldConsolidate ? " consolidation" : "" ));
                 DEBUG(D_prune) DFMT("completed removal of " << cacheEntryIt->second.getDir() << (shouldConsolidate ? " (consolidation)" : "" ));
+                removedPrevious = true;
             }
             else {
                 log(config.ifTitle() + " unable to remove " + (shouldConsolidate ? " (consolidation) " : "" ) + cacheEntryIt->second.getDir() + ": " +

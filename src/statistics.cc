@@ -319,7 +319,6 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
     int precisionLevel = statDetail > 1 ? 1 : -1;
 
     if (config.settings[sFaub].value.length() && fcache.size()) {
-    
         auto line = horizontalLine(60);
         auto bkups = fcache.getNumberOfBackups();
         auto stats = fcache.getTotalStats();
