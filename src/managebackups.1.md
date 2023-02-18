@@ -363,7 +363,7 @@ Example output from **managebackups -1 -p faub** (faub-style backup example)
 : Show a one-line summary for each backup profile. The summary includes detail on the most recent backup as well as the number of backups, age ranges and total disk space.
 
 # DEPENDENCIES
-**managebackups** uses three open-source libraries that are statically compiled in:
+**managebackups** uses three open-source libraries. These are statically compiled in under MacOS and dynamically linked under Linux.
 
 - OpenSSL (1.1.1s) for calculation of MD5s
 - pcre (8.45) for support of regular expressions
