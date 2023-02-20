@@ -174,5 +174,7 @@ bool exists(const std::string& name);
 
 string getUserHomeDir();
 
+time_t filename2Mtime(string filename);
+
 #endif
 

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <queue>
 #include <dirent.h>
+#include <unistd.h>
 #include "globals.h"
 #include "FaubCache.h"
 #include "BackupConfig.h"
@@ -14,7 +15,9 @@
 
 FaubCache::FaubCache(string path, string profileName) {
     baseDir = path;
-    restoreCache(profileName);
+    
+    if (path.length())
+        restoreCache(profileName);
 }
 
 
@@ -27,7 +30,7 @@ void FaubCache::restoreCache(string profileName) {
     struct dirent *c_dirEntry;
     queue<string> dirQueue;
     string currentDir;
-    Pcre regEx("-(\\d{4})(\\d{2})(\\d{2})(?:@(\\d{2}):(\\d{2}):(\\d{2}))*");
+    Pcre regEx(DATE_REGEX);
     auto refTime = time(NULL);
     Pcre tempRE("\\.tmp\\.\\d+$");
 
@@ -78,7 +81,7 @@ void FaubCache::restoreCache(string profileName) {
                                     }
                                 }
                                 else {
-                                    FaubEntry entry(fullFilename);
+                                    FaubEntry entry(fullFilename, profileName);
                                     auto success = entry.loadStats();
                                     DEBUG(D_faub|D_cache) DFMT("loading cache for " << fullFilename << (success ? ": success" : ": failed"));
                                     if (!success || !entry.finishTime || !entry.startDay) {
@@ -144,7 +147,7 @@ void FaubCache::recache(string dir) {
     map<string, FaubEntry>::iterator prevBackup = backups.end();
 
     for (auto aBackup = backups.begin(); aBackup != backups.end(); ++aBackup) {
-        DEBUG(D_faub) DFMT("cache set has " << aBackup->first << " with size " << aBackup->second.ds.sizeInBytes << " bytes, " << aBackup->second.duration << " duration");
+        DEBUG(D_faub) DFMT("cache set has " << aBackup->first << " with size " << aBackup->second.ds.sizeInBytes << " bytes used, " << aBackup->second.ds.savedInBytes << " saved, " << aBackup->second.duration << " duration");
 
         if ((!aBackup->second.ds.sizeInBytes &&
              !aBackup->second.ds.savedInBytes) ||         // if we have no cached data for this backup or
@@ -157,7 +160,7 @@ void FaubCache::recache(string dir) {
 
             set<ino_t> emptySet;
             auto ds = dus(aBackup->first, gotPrev ? prevBackup->second.inodes : emptySet, aBackup->second.inodes);
-            DEBUG(D_faub) DFMT("dus(" << aBackup->first << ") returned " << ds.sizeInBytes << " bytes");
+            DEBUG(D_faub) DFMT("dus(" << aBackup->first << ") returned " << ds.sizeInBytes << " used bytes, " << ds.savedInBytes << " saved bytes");
             aBackup->second.ds = ds;
             aBackup->second.updated = true;
         }
@@ -217,3 +220,81 @@ void FaubCache::displayDiffFiles(string backupDir) {
     }
 }
 
+
+/* cleanup() ignores the backupDir and profile to work across all faub caches
+ Walk through all faub cache files looking for cache's that reference backups
+ that no longer exist (have been removed).  When one is found, we delete the
+ cache files. But we also look for the next backup matching the same dir +
+ profile name as the deleted one and recalculate (dus) its disk usage because
+ that will have changed.  If multiple backups sequential backups are found
+ missing from the same dir + profile we re-dus the next one that's found.
+ */
+void FaubCache::cleanup() {
+    DIR *c_dir;
+    struct dirent *c_dirEntry;
+    ifstream cacheFile;
+    string backupDir, fullId, profileName;
+    string cacheFilename;
+    struct stat statData;
+
+    if ((c_dir = opendir(ue(GLOBALS.cacheDir).c_str())) != NULL) {
+        while ((c_dirEntry = readdir(c_dir)) != NULL) {
+
+            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..") ||
+                    strstr(c_dirEntry->d_name, SUFFIX_FAUBSTATS) == NULL)
+                continue;
+
+            cacheFilename = slashConcat(GLOBALS.cacheDir, c_dirEntry->d_name);
+            cacheFile.open(cacheFilename);
+
+            if (cacheFile.is_open()) {
+                cacheFile >> fullId;
+                cacheFile.close();
+                
+                backupDir = fullId;
+                
+                auto pos = fullId.find(";;");
+                if (pos != string::npos) {
+                    profileName = fullId.substr(pos + 2, string::npos);
+                    backupDir.erase(backupDir.find(";;"));  // erase the profile name portion
+                }
+                
+                // if the backup directory referenced in the cache file no longer exists
+                // delete the cache file
+                if (stat(backupDir.c_str(), &statData)) {
+                    auto targetMtime = filename2Mtime(backupDir);
+                    DEBUG(D_any) DFMT(backupDir << " no longer exists; will recalculate usage of subsequent backup");
+  
+                    unlink(cacheFilename.c_str());
+                    cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBSTATS), string(SUFFIX_FAUBSTATS).length(), SUFFIX_FAUBINODES);
+                    unlink(cacheFilename.c_str());
+                    cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBINODES), string(SUFFIX_FAUBINODES).length(), SUFFIX_FAUBDIFF);
+                    unlink(cacheFilename.c_str());
+  
+                    if (profileName.length()) {
+                        Pcre yearRE("^20\\d{2}$");
+                        auto ps = pathSplit(backupDir);
+
+                        while (backupDir.find("/") != string::npos && !yearRE.search(ps.file)) {
+                            backupDir = ps.dir;
+                            ps = pathSplit(backupDir);
+                        }
+                           
+                        FaubCache newCache(pathSplit(backupDir).dir, profileName);
+                     
+                        auto backupIt = newCache.getFirstBackup();
+                        while (backupIt != newCache.getEnd()) {
+                            if (filename2Mtime(backupIt->first) > targetMtime && !stat(backupIt->second.getDir().c_str(), &statData)) {
+                                DEBUG(D_any) DFMT("subsequent recalc: " << backupIt->second.getDir());
+                                newCache.recache(backupIt->second.getDir());
+                                break;
+                            }
+                    
+                            ++backupIt;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

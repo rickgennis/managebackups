@@ -1,6 +1,5 @@
 
 #include <dirent.h>
-#include <unistd.h>
 #include <fstream>
 #include <pcre++.h>
 #include "globals.h"
@@ -20,50 +19,13 @@ FaubEntry& FaubEntry::operator=(const DiskStats& stats) {
 }
 
 
-FaubEntry::FaubEntry(string dir) {
-    // normal initialization
-    if (dir.length()) {
-        directory = dir;
-        ds.sizeInBytes = ds.sizeInBlocks = ds.savedInBytes = ds.savedInBlocks = finishTime = duration = modifiedFiles = unchangedFiles = dirs = slinks = 0;
-        startDay = startMonth = startYear = mtimeDayAge = dow = 0;
-        updated = false;
-        return;
-    }
-
-    // if no directory is given, perform clean up of old cache files instead
-    DIR *c_dir;
-    struct dirent *c_dirEntry;
-    ifstream cacheFile;
-    string backupDir;
-    string cacheFilename;
-    struct stat statData;
-
-    if ((c_dir = opendir(ue(GLOBALS.cacheDir).c_str())) != NULL) {
-        while ((c_dirEntry = readdir(c_dir)) != NULL) {
-
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..") ||
-                    strstr(c_dirEntry->d_name, SUFFIX_FAUBSTATS) == NULL)
-                continue;
-
-            cacheFilename = slashConcat(GLOBALS.cacheDir, c_dirEntry->d_name);
-            cacheFile.open(cacheFilename);
-
-            if (cacheFile.is_open()) {
-                cacheFile >> backupDir;
-                cacheFile.close();
-
-                // if the backup directory referenced in the cache file no longer exists
-                // delete the cache file
-                if (stat(backupDir.c_str(), &statData)) {
-                    unlink(cacheFilename.c_str());
-                    cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBSTATS), string(SUFFIX_FAUBSTATS).length(), SUFFIX_FAUBINODES);
-                    unlink(cacheFilename.c_str());
-                    cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBINODES), string(SUFFIX_FAUBINODES).length(), SUFFIX_FAUBDIFF);
-                    unlink(cacheFilename.c_str());
-                }
-            }
-        }
-    }
+FaubEntry::FaubEntry(string dir, string aProfile) {
+    directory = dir;
+    ds.sizeInBytes = ds.sizeInBlocks = ds.savedInBytes = ds.savedInBlocks = finishTime = duration = modifiedFiles = unchangedFiles = dirs = slinks = 0;
+    startDay = startMonth = startYear = mtimeDayAge = dow = 0;
+    profile = aProfile;
+    updated = false;
+    return;
 }
 
 
@@ -131,12 +93,12 @@ bool FaubEntry::loadStats() {
 void FaubEntry::saveStats() {
     ofstream cacheFile;
     string filename = cacheFilename(SUFFIX_FAUBSTATS);
-
+    
     cacheFile.open(filename);
     if (cacheFile.is_open()) {
         string data = stats2string();
 
-        cacheFile << directory << endl;
+        cacheFile << directory << ";;" << profile << endl;
         cacheFile << data << endl;
         cacheFile.close();
     }
@@ -250,30 +212,6 @@ void FaubEntry::displayDiffFiles() {
 
 
 int FaubEntry::filenameDayAge() {
-    Pcre dateRE = Pcre(DATE_REGEX);
-    int date_year, date_month, date_day;
-    time_t refTime;
-    time(&refTime);
-
-    if (dateRE.search(directory) && dateRE.matches() > 2) {
-        date_year  = stoi(dateRE.get_match(0));
-        date_month = stoi(dateRE.get_match(1));
-        date_day   = stoi(dateRE.get_match(2));
-    }
-    else {   // should never get here due to a similar regex limiting filenames getting initially added to the cache
-        SCREENERR("error: cannot parse date/time from backup directory (" << directory << ")");
-        exit(1);
-    }
-
-    struct tm fileTime;
-    fileTime.tm_sec  = 0;
-    fileTime.tm_min  = 0;
-    fileTime.tm_hour = 0;
-    fileTime.tm_mday = date_day;
-    fileTime.tm_mon  = date_month - 1;
-    fileTime.tm_year = date_year - 1900;
-    fileTime.tm_isdst = -1;
-
-    auto fileMTime = mktime(&fileTime);
-    return floor((refTime - fileMTime) / SECS_PER_DAY);
+    return floor((time(NULL) - filename2Mtime(directory)) / SECS_PER_DAY);
 }
+

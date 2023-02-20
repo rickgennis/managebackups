@@ -45,7 +45,7 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
     string recentName;
     time_t recentTime = 0;
 
-    Pcre matchSpec("-\\d{8}($|-\\d{2}:)");
+    Pcre matchSpec(DATE_REGEX);
     if (matchSpec.search(backupDir)) {
 
         ++GLOBALS.statsCount;
@@ -107,18 +107,17 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
 string newBackupDir(BackupConfig& config) {
     time_t rawTime;
     struct tm *timeFields;
-    char buffer[100];
-
     time(&rawTime);
     timeFields = localtime(&rawTime);
+    
     bool incTime = str2bool(config.settings[sIncTime].value);
-    strftime(buffer, sizeof(buffer), "%Y-%m-%d@%X", timeFields);
-
     string setDir = config.settings[sDirectory].value;
-    strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d" : "%Y/%m", localtime(&rawTime));
+    
+    char buffer[100];
+    strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d" : "%Y/%m", timeFields);
     string subDir = buffer;
 
-    strftime(buffer, sizeof(buffer), incTime ? "-%Y%m%d@%H:%M:%S" : "-%Y%m%d", localtime(&rawTime));
+    strftime(buffer, sizeof(buffer), incTime ? "-%Y-%m-%d@%T" : "-%Y-%m-%d", timeFields);
     string filename = buffer;
 
     string fullPath = slashConcat(config.settings[sDirectory].value, subDir, safeFilename(config.settings[sTitle].value) + filename);
@@ -486,9 +485,6 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message1 << "\n\t\t" << message2 << endl;
 
     notify(config, "\t• " + message1 + "\n\t\t" + message2 + "\n", true);
-
-    // silently cleanup any old faub caches for backups that are no longer around
-    FaubEntry("");  
 }
 
 

@@ -857,31 +857,29 @@ DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes) {    /
     while ((dirEnt = readdir(dir)) != NULL) {
         if (!strcmp(dirEnt->d_name, ".") || !strcmp(dirEnt->d_name, ".."))
             continue;
-
+        
         string fullFilename = path + "/" + dirEnt->d_name;
         ++GLOBALS.statsCount;
         if (lstat(fullFilename.c_str(), &statData) < 0)
             log("error: stat(" + fullFilename + "): " + strerror(errno));
         else {
             if (S_ISDIR(statData.st_mode) && strcmp(dirEnt->d_name, ".") && strcmp(dirEnt->d_name, ".."))
-                subDirs.insert(subDirs.end(), fullFilename);    
-            else 
-                if (!S_ISLNK(statData.st_mode)) {
-                    if (seenInodes.find(statData.st_ino) != seenInodes.end()) {
-                        ds.savedInBytes += statData.st_size;
-                        ds.savedInBlocks += (512 * statData.st_blocks);
-                    }
-                    else {
-                        ds.sizeInBytes += statData.st_size;
-                        ds.sizeInBlocks += (512 * statData.st_blocks);
-                    }
-
-                    seenInodes.insert(statData.st_ino);
-                    newInodes.insert(statData.st_ino);
+                subDirs.insert(subDirs.end(), fullFilename);
+            else {
+                if (seenInodes.find(statData.st_ino) != seenInodes.end() ||
+                    newInodes.find(statData.st_ino) != newInodes.end()) {
+                    ds.savedInBytes += statData.st_size;
+                    ds.savedInBlocks += (512 * statData.st_blocks);
                 }
+                else {
+                    ds.sizeInBytes += statData.st_size;
+                    ds.sizeInBlocks += (512 * statData.st_blocks);
+                }
+                
+                newInodes.insert(statData.st_ino);
+            }
         }
     }
-
     closedir(dir);
 
     for (auto &subDir: subDirs)
@@ -972,4 +970,35 @@ string getUserHomeDir() {
         homeDir = getpwuid(getuid())->pw_dir;
 
     return homeDir;
+}
+
+
+time_t filename2Mtime(string filename) {
+    Pcre dateRE = Pcre(DATE_REGEX);
+    int date_year, date_month, date_day, time_hour = 0, time_min = 0, time_sec = 0;
+
+    if (dateRE.search(filename) && dateRE.matches() > 2) {
+        date_year  = stoi(dateRE.get_match(0));
+        date_month = stoi(dateRE.get_match(1));
+        date_day   = stoi(dateRE.get_match(2));
+        
+        if (dateRE.matches() > 5) {
+            time_hour = stoi(dateRE.get_match(3));
+            time_min  = stoi(dateRE.get_match(4));
+            time_sec  = stoi(dateRE.get_match(5));
+        }
+    }
+    else
+        return 0;
+
+    struct tm fileTime;
+    fileTime.tm_sec  = time_sec;
+    fileTime.tm_min  = time_min;
+    fileTime.tm_hour = time_hour;
+    fileTime.tm_mday = date_day;
+    fileTime.tm_mon  = date_month - 1;
+    fileTime.tm_year = date_year - 1900;
+    fileTime.tm_isdst = -1;
+
+    return mktime(&fileTime);
 }

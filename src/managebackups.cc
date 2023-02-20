@@ -522,7 +522,6 @@ void pruneFaubBackups(BackupConfig &config)
         << config.settings[sTitle].value);
 
     size_t backupAge = 0, backupCountOnDay = 0;
-    bool removedPrevious = false;
     
     auto cacheEntryIt = fcache.getFirstBackup();
     while (cacheEntryIt != fcache.getEnd()) {
@@ -550,16 +549,6 @@ void pruneFaubBackups(BackupConfig &config)
         
         // should we keep this backup?
         if (shouldKeep.length() && !shouldConsolidate) {
-
-            /* here we know we're keeping this backup. if the previous (or series of
-               previous backups) were deleted, then we need to recalculate the size (du -s)
-               this backup to determine how much space it's actually using. */
-            if (removedPrevious) {
-                DEBUG(D_prune) DFMT("previous backup removed; re-dusing " << cacheEntryIt->second.getDir());
-                fcache.recache(cacheEntryIt->second.getDir());
-                removedPrevious = false;
-            }
-
             DEBUG(D_prune) DFMT(shouldKeep);
             ++cacheEntryIt;
             continue;
@@ -575,7 +564,6 @@ void pruneFaubBackups(BackupConfig &config)
                 log(config.ifTitle() + " removed " + cacheEntryIt->second.getDir() +
                     " (age=" + to_string(mtimeDayAge) + ", dow=" + dw(filenameDOW) + ")" + (shouldConsolidate ? " consolidation" : "" ));
                 DEBUG(D_prune) DFMT("completed removal of " << cacheEntryIt->second.getDir() << (shouldConsolidate ? " (consolidation)" : "" ));
-                removedPrevious = true;
             }
             else {
                 log(config.ifTitle() + " unable to remove " + (shouldConsolidate ? " (consolidation) " : "" ) + cacheEntryIt->second.getDir() + ": " +
@@ -770,7 +758,8 @@ void pruneBackups(BackupConfig &config)
 /*******************************************************************************
  * updateLinks(config)
  *
- * Hard link identical backups together to save space.
+ * Hard link identical backups together to save space.  This is for single-file
+ * backups only.
  *******************************************************************************/
 void updateLinks(BackupConfig &config)
 {
@@ -1204,7 +1193,7 @@ void performBackup(BackupConfig &config)
     strftime(buffer, sizeof(buffer), incTime ? "%Y/%m/%d" : "%Y/%m", localtime(&now));
     string subDir = buffer;
 
-    strftime(buffer, sizeof(buffer), incTime ? "-%Y%m%d-%H:%M:%S" : "-%Y%m%d", localtime(&now));
+    strftime(buffer, sizeof(buffer), incTime ? "-%Y-%m-%d-%T" : "-%Y-%m-%d", localtime(&now));
     string fnameInsert = buffer;
 
     string fullDirectory = slashConcat(setDir, subDir) + "/";
@@ -1707,6 +1696,10 @@ int main(int argc, char *argv[])
     // if displaying stats and --profile hasn't been specified (or matched successfully)
     // then rescan all configs;  otherwise just scan the --profile config
     DEBUG(D_any) DFMT("about to scan directories...");
+
+    // clean up old cache files and recalculate any missing disk usage
+    FaubCache global("", "");
+    global.cleanup();
 
     /* SHOW STATS
      * ****************************/

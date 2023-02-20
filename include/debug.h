@@ -79,6 +79,8 @@ enum {
                                          D_scan             | \
                                          D_cache            | \
                                          D_exec             | \
+                                         D_faub             | \
+                                         D_netproto         | \
                                          D_notify           | \
                                          D_tripwire))
 
