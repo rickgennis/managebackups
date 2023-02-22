@@ -575,6 +575,11 @@ void pruneFaubBackups(BackupConfig &config)
 
         ++cacheEntryIt;
     }
+
+    /* if a faub backup is deleted we'll need to recalculate the disk usage of
+       the next cronological backup in order (if any). cleanup() handles this. */
+    FaubCache global("", "");
+    global.cleanup();
 }
 
 /*******************************************************************************
@@ -586,8 +591,7 @@ void pruneBackups(BackupConfig &config)
 {
     if (GLOBALS.cli.count(CLI_NOPRUNE)) return;
 
-    if (!config.settings[sPruneLive].value.length() && !GLOBALS.cli.count(CLI_NOPRUNE) &&
-        !GLOBALS.cli.count(CLI_QUIET)) {
+    if (!str2bool(config.settings[sPruneLive].value) && !GLOBALS.cli.count(CLI_QUIET)) {
         SCREENERR("warning: While a core feature, managebackups doesn't prune old backups"
                   << "until specifically enabled.  Use --prune to enable pruning.  Use --prune"
                   << "and --save to make it the default behavior for this profile."
@@ -751,7 +755,8 @@ void pruneBackups(BackupConfig &config)
             DEBUG(D_prune) DFMT("re-stat complete");
         }
 
-        if (changedMD5s.size()) config.cache.saveAtEnd();
+        if (changedMD5s.size())
+            config.cache.saveAtEnd();
     }
 }
 
@@ -1698,6 +1703,8 @@ int main(int argc, char *argv[])
     DEBUG(D_any) DFMT("about to scan directories...");
 
     // clean up old cache files and recalculate any missing disk usage
+    // this primarily catches recalculations that are necessary because
+    // the user manually deleted a backup unbeknown to us.
     FaubCache global("", "");
     global.cleanup();
 

@@ -2,7 +2,7 @@
 
 use strict;
 
-my $sVersionRegex = qr/(\d+\.\d+\.\d+)/;
+my $sVersionRegex = qr/(\d+\.\d+\.\d+(?:\w*))/;
 
 my %hChanges = (
     "/Users/rennis/managebackups/include/globalsdef.h" => qr/ VERSION\s+\"$sVersionRegex\"/,
