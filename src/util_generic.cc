@@ -324,10 +324,8 @@ string seconds2hms(unsigned long seconds) {
             result += string(dataAdded ? ":" : "") + buffer;
             dataAdded = true;
         }
-        else {
-            //result += dataAdded ? ":00" : index == (sizeof(unit) / sizeof(unit[0])) - 1 ? "  " : "   ";
+        else
             result += dataAdded ? ":00" : index == (sizeof(unit) / sizeof(unit[0])) - 1 ? "00" : "00:";
-        }
     }
 
     return(result.length() ? result : "        ");

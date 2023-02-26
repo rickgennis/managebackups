@@ -330,18 +330,39 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
         cout << "Directory: " << config.settings[sDirectory].value << "\n";
         cout << bkups << " backup" << s((int)bkups) << "\n";
         cout << approximate(stats.getSize() + stats.getSaved()) << " using " << approximate(stats.getSize()) << " on disk (saved " << saved << "%)\n";
-        cout << line << endl;
-
-        // determine the backup max filename length
-        int fnameLen = 0;
+        
+        // determine the backup max filename length and rention match counts
+        set<string> dayUnique;
+        struct tm *timeDetail;
+        int fnameLen = 0, numDay = 0, numWeek = 0, numMonth = 0, numYear = 0;
         auto backupIt = fcache.getFirstBackup();
         while (backupIt != fcache.getEnd()) {
             fnameLen = (int)max(fnameLen, backupIt->first.length());
+            timeDetail = localtime(&backupIt->second.finishTime);
+            auto timeString = to_string(timeDetail->tm_year) + to_string(timeDetail->tm_mon) + to_string(timeDetail->tm_mday);
+   
+            if (dayUnique.find(timeString) == dayUnique.end()) {
+                dayUnique.insert(timeString);
+                if (timeDetail->tm_mon == 0 && timeDetail->tm_mday == 1)
+                    ++numYear;
+                else if (timeDetail->tm_mday == 1)
+                    ++numMonth;
+                else if (timeDetail->tm_wday == config.settings[sDOW].ivalue())
+                    ++numWeek;
+                else
+                    ++numDay;
+            }
             ++backupIt;
         }
 
+        cout << "Retention stats:\n";
+        cout << "\t• " << numDay << " of " << config.settings[sDays].ivalue() << " daily\n";
+        cout << "\t• " << numWeek << " of " << config.settings[sWeeks].ivalue() << " weekly\n";
+        cout << "\t• " << numMonth << " of " << config.settings[sMonths].ivalue() << " monthly\n";
+        cout << "\t• " << numYear << " of " << config.settings[sYears].ivalue() << " yearly\n";
+        cout << line << endl;
+
         string lastMonthYear;
-        struct tm *timeDetail;
         char result[1000];
         backupIt = fcache.getFirstBackup();
         while (backupIt != fcache.getEnd())  {
@@ -379,7 +400,7 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
                         approximate(backupIt->second.slinks, precisionLevel, statDetail > 2).c_str(), 
                         approximate(backupIt->second.modifiedFiles, precisionLevel, statDetail > 2).c_str(),
                         seconds2hms(backupIt->second.duration).c_str(),
-                        timeDetail->tm_mon  == 0 && timeDetail->tm_mday == 1 ? "Year" : timeDetail->tm_mday == 1 ? "Mnth" : timeDetail->tm_wday == 0 ? "Week" : "Day",
+                        timeDetail->tm_mon  == 0 && timeDetail->tm_mday == 1 ? "Year" : timeDetail->tm_mday == 1 ? "Mnth" : timeDetail->tm_wday == config.settings[sDOW].ivalue() ? "Week" : "Day",
                         backupIt->second.finishTime ? timeDiff(mktimeval(backupIt->second.finishTime)).c_str() : "?");
 
             cout << result << endl;
@@ -395,10 +416,11 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
 
 
 void _displayDetailedStats(BackupConfig& config, int statDetail) {
-    int fnameLen = 0;
+    int fnameLen = 0, numDay = 0, numWeek = 0, numMonth = 0, numYear = 0;
     size_t bytesUsed = 0;
     size_t bytesSaved = 0;
     set<ino_t> countedInode;
+    set<string> dayUnique;
 
     if (_displayDetailedFaubStats(config, statDetail))
         return;
@@ -408,7 +430,7 @@ void _displayDetailedStats(BackupConfig& config, int statDetail) {
 
         // track the length of the longest filename for formatting
         fnameLen = (int)max(fnameLen, raw.second.filename.length());
-
+        
         // calculate total bytes used and saved
         if (countedInode.find(raw.second.inode) == countedInode.end()) {
             countedInode.insert(raw.second.inode);
@@ -416,6 +438,20 @@ void _displayDetailedStats(BackupConfig& config, int statDetail) {
         }
         else
             bytesSaved += raw.second.size;
+
+        auto timeString = to_string(raw.second.date_year) + to_string(raw.second.date_month) + to_string(raw.second.date_day);
+        
+        if (dayUnique.find(timeString) == dayUnique.end()) {
+            dayUnique.insert(timeString);
+            if (raw.second.date_month == 1 && raw.second.date_day == 1)
+                ++numYear;
+            else if (raw.second.date_day == 1)
+                ++numMonth;
+            else if (raw.second.dow == config.settings[sDOW].ivalue())
+                ++numWeek;
+            else
+                ++numDay;
+        }
     }
 
     // calcuclate percentage saved
@@ -427,10 +463,18 @@ void _displayDetailedStats(BackupConfig& config, int statDetail) {
     unsigned long rawSize = config.cache.rawData.size();
     unsigned long md5Size = config.cache.indexByMD5.size();
     cout << line << "\n";
-    if (config.settings[sTitle].value.length()) cout << "Profile: " << config.settings[sTitle].value << "\n";
+    
+    if (config.settings[sTitle].value.length())
+        cout << "Profile: " << config.settings[sTitle].value << "\n";
+    
     cout << "Directory: " << config.settings[sDirectory].value << " (" << config.settings[sBackupFilename].value << ")\n";
     cout << rawSize << " backup" << s((int)rawSize) << ", " << md5Size << " unique" << s((int)md5Size) << "\n";
     cout << approximate(bytesUsed + bytesSaved) << " using " << approximate(bytesUsed) << " on disk (saved " << saved << "%)\n";
+    cout << "Retention stats:\n";
+    cout << "\t• " << numDay << " of " << config.settings[sDays].ivalue() << " daily\n";
+    cout << "\t• " << numWeek << " of " << config.settings[sWeeks].ivalue() << " weekly\n";
+    cout << "\t• " << numMonth << " of " << config.settings[sMonths].ivalue() << " monthly\n";
+    cout << "\t• " << numYear << " of " << config.settings[sYears].ivalue() << " yearly\n";
     cout << line << endl;
 
     string lastMonthYear;
@@ -487,7 +531,7 @@ void _displayDetailedStats(BackupConfig& config, int statDetail) {
                     "%s").c_str(),
                         raw_it->second.filename.c_str(), approximate(raw_it->second.size).c_str(), 
                         seconds2hms(raw_it->second.duration).c_str(),
-                        raw_it->second.date_month == 1 && raw_it->second.date_day == 1 ? "Year" : raw_it->second.date_day == 1 ? "Mnth" : raw_it->second.dow == 0 ? "Week" : "Day",
+                        raw_it->second.date_month == 1 && raw_it->second.date_day == 1 ? "Year" : raw_it->second.date_day == 1 ? "Mnth" : raw_it->second.dow == config.settings[sDOW].ivalue() ? "Week" : "Day",
                         raw_it->second.links, timeDiff(mktimeval(prectime ? raw_it->second.mtime : raw_it->second.name_mtime)).c_str());
 
             // if there's more than 1 file with this MD5 then color code it as a set; otherwise no color

@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.3.6a
+% MANAGEBACKUPS(1) managebackups 1.3.6b
 % Rick Ennis
 % January 2023
 
@@ -21,10 +21,10 @@ A single file backup is any of the standard Linux backup commands (tar, cpio, du
 Faub-style backups, similar to the underlying approach of Apple's Time Machine, backs up an entire directory tree to another location without compression. The initial copy is an exact replica of the source. Subsequent copies are made to new directories but are hard-linked back to files in the the previous backup if the data hasn't changed. In effect, you only use disk space for changes but get the advantage of fully traversable directory trees, which allows interrogation via any standard commandline tool. Each backup creates a new directory of the form *directory*/YYYY/MM/*profile*-YYYYMMDD. With the **--time** option @HH:MM:SS gets appended as well.  Note: Faub-style backups require that **managebackups** is also installed on the remote server that's being backed up.
 
 ## 2. Prune Backups
-**managebackups** deletes old backups that have aged out.  The retention critera is configured on a daily, weekly, monthly and yearly basis.  By default *managebackups* will keep 14 daily, 4 weekly, 6 monthly and 2 yearly backups. Additionally, **managebackups** can perform a second level of pruning called consolidation. If elected, multiple backups taken on the same day can be consolidated down to a single per day backup after said backup has reached a specified age. The default is no consolidation.
+**managebackups** deletes old backups that have aged out.  The retention critera is configured on a daily, weekly, monthly and yearly basis.  By default **managebackups** will keep 14 daily, 4 weekly, 6 monthly and 2 yearly backups. Additionally, **managebackups** can perform a second level of pruning called consolidation. If elected, multiple backups taken on the same day can be consolidated down to a single per day backup after said backup has reached a specified age. The default is no consolidation.
 
 ## 3. Hard Linking
-In configurations using a single file backup where all backups are fulls, and therefore many are potentially identical, *managebackups* can save disk space by hard linking identical copies together.  This is done by default when identical copies are identified. In Faub-style backups hard linking is automatically implemented on a per-file basis.
+In configurations using a single file backup where all backups are fulls, and therefore many are potentially identical, **managebackups** can save disk space by hard linking identical copies together.  This is done by default when identical copies are identified. In Faub-style backups hard linking is automatically implemented on a per-file basis.
 
 # PROFILES
 Backup profiles are a collection of settings describing a backup set -- its directory to save backups to, the command to take the backups, how many weekly copies to keep, etc.  Once a profile is associated with a collection of options, all of those options are invoked when the profile is specified, unless an overriding option is also given.

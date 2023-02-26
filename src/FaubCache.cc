@@ -77,7 +77,7 @@ void FaubCache::restoreCache(string profileName) {
                                             if (rmrf(fullFilename))
                                                 log("warning: cleaned up abandoned in-process backup at " + fullFilename + " (" + timeDiff(mktimeval(statData.st_mtime)) + ")");
                                             else
-                                                log("error: unable to remove abandoned in-process backup at " + fullFilename);
+                                                log("error: unable to remove abandoned in-process backup at " + fullFilename + " (running as uid " + to_string(geteuid()) + ")");
                                     }
                                 }
                                 else {

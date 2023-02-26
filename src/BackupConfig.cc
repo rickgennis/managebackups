@@ -346,8 +346,8 @@ unsigned int BackupConfig::removeEmptyDirs(string directory, int baseSlashes) {
                     if (!removeEmptyDirs(fullFilename, numBaseSlashes)) {
 
                         if (!rmdir(fullFilename.c_str())) {    // remove empty subdirectory
-                            NOTQUIET && cout << ifTitle() << " removing empty directory " << fullFilename << endl;
-                            log(ifTitle() + " removing empty directory " + fullFilename);
+                            NOTQUIET && cout << ifTitle() << " removed empty directory " << fullFilename << endl;
+                            log(ifTitle() + " removed empty directory " + fullFilename);
                             --entryCount;
                         }
                         else {
