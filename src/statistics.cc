@@ -343,7 +343,8 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
         maxColLen[7] = 4;
         maxColLen[8] = 0;
         
-        for (int x = 0; x < sizeof(headers); ++x)
+        auto arrsize = sizeof(maxColLen) / sizeof(maxColLen[0]);
+        for (int x = 0; x < arrsize; ++x)
             if (!maxColLen[x]) maxColLen[x] = (int)headers[x].length();
         
         auto backupIt = fcache.getFirstBackup();
@@ -466,8 +467,8 @@ void _displayDetailedStats(BackupConfig& config, int statDetail) {
     maxColLen[2] = 8;
     maxColLen[3] = 4;
     maxColLen[5] = 0;
-
-    for (int x = 0; x < sizeof(headers); ++x)
+    auto arrsize = sizeof(maxColLen) / sizeof(maxColLen[0]);
+    for (int x = 0; x < arrsize; ++x)
         if (!maxColLen[x]) maxColLen[x] = (int)headers[x].length();
 
     // calcuclate stats from the entire list of backups
