@@ -84,10 +84,10 @@ Options are relative to the three functions of **managebackups** plus general op
 : Parallel cron execution.  Equivalent to "-A -x -q".
 
 **-0**
-: Provide a summary of backups. **-0** can be specified up to 3 times for different formatting of sizes. It can also be combined with -p to limit output to a single profile.
+: Provide a summary of backups. **-0** can be specified up to 5 times for different formatting of sizes. It can also be combined with -p to limit output to a single profile.
 
 **-1**
-: Provide detail of backups. **-1** can be specified up to 3 times for different formatting of sizes. It can also be combined with -p to limit output to a single profile.
+: Provide detail of backups. **-1** can be specified up to 5 times for different formatting of sizes. It can also be combined with -p to limit output to a single profile.
 
 **--test**
 : Run in test mode. No changes are actually made to disk (no backups, pruning or linking).

@@ -341,13 +341,13 @@ Equivalent to \[lq]-A -x -q\[rq].
 .TP
 \f[B]-0\f[R]
 Provide a summary of backups.
-\f[B]-0\f[R] can be specified up to 3 times for different formatting of
+\f[B]-0\f[R] can be specified up to 5 times for different formatting of
 sizes.
 It can also be combined with -p to limit output to a single profile.
 .TP
 \f[B]-1\f[R]
 Provide detail of backups.
-\f[B]-1\f[R] can be specified up to 3 times for different formatting of
+\f[B]-1\f[R] can be specified up to 5 times for different formatting of
 sizes.
 It can also be combined with -p to limit output to a single profile.
 .TP
