@@ -517,6 +517,7 @@ string safeFilename(string filename) {
 vector<string> expandWildcardSub(string fileSpec, string baseDir, int index) {
     vector<string> result;
     vector<string> parts;
+    vector<string> subDirs;
     stringstream tokenizer(fileSpec);
     string tempStr;
     string resultBaseDir = baseDir;
@@ -565,27 +566,26 @@ vector<string> expandWildcardSub(string fileSpec, string baseDir, int index) {
 
                 // does the current file match the current fileSpec's regex?
                 if (matchSpec.search(c_dirEntry->d_name)) {
-                    if (!stat(string(baseDir + "/" + c_dirEntry->d_name).c_str(), &statData)) {
+                    if (!lstat(string(baseDir + "/" + c_dirEntry->d_name).c_str(), &statData)) {
 
-                        // if this matching dir entry is a subdirectory, call ourselves recursively
-                        // and add those results to our our result list
-                        if ((statData.st_mode & S_IFMT) == S_IFDIR) {
-                            auto subResult = expandWildcardSub(fileSpec, baseDir + (baseDir.back() == '/' ? "" : "/") + 
-                                    c_dirEntry->d_name, index+1);
-                            result.insert(result.end(), subResult.begin(), subResult.end());
-                        }
+                        // if this matching dir entry is a subdirectory, add it to the list to call recursively
+                        if (S_ISDIR(statData.st_mode))
+                            subDirs.insert(subDirs.end(), c_dirEntry->d_name);
                         else {
                             // if it's not a subdirectory just add this entry to the result list
                             result.insert(result.end(), resultBaseDir + (resultBaseDir.back() == '/' ? "" : "/") + c_dirEntry->d_name);
                         }
                     }
-                    else {
-                        log("expandWildcard: unable to stat " + baseDir + "/" + c_dirEntry->d_name);
-                    }
+                    else
+                        log("expandWildcard: unable to stat " + baseDir + "/" + c_dirEntry->d_name + " - " + strerror(errno));
                 }
             }
-        
             closedir(c_dir);
+
+            for (auto &dir: subDirs) {
+                auto subResult = expandWildcardSub(fileSpec, baseDir + (baseDir.back() == '/' ? "" : "/") + dir, index+1);
+                result.insert(result.end(), subResult.begin(), subResult.end());
+            }
         } 
     }
 
@@ -784,11 +784,12 @@ string catdir(string dir) {
 
 
 // delete an absolute directory (rm -rf).
-// wildcards are not interpreted in the directory name.
+// wildcards are not interpreted in the directory name (use expandWildcardFilespec()).
 bool rmrf(string item) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
     struct stat statData;
+    vector<string> subDirs;
 
     if (!lstat(item.c_str(), &statData)) {
         if (S_ISDIR(statData.st_mode)) {
@@ -801,25 +802,34 @@ bool rmrf(string item) {
                     string filename = slashConcat(item, c_dirEntry->d_name);
                     if (!lstat(filename.c_str(), &statData)) {
                         
-                        // recurse into subdirectories
-                        if (S_ISDIR(statData.st_mode)) {
-                            if (!rmrf(filename))
-                                return false;
-                        }
+                        // save directories in a list to do after we close this fd
+                        if (S_ISDIR(statData.st_mode))
+                            subDirs.insert(subDirs.end(), filename);
                         else
-                            if (unlink(filename.c_str()))
+                            if (unlink(filename.c_str())) {
+                                closedir(c_dir);
+                                log("error: unable to remove " + filename + " - " + strerror(errno));
                                 return false;
+                            }
                     }
                 }
-                
                 closedir(c_dir);
+                
+                // recurse into subdirectories
+                for (auto &dir: subDirs)
+                    if (!rmrf(dir))
+                        return false;
+
+                // remove this directory itself
                 if (rmdir(item.c_str()))
                     return false;
             }
         }
         else
-            if (unlink(item.c_str()))
+            if (unlink(item.c_str())) {
+                log("error: unable to remove " + item + " - " + strerror(errno));
                 return false;
+            }
     }
     
     return true;

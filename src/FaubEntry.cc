@@ -103,7 +103,7 @@ void FaubEntry::saveStats() {
         cacheFile.close();
     }
     else {
-        string error = "error: unable to create " + filename;
+        string error = "error: unable to create " + filename + " - " + strerror(errno);
         log(error);
         SCREENERR(error);
     }
@@ -182,7 +182,7 @@ void FaubEntry::updateDiffFiles(set<string> files) {
             cacheFile.close();
         }
         else {
-            string error = "error: unable to create " + cacheFilename(SUFFIX_FAUBDIFF);
+            string error = "error: unable to create " + cacheFilename(SUFFIX_FAUBDIFF) + " - " + strerror(errno);
             log(error);
             SCREENERR(error);
         }
