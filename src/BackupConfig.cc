@@ -319,11 +319,12 @@ void BackupConfig::fullDump() {
 unsigned int BackupConfig::removeEmptyDirs(string directory, int baseSlashes) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
-    string dir = directory.length() ? directory : settings[sDirectory].value;
+    vector<string> subDirs;
+    string startDir = directory.length() ? directory : settings[sDirectory].value;
 
-    int numBaseSlashes = baseSlashes ? baseSlashes : (int)count(dir.begin(), dir.end(), '/');
+    int numBaseSlashes = baseSlashes ? baseSlashes : (int)count(startDir.begin(), startDir.end(), '/');
 
-    if ((c_dir = opendir(ue(dir).c_str())) != NULL) {
+    if ((c_dir = opendir(ue(startDir).c_str())) != NULL) {
         unsigned int entryCount = 0;
 
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
@@ -334,32 +335,34 @@ unsigned int BackupConfig::removeEmptyDirs(string directory, int baseSlashes) {
             ++entryCount;
             ++GLOBALS.statsCount;
             struct stat statData;
-            string fullFilename = slashConcat(dir, c_dirEntry->d_name);
+            string fullFilename = slashConcat(startDir, c_dirEntry->d_name);
 
             auto depth = count(fullFilename.begin(), fullFilename.end(), '/') - numBaseSlashes;
             bool entIsDay = (string(c_dirEntry->d_name).length() == 2 && isdigit(c_dirEntry->d_name[0]) && isdigit(c_dirEntry->d_name[1]));
 
             if ((depth < 3 || (depth == 3 && entIsDay)) && !stat(fullFilename.c_str(), &statData)) {
-                if ((statData.st_mode & S_IFMT) == S_IFDIR) {
-
-                    // recurse into subdirectories
-                    if (!removeEmptyDirs(fullFilename, numBaseSlashes)) {
-
-                        if (!rmdir(fullFilename.c_str())) {    // remove empty subdirectory
-                            NOTQUIET && cout << ifTitle() << " removed empty directory " << fullFilename << endl;
-                            log(ifTitle() + " removed empty directory " + fullFilename);
-                            --entryCount;
-                        }
-                        else {
-                            SCREENERR("error: unable to remove empty directory " << fullFilename);
-                            log(ifTitle() + " error: unable to remove empty directory " + fullFilename);
-                        }
-                    }
+                if (S_ISDIR(statData.st_mode)) {
+                    subDirs.insert(subDirs.end(), fullFilename);
                 }
             }
         }
-
         closedir(c_dir);
+        
+        for (auto &dir: subDirs) {
+            if (!removeEmptyDirs(dir, numBaseSlashes)) {
+                
+                if (!rmdir(dir.c_str())) {    // remove empty subdirectory
+                    NOTQUIET && cout << "\t• removed empty directory " << dir << endl;
+                    log(ifTitle() + " removed empty directory " + dir);
+                    --entryCount;
+                }
+                else {
+                    SCREENERR("error: unable to remove empty directory " << dir);
+                    log(ifTitle() + " error: unable to remove empty directory " + dir);
+                }
+            }
+        }
+        
         return entryCount;
     }
 

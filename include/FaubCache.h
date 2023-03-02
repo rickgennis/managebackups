@@ -43,7 +43,7 @@ public:
     map<string, FaubEntry>::iterator getFirstBackup() { return (backups.begin()); }
     map<string, FaubEntry>::iterator getLastBackup() { return (backups.size() ? --backups.end() : backups.end()); }
     map<string, FaubEntry>::iterator getEnd() { return backups.end(); }
-    void removeBackup(map<string, FaubEntry>::iterator which) { backups.erase(which); }
+    void removeBackup(map<string, FaubEntry>::iterator which) { which->second.removeEntry(); backups.erase(which); }
     
     void updateDiffFiles(string backupDir, set<string> files);
     void displayDiffFiles(string backupDir);

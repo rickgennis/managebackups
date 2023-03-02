@@ -3,6 +3,7 @@
 #include <fstream>
 #include <pcre++.h>
 #include "globals.h"
+#include <unistd.h>
 #include "FaubEntry.h"
 #include "BackupConfig.h"
 #include "util_generic.h"
@@ -167,6 +168,13 @@ void FaubEntry::loadInodes() {
         // here we only care about dus() updating 'inodes'
         dus(directory, seenInodes, inodes);
     }
+}
+
+
+void FaubEntry::removeEntry() {
+    unlink(cacheFilename(SUFFIX_FAUBSTATS).c_str());
+    unlink(cacheFilename(SUFFIX_FAUBINODES).c_str());
+    unlink(cacheFilename(SUFFIX_FAUBDIFF).c_str());
 }
 
 

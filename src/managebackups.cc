@@ -143,6 +143,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache, 
     struct dirent *c_dirEntry;
     Pcre fnameRE(fnamePattern);
     Pcre tempRE("\\.tmp\\.\\d+$");
+    vector<string> subDirs;
 
     if ((c_dir = opendir(ue(directory).c_str())) != NULL) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
@@ -154,16 +155,14 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache, 
             ++GLOBALS.statsCount;
             struct stat statData;
             if (!stat(fullFilename.c_str(), &statData)) {
-                // recurse into subdirectories
-                if ((statData.st_mode & S_IFMT) == S_IFDIR) {
-
+                if (S_ISDIR(statData.st_mode)) {
                     // to avoid walking into any faub-style backup directories we only go 2 level deeper than
                     // the starting directory (x/2023/01) or 3 levels deeper if the last subdir is a two-digit int
                     // for day (x/2023/01/03).
                     if (slashDiff < 3 ||
                             (slashDiff == 3 && string(c_dirEntry->d_name).length() == 2 &&
                              isdigit(c_dirEntry->d_name[0]) && isdigit(c_dirEntry->d_name[1])))
-                        parseDirToCache(fullFilename, fnamePattern, cache, baseSlashes);
+                        subDirs.insert(subDirs.end(), fullFilename);
                 }
                 else {
                     // filter for filename if specified
@@ -236,6 +235,9 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache, 
             }
         }
         closedir(c_dir);
+
+        for (auto &dir: subDirs)
+            parseDirToCache(dir, fnamePattern, cache, baseSlashes);
     }
     else {
         SCREENERR("error: unable to read " << directory);

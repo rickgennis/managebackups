@@ -54,6 +54,8 @@ public:
     void updateDiffFiles(set<string> files);
     void displayDiffFiles();
     
+    void removeEntry();
+    
     //string getDirNProfile() { return directory + ";;" + profile; }
     
     FaubEntry& operator=(const DiskStats& stats);

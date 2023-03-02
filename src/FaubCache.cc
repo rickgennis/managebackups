@@ -43,17 +43,17 @@ void FaubCache::restoreCache(string profileName) {
 
         if ((c_dir = opendir(ue(currentDir).c_str())) != NULL) {
             while ((c_dirEntry = readdir(c_dir)) != NULL) {
-
+                
                 if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
                     continue;
-
+                
                 struct stat statData;
                 string fullFilename = slashConcat(currentDir, c_dirEntry->d_name);
-
+                
                 ++GLOBALS.statsCount;
                 if (!stat(fullFilename.c_str(), &statData)) {
-
-                    if ((statData.st_mode & S_IFMT) == S_IFDIR) {
+                    
+                    if (S_ISDIR(statData.st_mode)) {
                         // regardless of the starting (baseDir) directory, we're only interested in subdirs
                         // exactly 2 levels lower because that's where our backups will live. e.g.
                         // baseDir = /tmp/backups then we're looking for things like /tmp/backups/2023/01.
@@ -62,14 +62,14 @@ void FaubCache::restoreCache(string profileName) {
                         auto ps = pathSplit(currentDir);
                         bool dirIsDay = (ps.file.length() == 2 && isdigit(ps.file[0]) && isdigit(ps.file[1]));
                         bool entIsDay = (string(c_dirEntry->d_name).length() == 2 && isdigit(c_dirEntry->d_name[0]) && isdigit(c_dirEntry->d_name[1]));
-
+                        
                         if (depth == 3 || (depth == 4 && dirIsDay)) {
                             // next we make sure the subdir matches our profile name
                             if (fullFilename.find(string("/") + profileName + "-") != string::npos) {
                                 // check for in process backups
                                 if (tempRE.search(fullFilename)) {
                                     inProcessFilename = fullFilename;
-
+                                    
                                     if (GLOBALS.startupTime - statData.st_mtime > 60*60*5) {
                                         if (GLOBALS.cli.count(CLI_TEST))
                                             cout << YELLOW << " TESTMODE: would have cleaned up abandoned in-process backup at " + fullFilename + " (" + timeDiff(mktimeval(statData.st_mtime)) + ")" << RESET << endl;
@@ -86,18 +86,18 @@ void FaubCache::restoreCache(string profileName) {
                                     DEBUG(D_faub|D_cache) DFMT("loading cache for " << fullFilename << (success ? ": success" : ": failed"));
                                     if (!success || !entry.finishTime || !entry.startDay) {
                                         /* here we have a backup in a directory but no cache file to describe it. all the diskstats
-                                        * for that cache file can be recalculated by traversing the backup.  but the finishTime &
-                                        * duration are lost. let's use the start time (from the filename) as a ballpark to seed
-                                        * the finish time, which will allow the stats output to show an age. */
-                                     
+                                         * for that cache file can be recalculated by traversing the backup.  but the finishTime &
+                                         * duration are lost. let's use the start time (from the filename) as a ballpark to seed
+                                         * the finish time, which will allow the stats output to show an age. */
+                                        
                                         if (regEx.search(pathSplit(fullFilename).file) && regEx.matches() > 2) {
                                             struct tm t;
-
+                                            
                                             t.tm_year = stoi(regEx.get_match(0)) - 1900;
                                             t.tm_mon  = stoi(regEx.get_match(1)) - 1;
                                             t.tm_mday = stoi(regEx.get_match(2));
                                             t.tm_isdst = -1;
-
+                                            
                                             if (regEx.matches() > 5) {
                                                 t.tm_hour = stoi(regEx.get_match(3));
                                                 t.tm_min = stoi(regEx.get_match(4));
@@ -108,33 +108,34 @@ void FaubCache::restoreCache(string profileName) {
                                                 t.tm_min = 0;
                                                 t.tm_sec = 0;
                                             }
-
+                                            
                                             if (!entry.finishTime)
                                                 entry.finishTime = mktime(&t);
-
+                                            
                                             if (!entry.startDay) {
                                                 entry.startDay = t.tm_mday;
                                                 entry.startMonth = t.tm_mon + 1;
                                                 entry.startYear = t.tm_year + 1900;
                                             }
-
+                                            
                                             entry.mtimeDayAge = floor((refTime - entry.finishTime) / SECS_PER_DAY);
                                             auto pFileTime = localtime(&entry.finishTime);
                                             entry.dow = pFileTime->tm_wday;
                                         }
                                     }
-
+                                    
                                     backups.insert(backups.end(), pair<string, FaubEntry>(fullFilename, entry));
                                     continue;
                                 }
                             }
                         }
-
+                        
                         if (depth < 3 || (depth == 3 && entIsDay))
                             dirQueue.push(fullFilename);
                     }
                 }
             }
+            closedir(c_dir);
         }
     }
 
@@ -295,8 +296,7 @@ void FaubCache::cleanup() {
                     }
                 }
             }
-        }
-        
+        }        
         closedir(c_dir);
     }
 }
