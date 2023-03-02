@@ -1515,6 +1515,7 @@ int main(int argc, char *argv[])
         CLI_DIR, "Directory", cxxopts::value<std::string>())(
         CLI_SCPTO, "SCP to", cxxopts::value<std::string>())(
         CLI_SFTPTO, "SFTP to", cxxopts::value<std::string>())(
+        CLI_NICE, "Nice value", cxxopts::value<int>())(
         CLI_STATS1, "Stats summary", cxxopts::value<bool>()->default_value("false"))(
         CLI_STATS2, "Stats detail", cxxopts::value<bool>()->default_value("false"))(
         CLI_PRUNE, "Enable pruning", cxxopts::value<bool>()->default_value("false"))(
@@ -1942,8 +1943,13 @@ int main(int argc, char *argv[])
                     GLOBALS.interruptLock = currentConfig->setLockPID(GLOBALS.pid);
 
                 int n = nice(0);
-                if (currentConfig->settings[sNice].ivalue() - n > 0)
-                    nice(currentConfig->settings[sNice].ivalue() - n);
+                if (currentConfig->settings[sNice].ivalue() != n) {
+                    errno = 0;
+                    int newnice = nice(currentConfig->settings[sNice].ivalue());
+                    DEBUG(D_any) DFMT("set nice value of " << currentConfig->settings[sNice].ivalue() << " (previous " << n << ", got " << newnice << ")");
+                    if (newnice == -1 && errno)
+                        log(currentConfig->ifTitle() + " unable to set nice value - " + strerror(errno));
+                }
 
                 scanConfigToCache(*currentConfig);
                 if (performTripwire(*currentConfig)) {

@@ -541,6 +541,11 @@ The NOTIFICATIONS section below has more detail.
 notify every \f[I]count\f[R] failures as well.
 See the NOTIFICATIONS section.
 .TP
+\f[B]\[en]nice\f[R] [\f[I]nice\f[R]]
+{both} Specify a nice value for the backup to run as.
+Defaults to 10.
+Use 0 for normal priority.
+.TP
 \f[B]\[en]nos\f[R]
 {both} Notify on successful backups also.
 .TP
