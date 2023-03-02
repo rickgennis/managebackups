@@ -553,11 +553,13 @@ void pruneFaubBackups(BackupConfig &config)
             ++cacheEntryIt;
             continue;
         }
-        
-        if (GLOBALS.cli.count(CLI_TEST))
+
+        if (GLOBALS.cli.count(CLI_TEST)) {
             cout << YELLOW << config.ifTitle() << " TESTMODE: would have deleted "
-                 << cacheEntryIt->second.getDir() << " (age=" + to_string(mtimeDayAge)
-                 << ", dow=" + dw(filenameDOW) << ")" << (shouldConsolidate ? " consolidation" : "" ) << RESET << endl;
+            << cacheEntryIt->second.getDir() << " (age=" + to_string(mtimeDayAge)
+            << ", dow=" + dw(filenameDOW) << ")" << (shouldConsolidate ? " consolidation" : "" ) << RESET << endl;
+            ++cacheEntryIt;
+        }
         else {
             if (rmrf(cacheEntryIt->second.getDir())) {
                 NOTQUIET &&cout << "\t• removed " << cacheEntryIt->second.getDir() << (shouldConsolidate ? " (consolidation)" : "" ) << endl;
@@ -571,9 +573,10 @@ void pruneFaubBackups(BackupConfig &config)
                 SCREENERR(string("unable to remove ") + (shouldConsolidate ? " (consolidation) " : "" ) + cacheEntryIt->second.getDir() + ": " +
                           strerror(errno));
             }
+         
+            auto deadBackupIt = cacheEntryIt++;
+            fcache.removeBackup(deadBackupIt);
         }
-
-        ++cacheEntryIt;
     }
 
     /* if a faub backup is deleted we'll need to recalculate the disk usage of

@@ -41,10 +41,10 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
     DIR *c_dir;
     struct dirent *c_dirEntry;
     struct stat statData;
-
     string recentName;
     time_t recentTime = 0;
-
+    vector<string> subDirs;
+    
     Pcre matchSpec(DATE_REGEX);
     if (matchSpec.search(backupDir)) {
 
@@ -73,12 +73,8 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
 
                     if (slashDiff < 3 || (slashDiff == 3 && 
                                 string(c_dirEntry->d_name).length() == 2 && isdigit(c_dirEntry->d_name[0]) && isdigit(c_dirEntry->d_name[1]))) {
-                        DEBUG(D_faub) DFMT("recursing into " << fullFilename);
-                        auto [fname, fmtime] = mostRecentBackupDirSinceInternal(baseSlashes, fullFilename, sinceTime, profileName);
-                        if ((fmtime > recentTime) && ((fmtime < sinceTime) || !sinceTime)) {
-                            recentTime = fmtime;
-                            recentName = fname;
-                        }
+                        DEBUG(D_faub) DFMT("adding " << fullFilename << " to recursion list");
+                        subDirs.insert(subDirs.end(), fullFilename);
                     }
                     
                     if (slashDiff > 2 && slashDiff < 5) {
@@ -96,8 +92,15 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
                 }
             }
         }
-
         closedir(c_dir);
+        
+        for (auto &dir: subDirs) {
+            auto [fname, fmtime] = mostRecentBackupDirSinceInternal(baseSlashes, dir, sinceTime, profileName);
+            if ((fmtime > recentTime) && ((fmtime < sinceTime) || !sinceTime)) {
+                recentTime = fmtime;
+                recentName = fname;
+            }
+        }
     }
 
     return {recentName, recentTime};
@@ -215,6 +218,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             if (remoteFilename.substr(0, 4) == "##* ") {
                 remoteFilename.erase(0, 4);
                 log(config.ifTitle() + " " + fs + " " + remoteFilename);
+                sigTermHandler(0);
+                exit(10);
             }
 
             ++fileTotal;
@@ -498,6 +503,7 @@ size_t fc_scanToServer(string entryName, IPC_Base& server) {
     struct dirent *c_dirEntry;
     struct stat statData;
     size_t totalEntries = 0;
+    vector<string> subDirs;
     
     entryName.erase(remove(entryName.begin(), entryName.end(), '\\'), entryName.end());
     
@@ -522,17 +528,19 @@ size_t fc_scanToServer(string entryName, IPC_Base& server) {
                         DEBUG(D_netproto) DFMT("client provided stats on " << fullFilename);
                         
                         if (S_ISDIR(statData.st_mode))
-                            totalEntries += fc_scanToServer(fullFilename, server);
+                            subDirs.insert(subDirs.end(), fullFilename);
                     }
                     else
                         log("error: stat failed for " + fullFilename);
                 }
-                
                 closedir(c_dir);
+
+                for (auto &dir: subDirs)
+                    totalEntries += fc_scanToServer(dir, server);
             }
             else {
-                log("error: can't open " + entryName);
-                server.ipcWrite(string(string("##* error: client instance unable to read ") + entryName + NET_DELIM).c_str());
+                log("error: can't open " + entryName + " - " + strerror(errno));
+                server.ipcWrite(string(string("##* error: client instance unable to read ") + entryName + " - " + strerror(errno) + NET_DELIM).c_str());
                 sigTermHandler(0);
                 exit(5);
             }

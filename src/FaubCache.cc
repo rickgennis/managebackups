@@ -296,5 +296,7 @@ void FaubCache::cleanup() {
                 }
             }
         }
+        
+        closedir(c_dir);
     }
 }
