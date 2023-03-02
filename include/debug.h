@@ -1,5 +1,5 @@
-//ifndef DEBUG_H
-//define DEBUG_H
+#ifndef DEBUG_H
+#define DEBUG_H
 
 #include <sys/types.h>
 
@@ -100,3 +100,7 @@ extern int ndebug_options;
 
 void decode_bits(unsigned int *selector, size_t selsize, int *notall,
   uschar *parsestring, bit_table *options, int count);
+
+
+#endif
+

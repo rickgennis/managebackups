@@ -323,7 +323,7 @@ void scheduleLaunchCtl(string& appPath) {
                 if (offset == 0 || offset == 24)
                     cout << "daily." << endl;
                 else
-                    cout << "every " << offset << " hour" << s(offset) << ".\n";
+                    cout << "every " << plural(offset, "hour") << ".\n";
                 cout << "use \"launchctl disable gui/" << uid << "/com.local.managebackups\" to disable." << endl;
             }
             else {
@@ -410,7 +410,7 @@ void scheduleCron(string& appPath) {
     
     if (success) {
         int offset = GLOBALS.cli[CLI_SCHED].as<int>();
-        cout << "successfully scheduled cron job for every " << offset << " hour" << s(offset) << "." << endl;
+        cout << "successfully scheduled cron job for every " << plural(offset, "hour") << "." << endl;
         cout << "use 'crontab -e' to make changes." << endl;
     }
     else

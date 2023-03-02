@@ -176,10 +176,10 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     DEBUG(D_faub) DFMT("previous: " << prevDir);
 
     // record number of filesystems the client is going to send
-    auto nfs = client.ipcRead();
+    auto numFS = client.ipcRead();
 
     currentDir += tempExtension;
-    string screenMessage = config.ifTitle() + " backing up to temp dir " + currentDir + " (" + to_string(nfs * 4) +  ")... ";
+    string screenMessage = config.ifTitle() + " backing up to temp dir " + currentDir + " (" + to_string(numFS * 4) +  ")... ";
     string backspaces = string(screenMessage.length(), '\b');
     string blankspaces = string(screenMessage.length() , ' ');
     NOTQUIET && ANIMATE && cout << screenMessage << flush;
@@ -207,6 +207,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         string fs = client.ipcReadTo(NET_DELIM);
 
         unsigned int maxLinksAllowed = config.settings[sMaxLinks].ivalue();
+        size_t checkpointTotal = fileTotal;
 
         while (1) {
             remoteFilename = client.ipcReadTo(NET_DELIM);
@@ -291,9 +292,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             }
         }
  
-        NOTQUIET && ANIMATE && cout << PB(nfs * 4) << to_string(nfs * 4 - 1) << ")... " << flush;
-        log(config.ifTitle() + " " + fs + " phase 1: client detailed " + to_string(fileTotal) + " entr" + ies((int)fileTotal));
-        DEBUG(D_netproto) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size() 
+        NOTQUIET && ANIMATE && cout << PB(numFS * 4) << to_string(numFS * 4 - 1) << ")... " << flush;
+        DEBUG(D_netproto) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size()
                 << ", willLink:" << hardLinkList.size());
 
         /*
@@ -307,9 +307,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
         client.ipcWrite(NET_OVER_DELIM);
 
-        NOTQUIET && ANIMATE && cout << PB(nfs * 4 - 1) << to_string(nfs * 4 - 2) << ")... " << flush;
+        NOTQUIET && ANIMATE && cout << PB(numFS * 4 - 1) << to_string(numFS * 4 - 2) << ")... " << flush;
         DEBUG(D_netproto) DFMT(fs << " server phase 2 complete; told client we need " << neededFiles.size() << " of " << fileTotal);
-        log(config.ifTitle() + " " + fs + " phase 2: requested " + to_string(neededFiles.size()) + " entr" + ies((int)neededFiles.size()) + " from client");
 
         /*
          * phase 3 - receive full copies of the files we've requested. they come over
@@ -333,9 +332,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                     ++receivedSymLinks;
         }
 
-        NOTQUIET && ANIMATE && cout << PB(nfs * 4 - 2) << to_string(nfs * 4 - 3) << ")... " << flush;
-        DEBUG(D_netproto) DFMT(fs << " server phase 3 complete; received " << neededFiles.size() << " file" << s((int)neededFiles.size()) + " from client");
-        log(config.ifTitle() + " " + fs + " phase 3: received " + to_string(neededFiles.size()) + " entr" + ies((int)neededFiles.size()) + " from client");
+        NOTQUIET && ANIMATE && cout << PB(numFS * 4 - 2) << to_string(numFS * 4 - 3) << ")... " << flush;
+        DEBUG(D_netproto) DFMT(fs << " server phase 3 complete; received " << plural((int)neededFiles.size(), "file") + " from client");
 
         /*
          * phase 4 - create the links for everything that matches the previous backup.
@@ -425,14 +423,15 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
         }
 
-        DEBUG(D_netproto) DFMT(fs << " server phase 4 complete; created " << (hardLinkList.size() - linkErrors)  << 
-                " link" << s((int)hardLinkList.size() - linkErrors) << " to previously backed up files" << (linkErrors ? string(" (" + to_string(linkErrors) + " error" + s(linkErrors) + ")") : ""));
-        log(config.ifTitle() + " " + fs + " phase 4: created " + to_string(hardLinkList.size() - linkErrors) + " link" + s((int)hardLinkList.size() - linkErrors) + (linkErrors ? " (" + to_string(linkErrors) + " error" + s(linkErrors) + ")" : ""));
-
+        DEBUG(D_netproto) DFMT(fs << " server phase 4 complete; created " << plural(hardLinkList.size() - linkErrors, "link")  <<
+                " to previously backed up files" << (linkErrors ? string(" (" + plural(linkErrors, "error") + ")") : ""));
+        log(config.ifTitle() + " processed " + fs + ": " + plurali((int)fileTotal - checkpointTotal, "entr") + ", " +
+            plural(neededFiles.size(), "request") + ", " + plural(hardLinkList.size() - linkErrors, "link"));
+        
         filesModified += neededFiles.size();
         filesHardLinked += hardLinkList.size();
         filesSymLinked += symLinkList.size();
-        --nfs;
+        --numFS;
 
     } while (client.ipcRead());
 
@@ -608,8 +607,8 @@ void fc_mainEngine(vector<string> paths) {
             auto changes = fc_sendFilesToServer(server);
 
             clientTime.stop();
-            log("faub_client request for " + *it + " served " + to_string(entries) + " entr" + ies(entries) +
-                ", " + to_string(changes) + " change" + s(changes) + " in " + clientTime.elapsed());
+            log("faub_client request for " + *it + " served " + plurali((int)entries, "entr") +
+                ", " + plural((int)changes, "change") + " in " + clientTime.elapsed());
 
             __int64_t end = (it+1) != paths.end();
             server.ipcWrite(end);

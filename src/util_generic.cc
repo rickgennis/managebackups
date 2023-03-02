@@ -42,6 +42,15 @@ string ies(int number) {
     return(number == 1 ? "y" : "ies");
 }
 
+string plural(int number, string text) {
+    return (to_string(number) + " " + text + (number == 1 ? "" : "s"));
+}
+
+string plurali(int number, string text) {
+    return (to_string(number) + " " + text + (number == 1 ? "y" : "ies"));
+}
+
+
 
 string cppgetenv(string variable) {
     char* c;

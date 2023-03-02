@@ -54,9 +54,13 @@ struct DiskStats {
 
 string cppgetenv(string variable);
 
-string s(int number);
+//string s(int number);
 
-string ies(int number);
+//string ies(int number);
+
+string plural(int number, string text);
+
+string plurali(int number, string text);
 
 void log(string message);
 

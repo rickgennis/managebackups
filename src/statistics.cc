@@ -331,7 +331,7 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
         cout << line << "\n";
         if (config.settings[sTitle].value.length()) cout << "Profile: " << config.settings[sTitle].value << "\n";
         cout << "Directory: " << config.settings[sDirectory].value << "\n";
-        cout << bkups << " backup" << s((int)bkups) << "\n";
+        cout << plural((int)bkups, "backup") << "\n";
         cout << approximate(stats.getSize() + stats.getSaved(), precisionLevel, statDetail == 3 || statDetail == 5) << " using "
             << approximate(stats.getSize(), precisionLevel, statDetail == 3 || statDetail == 5) << " on disk (saved " << saved << "%)\n";
         
@@ -515,7 +515,7 @@ void _displayDetailedStats(BackupConfig& config, int statDetail) {
         cout << "Profile: " << config.settings[sTitle].value << "\n";
     
     cout << "Directory: " << config.settings[sDirectory].value << " (" << config.settings[sBackupFilename].value << ")\n";
-    cout << rawSize << " backup" << s((int)rawSize) << ", " << md5Size << " unique" << s((int)md5Size) << "\n";
+    cout << plural((int)rawSize, "backup") << ", " << plural((int)md5Size, "unique") << "\n";
     cout << approximate(bytesUsed + bytesSaved, precisionLevel, statDetail == 3 || statDetail == 5) << " using " << approximate(bytesUsed, precisionLevel, statDetail == 3 || statDetail == 5) << " on disk (saved " << saved << "%)\n";
     cout << "Retention stats:\n";
     cout << "\t• " << numDay << " of " << config.settings[sDays].ivalue() << " daily\n";

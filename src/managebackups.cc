@@ -654,8 +654,8 @@ void pruneBackups(BackupConfig &config)
 
         if (minValidBackups < fb) {
             string message = "skipping pruning due to failsafe check; only " +
-                             to_string(minValidBackups) + " backup" + s(minValidBackups) +
-                             " within the last " + to_string(fd) + " day" + s(fd) + "; " +
+                             plural(minValidBackups, "backup") +
+                             " within the last " + plural(fd, "day") + "; " +
                              to_string(fb) + " required";
 
             SCREENERR("warning: " << message);
@@ -663,8 +663,8 @@ void pruneBackups(BackupConfig &config)
             return;
         }
         DEBUG(D_prune)
-        DFMT("failsafe passed with " << minValidBackups << " backup" << s(minValidBackups) << " ("
-                                     << fb << " required) in the last " << fd << " day" << s(fd));
+        DFMT("failsafe passed with " << plural(minValidBackups, "backup") << " ("
+                                     << fb << " required) in the last " << plural(fd, "day"));
     }
 
     /* safety checks complete - begin pruning */
