@@ -453,20 +453,14 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     GLOBALS.interruptFilename = "";
     currentDir = originalCurrentDir;
 
-    // loading the cache for this baseDir will automatically detect our new backup having
-    // no cached stats and run a dus() on it to determine totalSize/totalSaved.
-    FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
-    fcache.updateDiffFiles(currentDir, modifiedFiles);
+    // add the backup to the cache, including running a dus()
+    config.fcache.recache(currentDir);
 
-    // the one exception is if this backup was already in the cache and this run is
-    // overwriting that backup.  in that case we may need to recache() the new version.
-    // recache() is smart enough to skip backups its already recached in this run of the
-    // app.  i.e. if this is the first time for this backup and the above fcache() cache
-    // instantiation correctly cached it, recache() will do nothing.
-    fcache.recache(currentDir);
-
+    // record which files changed in this backup
+    config.fcache.updateDiffFiles(currentDir, modifiedFiles);
+    
     // we can pull these out to display
-    auto fcacheCurrent = fcache.getBackupByDir(currentDir);
+    auto fcacheCurrent = config.fcache.getBackupByDir(currentDir);
     auto backupSize = fcacheCurrent->second.ds.getSize();
     auto backupSaved = fcacheCurrent->second.ds.getSaved();
 

@@ -48,13 +48,12 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
 
     // handle faub configs first
     if (config.settings[sFaub].value.length()) {
-        FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
-        if (fcache.size() < 1) {
+        if (config.fcache.size() < 1) {
             resultStats.stringOutput[0] = config.settings[sTitle].value;
             return resultStats;
         }
 
-        string inProcessFilename = fcache.getInProcessFilename();
+        string inProcessFilename = config.fcache.getInProcessFilename();
 
 #ifdef __APPLE__
         struct stat statBuf;
@@ -63,13 +62,13 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
 #endif
 
         // set numeric stats
-        auto ds = fcache.getTotalStats();
+        auto ds = config.fcache.getTotalStats();
         resultStats.totalUsed = ds.getSize();
         resultStats.totalSaved = ds.getSaved();
-        resultStats.numberOfBackups = resultStats.uniqueBackups = fcache.size();
-        resultStats.lastBackupBytes = fcache.getLastBackup()->second.ds.getSize() + fcache.getLastBackup()->second.ds.getSaved();
-        resultStats.lastBackupTime = fcache.getLastBackup()->second.finishTime;
-        resultStats.duration = fcache.getLastBackup()->second.duration;
+        resultStats.numberOfBackups = resultStats.uniqueBackups = config.fcache.size();
+        resultStats.lastBackupBytes = config.fcache.getLastBackup()->second.ds.getSize() + config.fcache.getLastBackup()->second.ds.getSaved();
+        resultStats.lastBackupTime = config.fcache.getLastBackup()->second.finishTime;
+        resultStats.duration = config.fcache.getLastBackup()->second.duration;
         resultStats.inProcess = inProcessFilename.length() > 0;
 
         // set string stats
@@ -81,16 +80,16 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
 
         string soutput[NUMSTATDETAILS] = { 
             config.settings[sTitle].value,
-            pathSplit(fcache.getLastBackup()->first).file,
+            pathSplit(config.fcache.getLastBackup()->first).file,
             fileTime,    
             seconds2hms(resultStats.duration),
             (approximate(resultStats.lastBackupBytes, precisionLevel, statDetail == 3 || statDetail == 5) +
              " (" + approximate(resultStats.totalUsed, precisionLevel, statDetail == 3 || statDetail == 5) + ")"),
             to_string(resultStats.uniqueBackups),
             to_string(saved) + "%",
-            fcache.getFirstBackup()->second.finishTime ? timeDiff(mktimeval(fcache.getFirstBackup()->second.finishTime)) : "?",
-            fcache.getLastBackup()->second.finishTime ? timeDiff(mktimeval(fcache.getLastBackup()->second.finishTime)) : "?",
-            processAge.length() ? processAge : GLOBALS.startupTime - fcache.getLastBackup()->second.finishTime > 2*60*60*24 ? oldMessage : ""
+            config.fcache.getFirstBackup()->second.finishTime ? timeDiff(mktimeval(config.fcache.getFirstBackup()->second.finishTime)) : "?",
+            config.fcache.getLastBackup()->second.finishTime ? timeDiff(mktimeval(config.fcache.getLastBackup()->second.finishTime)) : "?",
+            processAge.length() ? processAge : GLOBALS.startupTime - config.fcache.getLastBackup()->second.finishTime > 2*60*60*24 ? oldMessage : ""
         };
             
         for (int i = 0; i < NUMSTATDETAILS; ++i)
@@ -315,13 +314,12 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
 
 
 bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
-    FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
     int precisionLevel = statDetail > 3 ? 0 : statDetail > 1 ? 1 : -1;
 
-    if (config.settings[sFaub].value.length() && fcache.size()) {
+    if (config.settings[sFaub].value.length() && config.fcache.size()) {
         auto line = horizontalLine(60);
-        auto bkups = fcache.getNumberOfBackups();
-        auto stats = fcache.getTotalStats();
+        auto bkups = config.fcache.getNumberOfBackups();
+        auto stats = config.fcache.getTotalStats();
         int saved = floor((1 - (long double)stats.getSize() / (stats.getSize() + stats.getSaved())) * 100 + 0.5);
         const int NUMCOLUMNS = 9;
         int maxColLen[NUMCOLUMNS] = { 0 };
@@ -347,8 +345,8 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
         for (int x = 0; x < arrsize; ++x)
             if (!maxColLen[x]) maxColLen[x] = (int)headers[x].length();
         
-        auto backupIt = fcache.getFirstBackup();
-        while (backupIt != fcache.getEnd()) {
+        auto backupIt = config.fcache.getFirstBackup();
+        while (backupIt != config.fcache.getEnd()) {
             maxColLen[0] = (int)max(maxColLen[0], backupIt->first.length());
             maxColLen[1] = (int)max(maxColLen[1], approximate(backupIt->second.ds.getSize() + backupIt->second.ds.getSaved(), precisionLevel, statDetail == 3 || statDetail == 5).length());
             maxColLen[2] = (int)max(maxColLen[2], approximate(backupIt->second.ds.getSize(), precisionLevel, statDetail == 3 || statDetail == 5).length());
@@ -382,8 +380,8 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
 
         string lastMonthYear;
         char result[1000];
-        backupIt = fcache.getFirstBackup();
-        while (backupIt != fcache.getEnd())  {
+        backupIt = config.fcache.getFirstBackup();
+        while (backupIt != config.fcache.getEnd())  {
             timeDetail = localtime(&backupIt->second.finishTime);
             string monthYear = backupIt->second.finishTime ? vars2MY(timeDetail->tm_mon+1, timeDetail->tm_year+1900) : "Unknown";
 

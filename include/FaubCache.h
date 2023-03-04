@@ -30,11 +30,15 @@ struct cmpName {
 class FaubCache {
 private:
     string baseDir;
+    string coreProfile;
     map<string, FaubEntry, cmpName> backups;
     string inProcessFilename;
     
+    void restoreCache_internal(string backupDir);
+    
 public:
     void restoreCache(string profileName);
+    void restoreCache(string path, string profileName);
     DiskStats getTotalStats();
     long size() { return backups.size(); }
     
@@ -49,11 +53,12 @@ public:
     void displayDiffFiles(string backupDir);
     
     void cleanup();
-    void recache(string dir);
+    void recache(string targetDir, time_t deletedtime = 0);
     string getInProcessFilename() { return inProcessFilename; }
     
     FaubCache(string path, string profileName);
-    ~FaubCache();
+    FaubCache() {}
+    ~FaubCache() {}
 };
 
 #endif

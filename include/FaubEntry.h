@@ -49,6 +49,7 @@ public:
     void saveStats();
     
     void loadInodes();
+    void unloadInodes() { inodes.clear(); };
     void saveInodes();
     
     void updateDiffFiles(set<string> files);

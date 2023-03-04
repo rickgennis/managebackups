@@ -250,10 +250,17 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache, 
  *
  * Wrapper function for parseDirToCache().
  *******************************************************************************/
-void scanConfigToCache(BackupConfig &config)
-{
-    if (config.settings[sFaub].value.length()) 
+void scanConfigToCache(BackupConfig &config) {
+    if (config.settings[sFaub].value.length()) {
+        config.fcache.restoreCache(config.settings[sDirectory].value, config.settings[sTitle].value);
+      
+        // clean up old cache files and recalculate any missing disk usage
+        // this primarily catches recalculations that are necessary because
+        // the user manually deleted a backup unbeknown to us.
+        config.fcache.cleanup();
+        
         return;
+    }
 
     string fnamePattern = "";
     string directory = config.settings[sDirectory].value;
@@ -518,15 +525,13 @@ string pruneShouldKeep(BackupConfig &config, string filename, int filenameAge, i
 void pruneFaubBackups(BackupConfig &config)
 {
     DEBUG(D_prune) DFMT("weeklies set to dow " << dw(config.settings[sDOW].ivalue()));
-
-    FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
-    DEBUG(D_prune) DFMT("examining " << fcache.getNumberOfBackups() << " backup(s) for "
+    DEBUG(D_prune) DFMT("examining " << config.fcache.getNumberOfBackups() << " backup(s) for "
         << config.settings[sTitle].value);
 
     size_t backupAge = 0, backupCountOnDay = 0;
     
-    auto cacheEntryIt = fcache.getFirstBackup();
-    while (cacheEntryIt != fcache.getEnd()) {
+    auto cacheEntryIt = config.fcache.getFirstBackup();
+    while (cacheEntryIt != config.fcache.getEnd()) {
         auto mtimeDayAge = cacheEntryIt->second.mtimeDayAge;
         auto filenameDOW = cacheEntryIt->second.dow;
         auto filenameDayAge = cacheEntryIt->second.filenameDayAge();
@@ -577,14 +582,13 @@ void pruneFaubBackups(BackupConfig &config)
             }
          
             auto deadBackupIt = cacheEntryIt++;
-            fcache.removeBackup(deadBackupIt);
+            config.fcache.removeBackup(deadBackupIt);
         }
     }
 
     /* if a faub backup is deleted we'll need to recalculate the disk usage of
        the next cronological backup in order (if any). cleanup() handles this. */
-    FaubCache global("", "");
-    global.cleanup();
+    config.fcache.cleanup();
 }
 
 /*******************************************************************************
@@ -616,10 +620,8 @@ void pruneBackups(BackupConfig &config)
         int minValidBackups = 0;
 
         if (config.settings[sFaub].value.length()) {
-            FaubCache fcache(config.settings[sDirectory].value, config.settings[sTitle].value);
-
-            auto cacheEntryIt = fcache.getFirstBackup();
-            while (cacheEntryIt != fcache.getEnd()) {
+            auto cacheEntryIt = config.fcache.getFirstBackup();
+            while (cacheEntryIt != config.fcache.getEnd()) {
                 descrip = "";
                 if (cacheEntryIt->second.mtimeDayAge <= fd) {
                     ++minValidBackups;
@@ -1685,12 +1687,12 @@ int main(int argc, char *argv[])
     DEBUG(D_any) DFMT("about to setup config...");
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager);
-
+    
     if (GLOBALS.cli.count(CLI_DIFF)) {
         if (GLOBALS.cli.count(CLI_PROFILE)) {
             if (currentConfig->settings[sFaub].value.length()) {
-                FaubCache fcache(currentConfig->settings[sDirectory].value, currentConfig->settings[sTitle].value);
-                fcache.displayDiffFiles(GLOBALS.cli[CLI_DIFF].as<string>());
+                scanConfigToCache(*currentConfig);
+                currentConfig->fcache.displayDiffFiles(GLOBALS.cli[CLI_DIFF].as<string>());
                 exit(1);
             }
             else {
@@ -1707,12 +1709,6 @@ int main(int argc, char *argv[])
     // if displaying stats and --profile hasn't been specified (or matched successfully)
     // then rescan all configs;  otherwise just scan the --profile config
     DEBUG(D_any) DFMT("about to scan directories...");
-
-    // clean up old cache files and recalculate any missing disk usage
-    // this primarily catches recalculations that are necessary because
-    // the user manually deleted a backup unbeknown to us.
-    FaubCache global("", "");
-    global.cleanup();
 
     /* SHOW STATS
      * ****************************/

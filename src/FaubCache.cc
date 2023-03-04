@@ -21,19 +21,77 @@ FaubCache::FaubCache(string path, string profileName) {
 }
 
 
-FaubCache::~FaubCache() {
+void FaubCache::restoreCache(string path, string profileName) {
+    baseDir = path;
+    
+    if (path.length())
+        restoreCache(profileName);
 }
 
 
+void FaubCache::restoreCache_internal(string backupDir) {
+    Pcre regEx(DATE_REGEX);
+    FaubEntry entry(backupDir, coreProfile);
+    auto success = entry.loadStats();
+    DEBUG(D_faub|D_cache) DFMT("loading cache for " << backupDir << (success ? ": success" : ": failed"));
+    
+    if (!success || !entry.finishTime || !entry.startDay) {
+        /* here we have a backup in a directory but no cache file to describe it. all the diskstats
+         * for that cache file can be recalculated by traversing the backup.  but the finishTime &
+         * duration are lost. let's use the start time (from the filename) as a ballpark to seed
+         * the finish time, which will allow the stats output to show an age. */
+        
+        if (regEx.search(pathSplit(backupDir).file) && regEx.matches() > 2) {
+            struct tm t;
+            
+            t.tm_year = stoi(regEx.get_match(0)) - 1900;
+            t.tm_mon  = stoi(regEx.get_match(1)) - 1;
+            t.tm_mday = stoi(regEx.get_match(2));
+            t.tm_isdst = -1;
+            
+            if (regEx.matches() > 5) {
+                t.tm_hour = stoi(regEx.get_match(3));
+                t.tm_min = stoi(regEx.get_match(4));
+                t.tm_sec = stoi(regEx.get_match(5));
+            }
+            else {
+                t.tm_hour = 0;
+                t.tm_min = 0;
+                t.tm_sec = 0;
+            }
+            
+            if (!entry.finishTime)
+                entry.finishTime = mktime(&t);
+            
+            if (!entry.startDay) {
+                entry.startDay = t.tm_mday;
+                entry.startMonth = t.tm_mon + 1;
+                entry.startYear = t.tm_year + 1900;
+            }
+            
+            entry.mtimeDayAge = floor((time(NULL) - entry.finishTime) / SECS_PER_DAY);
+            auto pFileTime = localtime(&entry.finishTime);
+            entry.dow = pFileTime->tm_wday;
+        }
+    }
+    
+    backups.insert(backups.end(), pair<string, FaubEntry>(backupDir, entry));
+}
+
+
+/*
+   load or reload all profile name-matching entries from disk.
+   don't reload anything that's already in the cache.
+ */
 void FaubCache::restoreCache(string profileName) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
     queue<string> dirQueue;
     string currentDir;
-    Pcre regEx(DATE_REGEX);
-    auto refTime = time(NULL);
     Pcre tempRE("\\.tmp\\.\\d+$");
 
+    coreProfile = profileName;
+    
     dirQueue.push(baseDir);
     auto baseSlashes = count(baseDir.begin(), baseDir.end(), '/');
 
@@ -81,51 +139,10 @@ void FaubCache::restoreCache(string profileName) {
                                     }
                                 }
                                 else {
-                                    FaubEntry entry(fullFilename, profileName);
-                                    auto success = entry.loadStats();
-                                    DEBUG(D_faub|D_cache) DFMT("loading cache for " << fullFilename << (success ? ": success" : ": failed"));
-                                    if (!success || !entry.finishTime || !entry.startDay) {
-                                        /* here we have a backup in a directory but no cache file to describe it. all the diskstats
-                                         * for that cache file can be recalculated by traversing the backup.  but the finishTime &
-                                         * duration are lost. let's use the start time (from the filename) as a ballpark to seed
-                                         * the finish time, which will allow the stats output to show an age. */
-                                        
-                                        if (regEx.search(pathSplit(fullFilename).file) && regEx.matches() > 2) {
-                                            struct tm t;
-                                            
-                                            t.tm_year = stoi(regEx.get_match(0)) - 1900;
-                                            t.tm_mon  = stoi(regEx.get_match(1)) - 1;
-                                            t.tm_mday = stoi(regEx.get_match(2));
-                                            t.tm_isdst = -1;
-                                            
-                                            if (regEx.matches() > 5) {
-                                                t.tm_hour = stoi(regEx.get_match(3));
-                                                t.tm_min = stoi(regEx.get_match(4));
-                                                t.tm_sec = stoi(regEx.get_match(5));
-                                            }
-                                            else {
-                                                t.tm_hour = 0;
-                                                t.tm_min = 0;
-                                                t.tm_sec = 0;
-                                            }
-                                            
-                                            if (!entry.finishTime)
-                                                entry.finishTime = mktime(&t);
-                                            
-                                            if (!entry.startDay) {
-                                                entry.startDay = t.tm_mday;
-                                                entry.startMonth = t.tm_mon + 1;
-                                                entry.startYear = t.tm_year + 1900;
-                                            }
-                                            
-                                            entry.mtimeDayAge = floor((refTime - entry.finishTime) / SECS_PER_DAY);
-                                            auto pFileTime = localtime(&entry.finishTime);
-                                            entry.dow = pFileTime->tm_wday;
-                                        }
+                                    if (backups.find(fullFilename) == backups.end()) {
+                                        restoreCache_internal(fullFilename);
+                                        continue;
                                     }
-                                    
-                                    backups.insert(backups.end(), pair<string, FaubEntry>(fullFilename, entry));
-                                    continue;
                                 }
                             }
                         }
@@ -144,26 +161,44 @@ void FaubCache::restoreCache(string profileName) {
 }
 
 
-void FaubCache::recache(string dir) {
+void FaubCache::recache(string targetDir, time_t deletedTime) {
     map<string, FaubEntry>::iterator prevBackup = backups.end();
 
+    if (targetDir.length() && backups.find(targetDir) == backups.end())
+        restoreCache_internal(targetDir);
+        
     for (auto aBackup = backups.begin(); aBackup != backups.end(); ++aBackup) {
-        DEBUG(D_faub) DFMT("cache set has " << aBackup->first << " with size " << aBackup->second.ds.sizeInBytes << " bytes used, " << aBackup->second.ds.savedInBytes << " saved, " << aBackup->second.duration << " duration");
+        bool deletedMatch = deletedTime && filename2Mtime(aBackup->first) > deletedTime;
 
-        if ((!aBackup->second.ds.sizeInBytes &&
-             !aBackup->second.ds.savedInBytes) ||         // if we have no cached data for this backup or
-            ((dir.length() && dir == aBackup->first) &&   // (this is a backup we've specifically been asked to recache
-            !aBackup->second.updated)) {                  // and it hasn't already been updated on this run of the app)
-
+        // this is a backup we've specifically been asked to recache
+        if ((targetDir.length() && targetDir == aBackup->first) ||
+            (!targetDir.length() &&
+             
+             // if we have no cached data for this backup or its the next sequential backup
+             // after the time of a deleted one
+             ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))) {
+            
+            if (deletedMatch)
+                deletedTime = 0;  // only want to match the *first* backup after the delete time
+            
             bool gotPrev = prevBackup != backups.end();
-            if (gotPrev) 
+            if (gotPrev)
                 prevBackup->second.loadInodes();
-
+            
             set<ino_t> emptySet;
             auto ds = dus(aBackup->first, gotPrev ? prevBackup->second.inodes : emptySet, aBackup->second.inodes);
             DEBUG(D_faub) DFMT("dus(" << aBackup->first << ") returned " << ds.sizeInBytes << " used bytes, " << ds.savedInBytes << " saved bytes");
             aBackup->second.ds = ds;
             aBackup->second.updated = true;
+            
+            // the inode list can be long and suck memory.  so let's not let multiple cache entries
+            // all keep their inode lists populated at the same time.
+            if (gotPrev)
+                prevBackup->second.unloadInodes();
+            
+            // when we're recaching a single backup no need to loop through the rest of them
+            if (targetDir.length())
+                break;
         }
 
         prevBackup = aBackup;
@@ -238,6 +273,12 @@ void FaubCache::cleanup() {
     string cacheFilename;
     struct stat statData;
 
+    /* this should probably stop ignoring directory and profile to instead
+       search just for cache files on disk that match those.  then if the
+       backup is gone, still delete those cache files but you'll have the
+       cache ordered in memory to figure out how to dus the next sequential
+       one. */
+    
     if ((c_dir = opendir(ue(GLOBALS.cacheDir).c_str())) != NULL) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
 
@@ -264,34 +305,27 @@ void FaubCache::cleanup() {
                 // delete the cache file
                 if (stat(backupDir.c_str(), &statData)) {
                     auto targetMtime = filename2Mtime(backupDir);
-                    DEBUG(D_any) DFMT(backupDir << " no longer exists; will recalculate usage of subsequent backup");
-  
-                    unlink(cacheFilename.c_str());
-                    cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBSTATS), string(SUFFIX_FAUBSTATS).length(), SUFFIX_FAUBINODES);
-                    unlink(cacheFilename.c_str());
-                    cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBINODES), string(SUFFIX_FAUBINODES).length(), SUFFIX_FAUBDIFF);
-                    unlink(cacheFilename.c_str());
   
                     if (profileName.length()) {
                         Pcre yearRE("^20\\d{2}$");
-                        auto ps = pathSplit(backupDir);
+                        auto parentDir = backupDir;
+                        auto ps = pathSplit(parentDir);
 
-                        while (backupDir.find("/") != string::npos && !yearRE.search(ps.file)) {
-                            backupDir = ps.dir;
-                            ps = pathSplit(backupDir);
+                        while (parentDir.find("/") != string::npos && !yearRE.search(ps.file)) {
+                            parentDir = ps.dir;
+                            ps = pathSplit(parentDir);
                         }
-                           
-                        FaubCache newCache(pathSplit(backupDir).dir, profileName);
-                     
-                        auto backupIt = newCache.getFirstBackup();
-                        while (backupIt != newCache.getEnd()) {
-                            if (filename2Mtime(backupIt->first) > targetMtime && !stat(backupIt->second.getDir().c_str(), &statData)) {
-                                DEBUG(D_any) DFMT("subsequent recalc: " << backupIt->second.getDir());
-                                newCache.recache(backupIt->second.getDir());
-                                break;
-                            }
-                    
-                            ++backupIt;
+                        
+                        auto bdir = pathSplit(parentDir).dir;
+                        if (profileName == coreProfile && bdir == baseDir) {
+                            DEBUG(D_any) DFMT(parentDir << " no longer exists; will recalculate usage of subsequent backup");
+                            unlink(cacheFilename.c_str());
+                            cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBSTATS), string(SUFFIX_FAUBSTATS).length(), SUFFIX_FAUBINODES);
+                            unlink(cacheFilename.c_str());
+                            cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBINODES), string(SUFFIX_FAUBINODES).length(), SUFFIX_FAUBDIFF);
+                            unlink(cacheFilename.c_str());
+          
+                            recache("", targetMtime);
                         }
                     }
                 }

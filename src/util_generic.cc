@@ -830,8 +830,10 @@ bool rmrf(string item) {
                         return false;
 
                 // remove this directory itself
-                if (rmdir(item.c_str()))
+                if (rmdir(item.c_str())) {
+                    log("error: unable to remove " + item + " - " + strerror(errno));
                     return false;
+                }
             }
         }
         else
