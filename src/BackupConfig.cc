@@ -55,7 +55,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_MODE, RE_MODE, OCTAL, "0600"));
     settings.insert(settings.end(), Setting(CLI_MINSPACE, RE_MINSPACE, SIZE, "0"));
     settings.insert(settings.end(), Setting(CLI_MINSFTPSPACE, RE_MINSFTPSPACE, SIZE, "0"));
-    settings.insert(settings.end(), Setting(CLI_NICE, RE_NICE, INT, "10"));
+    settings.insert(settings.end(), Setting(CLI_NICE, RE_NICE, INT, "0"));
     settings.insert(settings.end(), Setting(CLI_TRIPWIRE, RE_TRIPWIRE, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_NOTIFYEVERY, RE_NOTIFYEVERY, INT, "0"));
     settings.insert(settings.end(), Setting(CLI_MAILFROM, RE_MAILFROM, STRING, ""));

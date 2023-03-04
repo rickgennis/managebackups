@@ -395,7 +395,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
                         currentConf->modified = 1;
                     try {
                         setting.value = GLOBALS.cli[setting.display_name].as<string>();
-                        setting.execParam = "--" + setting.display_name + " " + setting.value;
+                        setting.execParam = "--" + setting.display_name + " '" + setting.value + "'";
                         approx2bytes(setting.value);  // throws on error
                     }
                     catch (...) {
@@ -1793,7 +1793,7 @@ int main(int argc, char *argv[])
             ValueParamIfSpecified(CLI_NOS) + ValueParamIfSpecified(CLI_DAYS) +
             ValueParamIfSpecified(CLI_WEEKS) + ValueParamIfSpecified(CLI_MONTHS) +
             ValueParamIfSpecified(CLI_TRIPWIRE) + ValueParamIfSpecified(CLI_NOTIFYEVERY) +
-            ValueParamIfSpecified(CLI_YEARS) +
+            ValueParamIfSpecified(CLI_YEARS) + ValueParamIfSpecified(CLI_NICE) +
             (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ? " -x" : "") +
             ValueParamIfSpecified(CLI_MAXLINKS);
 
