@@ -50,7 +50,7 @@ public:
     void removeBackup(map<string, FaubEntry>::iterator which) { which->second.removeEntry(); backups.erase(which); }
     
     void updateDiffFiles(string backupDir, set<string> files);
-    void displayDiffFiles(string backupDir);
+    void displayDiffFiles(string backupDir, bool fullPaths = false);
     
     void cleanup();
     void recache(string targetDir, time_t deletedtime = 0);

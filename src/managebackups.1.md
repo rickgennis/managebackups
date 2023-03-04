@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.3.7b
+% MANAGEBACKUPS(1) managebackups 1.4
 % Rick Ennis
 % January 2023
 
@@ -127,6 +127,9 @@ Options are relative to the three functions of **managebackups** plus general op
 
 **--diff** [*string*]
 : With faub-style backups, **managebackups** tracks the files that have changed between each subsequent backup. The **--diff** option, when given the directory name of a specific backup, will display the changed files between it and the previous backup. The specified backup name can be partial. Note: diff data is cached per backup relative to the previous one.  For example, if you have backups 1, 2, 3, and delete backup 2, a "--diff 3" will not be relative to backup 1.  It'll still show the diff to backup 2, as if 2 were still there.
+
+**--diffl** [*string*]
+: Similar to **--diff** except display the full path (long form) of the changed files within the context of the matching backup.
 
 **--consolidate** [*days*]
 : Prune backups down to a single backups per day once they're *days* days old. If you take multiple backups of the same profile in the same day (with **--time**), this allows you to keep only a single one after they age to *days* days but haven't reached the full retention policy to be completely deleted.

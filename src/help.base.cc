@@ -67,6 +67,8 @@ void showHelp(enum helpType kind) {
             + "   -p, --profile [p]   Use the specified profile for the current run; can be a partial name\n"
             + "   --save              Save all the specified settings to the specified profile.\n"
             + "   --recreate          Delete any existing .conf file for this profile and recreate it in the standard format\n\n"
+            + "   --diff [bkup]       List files that changed in the specified backup\n"
+            + "   --diffl [bkup]      List files that changed in the specified backup in the context of that backup (long form)\n\n"
             + "   -a, --all           Execute all profiles sequentially\n"
             + "   -A, --All           Execute all profiles in parallel\n"
             + "   -k, --cron          Execute all profiles sequentially for cron (equivalent to '-a -x -q')\n"

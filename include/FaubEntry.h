@@ -53,7 +53,7 @@ public:
     void saveInodes();
     
     void updateDiffFiles(set<string> files);
-    void displayDiffFiles();
+    void displayDiffFiles(bool fullPaths = false);
     
     void removeEntry();
     

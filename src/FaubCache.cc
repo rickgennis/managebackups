@@ -225,7 +225,7 @@ void FaubCache::updateDiffFiles(string backupDir, set<string> files) {
 }
 
 
-void FaubCache::displayDiffFiles(string backupDir) {
+void FaubCache::displayDiffFiles(string backupDir, bool fullPaths) {
     set<string> contenders;
     auto backupIt = backups.find(backupDir);
 
@@ -243,7 +243,7 @@ void FaubCache::displayDiffFiles(string backupDir) {
         }
 
         if (contenders.size() == 1)
-            match->second.displayDiffFiles();
+            match->second.displayDiffFiles(fullPaths);
         else
             if (contenders.size() > 1) {
                 cout << "error: multiple backups match -" << endl;

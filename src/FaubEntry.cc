@@ -198,7 +198,7 @@ void FaubEntry::updateDiffFiles(set<string> files) {
 }
 
 
-void FaubEntry::displayDiffFiles() {
+void FaubEntry::displayDiffFiles(bool fullPaths) {
     ifstream cacheFile;
     string data;
 
@@ -209,6 +209,9 @@ void FaubEntry::displayDiffFiles() {
              if (cacheFile.eof())
                  break;
 
+            if (fullPaths)
+                data = slashConcat(directory, data);
+            
             cout << data << endl;
         }
 

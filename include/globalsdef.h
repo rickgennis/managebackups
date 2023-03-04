@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.3.7b"
+#define VERSION "1.4"
 
 #include "cxxopts.hpp"
 #include "colors.h"
@@ -113,6 +113,7 @@
 #define CLI_UID "uid"
 #define CLI_GID "gid"
 #define CLI_DIFF "diff"
+#define CLI_DIFFL "diffl"
 #define CLI_FORCE "force"
 #define CLI_SCHED "sched"
 #define CLI_SCHEDHOUR "schedhour"

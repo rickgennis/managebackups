@@ -462,7 +462,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
         !currentConf->settings[sDirectory].value.length() &&
 
         // user hasn't specified --diff (that condition is handled after this function returns)
-        !GLOBALS.cli.count(CLI_DIFF) &&
+        !GLOBALS.cli.count(CLI_DIFF) && !GLOBALS.cli.count(CLI_DIFFL) &&
 
         // & user hasn't selected --all/--All where there's a dir configured in at least one (first)
         // profile
@@ -1513,6 +1513,7 @@ int main(int argc, char *argv[])
         string("s,") + CLI_PATHS, "Faub paths", cxxopts::value<std::vector<std::string>>())(
         CLI_FORCE, "Force, override lock", cxxopts::value<bool>()->default_value("false"))(
         CLI_DIFF, "Faub diff", cxxopts::value<std::string>())(
+        CLI_DIFFL, "Faub diff long paths", cxxopts::value<std::string>())(
         CLI_FAUB, "Faub backup", cxxopts::value<std::string>())(
         CLI_NOS, "Notify on success", cxxopts::value<bool>()->default_value("false"))(
         CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))(
@@ -1688,11 +1689,12 @@ int main(int argc, char *argv[])
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager);
     
-    if (GLOBALS.cli.count(CLI_DIFF)) {
+    if (GLOBALS.cli.count(CLI_DIFF) || GLOBALS.cli.count(CLI_DIFFL)) {
         if (GLOBALS.cli.count(CLI_PROFILE)) {
+            bool basic = GLOBALS.cli.count(CLI_DIFF);  // DIFF not DIFFL
             if (currentConfig->settings[sFaub].value.length()) {
                 scanConfigToCache(*currentConfig);
-                currentConfig->fcache.displayDiffFiles(GLOBALS.cli[CLI_DIFF].as<string>());
+                currentConfig->fcache.displayDiffFiles(basic ? GLOBALS.cli[CLI_DIFF].as<string>() : GLOBALS.cli[CLI_DIFFL].as<string>(), !basic);
                 exit(1);
             }
             else {
