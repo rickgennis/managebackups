@@ -160,8 +160,20 @@ void FaubCache::restoreCache(string profileName) {
     recache("");
 }
 
-
-void FaubCache::recache(string targetDir, time_t deletedTime) {
+/*
+ recache() runs a dus() on the backups and updates the cache with their current
+ disk usage.  which backups are recached can be selected as:
+ 
+ (1) a single specific backup - full backupdir directory specified as targetDir
+ 
+ (2) a single backup after delete - when a backup is deleted (such as by cleanup())
+ the time of that deleted backup can be passed in as deletedTime.  recache() will dus()
+ the backup with the next sequential time after the deleted one.
+ 
+ (3) as required - the general of catch all case is to loop through all backups of
+ the profile and run dus() on any that we don't already have cached stats on.
+ */
+void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
     map<string, FaubEntry>::iterator prevBackup = backups.end();
 
     if (targetDir.length() && backups.find(targetDir) == backups.end())
@@ -170,16 +182,15 @@ void FaubCache::recache(string targetDir, time_t deletedTime) {
     for (auto aBackup = backups.begin(); aBackup != backups.end(); ++aBackup) {
         bool deletedMatch = deletedTime && filename2Mtime(aBackup->first) > deletedTime;
 
-        // this is a backup we've specifically been asked to recache
-        if ((targetDir.length() && targetDir == aBackup->first) ||
-            (!targetDir.length() &&
-             
+        // we're doing all
+        if (forceAll ||
+            
+            // this is a backup we've specifically been asked to recache
+            (targetDir.length() && targetDir == aBackup->first) ||
+            
              // if we have no cached data for this backup or its the next sequential backup
              // after the time of a deleted one
-             ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))) {
-            
-            if (deletedMatch)
-                deletedTime = 0;  // only want to match the *first* backup after the delete time
+            (!targetDir.length() && ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))) {
             
             bool gotPrev = prevBackup != backups.end();
             if (gotPrev)
@@ -187,17 +198,23 @@ void FaubCache::recache(string targetDir, time_t deletedTime) {
             
             set<ino_t> emptySet;
             auto ds = dus(aBackup->first, gotPrev ? prevBackup->second.inodes : emptySet, aBackup->second.inodes);
-            DEBUG(D_faub) DFMT("dus(" << aBackup->first << ") returned " << ds.sizeInBytes << " used bytes, " << ds.savedInBytes << " saved bytes");
+            DEBUG(D_any) DFMT("dus(" << aBackup->first << ") returned " << ds.sizeInBytes + ds.savedInBytes << " size bytes, " << ds.sizeInBytes << " used bytes");
             aBackup->second.ds = ds;
             aBackup->second.updated = true;
+            aBackup->second.saveStats();
+            aBackup->second.saveInodes();
             
+            if (forceAll && NOTQUIET)
+                cout << BOLDBLUE << aBackup->first << "  " << RESET << "size: " << approximate(ds.getSize() + ds.getSaved()) << ", used: " << approximate(ds.getSize()) <<
+                " (prvI: " << prevBackup->second.inodes.size() << ", curI: " << aBackup->second.inodes.size() << ")" << endl;
+                
             // the inode list can be long and suck memory.  so let's not let multiple cache entries
             // all keep their inode lists populated at the same time.
             if (gotPrev)
                 prevBackup->second.unloadInodes();
             
             // when we're recaching a single backup no need to loop through the rest of them
-            if (targetDir.length())
+            if (targetDir.length() || deletedMatch)
                 break;
         }
 
@@ -312,7 +329,7 @@ void FaubCache::cleanup() {
                         
                         auto bdir = pathSplit(parentDir).dir;
                         if (profileName == coreProfile && bdir == baseDir) {
-                            DEBUG(D_any) DFMT(parentDir << " no longer exists; will recalculate usage of subsequent backup");
+                            DEBUG(D_any) DFMT(backupDir << " no longer exists; will recalculate usage of subsequent backup");
                             unlink(cacheFilename.c_str());
                             cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBSTATS), string(SUFFIX_FAUBSTATS).length(), SUFFIX_FAUBINODES);
                             unlink(cacheFilename.c_str());

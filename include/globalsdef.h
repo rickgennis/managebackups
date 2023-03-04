@@ -120,6 +120,7 @@
 #define CLI_SCHEDMIN "schedminute"
 #define CLI_SCHEDPATH "schedpath"
 #define CLI_CONSOLIDATE "consolidate"
+#define CLI_RECALC "recalc"
 
 
 // conf file regexes

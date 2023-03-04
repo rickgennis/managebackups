@@ -53,7 +53,7 @@ public:
     void displayDiffFiles(string backupDir, bool fullPaths = false);
     
     void cleanup();
-    void recache(string targetDir, time_t deletedtime = 0);
+    void recache(string targetDir, time_t deletedtime = 0, bool forceAll = false);
     string getInProcessFilename() { return inProcessFilename; }
     
     FaubCache(string path, string profileName);

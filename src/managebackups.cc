@@ -1552,6 +1552,7 @@ int main(int argc, char *argv[])
         CLI_SCHEDMIN, "Schedule minute", cxxopts::value<int>())(
         CLI_SCHEDPATH, "Schedule path", cxxopts::value<string>())(
         CLI_CONSOLIDATE, "Consolidate backups after days", cxxopts::value<int>())(
+        CLI_RECALC, "Recalculate faub space", cxxopts::value<bool>()->default_value("false"))(
         CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
 
     try {
@@ -1561,14 +1562,17 @@ int main(int argc, char *argv[])
         GLOBALS.stats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2);
         GLOBALS.useBlocks = GLOBALS.cli.count(CLI_USEBLOCKS);
 
-        if (GLOBALS.cli.count(CLI_USER)) setupUserDirectories();
+        if (GLOBALS.cli.count(CLI_USER))
+            setupUserDirectories();
 
-        if (GLOBALS.cli.count(CLI_CONFDIR)) GLOBALS.confDir = GLOBALS.cli[CLI_CONFDIR].as<string>();
+        if (GLOBALS.cli.count(CLI_CONFDIR))
+            GLOBALS.confDir = GLOBALS.cli[CLI_CONFDIR].as<string>();
 
         if (GLOBALS.cli.count(CLI_CACHEDIR))
             GLOBALS.cacheDir = GLOBALS.cli[CLI_CACHEDIR].as<string>();
 
-        if (GLOBALS.cli.count(CLI_LOGDIR)) GLOBALS.logDir = GLOBALS.cli[CLI_LOGDIR].as<string>();
+        if (GLOBALS.cli.count(CLI_LOGDIR))
+            GLOBALS.logDir = GLOBALS.cli[CLI_LOGDIR].as<string>();
 
         /* Enable selective debugging
          * (code taken from Exim MTA - Philip Hazel)
@@ -1596,7 +1600,7 @@ int main(int argc, char *argv[])
             }
 
             SCREENERR("error: unrecognized parameter " << uarg
-                                                       << "\nUse --help for a list of options.");
+                      << "\nUse --help for a list of options.");
             exit(1);
         }
     }
@@ -1706,6 +1710,22 @@ int main(int argc, char *argv[])
             SCREENERR("error: --diff is only valid with a profile (use -p)");
             exit(1);
         }
+    }
+    
+    if (GLOBALS.cli.count(CLI_RECALC)) {
+        if (!GLOBALS.cli.count(CLI_PROFILE)) {
+            SCREENERR("--recalc requires a profile (use -p)");
+            exit(2);
+        }
+        
+        if (!currentConfig->settings[sFaub].value.length()) {
+            SCREENERR("--recalc can only be used with a faub-based profile");
+            exit(2);
+        }
+        
+        scanConfigToCache(*currentConfig);
+        currentConfig->fcache.recache("", 0, true);
+        exit(0);
     }
 
     // if displaying stats and --profile hasn't been specified (or matched successfully)
