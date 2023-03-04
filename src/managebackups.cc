@@ -601,13 +601,13 @@ void pruneBackups(BackupConfig &config)
     if (GLOBALS.cli.count(CLI_NOPRUNE)) return;
 
     if (!str2bool(config.settings[sPruneLive].value) && !GLOBALS.cli.count(CLI_QUIET)) {
-        SCREENERR("warning: While a core feature, managebackups doesn't prune old backups"
-                  << "until specifically enabled.  Use --prune to enable pruning.  Use --prune"
-                  << "and --save to make it the default behavior for this profile."
-                  << "pruning skipped;  would have used these settings:"
-                  << "\t--days " << config.settings[sDays].value << " --weeks "
-                  << config.settings[sWeeks].value << " --months " << config.settings[sMonths].value
-                  << " --years " << config.settings[sYears].value);
+        SCREENERR("warning: while a core feature, managebackups doesn't prune old backups\n"
+                  << "until specifically enabled.  Use --prune to enable pruning.  Use --prune\n"
+                  << "and --save to make it the default behavior for this profile.\n"
+                  << "pruning skipped;  would have used these settings:\n"
+                  << "\t--days " << config.settings[sDays].value << "\n\t--weeks "
+                  << config.settings[sWeeks].value << "\n\t--months " << config.settings[sMonths].value
+                  << "\n\t--years " << config.settings[sYears].value);
         return;
     }
 

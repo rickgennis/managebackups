@@ -181,9 +181,10 @@ void BackupConfig::saveConfig() {
         newFile << blockp("profile:", -17) << settings[sTitle].value << "\n\n\n";
         newFile << commentLine << "# Backing up\n" << commentLine << "\n";
 
-        newFile << settings[sDirectory].confPrint("/home/myuser");
+        newFile << settings[sDirectory].confPrint("/var/backups");
         newFile << settings[sBackupFilename].confPrint("myuser.tgz");
-        newFile << settings[sBackupCommand].confPrint("myuser.tgz");
+        newFile << settings[sBackupCommand].confPrint("tar czf - /usr/local/bin");
+        newFile << settings[sFaub].confPrint("ssh remoteserver managebackups --path /usr/local/bin");
         newFile << settings[sNotify].confPrint("me@zmail.com, marvin@ymail.com");
         newFile << settings[sSFTPTo].confPrint("myremotebox:/backups");
         newFile << settings[sSCPTo].confPrint("myremotebox:/backups/{subdir}/{file}");
@@ -204,7 +205,6 @@ void BackupConfig::saveConfig() {
         newFile << commentLine << "# Linking\n" << commentLine << "\n";
         newFile << settings[sMaxLinks].confPrint();
     }
-
 
     newFile.close();
     remove(config_filename.c_str());

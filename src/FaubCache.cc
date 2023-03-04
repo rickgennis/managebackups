@@ -257,8 +257,8 @@ void FaubCache::displayDiffFiles(string backupDir, bool fullPaths) {
 }
 
 
-/* cleanup() ignores the backupDir and profile to work across all faub caches
- Walk through all faub cache files looking for cache's that reference backups
+/* cleanup()
+ Walk through this cache's files looking for cache's that reference backups
  that no longer exist (have been removed).  When one is found, we delete the
  cache files. But we also look for the next backup matching the same dir +
  profile name as the deleted one and recalculate (dus) its disk usage because
@@ -272,12 +272,6 @@ void FaubCache::cleanup() {
     string backupDir, fullId, profileName;
     string cacheFilename;
     struct stat statData;
-
-    /* this should probably stop ignoring directory and profile to instead
-       search just for cache files on disk that match those.  then if the
-       backup is gone, still delete those cache files but you'll have the
-       cache ordered in memory to figure out how to dus the next sequential
-       one. */
     
     if ((c_dir = opendir(ue(GLOBALS.cacheDir).c_str())) != NULL) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
@@ -325,6 +319,7 @@ void FaubCache::cleanup() {
                             cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBINODES), string(SUFFIX_FAUBINODES).length(), SUFFIX_FAUBDIFF);
                             unlink(cacheFilename.c_str());
           
+                            // re-dus the next backup
                             recache("", targetMtime);
                         }
                     }

@@ -10,6 +10,8 @@
 #include "notify.h"
 #include "debug.h"
 #include "globals.h"
+#include "exception.h"
+
 
 extern void sigTermHandler(int sig);
 
@@ -172,317 +174,328 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     timer backupTime;
     backupTime.start();
 
-    DEBUG(D_faub) DFMT("current: " << currentDir);
-    DEBUG(D_faub) DFMT("previous: " << prevDir);
-
-    // record number of filesystems the client is going to send
-    auto numFS = client.ipcRead();
-
-    currentDir += tempExtension;
-    string screenMessage = config.ifTitle() + " backing up to temp dir " + currentDir + " (" + to_string(numFS * 4) +  ")... ";
-    string backspaces = string(screenMessage.length(), '\b');
-    string blankspaces = string(screenMessage.length() , ' ');
-    NOTQUIET && ANIMATE && cout << screenMessage << flush;
-    DEBUG(D_any) cerr << "\n";
-    DEBUG(D_netproto) DFMT("faub server ready to receive");
-
-    log(config.ifTitle() + " starting backup to " + currentDir);
-    GLOBALS.interruptFilename = currentDir;  // interruptFilename gets cleaned up on SIGTERM & SIGINT
-    bool incTime = str2bool(config.settings[sIncTime].value);
-
-    set<string> modifiedFiles;
-
-    do {
-        set<string> neededFiles;
-        map<string,string> hardLinkList;
-        map<string,string> symLinkList;
-        map<string,string> duplicateList;
-
-        /*
-         * phase 1 - get list of filenames and mtimes from client
-         * and see if the remote file is different from what we
-         * have locally in the most recent backup.
-        */
-
-        string fs = client.ipcReadTo(NET_DELIM);
-
-        unsigned int maxLinksAllowed = config.settings[sMaxLinks].ivalue();
-        size_t checkpointTotal = fileTotal;
-
-        while (1) {
-            remoteFilename = client.ipcReadTo(NET_DELIM);
-            if (remoteFilename == NET_OVER) {
-                break;
-            }
-
-            // log errors sent by the client
-            if (remoteFilename.substr(0, 4) == "##* ") {
-                remoteFilename.erase(0, 4);
-                log(config.ifTitle() + " " + fs + " " + remoteFilename);
-                sigTermHandler(0);
-                exit(10);
-            }
-
-            ++fileTotal;
-            long mtime = client.ipcRead();
-            long mode  = client.ipcRead();
-
-            DEBUG(D_netproto) DFMTNOENDL("server learned about " << remoteFilename << " (" << to_string(mode) << ") ");
-
-            localPrevFilename = slashConcat(prevDir, remoteFilename);
-            localCurFilename = slashConcat(currentDir, remoteFilename);
-
+    try {
+        DEBUG(D_faub) DFMT("current: " << currentDir);
+        DEBUG(D_faub) DFMT("previous: " << prevDir);
+        
+        // record number of filesystems the client is going to send
+        auto numFS = client.ipcRead();
+        
+        currentDir += tempExtension;
+        string screenMessage = config.ifTitle() + " backing up to temp dir " + currentDir + " (" + to_string(numFS * 4) +  ")... ";
+        string backspaces = string(screenMessage.length(), '\b');
+        string blankspaces = string(screenMessage.length() , ' ');
+        NOTQUIET && ANIMATE && cout << screenMessage << flush;
+        DEBUG(D_any) cerr << "\n";
+        DEBUG(D_netproto) DFMT("faub server ready to receive");
+        
+        log(config.ifTitle() + " starting backup to " + currentDir);
+        GLOBALS.interruptFilename = currentDir;  // interruptFilename gets cleaned up on SIGTERM & SIGINT
+        bool incTime = str2bool(config.settings[sIncTime].value);
+        
+        set<string> modifiedFiles;
+        
+        do {
+            set<string> neededFiles;
+            map<string,string> hardLinkList;
+            map<string,string> symLinkList;
+            map<string,string> duplicateList;
+            
             /*
-             * What do we need from the client based on the directory entry they've just described?
-             * The general process is to compare the remote filename to the local filename in the
-             * most recent backup and if both exist, compare their mtimes.  If there's a match we
-             * can assume the data hasn't changed. When they match we hard link the new file to
-             * the previous backup's copy of it.  Because of the order entries come over we can't
-             * guarantee that a parent directory will come over before a file within it.  So we
-             * make a list of all the entries as they come over the wire then go back and create
-             * the links at the end.  Details inline below.
+             * phase 1 - get list of filenames and mtimes from client
+             * and see if the remote file is different from what we
+             * have locally in the most recent backup.
              */
-
-            // if it's a directory, we need it.  hardlinks don't work for directories.
-            if (S_ISDIR(mode)) {
-                neededFiles.insert(neededFiles.end(), remoteFilename);
-                ++unmodDirs;
-                DEBUG(D_netproto) DFMTNOPREFIX("[dir]");
-            }
-            else {
-                // lstat the previous backup's copy of the file and compare the mtimes
-                ++GLOBALS.statsCount;
-                int statResult = lstat(localPrevFilename.c_str(), &statData);
-
-                if (prevDir.length() && !statResult && statData.st_mtime == mtime) {
-
-                    /* check that hard links aren't maxed out against the configured limit.
-                     * if we're at the limit & the backup includes the Time field OR
-                     * if we're at the limit & the backup doesn't include Time & the new file doesn't exist
-                     * then we mark this as a dup.  i.e. one we have to copy instead of hardlink.
-                     */
-                    struct stat statData2;
-                    if ((statData.st_nlink >= maxLinksAllowed) &&
-                       ((!incTime && lstat(localCurFilename.c_str(), &statData2)) || incTime)) {
-                        if (!incTime) ++GLOBALS.statsCount;
-                        duplicateList.insert(duplicateList.end(), pair<string, string>(localPrevFilename, localCurFilename));
-                        DEBUG(D_netproto) DFMTNOPREFIX("[matches, but links maxed]");
-                    }
-                    else {
-                        // if they match then add it to the appropriate list to be symlinked or hardlinked, depending
-                        // on whether its a symlink on the remote system
-                        if (S_ISLNK(mode)) {
-                            symLinkList.insert(symLinkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
-                            DEBUG(D_netproto) DFMTNOPREFIX("[remote symlink]");
-                        }
-                        else {
-                            hardLinkList.insert(hardLinkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
-                            DEBUG(D_netproto) DFMTNOPREFIX("[matches, can hardlink]");
-                        }
-                    }
+            
+            string fs = client.ipcReadTo(NET_DELIM);
+            
+            unsigned int maxLinksAllowed = config.settings[sMaxLinks].ivalue();
+            size_t checkpointTotal = fileTotal;
+            
+            while (1) {
+                remoteFilename = client.ipcReadTo(NET_DELIM);
+                if (remoteFilename == NET_OVER) {
+                    break;
+                }
+                
+                // log errors sent by the client
+                if (remoteFilename.substr(0, 4) == "##* ") {
+                    remoteFilename.erase(0, 4);
+                    log(config.ifTitle() + " " + fs + " " + remoteFilename);
+                    sigTermHandler(0);
+                    exit(10);
+                }
+                
+                ++fileTotal;
+                long mtime = client.ipcRead();
+                long mode  = client.ipcRead();
+                
+                DEBUG(D_netproto) DFMTNOENDL("server learned about " << remoteFilename << " (" << to_string(mode) << ") ");
+                
+                localPrevFilename = slashConcat(prevDir, remoteFilename);
+                localCurFilename = slashConcat(currentDir, remoteFilename);
+                
+                /*
+                 * What do we need from the client based on the directory entry they've just described?
+                 * The general process is to compare the remote filename to the local filename in the
+                 * most recent backup and if both exist, compare their mtimes.  If there's a match we
+                 * can assume the data hasn't changed. When they match we hard link the new file to
+                 * the previous backup's copy of it.  Because of the order entries come over we can't
+                 * guarantee that a parent directory will come over before a file within it.  So we
+                 * make a list of all the entries as they come over the wire then go back and create
+                 * the links at the end.  Details inline below.
+                 */
+                
+                // if it's a directory, we need it.  hardlinks don't work for directories.
+                if (S_ISDIR(mode)) {
+                    neededFiles.insert(neededFiles.end(), remoteFilename);
+                    ++unmodDirs;
+                    DEBUG(D_netproto) DFMTNOPREFIX("[dir]");
                 }
                 else {
-                    // if the mtimes don't match or the file doesn't exist in the previous backup, add it to the list of
-                    // ones we need the client to send in full
-                    neededFiles.insert(neededFiles.end(), remoteFilename);
-                    modifiedFiles.insert(modifiedFiles.end(), remoteFilename);
-                    DEBUG(D_netproto) DFMTNOPREFIX("[" << (!prevDir.length() ? "no prev dir" : statResult < 0 ? "unable to stat" : 
-                            string("mtime mismatch (") + to_string(statData.st_mtime) + "; " + to_string(mtime)) << "]");
-                }
-            }
-        }
- 
-        NOTQUIET && ANIMATE && cout << PB(numFS * 4) << to_string(numFS * 4 - 1) << ")... " << flush;
-        DEBUG(D_netproto) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size()
-                << ", willLink:" << hardLinkList.size());
-
-        /*
-         * phase 2 - send the client the list of files that we need full copies of
-         * because they've changed or are missing from the previous backup
-        */
-        for (auto &file: neededFiles) {
-            DEBUG(D_netproto) DFMT("server requesting " << file);
-            client.ipcWrite(string(file + NET_DELIM).c_str());
-        }
-
-        client.ipcWrite(NET_OVER_DELIM);
-
-        NOTQUIET && ANIMATE && cout << PB(numFS * 4 - 1) << to_string(numFS * 4 - 2) << ")... " << flush;
-        DEBUG(D_netproto) DFMT(fs << " server phase 2 complete; told client we need " << neededFiles.size() << " of " << fileTotal);
-
-        /*
-         * phase 3 - receive full copies of the files we've requested. they come over
-         * in the order we've requested in the format of 8 bytes for 'size' and then
-         * the 'size' number of bytes of data.
-        */
-        for (auto &file: neededFiles) {
-            DEBUG(D_netproto) DFMTNOENDL("server waiting for " << file);
-            auto [errorMsg, mode] = client.ipcReadToFile(slashConcat(currentDir, file), !incTime);
-            DEBUG(D_netproto) DFMTNOPREFIX(" :mode " << mode);
-
-            if (errorMsg.length()) {
-                SCREENERR(fs << " " << errorMsg);
-                log(config.ifTitle() + " " + fs + errorMsg);
-            }
-
-            if (mode < 1)
-                ++linkErrors;
-            else
-                if (S_ISLNK(mode))
-                    ++receivedSymLinks;
-        }
-
-        NOTQUIET && ANIMATE && cout << PB(numFS * 4 - 2) << to_string(numFS * 4 - 3) << ")... " << flush;
-        DEBUG(D_netproto) DFMT(fs << " server phase 3 complete; received " << plural((int)neededFiles.size(), "file") + " from client");
-
-        /*
-         * phase 4 - create the links for everything that matches the previous backup.
-        */
-        for (auto &links: hardLinkList) {
-            mkbasedirs(links.second);
-
-            // when Time isn't included we're potentially overwriting an existing backup. pre-delete
-            // so we don't get an error.
-            if (!incTime)
-                unlink(links.second.c_str());
-
-            if (link(links.first.c_str(), links.second.c_str()) < 0) {
-                ++linkErrors;
-                SCREENERR(fs << " error: unable to link " << links.second << " to " << links.first << " - " << strerror(errno));
-                log(config.ifTitle() + " " + fs + " error: unable to link " + links.second + " to " + links.first + " - " + strerror(errno));
-            }
-        }
-
-        for (auto &dups: duplicateList) {
-            mkbasedirs(dups.second);
-
-            if (!copyFile(dups.first, dups.second)) {
-                ++linkErrors;
-                SCREENERR(fs << " error: unable to copy (due to maxed out links) " << dups.first << " to " << dups.second << " - " << strerror(errno));
-                log(config.ifTitle() + " " + fs + " error: unable to copy (due to maxed out links) " + dups.first + " to " + dups.second + " - " + strerror(errno));
-            }
-            else {
-                struct stat statData;
-                ++GLOBALS.statsCount;
-                if (!lstat(dups.first.c_str(), &statData)) {
-                    if (lchown(dups.second.c_str(), statData.st_uid, statData.st_gid)) {
-                        SCREENERR(fs << " error: unable to chown " << dups.second << ": " << strerror(errno));
-                        log(config.ifTitle() + " " + fs + " error: unable to chown " + dups.second + ": " + strerror(errno));
-                    }
-
-                    if (chmod(dups.second.c_str(), statData.st_mode)) {
-                        SCREENERR(fs << " error: unable to chmod " << dups.second << ": " << strerror(errno));
-                        log(config.ifTitle() + " " + fs + " error: unable to chmod " + dups.second + ": " + strerror(errno));
-                    }
-
-                    struct timeval tv[2];
-                    tv[0].tv_sec  = tv[1].tv_sec  = statData.st_mtime;
-                    tv[0].tv_usec = tv[1].tv_usec = 0;
-                    lutimes(dups.second.c_str(), tv);
-                }
-            }
-        }
-
-        char linkBuf[1000];
-        for (auto &links: symLinkList) {
-            mkbasedirs(links.second);
-
-            // when Time isn't included we're potentially overwriting an existing backup. pre-delete
-            // so we don't get an error.
-            if (!incTime)
-                unlink(links.second.c_str());
-
-            auto bytes = readlink(links.first.c_str(), linkBuf, sizeof(linkBuf));
-            if (bytes >= 0 && bytes < sizeof(linkBuf)) {
-                linkBuf[bytes] = 0;
-                if (!symlink(linkBuf, links.second.c_str())) {
+                    // lstat the previous backup's copy of the file and compare the mtimes
                     ++GLOBALS.statsCount;
-                    if (!lstat(links.first.c_str(), &statData)) {
-                        if (lchown(links.second.c_str(), statData.st_uid, statData.st_gid)) {
-                            SCREENERR(fs << " error: unable to chown symlink " << links.second << ": " << strerror(errno));
-                            log(config.ifTitle() + " " + fs + " error: unable to chown symlink " + links.second + ": " + strerror(errno));
+                    int statResult = lstat(localPrevFilename.c_str(), &statData);
+                    
+                    if (prevDir.length() && !statResult && statData.st_mtime == mtime) {
+                        
+                        /* check that hard links aren't maxed out against the configured limit.
+                         * if we're at the limit & the backup includes the Time field OR
+                         * if we're at the limit & the backup doesn't include Time & the new file doesn't exist
+                         * then we mark this as a dup.  i.e. one we have to copy instead of hardlink.
+                         */
+                        struct stat statData2;
+                        if ((statData.st_nlink >= maxLinksAllowed) &&
+                            ((!incTime && lstat(localCurFilename.c_str(), &statData2)) || incTime)) {
+                            if (!incTime) ++GLOBALS.statsCount;
+                            duplicateList.insert(duplicateList.end(), pair<string, string>(localPrevFilename, localCurFilename));
+                            DEBUG(D_netproto) DFMTNOPREFIX("[matches, but links maxed]");
                         }
-
+                        else {
+                            // if they match then add it to the appropriate list to be symlinked or hardlinked, depending
+                            // on whether its a symlink on the remote system
+                            if (S_ISLNK(mode)) {
+                                symLinkList.insert(symLinkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
+                                DEBUG(D_netproto) DFMTNOPREFIX("[remote symlink]");
+                            }
+                            else {
+                                hardLinkList.insert(hardLinkList.end(), pair<string, string>(localPrevFilename, localCurFilename));
+                                DEBUG(D_netproto) DFMTNOPREFIX("[matches, can hardlink]");
+                            }
+                        }
+                    }
+                    else {
+                        // if the mtimes don't match or the file doesn't exist in the previous backup, add it to the list of
+                        // ones we need the client to send in full
+                        neededFiles.insert(neededFiles.end(), remoteFilename);
+                        modifiedFiles.insert(modifiedFiles.end(), remoteFilename);
+                        DEBUG(D_netproto) DFMTNOPREFIX("[" << (!prevDir.length() ? "no prev dir" : statResult < 0 ? "unable to stat" :
+                                                               string("mtime mismatch (") + to_string(statData.st_mtime) + "; " + to_string(mtime)) << "]");
+                    }
+                }
+            }
+            
+            NOTQUIET && ANIMATE && cout << PB(numFS * 4) << to_string(numFS * 4 - 1) << ")... " << flush;
+            DEBUG(D_netproto) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size()
+                                   << ", willLink:" << hardLinkList.size());
+            
+            /*
+             * phase 2 - send the client the list of files that we need full copies of
+             * because they've changed or are missing from the previous backup
+             */
+            for (auto &file: neededFiles) {
+                DEBUG(D_netproto) DFMT("server requesting " << file);
+                client.ipcWrite(string(file + NET_DELIM).c_str());
+            }
+            
+            client.ipcWrite(NET_OVER_DELIM);
+            
+            NOTQUIET && ANIMATE && cout << PB(numFS * 4 - 1) << to_string(numFS * 4 - 2) << ")... " << flush;
+            DEBUG(D_netproto) DFMT(fs << " server phase 2 complete; told client we need " << neededFiles.size() << " of " << fileTotal);
+            
+            /*
+             * phase 3 - receive full copies of the files we've requested. they come over
+             * in the order we've requested in the format of 8 bytes for 'size' and then
+             * the 'size' number of bytes of data.
+             */
+            for (auto &file: neededFiles) {
+                DEBUG(D_netproto) DFMTNOENDL("server waiting for " << file);
+                auto [errorMsg, mode] = client.ipcReadToFile(slashConcat(currentDir, file), !incTime);
+                DEBUG(D_netproto) DFMTNOPREFIX(" :mode " << mode);
+                
+                if (errorMsg.length()) {
+                    SCREENERR(fs << " " << errorMsg);
+                    log(config.ifTitle() + " " + fs + errorMsg);
+                }
+                
+                if (mode < 1)
+                    ++linkErrors;
+                else
+                    if (S_ISLNK(mode))
+                        ++receivedSymLinks;
+            }
+            
+            NOTQUIET && ANIMATE && cout << PB(numFS * 4 - 2) << to_string(numFS * 4 - 3) << ")... " << flush;
+            DEBUG(D_netproto) DFMT(fs << " server phase 3 complete; received " << plural((int)neededFiles.size(), "file") + " from client");
+            
+            /*
+             * phase 4 - create the links for everything that matches the previous backup.
+             */
+            for (auto &links: hardLinkList) {
+                mkbasedirs(links.second);
+                
+                // when Time isn't included we're potentially overwriting an existing backup. pre-delete
+                // so we don't get an error.
+                if (!incTime)
+                    unlink(links.second.c_str());
+                
+                if (link(links.first.c_str(), links.second.c_str()) < 0) {
+                    ++linkErrors;
+                    SCREENERR(fs << " error: unable to link " << links.second << " to " << links.first << " - " << strerror(errno));
+                    log(config.ifTitle() + " " + fs + " error: unable to link " + links.second + " to " + links.first + " - " + strerror(errno));
+                }
+            }
+            
+            for (auto &dups: duplicateList) {
+                mkbasedirs(dups.second);
+                
+                if (!copyFile(dups.first, dups.second)) {
+                    ++linkErrors;
+                    SCREENERR(fs << " error: unable to copy (due to maxed out links) " << dups.first << " to " << dups.second << " - " << strerror(errno));
+                    log(config.ifTitle() + " " + fs + " error: unable to copy (due to maxed out links) " + dups.first + " to " + dups.second + " - " + strerror(errno));
+                }
+                else {
+                    struct stat statData;
+                    ++GLOBALS.statsCount;
+                    if (!lstat(dups.first.c_str(), &statData)) {
+                        if (lchown(dups.second.c_str(), statData.st_uid, statData.st_gid)) {
+                            SCREENERR(fs << " error: unable to chown " << dups.second << ": " << strerror(errno));
+                            log(config.ifTitle() + " " + fs + " error: unable to chown " + dups.second + ": " + strerror(errno));
+                        }
+                        
+                        if (chmod(dups.second.c_str(), statData.st_mode)) {
+                            SCREENERR(fs << " error: unable to chmod " << dups.second << ": " << strerror(errno));
+                            log(config.ifTitle() + " " + fs + " error: unable to chmod " + dups.second + ": " + strerror(errno));
+                        }
+                        
                         struct timeval tv[2];
                         tv[0].tv_sec  = tv[1].tv_sec  = statData.st_mtime;
                         tv[0].tv_usec = tv[1].tv_usec = 0;
-                        lutimes(links.second.c_str(), tv);
+                        lutimes(dups.second.c_str(), tv);
+                    }
+                }
+            }
+            
+            char linkBuf[1000];
+            for (auto &links: symLinkList) {
+                mkbasedirs(links.second);
+                
+                // when Time isn't included we're potentially overwriting an existing backup. pre-delete
+                // so we don't get an error.
+                if (!incTime)
+                    unlink(links.second.c_str());
+                
+                auto bytes = readlink(links.first.c_str(), linkBuf, sizeof(linkBuf));
+                if (bytes >= 0 && bytes < sizeof(linkBuf)) {
+                    linkBuf[bytes] = 0;
+                    if (!symlink(linkBuf, links.second.c_str())) {
+                        ++GLOBALS.statsCount;
+                        if (!lstat(links.first.c_str(), &statData)) {
+                            if (lchown(links.second.c_str(), statData.st_uid, statData.st_gid)) {
+                                SCREENERR(fs << " error: unable to chown symlink " << links.second << ": " << strerror(errno));
+                                log(config.ifTitle() + " " + fs + " error: unable to chown symlink " + links.second + ": " + strerror(errno));
+                            }
+                            
+                            struct timeval tv[2];
+                            tv[0].tv_sec  = tv[1].tv_sec  = statData.st_mtime;
+                            tv[0].tv_usec = tv[1].tv_usec = 0;
+                            lutimes(links.second.c_str(), tv);
+                        }
+                    }
+                    else {
+                        ++linkErrors;
+                        SCREENERR(fs << " error: unable to symlink " << links.second << " to " << links.first << ": " << strerror(errno));
+                        log(config.ifTitle() + " " + fs + " error: unable to symlink " + links.second + " to " + links.first + ": " + strerror(errno));
                     }
                 }
                 else {
                     ++linkErrors;
-                    SCREENERR(fs << " error: unable to symlink " << links.second << " to " << links.first << ": " << strerror(errno));
-                    log(config.ifTitle() + " " + fs + " error: unable to symlink " + links.second + " to " + links.first + ": " + strerror(errno));
+                    SCREENERR(fs << " error: unable to dereference symlink " << links.first << ": " << strerror(errno));
+                    log(config.ifTitle() + " " + fs + " error: unable to dereference symlink " + links.first + ": " + strerror(errno));
                 }
+                
             }
-            else {
-                ++linkErrors;
-                SCREENERR(fs << " error: unable to dereference symlink " << links.first << ": " << strerror(errno));
-                log(config.ifTitle() + " " + fs + " error: unable to dereference symlink " + links.first + ": " + strerror(errno));
-            }
-
-        }
-
-        DEBUG(D_netproto) DFMT(fs << " server phase 4 complete; created " << plural(hardLinkList.size() - linkErrors, "link")  <<
-                " to previously backed up files" << (linkErrors ? string(" (" + plural(linkErrors, "error") + ")") : ""));
-        log(config.ifTitle() + " processed " + fs + ": " + plurali((int)fileTotal - checkpointTotal, "entr") + ", " +
-            plural(neededFiles.size(), "request") + ", " + plural(hardLinkList.size() - linkErrors, "link"));
+            
+            DEBUG(D_netproto) DFMT(fs << " server phase 4 complete; created " << plural(hardLinkList.size() - linkErrors, "link")  <<
+                                   " to previously backed up files" << (linkErrors ? string(" (" + plural(linkErrors, "error") + ")") : ""));
+            log(config.ifTitle() + " processed " + fs + ": " + plurali((int)fileTotal - checkpointTotal, "entr") + ", " +
+                plural(neededFiles.size(), "request") + ", " + plural(hardLinkList.size() - linkErrors, "link"));
+            
+            filesModified += neededFiles.size();
+            filesHardLinked += hardLinkList.size();
+            filesSymLinked += symLinkList.size();
+            --numFS;
+            
+        } while (client.ipcRead());
         
-        filesModified += neededFiles.size();
-        filesHardLinked += hardLinkList.size();
-        filesSymLinked += symLinkList.size();
-        --numFS;
-
-    } while (client.ipcRead());
-
-    // note finish time
-    backupTime.stop();
-    NOTQUIET && ANIMATE && cout << backspaces << blankspaces << backspaces << flush;
-
-    // if time isn't included we may be about to overwrite a previous backup for this date
-    if (!incTime)
-        rmrf(originalCurrentDir.c_str());
-
-    if (rename(string(currentDir).c_str(), originalCurrentDir.c_str())) {
-        string errorDetail = config.ifTitle() + " unable to rename " + currentDir + " to " + originalCurrentDir + ": " + strerror(errno);
-        log(errorDetail);
-        SCREENERR(errorDetail);
-        return;
-    }
-
-    GLOBALS.interruptFilename = "";
-    currentDir = originalCurrentDir;
-
-    // add the backup to the cache, including running a dus()
-    config.fcache.recache(currentDir);
-
-    // record which files changed in this backup
-    config.fcache.updateDiffFiles(currentDir, modifiedFiles);
-    
-    // we can pull these out to display
-    auto fcacheCurrent = config.fcache.getBackupByDir(currentDir);
-    auto backupSize = fcacheCurrent->second.ds.getSize();
-    auto backupSaved = fcacheCurrent->second.ds.getSaved();
-
-    // and only need to update the remaining fields
-    fcacheCurrent->second.duration = backupTime.seconds();
-    fcacheCurrent->second.finishTime = time(NULL);
-    fcacheCurrent->second.modifiedFiles = filesModified - unmodDirs;
-    fcacheCurrent->second.unchangedFiles = filesHardLinked;
-    fcacheCurrent->second.dirs = unmodDirs;
-    fcacheCurrent->second.slinks = filesSymLinked + receivedSymLinks;
-    
-    string message1 = "backup completed to " + currentDir + " in " + backupTime.elapsed();
-    string message2 = "(total: " +
-        to_string(fileTotal) + ", modified: " + to_string(filesModified - unmodDirs) + ", unmodified: " + to_string(filesHardLinked) + ", dirs: " + 
-        to_string(unmodDirs) + ", symlinks: " + to_string(filesSymLinked + receivedSymLinks) + 
-        (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") + 
+        // note finish time
+        backupTime.stop();
+        NOTQUIET && ANIMATE && cout << backspaces << blankspaces << backspaces << flush;
+        
+        // if time isn't included we may be about to overwrite a previous backup for this date
+        if (!incTime)
+            rmrf(originalCurrentDir.c_str());
+        
+        if (rename(string(currentDir).c_str(), originalCurrentDir.c_str())) {
+            string errorDetail = config.ifTitle() + " unable to rename " + currentDir + " to " + originalCurrentDir + ": " + strerror(errno);
+            log(errorDetail);
+            SCREENERR(errorDetail);
+            notify(config, "\t• " + errorDetail, false);
+            return;
+        }
+        
+        GLOBALS.interruptFilename = "";
+        currentDir = originalCurrentDir;
+        
+        // add the backup to the cache, including running a dus()
+        config.fcache.recache(currentDir);
+        
+        // record which files changed in this backup
+        config.fcache.updateDiffFiles(currentDir, modifiedFiles);
+        
+        // we can pull these out to display
+        auto fcacheCurrent = config.fcache.getBackupByDir(currentDir);
+        auto backupSize = fcacheCurrent->second.ds.getSize();
+        auto backupSaved = fcacheCurrent->second.ds.getSaved();
+        
+        // and only need to update the remaining fields
+        fcacheCurrent->second.duration = backupTime.seconds();
+        fcacheCurrent->second.finishTime = time(NULL);
+        fcacheCurrent->second.modifiedFiles = filesModified - unmodDirs;
+        fcacheCurrent->second.unchangedFiles = filesHardLinked;
+        fcacheCurrent->second.dirs = unmodDirs;
+        fcacheCurrent->second.slinks = filesSymLinked + receivedSymLinks;
+        
+        string message1 = "backup completed to " + currentDir + " in " + backupTime.elapsed();
+        string message2 = "(total: " +
+        to_string(fileTotal) + ", modified: " + to_string(filesModified - unmodDirs) + ", unmodified: " + to_string(filesHardLinked) + ", dirs: " +
+        to_string(unmodDirs) + ", symlinks: " + to_string(filesSymLinked + receivedSymLinks) +
+        (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") +
         ", size: " + approximate(backupSize + backupSaved) + ", usage: " + approximate(backupSize) + ")";
-    log(config.ifTitle() + " " + message1);
-    log(config.ifTitle() + " " + message2);
-    NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message1 << "\n\t\t" << message2 << endl;
-
-    notify(config, "\t• " + message1 + "\n\t\t" + message2 + "\n", true);
+        log(config.ifTitle() + " " + message1);
+        log(config.ifTitle() + " " + message2);
+        NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message1 << "\n\t\t" << message2 << endl;
+        
+        notify(config, "\t• " + message1 + "\n\t\t" + message2 + "\n", true);
+    }
+    catch (MBException &e) {
+        notify(config, "\t• " + config.ifTitle() + " Error (exception): " + e.detail(), false);
+        log(config.ifTitle() + "  error (exception): " + e.what());
+    }
+    catch (...) {
+        notify(config, "\t• " + config.ifTitle() + " Error (exception): unknown", false);
+        log(config.ifTitle() + "  error (exception), unknown");
+    }
 }
 
 
@@ -613,6 +626,10 @@ void fc_mainEngine(vector<string> paths) {
     catch (string s) {
         cerr << "faub client caught internal exception: " << s << endl;
         log("error: faub client caught internal exception: " + s);
+    }
+    catch (MBException &e) {
+        cerr << "faub client caught MB excetion: " << e.detail() << endl;
+        log("error: faub client caught exception: " + e.detail());
     }
     catch (...) {
         cerr << "faub client caught unknown exception" << endl;
