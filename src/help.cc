@@ -48,6 +48,7 @@ void showHelp(enum helpType kind) {
             + "   --notify [contact]  Notify after a backup completes; can be email addresses and/or script names (failures only).\n"
             + "   --notifyevery [x]   Notify on every x failure (plus the first one).\n"
             + "   --nos               Notify on success also.\n"
+            + "   --bloat [x]         Notify if backup is x larger than the average backup size.\n"
             + "   --mailfrom [addr]   Use addr as the sending/from address for outgoing notify emails.\n"
             + "\n" + string(BOLDBLUE) + "PRUNING\n" + RESET
             + "   --prune             Enable pruning.\n"
@@ -554,6 +555,17 @@ Use 0 for normal priority.
 .TP
 \f[B]\[en]nos\f[R]
 {both} Notify on successful backups also.
+.TP
+\f[B]\[en]bloat\f[R] [\f[I]size\f[R]]
+{both} Notify if a newly taken backup is \f[I]size\f[R] larger than the
+average size backup for this profile.
+\f[I]size\f[R] can be a specific number (e.g.\ \[lq]2G\[rq],
+\[lq]500K\[rq], etc) or a percentage (e.g.\ \[lq]80%\[rq]).
+The average size is calculated from the most recent 10 backups.
+For single-file backups, the full size of the backups are being
+compared.
+For faub-style backups, it\[cq]s the actual disk usage, not the full
+size.
 .TP
 \f[B]\[en]mailfrom\f[R] [\f[I]address\f[R]]
 {both} Use \f[I]address\f[R] as the sending (i.e.\ \[lq]From\[rq])

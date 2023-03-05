@@ -48,6 +48,7 @@ void showHelp(enum helpType kind) {
             + "   --notify [contact]  Notify after a backup completes; can be email addresses and/or script names (failures only).\n"
             + "   --notifyevery [x]   Notify on every x failure (plus the first one).\n"
             + "   --nos               Notify on success also.\n"
+            + "   --bloat [x]         Notify if backup is x larger than the average backup size.\n"
             + "   --mailfrom [addr]   Use addr as the sending/from address for outgoing notify emails.\n"
             + "\n" + string(BOLDBLUE) + "PRUNING\n" + RESET
             + "   --prune             Enable pruning.\n"

@@ -130,7 +130,7 @@ void log(string message) {
 }
 
 
-struct timeval mktimeval(unsigned long secs) { struct timeval t; t.tv_sec = secs; t.tv_usec = 0; return t; }
+struct timeval mktimeval(time_t secs) { struct timeval t; t.tv_sec = secs; t.tv_usec = 0; return t; }
 
 
 string slashConcat(string str1, string str2) {
@@ -245,7 +245,7 @@ string onevarsprintf(string format, string data) {
 }
 
 
-string approximate(double size, int maxUnits, bool commas) {
+string approximate(size_t size, int maxUnits, bool commas) {
     int index = 0;
     char unit[] = {'B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'};
 
@@ -279,7 +279,7 @@ string approximate(double size, int maxUnits, bool commas) {
 }
 
 
-unsigned long approx2bytes(string approx) {
+size_t approx2bytes(string approx) {
     vector<string> units = { "B", "K", "M", "G", "T", "P", "E", "Z", "Y" };
     Pcre reg("^((?:\\d|\\.)+)\\s*(?:(\\w)(?:[Bb]$|$)|$)");
 
@@ -314,7 +314,7 @@ unsigned long approx2bytes(string approx) {
 }
 
 
-string seconds2hms(unsigned long seconds) {
+string seconds2hms(time_t seconds) {
     string result;
     int unit[] = {3600, 60, 1};
     bool dataAdded = false;

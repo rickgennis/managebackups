@@ -175,6 +175,7 @@ void FaubCache::restoreCache(string profileName) {
  */
 void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
     map<string, FaubEntry>::iterator prevBackup = backups.end();
+    unsigned int recached = 0;
 
     if (targetDir.length() && backups.find(targetDir) == backups.end())
         restoreCache_internal(targetDir);
@@ -195,7 +196,8 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             bool gotPrev = prevBackup != backups.end();
             if (gotPrev)
                 prevBackup->second.loadInodes();
-            
+
+            ++recached;
             set<ino_t> emptySet;
             auto ds = dus(aBackup->first, gotPrev ? prevBackup->second.inodes : emptySet, aBackup->second.inodes);
             DEBUG(D_any) DFMT("dus(" << aBackup->first << ") returned " << ds.sizeInBytes + ds.savedInBytes << " size bytes, " << ds.sizeInBytes << " used bytes");
@@ -205,8 +207,7 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             aBackup->second.saveInodes();
             
             if (forceAll && NOTQUIET)
-                cout << BOLDBLUE << aBackup->first << "  " << RESET << "size: " << approximate(ds.getSize() + ds.getSaved()) << ", used: " << approximate(ds.getSize()) <<
-                " (prvI: " << prevBackup->second.inodes.size() << ", curI: " << aBackup->second.inodes.size() << ")" << endl;
+                cout << BOLDBLUE << aBackup->first << "  " << RESET << "size: " << approximate(ds.getSize() + ds.getSaved()) << ", used: " << approximate(ds.getSize()) << endl;
                 
             // the inode list can be long and suck memory.  so let's not let multiple cache entries
             // all keep their inode lists populated at the same time.
@@ -220,6 +221,9 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
 
         prevBackup = aBackup;
     }
+    
+    if (forceAll)
+        cout << "caches updated for " << plural(recached, "backup") << "." << endl;
 }
 
 

@@ -31,6 +31,9 @@ public:
     
     void fullDump();
     
+    size_t getRecentAvgSize(int maxBackups = 10);
+    size_t getBloatTarget();
+    
     void saveConfig();
     bool loadConfig(string filename);
     void loadConfigsCache();

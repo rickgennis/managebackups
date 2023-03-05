@@ -121,6 +121,7 @@
 #define CLI_SCHEDPATH "schedpath"
 #define CLI_CONSOLIDATE "consolidate"
 #define CLI_RECALC "recalc"
+#define CLI_BLOAT "bloat"
 
 
 // conf file regexes
@@ -160,6 +161,7 @@
 #define RE_UID "(uid)"
 #define RE_GID "(gid)"
 #define RE_CONSOLIDATE "(consolidate)"
+#define RE_BLOAT "(bloat)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"

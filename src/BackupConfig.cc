@@ -64,6 +64,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_UID, RE_UID, INT, "-1"));
     settings.insert(settings.end(), Setting(CLI_GID, RE_GID, INT, "-1"));
     settings.insert(settings.end(), Setting(CLI_CONSOLIDATE, RE_CONSOLIDATE, INT, "0"));
+    settings.insert(settings.end(), Setting(CLI_BLOAT, RE_BLOAT, STRING, ""));
     // CLI_PATHS is intentionally left out because its only accessed via CLI
     // and never as a Setting.  to implement it as a Setting would require a new
     // type (vector<string>) to be setup and parse and there's really no benefit.
@@ -190,7 +191,8 @@ void BackupConfig::saveConfig() {
         newFile << settings[sSCPTo].confPrint("myremotebox:/backups/{subdir}/{file}");
         newFile << settings[sMode].confPrint();
         newFile << settings[sIncTime].confPrint();
-        newFile << settings[sMinSpace].confPrint("2G") << "\n\n";
+        newFile << settings[sMinSpace].confPrint("2G");
+        newFile << settings[sBloat].confPrint() << "\n\n";
 
         newFile << commentLine << "# Pruning\n" << commentLine << "\n";
         newFile << settings[sPruneLive].confPrint();
@@ -200,6 +202,7 @@ void BackupConfig::saveConfig() {
         newFile << settings[sYears].confPrint();
         newFile << settings[sFailsafeBackups].confPrint();
         newFile << settings[sFailsafeDays].confPrint();
+        newFile << settings[sConsolidate].confPrint();
         newFile << settings[sFP].confPrint() << "\n\n";
 
         newFile << commentLine << "# Linking\n" << commentLine << "\n";
@@ -232,7 +235,26 @@ bool BackupConfig::loadConfig(string filename) {
                 for (auto &setting: settings) {
                     if (setting.regex.search(dataLine) && setting.regex.matches() > 2) {
                         setting.value = setting.regex.get_match(2);
-
+                        // STRING is handled implicitly with no conversion
+                        
+                        // special-case for something that can look like a SIZE or be a percentage
+                        if (setting.display_name == CLI_BLOAT) {
+                            for (int i=0; i < setting.value.length(); ++i)
+                                if (!isdigit(setting.value[i]) && setting.value[i] != '%') {
+                                    try {
+                                        approx2bytes(setting.value);
+                                    }
+                                    catch (...) {
+                                        log("error: unable to parse value for the directive on line " + to_string(line) + " of " + filename);
+                                        SCREENERR("error: unable to parse value on line " << line << " of " << filename << "\n" <<
+                                                  "it should be a size (e.g. 25G) or a percentage (e.g. 75%)\n");
+                                        exit(1);
+                                    }
+                                    
+                                    break;
+                                }
+                        }
+                        
                         if (setting.data_type == INT)
                             stoi(setting.value);    // will throw on invalid value
                         else 
@@ -452,3 +474,78 @@ void BackupConfig::setPreviousFailures(unsigned int count) {
     }
 }
 
+/* calculate the average size of the most rercent 'maxBackups'
+   backups. because backups can be large & the last several of
+   them added together may be huge, we check for variable
+   overflow. if it overflows we may end up using fewer than
+   'maxBackups' backups.
+ */
+size_t BackupConfig::getRecentAvgSize(int maxBackups) {
+    auto cacheSize = cache.indexByFilename.size();
+    auto fcacheSize = fcache.size();
+    size_t runningTotal = 0, temp = 0;
+    int counted = 0;
+    
+    if (cacheSize > fcacheSize) {
+        auto backupIt = cache.indexByFilename.end();
+        
+        if (cacheSize)
+            while (--backupIt != cache.indexByFilename.begin() && counted < maxBackups) {
+                auto rawIt = cache.rawData.find(backupIt->second);
+                if (rawIt != cache.rawData.end()) {
+                    temp += rawIt->second.size;
+                    
+                    // check for overflow
+                    if (temp < 0)
+                        break;
+                    
+                    ++counted;
+                    runningTotal += rawIt->second.size;
+                }
+            }
+    }
+    else {
+        auto backupIt = fcache.getEnd();
+        
+        if (fcacheSize)
+            while (--backupIt != fcache.getFirstBackup() && counted < maxBackups) {
+                temp += backupIt->second.ds.sizeInBytes;
+                
+                // check for overflow
+                if (temp < 0) {
+                    --counted;
+                    break;
+                }
+                
+                ++counted;
+                runningTotal += backupIt->second.ds.sizeInBytes;
+            }
+    }
+
+    if (counted < maxBackups)
+        log("warning: used " + to_string(counted) + " instead of " + to_string(maxBackups) + " backups for average due to variable overflow");
+    
+    DEBUG(D_backup) DFMT("examined " << counted << " out of " << maxBackups << ", average is " << (counted ? runningTotal / counted : 0));
+    return (counted ? runningTotal / counted : 0);
+}
+
+
+size_t BackupConfig::getBloatTarget() {
+    string bloat = settings[sBloat].value;
+    size_t target = getRecentAvgSize();
+    size_t origTarget = target;
+    
+    if (bloat.find("%") == string::npos) {
+        auto bytes = approx2bytes(bloat);
+        target += bytes;
+        DEBUG(D_backup) DFMT("avg " << origTarget << " + " << bloat << " (" << bytes << ") = " << target);
+    }
+    else {
+        bloat.erase(bloat.find("%"), string::npos);  // remove % sign
+        int percent = stoi(bloat);
+        target = percent / 100.0 * target;
+        DEBUG(D_backup) DFMT("avg " << origTarget << " * " << settings[sBloat].value << " = " << target);
+    }
+    
+    return target;
+}

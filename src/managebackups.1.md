@@ -182,6 +182,9 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 **--nos**
 : {both} Notify on successful backups also.
 
+**--bloat** [*size*]
+: {both} Notify if a newly taken backup is *size* larger than the average size backup for this profile.  *size* can be a specific number (e.g. "2G", "500K", etc) or a percentage (e.g. "80%").  The average size is calculated from the most recent 10 backups.  For single-file backups, the full size of the backups are being compared.  For faub-style backups, it's the actual disk usage, not the full size.
+
 **--mailfrom** [*address*]
 : {both} Use *address* as the sending (i.e. "From") address for outgoing notify email. 
 

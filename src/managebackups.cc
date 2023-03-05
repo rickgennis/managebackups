@@ -357,20 +357,42 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
                 case STRING:
                 default:
                     // the rest of this STRING block will update the value of Profile with anything
-                    // specified after -p on the commandline.  we only require -p to be precise when
+                    // specified after -p on the commandline.  we only require -p to be a precise name when
                     // creating a new profile (i.e. when --save is also given).  otherwise -p can be
                     // a partial string used to match an existing profile.  so if there's no --save
                     // and therefore we may have a partial match value given on the commandline,
                     // don't update the value of our setting with the commandline specification.
                     // instead, break.
-                    if ((setting.display_name == CLI_PROFILE) && !bSave) break;
+                    if ((setting.display_name == CLI_PROFILE) && !bSave)
+                        break;
+                    
+                    // special-case for something that can look like a SIZE or be a percentage
+                    if (setting.display_name == CLI_BLOAT) {
+                        for (int i=0; i < setting.value.length(); ++i)
+                            if (!isdigit(setting.value[i]) && setting.value[i] != '%') {
+                                try {
+                                    approx2bytes(setting.value);
+                                }
+                                catch (...) {
+                                    log("error: invalid value specified for --" + setting.display_name +
+                                        " (" + setting.value + ")");
+                                    SCREENERR("error: invalid value specified for option"
+                                              << "\n\t--" << setting.display_name << " " << setting.value << "\n" <<
+                                              "value should be a size ('2G') or a percentage ('85%').");
+                                    exit(1);
+                                }
+                                
+                                break;
+                            }
+                    }
 
                     if (bSave && (setting.value != GLOBALS.cli[setting.display_name].as<string>()))
                         currentConf->modified = 1;
                     setting.value = GLOBALS.cli[setting.display_name].as<string>();
                     setting.execParam = "--" + setting.display_name + " '" + setting.value + "'";
 
-                    if (setting.display_name == CLI_TRIPWIRE) verifyTripwireParams(setting.value);
+                    if (setting.display_name == CLI_TRIPWIRE)
+                        verifyTripwireParams(setting.value);
                     break;
 
                 case OCTAL:
@@ -1180,6 +1202,7 @@ bool performTripwire(BackupConfig &config)
     return true;
 }
 
+
 /*******************************************************************************
  * performBackup(config)
  *
@@ -1333,6 +1356,17 @@ void performBackup(BackupConfig &config)
                     notifyMessage += "\n" + sCPStatus.detail + "\n";
                 }
 
+                if (config.settings[sBloat].value.length()) {
+                    string bloat = config.settings[sBloat].value;
+                    auto target = config.getBloatTarget();
+                    if (cacheEntry.size > target) {
+                        notify(config, errorcom(config.ifTitle(), "warning: backup is larger than the bloat warning threshold (backup: " + to_string(cacheEntry.size) + ", threshold: " + bloat + ")"), false);
+
+                        backup.flushErrors();
+                        return;
+                    }
+                }
+                
                 notify(config, notifyMessage, overallSuccess);
                 backup.flushErrors();
             }
@@ -1456,8 +1490,7 @@ bool enoughLocalSpace(BackupConfig &config)
  *
  * Main entry point -- where all the magic happens.
  *******************************************************************************/
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     timer AppTimer;
     AppTimer.start();
 
@@ -1553,6 +1586,7 @@ int main(int argc, char *argv[])
         CLI_SCHEDPATH, "Schedule path", cxxopts::value<string>())(
         CLI_CONSOLIDATE, "Consolidate backups after days", cxxopts::value<int>())(
         CLI_RECALC, "Recalculate faub space", cxxopts::value<bool>()->default_value("false"))(
+        CLI_BLOAT, "Bloat size warning", cxxopts::value<string>())(
         CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
 
     try {

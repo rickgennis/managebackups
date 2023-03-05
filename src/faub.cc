@@ -486,6 +486,18 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         log(config.ifTitle() + " " + message2);
         NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message1 << "\n\t\t" << message2 << endl;
         
+        if (config.settings[sBloat].value.length()) {
+            string bloat = config.settings[sBloat].value;
+            auto target = config.getBloatTarget();
+            if (fcacheCurrent->second.ds.sizeInBytes > target) {
+                string message = config.ifTitle() + " warning: backup is larger than the bloat threshold (backup usage: " + approximate(fcacheCurrent->second.ds.sizeInBytes) + ", threshold: " + bloat + ", target: " + approximate(target) + ")";
+                log(message);
+                SCREENERR(message)
+                notify(config, "\t• " + message, false);
+                return;
+            }
+        }
+
         notify(config, "\t• " + message1 + "\n\t\t" + message2 + "\n", true);
     }
     catch (MBException &e) {

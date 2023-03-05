@@ -54,17 +54,13 @@ struct DiskStats {
 
 string cppgetenv(string variable);
 
-//string s(int number);
-
-//string ies(int number);
-
 string plural(int number, string text);
 
 string plurali(int number, string text);
 
 void log(string message);
 
-struct timeval mktimeval(unsigned long secs);
+struct timeval mktimeval(time_t secs);
 
 string timeDiff(struct timeval start, struct timeval end = mktimeval(GLOBALS.startupTime), int maxUnits = 2, int precision = 2);
 
@@ -115,9 +111,9 @@ string MD5string(string data);
 
 string onevarsprintf(string format, string data);
 
-string approximate(double size, int maxUnits = -1, bool commas = false);
+string approximate(size_t size, int maxUnits = -1, bool commas = false);
 
-string seconds2hms(unsigned long seconds);
+string seconds2hms(time_t seconds);
 
 string dw(int which);
 
@@ -147,7 +143,7 @@ string horizontalLine(int length);
 
 void sendEmail(string from, string recipients, string subject, string message);
 
-unsigned long approx2bytes(string approx);
+size_t approx2bytes(string approx);
 
 string todayString();
 

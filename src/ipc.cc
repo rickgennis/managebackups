@@ -498,9 +498,15 @@ PipeExec::~PipeExec() {
     if (!bypassDestructor) {
         closeAll();
 
-        while (numProcs--)
+        //cerr << "pid " << getpid() << " has " << numProcs << " child proc(s)" << endl;
+        while (numProcs--) {
+            //cerr << "pid " << getpid() << " pre-wait" << endl;
             waitpid(-1, NULL, WNOHANG);
+            //auto w = wait(NULL);
+            //cerr << "pid " << getpid() << " returned " << w << endl;
+        }
 
+        
         if (!dontCleanup) {
             flushErrors();
         }
@@ -509,8 +515,10 @@ PipeExec::~PipeExec() {
 
 
 void PipeExec::flushErrors() {
-    if (errorDir.length())
+    if (errorDir.length()) {
+        //cerr << "pid " << getpid() << " cleaning up " << errorDir << endl;
         rmrf(errorDir);
+    }
 }
 
 
@@ -546,6 +554,7 @@ void redirectStdError(string filename) {
     if (errorFd > 0)
         DUP2(errorFd, 2);
     else {
+        cerr << "pid " << getpid() << " (parent is " << getppid() << ") unable to write to " << filename << endl;
         string msg = "warning: unable to redirect STDERR of subprocess to " + filename + " (" + strerror(errno) + ")";
         SCREENERR("\n" << msg);
         log(msg);
@@ -678,7 +687,8 @@ bool PipeExec::execute2file(string toFile, string procName) {
     else
         log("unable to write to " + toFile + ": " + strerror(errno));
 
-    while (wait(NULL) > 0);
+    while (wait(NULL) > 0)
+        numProcs--;
 
     return success;
 }
