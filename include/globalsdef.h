@@ -6,6 +6,7 @@
 
 #include "cxxopts.hpp"
 #include "colors.h"
+#include <set>
 
 /*
  Adding a commandline option vs adding a backup config setting.
@@ -191,6 +192,7 @@ struct global_vars {
     string interruptLock;
     bool useBlocks;
     int pipes[2][2];
+    set<int> reapedPids;
 };
 
 #endif

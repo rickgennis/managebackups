@@ -156,6 +156,7 @@ void fs_startServer(BackupConfig& config) {
 
 #define PB(x) string(5 + to_string(x).length(), '\b')
 void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir, string currentDir) {
+    size_t maxLinksReached = 0;
     string remoteFilename;
     string localPrevFilename;
     string localCurFilename;
@@ -269,6 +270,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                             ((!incTime && lstat(localCurFilename.c_str(), &statData2)) || incTime)) {
                             if (!incTime) ++GLOBALS.statsCount;
                             duplicateList.insert(duplicateList.end(), pair<string, string>(localPrevFilename, localCurFilename));
+                            ++maxLinksReached;
                             DEBUG(D_netproto) DFMTNOPREFIX("[matches, but links maxed]");
                         }
                         else {
@@ -475,13 +477,15 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         fcacheCurrent->second.unchangedFiles = filesHardLinked;
         fcacheCurrent->second.dirs = unmodDirs;
         fcacheCurrent->second.slinks = filesSymLinked + receivedSymLinks;
-        
+
+        string maxLinkMsg = maxLinksReached ? " [" + plural(maxLinksReached, "max link") + " reached]" : "";
         string message1 = "backup completed to " + currentDir + " in " + backupTime.elapsed();
         string message2 = "(total: " +
-        to_string(fileTotal) + ", modified: " + to_string(filesModified - unmodDirs) + ", unmodified: " + to_string(filesHardLinked) + ", dirs: " +
-        to_string(unmodDirs) + ", symlinks: " + to_string(filesSymLinked + receivedSymLinks) +
-        (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") +
-        ", size: " + approximate(backupSize + backupSaved) + ", usage: " + approximate(backupSize) + ")";
+            to_string(fileTotal) + ", modified: " + to_string(filesModified - unmodDirs) + ", unmodified: " + to_string(filesHardLinked) + ", dirs: " +
+            to_string(unmodDirs) + ", symlinks: " + to_string(filesSymLinked + receivedSymLinks) +
+            (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") +
+            ", size: " + approximate(backupSize + backupSaved) + ", usage: " + approximate(backupSize) + maxLinkMsg + ")";
+                
         log(config.ifTitle() + " " + message1);
         log(config.ifTitle() + " " + message2);
         NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message1 << "\n\t\t" << message2 << endl;
@@ -490,9 +494,10 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             string bloat = config.settings[sBloat].value;
             auto target = config.getBloatTarget();
             if (fcacheCurrent->second.ds.sizeInBytes > target) {
-                string message = config.ifTitle() + " warning: backup is larger than the bloat threshold (backup usage: " + approximate(fcacheCurrent->second.ds.sizeInBytes) + ", threshold: " + bloat + ", target: " + approximate(target) + ")";
-                log(message);
-                SCREENERR(message)
+                string message = config.ifTitle() + " warning: backup is larger than the bloat threshold (backup usage: " + approximate(fcacheCurrent->second.ds.sizeInBytes) + ", threshold: " + bloat + ", target: " + approximate(target);
+                log(message + ")");
+                SCREENERR(message + ")")
+                message += maxLinkMsg + ")";
                 notify(config, "\t• " + message, false);
                 return;
             }

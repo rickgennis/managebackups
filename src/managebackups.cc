@@ -1927,12 +1927,11 @@ int main(int argc, char *argv[]) {
                         // launch each profile in a separate child
                         PipeExec miniMe(string(argv[0]) + " -p " + config.settings[sTitle].value +
                                         commonSwitches + " -z");
-                        auto childPID = miniMe.execute("", true, false, true);
+                        auto childPID = miniMe.execute("", true, true, true);
                         miniMe.closeAll();
 
                         // save the child PID and pipe object in our map
-                        childProcMap.insert(childProcMap.end(),
-                                            pair<int, PipeExec>(childPID, miniMe));
+                        childProcMap.emplace(pair<int, PipeExec>(childPID, miniMe));
                     }
 
                 // wait while all child procs finish

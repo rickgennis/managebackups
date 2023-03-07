@@ -79,14 +79,24 @@ typedef struct ProcDetail {
     int readfd[2];
     string command;
     unsigned int childPID;
+    bool reaped;
 
-    ProcDetail(string cmd) { command = cmd; writefd[0] = writefd[1] = readfd[0] = readfd[1] = childPID = 0; }
+    ProcDetail(string cmd) { command = cmd; writefd[0] = writefd[1] = readfd[0] = readfd[1] = childPID = reaped = 0; }
     string fdDetail();
 
     friend bool operator!=(const struct ProcDetail& A, const struct ProcDetail& B);
     friend bool operator==(const struct ProcDetail& A, const struct ProcDetail& B);
 
 } procDetail;
+
+
+struct find_ProcDetail {
+    unsigned int childPID;
+    find_ProcDetail(unsigned int childPID) : childPID(childPID) {}
+    bool operator () (const ProcDetail& p) const {
+        return p.childPID == childPID;
+    }
+};
 
 
 /********************************************************************
@@ -122,6 +132,8 @@ class PipeExec : public IPC_Base {
     bool bypassDestructor;
     bool dontCleanup;
     string errorDir;
+    
+    void pickupTheKids();
 
     public:
         /* structors */

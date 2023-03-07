@@ -63,7 +63,7 @@ void showHelp(enum helpType kind) {
             + "   --fs_days [d]       FAILSAFE: within the last d days.\n"
             + "   --fp                FAILSAFE: Paranoid mode; sets --fs_backups 1 --fs_days 2\n"
             + "\n" + string(BOLDBLUE) + "HARD LINKING\n" + RESET
-            + "   -l, --maxlinks [x]  Max number of links to a file (default 100).\n"
+            + "   -l, --maxlinks [x]  Max number of links to a file (default 200).\n"
             + "\n" + string(BOLDBLUE) + "GENERAL\n" + RESET
             + "   -p, --profile [p]   Use the specified profile for the current run; can be a partial name\n"
             + "   --save              Save all the specified settings to the specified profile.\n"
@@ -476,6 +476,10 @@ See \f[B]\[en]sched\f[R].
 Specify the path to \f[B]managebackups\f[R] if it isn\[cq]t installed in
 /usr/local/bin.
 See \f[B]\[en]sched\f[R].
+.TP
+\f[B]\[en]recalc\f[R]
+Recalcuate all disk usage for a profile.
+This should never be necessary.
 .SS 1. Take Backups Options
 .PP
 Backups options are noted as {1F} for single-file applicable, {FB} for
@@ -682,7 +686,7 @@ In effect, increasing \f[B]\[en]maxlinks\f[R] saves disk space.
 But an accidental mis-edit to one of those files could damage more
 backups with a higher number.
 Set \f[B]\[en]maxlinks\f[R] to 0 or 1 to disable linking.
-Defaults to 100.
+Defaults to 200.
 .SH NOTIFICATIONS
 .PP
 \f[B]managebackups\f[R] can notify on success or failure of a backup via

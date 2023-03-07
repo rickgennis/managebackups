@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/stat.h>
 #include <pcre++.h>
+#include <algorithm>
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <dirent.h>
@@ -494,18 +495,79 @@ PipeExec::PipeExec(string command, unsigned int timeout) : IPC_Base(0, 0, timeou
 }
 
 
+void PipeExec::pickupTheKids() {
+    bool done = true;
+    
+    // if any previous child prods have been reaped, check them first in our global list.
+    // loop through the list of child procs we're looking to reap
+    for (auto procIt = procs.begin(); procIt != procs.end(); ++procIt) {
+        
+        // valid pids that are still waiting
+        if (procIt->childPID && !procIt->reaped) {
+            
+            // is this pid on our previously reaped list?
+            if (GLOBALS.reapedPids.find(procIt->childPID) != GLOBALS.reapedPids.end()) {
+                GLOBALS.reapedPids.erase(procIt->childPID);
+                procIt->reaped = true;
+                DEBUG(D_exec) DFMT("pid " + to_string(GLOBALS.pid) + " successfully reaped child pid " + to_string(procIt->childPID) + "*");
+            }
+            else
+                // if not then that's still a valid pid that's outstanding and we need to
+                // wait() for it further below
+                done = false;
+        }
+    }
+    
+    
+    // in this loop 'done' is used to track whether there are any child pids that are not
+    // yet reaped and therefore we need to continue waiting for
+    while (!done) {
+        
+        // wait for a child pid
+        auto pid = wait(NULL);
+        
+        if (pid > 0) {
+            bool pidFound = false;
+            done = true;
+            
+            // loop through the list of child pids we're waiting on. looping is better than
+            // a find() because we not only want to locate the matching pid but we want to
+            // know if there are any others ramaining in the list, meaning we need to wait()
+            // some more.
+            for (auto procIt = procs.begin(); procIt != procs.end(); ++procIt) {
+                if (procIt->childPID == pid) {
+                    procIt->reaped = pidFound = true;
+                    DEBUG(D_exec) DFMT("pid " + to_string(GLOBALS.pid) + " successfully reaped child pid " + to_string(pid));
+                    
+                    // bail early if we've hit both conditions (a pid found & a pid not found)
+                    if (!done)
+                        break;
+                }
+                else
+                    if (!procIt->reaped && procIt->childPID) {
+                        done = false;
+
+                        // bail early if we've hit both conditions (a pid found & a pid not found)
+                        if (pidFound)
+                            break;
+                    }
+            }
+
+            // wait() may return info on a pid that's not part of our list, likely part of some
+            // other PipeExec() instance. stash the pid in our global list which will get
+            // checked by those other instances before they bother to call wait().
+            if (!pidFound)
+                GLOBALS.reapedPids.insert(GLOBALS.reapedPids.end(), pid);
+        }
+    }
+}
+
+
 PipeExec::~PipeExec() {
     if (!bypassDestructor) {
         closeAll();
-
-        //cerr << "pid " << getpid() << " has " << numProcs << " child proc(s)" << endl;
-        while (numProcs--) {
-            //cerr << "pid " << getpid() << " pre-wait" << endl;
-            waitpid(-1, NULL, WNOHANG);
-            //auto w = wait(NULL);
-            //cerr << "pid " << getpid() << " returned " << w << endl;
-        }
-
+        
+        pickupTheKids();
         
         if (!dontCleanup) {
             flushErrors();
@@ -515,10 +577,8 @@ PipeExec::~PipeExec() {
 
 
 void PipeExec::flushErrors() {
-    if (errorDir.length()) {
-        //cerr << "pid " << getpid() << " cleaning up " << errorDir << endl;
+    if (errorDir.length())
         rmrf(errorDir);
-    }
 }
 
 
@@ -554,7 +614,6 @@ void redirectStdError(string filename) {
     if (errorFd > 0)
         DUP2(errorFd, 2);
     else {
-        cerr << "pid " << getpid() << " (parent is " << getppid() << ") unable to write to " << filename << endl;
         string msg = "warning: unable to redirect STDERR of subprocess to " + filename + " (" + strerror(errno) + ")";
         SCREENERR("\n" << msg);
         log(msg);
@@ -573,7 +632,7 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
 
     string commandID = firstAvailIDForDir(errorDir);
 
-    DEBUG(D_exec) DFMT("preparing full command [" << origCommand << "]");
+    DEBUG(D_exec) DFMT(to_string(getpid()) + " preparing full command [" << origCommand << "]");
 
     int commandIdx = -1;
     for (auto proc_it = procs.begin(); proc_it != procs.end(); ++proc_it) {
@@ -583,7 +642,7 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
 
         // last loop
         if (*proc_it == procs[procs.size() - 1]) {
-            DEBUG(D_exec) DFMT("executing final command [" << proc_it->command << "]");
+            DEBUG(D_exec) DFMT(to_string(getpid()) + " executing final command [" << proc_it->command << "]");
 
             // redirect stderr to a file
             if (!noErrToDisk)
@@ -608,11 +667,10 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
 
             // create the pipe & fork
             pipe(proc_it->writefd);
-            if ((proc_it->childPID = fork())) {
-
+            if (((proc_it+1)->childPID = fork())) {
                 // PARENT - all subsequent parents
                 if (*proc_it != procs[0]) {
-                    DEBUG(D_exec) DFMT("executing mid command [" << proc_it->command << "] with pipes " << proc_it->writefd[0] << " & " << proc_it->writefd[1]);
+                    DEBUG(D_exec) DFMT(to_string(getpid()) + " executing mid command [" << proc_it->command << "] with pipes " << proc_it->writefd[0] << " & " << proc_it->writefd[1]);
 
                     // redirect stderr to a file
                     if (!noErrToDisk)
@@ -645,7 +703,7 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
                 readFd = procs[0].readfd[READ_END];
                 writeFd = procs[0].writefd[WRITE_END];
 
-                return(proc_it->childPID);
+                return((proc_it+1)->childPID);
             }
         }
 
@@ -687,8 +745,7 @@ bool PipeExec::execute2file(string toFile, string procName) {
     else
         log("unable to write to " + toFile + ": " + strerror(errno));
 
-    while (wait(NULL) > 0)
-        numProcs--;
+    pickupTheKids();
 
     return success;
 }

@@ -146,6 +146,9 @@ Options are relative to the three functions of **managebackups** plus general op
 **--schedpath** [*path*]
 : Specify the path to **managebackups** if it isn't installed in /usr/local/bin.  See **--sched**.
 
+**--recalc**
+: Recalcuate all disk usage for a profile. This should never be necessary.
+
 ## 1. Take Backups Options
 Backups options are noted as {1F} for single-file applicable, {FB} for faub-backup applicable, or {both}.
 
@@ -235,7 +238,7 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 ## 3. Linking Options
 
 **-l**, **--maxlinks** [*links*]
-: Use *links* as the maximum number of links for a backup. For example, if the max is set to 10 and there are 25 identical content backups on disk, the first 10 all share inodes (i.e. there's only one copy of that data on disk for those 10 backups), the next 10 share another set of inodes, and the final 5 share another set of inodes.  From a disk space and allocation perspective those 25 identical copies of data are taking up the space of 3 copies, not 25.  In effect, increasing **--maxlinks** saves disk space. But an accidental mis-edit to one of those files could damage more backups with a higher number. Set **--maxlinks** to 0 or 1 to disable linking. Defaults to 100.
+: Use *links* as the maximum number of links for a backup. For example, if the max is set to 10 and there are 25 identical content backups on disk, the first 10 all share inodes (i.e. there's only one copy of that data on disk for those 10 backups), the next 10 share another set of inodes, and the final 5 share another set of inodes.  From a disk space and allocation perspective those 25 identical copies of data are taking up the space of 3 copies, not 25.  In effect, increasing **--maxlinks** saves disk space. But an accidental mis-edit to one of those files could damage more backups with a higher number. Set **--maxlinks** to 0 or 1 to disable linking. Defaults to 200.
 
 # NOTIFICATIONS
 **managebackups** can notify on success or failure of a backup via two methods: email or script. Multiple emails and/or scripts can be specified for the same profile.
