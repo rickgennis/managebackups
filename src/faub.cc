@@ -149,7 +149,7 @@ void fs_startServer(BackupConfig& config) {
     }
 
     DEBUG(D_netproto) DFMT("executing: \"" << config.settings[sFaub].value << "\"");
-    faub.execute("faub", false, false, true);
+    faub.execute(GLOBALS.cli.count(CLI_LEAVEOUTPUT) ? config.settings[sTitle].value : "", false, false, false, true);
     fs_serverProcessing(faub, config, prevDir, newDir);
 }
 
