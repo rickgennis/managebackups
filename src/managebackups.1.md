@@ -1,6 +1,6 @@
 % MANAGEBACKUPS(1) managebackups 1.4
 % Rick Ennis
-% January 2023
+% March 2023
 
 # NAME
 managebackups - Take and manage backups
@@ -210,7 +210,7 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 : {both} Disable performing backups for this run. To disable permanently moving forward, remove the "command" directive from the profile's config file.
 
 **--leaveoutput**
-: {both} Leave the output from any commands that are run to create a backup or SFTP one in a file under /tmp/managebackups_output. This can help facilitate diagnosing authentication errors.
+: {both} Leave the output from any commands that are executed (create a backup, ssh, SFTP, etc) in a file under /tmp/managebackups_output. This can help facilitate diagnosing authentication or configuration errors.
 
 **-s**, **--path** [*path*]
 : {FB-remote} Specifies which directories to backup in a faub-style backup.  This option is only used on the REMOTE end, i.e. the server being backed up. See the FAUB-STYLE BACKUPS section below. Multiple paths can be specified via quoted parameters that are space delimited (--path "/usr /usr/local /root") or multiple directives (--path /usr --path /usr/local).
@@ -286,6 +286,8 @@ to backup /usr/local/bin, assuming your backup server is connecting from 192.168
 Without the authorized_keys2 file you would need the options in your faub config directly:
 
     --faub "ssh dataserver sudo managebackups --path /usr/local/bin"
+    
+Complications with configuration of faub, particularly if ssh is involved, are much easier to debug given the output of the various subcommands.  See **--leaveoutput**.
 
 # ENVIRONMENT VARIABLES
 Environment variables are overriden by **--user**, **--confdir**, **--cachedir**, and **--logdir**.

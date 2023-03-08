@@ -484,9 +484,7 @@ PipeExec::PipeExec(string command, unsigned int timeout) : IPC_Base(0, 0, timeou
     strcpy(data, command.c_str());
     char *p = strtok(data, "|");
 
-    numProcs = 0;
     while (p) {
-        ++numProcs;
         procs.insert(procs.end(), procDetail(trimSpace(p)));
         p = strtok(NULL, "|");
     }
@@ -624,33 +622,115 @@ void redirectStdError(string filename) {
 int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, bool noErrToDisk, bool noTmpCleanup) {
     bypassDestructor = noDestruct;
     dontCleanup = noTmpCleanup;
-    procs.insert(procs.begin(), procDetail("head"));
 
+    if (!procs.size())
+        return 0;
+    
     errorDir = string(TMP_OUTPUT_DIR) + "/" + (procName.length() ? safeFilename(procName) : "pid_" + to_string(getpid())) + "/";
     if (mkdirp(errorDir))
         showError("error: unable to mkdir " + errorDir + ": " + strerror(errno));
 
     string commandID = firstAvailIDForDir(errorDir);
-
     DEBUG(D_exec) DFMT(to_string(getpid()) + " preparing full command [" << origCommand << "]");
 
-    int commandIdx = -1;
-    for (auto proc_it = procs.begin(); proc_it != procs.end(); ++proc_it) {
-        ++commandIdx;
-        string commandPrefix = proc_it->command.substr(0, proc_it->command.find(" "));
-        string stderrFname = errorDir + commandID + ":" + to_string(commandIdx) + "." + safeFilename(commandPrefix) + ".stderr";
+    /* Each pipe in the exec string denotes a separate proc.
+     
+       Given our design, reading and writing to the first proc in the chain is easier
+       if we insert a dummy proc at the beginning of the chain, which we just use for
+       file descriptors.  The dummy entry together with the real list of procs fall into
+       3 possible categories:
+     
+       - The first proc: this is always the dummy entry. On this iteration of the loop
+         it fork()s just the others but the parent (i.e. our original proc) sets up the
+         reading and writing FDs and then immediately returns to our calling process.
+     
+       - The middle procs: Zero or more procs may fall into this category. For each of
+         these we fork() and then in the parent exec() the command to create the proc.
+         In the child we continue to the top of the loop and are considered the parent
+         for the next proc -- fork() again...
+     
+       - The last proc: Last proc gets fork()ed by either the first or middle proc. The
+         difference is the last proc does different FD clean up depending on whether it's
+         going to leave its STDOUT as a default (such as someone executing 'less' and
+         expecting it to spill onto the screen) or will it be redirected back to the
+         output of the dummy proc at the beginning so our calling app can read from it.
+     
+         First, insert the dummy proc...
+     */
+    procs.insert(procs.begin(), procDetail("head"));
 
-        // last loop
-        if (*proc_it == procs[procs.size() - 1]) {
-            DEBUG(D_exec) DFMT(to_string(getpid()) + " executing final command [" << proc_it->command << "]");
+    // loop through the list of procs that we need to kick off
+    for (auto procIt = procs.begin(); procIt != procs.end(); ++procIt) {
+        string commandPrefix = procIt->command.substr(0, procIt->command.find(" "));
+        string stderrFname = errorDir + commandID + ":" + to_string(distance(procs.begin(), procIt)) + "." + safeFilename(commandPrefix) + ".stderr";
+
+        if (procIt != procs.end() - 1) {  // if not last proc
+            if (procIt == procs.begin())
+                pipe(procIt->readfd);  // extra pipe for our dummy entry to communicate with the calling app
+
+            // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+            // Pipe & Fork
+            // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+            pipe(procIt->writefd);
+            if (((procIt+1)->childPID = fork())) {
+                
+                // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+                // Middle Procs:  PARENT (i.e. all subsequent
+                // parents) - execute the command
+                // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+                if (procIt != procs.begin()) {  // if not first proc
+                    DEBUG(D_exec) DFMT(to_string(getpid()) + " executing mid command [" << procIt->command << "] with pipes " << procIt->writefd[0] << " & " << procIt->writefd[1]);
+
+                    // redirect stderr to a file
+                    if (!noErrToDisk)
+                        redirectStdError(stderrFname);
+
+                    // close fds from two procs back
+                    if (procs.size() > 2 && *procIt != procs[1]) {
+                        auto back2_it = procIt - 2;
+                        close(back2_it->writefd[0]);
+                        close(back2_it->writefd[1]);
+                    }
+
+                    // dup and close current and x - 1 fds
+                    auto backIt = procIt - 1;
+                    close(procIt->writefd[READ_END]);
+                    close(backIt->writefd[WRITE_END]);
+                    DUP2(backIt->writefd[READ_END], READ_END);
+                    DUP2(procIt->writefd[WRITE_END], WRITE_END);
+
+                    // exec middle procs
+                    varexec(procIt->command);
+                }
+
+                // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+                // First Proc:  PARENT - the dummy proc that returns
+                // FDs to the calling app
+                // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+                close(procIt->writefd[READ_END]);
+                close(procIt->readfd[WRITE_END]);
+                if (procName.length())
+                    errorDir = "";  // reset errorDir so that we don't clean up stderr files for a named proc
+
+                readFd = procs[0].readfd[READ_END];
+                writeFd = procs[0].writefd[WRITE_END];
+
+                return((procIt+1)->childPID);
+            }
+        }
+        else  {
+            // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+            // Last Proc: PARENT - execute the last command
+            // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+            DEBUG(D_exec) DFMT(to_string(getpid()) + " executing final command [" << procIt->command << "]");
 
             // redirect stderr to a file
             if (!noErrToDisk)
                 redirectStdError(stderrFname);
         
             // dup and close remaining fds
-            auto back_it = proc_it - 1;
-            DUP2(back_it->writefd[READ_END], READ_END);
+            auto backIt = procIt - 1;
+            DUP2(backIt->writefd[READ_END], READ_END);
             close(procs[0].writefd[WRITE_END]);
             close(procs[0].readfd[READ_END]);
 
@@ -658,63 +738,31 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
                 DUP2(procs[0].readfd[WRITE_END], 1);
 
             // exec the last process
-            varexec(proc_it->command);
-        }
-        else  {
-            if (*proc_it == procs[0]) {
-                pipe(proc_it->readfd);
-            }
-
-            // create the pipe & fork
-            pipe(proc_it->writefd);
-            if (((proc_it+1)->childPID = fork())) {
-                // PARENT - all subsequent parents
-                if (*proc_it != procs[0]) {
-                    DEBUG(D_exec) DFMT(to_string(getpid()) + " executing mid command [" << proc_it->command << "] with pipes " << proc_it->writefd[0] << " & " << proc_it->writefd[1]);
-
-                    // redirect stderr to a file
-                    if (!noErrToDisk)
-                        redirectStdError(stderrFname);
-
-                    // close fds from two procs back
-                    if (procs.size() > 2 && *proc_it != procs[1]) {
-                        auto back2_it = proc_it - 2;
-                        close(back2_it->writefd[0]);
-                        close(back2_it->writefd[1]);
-                    }
-
-                    // dup and close current and x - 1 fds
-                    auto back_it = proc_it - 1;
-                    close(proc_it->writefd[READ_END]);
-                    close(back_it->writefd[WRITE_END]);
-                    DUP2(back_it->writefd[READ_END], READ_END);
-                    DUP2(proc_it->writefd[WRITE_END], WRITE_END);
-
-                    // exec middle procs
-                    varexec(proc_it->command);
-                }
-
-                // PARENT - first parent
-                close(proc_it->writefd[READ_END]);
-                close(proc_it->readfd[WRITE_END]);
-                if (procName.length())
-                    errorDir = "";  // reset errorDir so that we don't clean up stderr files for a named proc
-
-                readFd = procs[0].readfd[READ_END];
-                writeFd = procs[0].writefd[WRITE_END];
-
-                return((proc_it+1)->childPID);
-            }
+            varexec(procIt->command);
         }
 
-        // CHILD
-        if (*proc_it != procs[0]) {
-            close(proc_it->writefd[WRITE_END]);
-            DUP2(proc_it->writefd[READ_END], READ_END);
+        // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        // CHILD - all children
+        // It's confusing because a proc will come out of the
+        // fork as a child and immediately hit this block,
+        // only to then get back up to the top of the for() loop
+        // and be considered a parent (the same PID) going
+        // into the next fork iteration. Remember, it's not
+        // a parent having a bunch of kids; it's multiple
+        // generations where each child has the next child.
+        // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        if (*procIt != procs[0]) {
+            close(procIt->writefd[WRITE_END]);
+            DUP2(procIt->writefd[READ_END], READ_END);
         }
     }
 
-    exit(1);  // never get here
+    /* The original parent return()s to the calling app with FDs
+       for communicating to the process list. All the children
+       on down end in an exec() call to whatever command they're
+       running.  So nothing ever gets to this purely decorative
+       exit(). */
+    exit(1);
 }
 
 

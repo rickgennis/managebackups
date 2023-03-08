@@ -128,7 +128,6 @@ struct find_ProcDetail {
 class PipeExec : public IPC_Base {
     string origCommand;
     vector<procDetail> procs;
-    int numProcs;
     bool bypassDestructor;
     bool dontCleanup;
     string errorDir;
