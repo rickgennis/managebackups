@@ -58,7 +58,7 @@ string plural(size_t number, string text);
 
 string plurali(size_t number, string text);
 
-void log(string message);
+string log(string message);
 
 struct timeval mktimeval(time_t secs);
 

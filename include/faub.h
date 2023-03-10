@@ -14,3 +14,4 @@ size_t fc_scanToServer(string entryName, IPC_Base& server);
 size_t fc_sendFilesToServer(IPC_Base& server);
 void fc_mainEngine(vector<string> paths);
 void pruneFaub(BackupConfig& config);
+void relocateFaubBackups(BackupConfig &config, string newBaseDir);

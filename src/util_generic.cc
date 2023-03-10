@@ -85,7 +85,7 @@ vector<string> perlSplit(string regex, string haystack) {
 }
 
 
-void log(string message) {
+string log(string message) {
 #ifdef __APPLE__
     if (!GLOBALS.logDir.length()) {  
         string defaultDir = "/var/log";
@@ -127,6 +127,8 @@ void log(string message) {
 #else
     syslog(LOG_CRIT, "%s", message.c_str());
 #endif
+    
+    return message;
 }
 
 

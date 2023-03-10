@@ -1470,8 +1470,7 @@ bool enoughLocalSpace(BackupConfig &config)
                    errorcom(config.ifTitle(), "error: insufficient space (" +
                                                   approximate(availableSpace) +
                                                   ") to start a new backup, " +
-                                                  approximate(requiredSpace) + " required."),
-                   true);
+                                                  approximate(requiredSpace) + " required."), true);
             return false;
         }
     }
@@ -1484,6 +1483,20 @@ bool enoughLocalSpace(BackupConfig &config)
 
     return true;
 }
+
+
+void relocate1FBackups(BackupConfig &config, string newBaseDir) {
+    
+}
+
+
+void relocateBackups(BackupConfig &config, string newBaseDir) {
+    if (config.settings[sFaub].value.length())
+        relocateFaubBackups(config, newBaseDir);
+    else
+        relocate1FBackups(config, newBaseDir);
+}
+
 
 /*******************************************************************************
  * main(argc, argv)

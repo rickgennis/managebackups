@@ -139,8 +139,9 @@ tuple<string, int> IPC_Base::ipcReadToFile(string filename, bool preDelete) {
 
         struct utimbuf timeBuf;
         timeBuf.actime = timeBuf.modtime = mtime;
-        utime(filename.c_str(), &timeBuf);
-
+        if (utime(filename.c_str(), &timeBuf))
+            errorMsg += "error: unable to set utime() on " + filename + " - " + strerror(errno);
+        
         return {errorMsg, mode};
     }
 
