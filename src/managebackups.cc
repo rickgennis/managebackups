@@ -1506,7 +1506,7 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
 int main(int argc, char *argv[]) {
     timer AppTimer;
     AppTimer.start();
-
+    
     signal(SIGTERM, sigTermHandler);
     signal(SIGINT, sigTermHandler);
 

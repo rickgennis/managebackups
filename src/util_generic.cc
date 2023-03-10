@@ -249,16 +249,17 @@ string onevarsprintf(string format, string data) {
 
 string approximate(size_t size, int maxUnits, bool commas) {
     int index = 0;
+    long double decimalSize = size;
     char unit[] = {'B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'};
 
-    while (size >= 1024 && 
+    while (decimalSize >= 1024 &&
             (maxUnits < 0 || index < maxUnits) &&
-            index++ <= sizeof(unit)) { 
-        size /= 1024;
+            index++ <= sizeof(unit)) {
+        decimalSize /= 1024.0;
     }
 
     char buffer[150];
-    snprintf(buffer, sizeof(buffer), index > 1 ? "%.01f" : "%.0f", index > 1 ? size : floor(size));
+    snprintf(buffer, sizeof(buffer), index > 1 ? "%.01Lf" : "%.0Lf", index > 1 ? decimalSize : floor(decimalSize));
     string unitSuffix(1, unit[index]);
     string result = string(buffer);
 
@@ -869,7 +870,7 @@ DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes) {    /
     struct stat statData;
     struct dirent *dirEnt;
     DiskStats ds;
-
+    
     if ((dir = opendir(path.c_str())) == NULL) {
         perror(path.c_str());
         return DiskStats(0, 0, 0, 0);
@@ -884,28 +885,27 @@ DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes) {    /
         if (lstat(fullFilename.c_str(), &statData) < 0)
             log("error: stat(" + fullFilename + "): " + strerror(errno));
         else {
-            if (S_ISDIR(statData.st_mode) && strcmp(dirEnt->d_name, ".") && strcmp(dirEnt->d_name, ".."))
-                subDirs.insert(subDirs.end(), fullFilename);
-            else {
-                if (seenInodes.find(statData.st_ino) != seenInodes.end() ||
-                    newInodes.find(statData.st_ino) != newInodes.end()) {
-                    ds.savedInBytes += statData.st_size;
-                    ds.savedInBlocks += (512 * statData.st_blocks);
-                }
-                else {
-                    ds.sizeInBytes += statData.st_size;
-                    ds.sizeInBlocks += (512 * statData.st_blocks);
-                }
-                
-                newInodes.insert(statData.st_ino);
+            if (seenInodes.find(statData.st_ino) != seenInodes.end() ||
+                newInodes.find(statData.st_ino) != newInodes.end()) {
+                ds.savedInBytes += statData.st_size;
+                ds.savedInBlocks += 512 * statData.st_blocks;
             }
+            else {
+                ds.sizeInBytes += statData.st_size;
+                ds.sizeInBlocks += 512 * statData.st_blocks;
+            }
+            
+            newInodes.insert(statData.st_ino);
+            
+            if (S_ISDIR(statData.st_mode))
+                subDirs.insert(subDirs.end(), fullFilename);
         }
     }
     closedir(dir);
 
     for (auto &subDir: subDirs)
         ds += dus(subDir, seenInodes, newInodes);
-    
+            
     return ds;
 }
 

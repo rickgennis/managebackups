@@ -40,7 +40,7 @@ class IPC_Base {
         ssize_t ipcRead(void *data, size_t count);
         __int64_t ipcRead();
         string ipcReadTo(string delimiter);
-        tuple<string, int> ipcReadToFile(string filename, bool preDelete = false);
+        tuple<string, int, time_t> ipcReadToFile(string filename, bool preDelete = false);
         void readAndTrash();
         bool readAndMatch(string matchStr);
         string statefulReadAndMatchRegex(string regex);

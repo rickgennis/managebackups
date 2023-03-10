@@ -3,6 +3,7 @@
 #include <netinet/tcp.h>
 #include <algorithm>
 #include <unistd.h>
+#include <utime.h>
 
 #include "FaubCache.h"
 #include "faub.h"
@@ -175,6 +176,26 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     timer backupTime;
     backupTime.start();
 
+    /*
+     FAUB PROTOCOL - 4 PHASES
+     
+     Note: The term filesystem is used here very loosely to mean a directory structive the client
+     wants to backup (--path option).  It doesn't really need to coorelate to a filesystem.
+     
+     1. Client (server being backed up) sends a list comprised of a full path and its mtime for
+        all directory entries (files, directories, symlinks) to be backed up.
+     2. Server compares each full path name and mtime to the previous backup of this
+        filesystem (if any) and makes a new list of the ones that have changed.  Those changes
+        are sent back to the client as requests.
+     3. Client send the full detail (uid, gid, mode, mtime, size and the full content of the file)
+        for each requested item, which the server writes to disk as newly backed up entries.
+     4. Server finishes administrative tasks:
+            - hard links all files that haven't changed from the previous backup to the previous backup
+            - symlinks all entries that are symlinks on the remote server to their entries in the previous backup
+            - copies files from the previous backup to the current if maxLinks is exceeeded
+            - sets the mtime on all directories in the newly created backup
+     */
+    
     try {
         DEBUG(D_faub) DFMT("current: " << currentDir);
         DEBUG(D_faub) DFMT("previous: " << prevDir);
@@ -194,15 +215,26 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         GLOBALS.interruptFilename = currentDir;  // interruptFilename gets cleaned up on SIGTERM & SIGINT
         bool incTime = str2bool(config.settings[sIncTime].value);
         
+        // all modified files from this client (used to create --diff list)
         set<string> modifiedFiles;
         
         do {
+            // needed (i.e. modified) files for this filesystem (pass of the protocol)
             set<string> neededFiles;
+            
+            // mtimes for all directories so we can set them at the very end
+            map<string, time_t> dirMtimes;
+            
+            // hardlinks to create after receiving new files
             map<string,string> hardLinkList;
+            
+            // symlinks to create (bc they exist on the remote system) after receiving new files
             map<string,string> symLinkList;
+            
+            // files to copy from previous backup due to reaching maxLinks
             map<string,string> duplicateList;
             
-            /*
+            /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
              * phase 1 - get list of filenames and mtimes from client
              * and see if the remote file is different from what we
              * have locally in the most recent backup.
@@ -245,9 +277,25 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                  * guarantee that a parent directory will come over before a file within it.  So we
                  * make a list of all the entries as they come over the wire then go back and create
                  * the links at the end.  Details inline below.
+                 
+                 * The nuances of directories in this model can be incredibly confusing.  When you
+                 * stumble upon a subdir you could examine its mtime and decide if its changed,
+                 * effectively treating it just like a file (trasnfer its metadata only if necessary).
+                 * Or you could say just transfer them all regardless of mtime (its only uid, gid,
+                 * mode and mtime).  Either way you're getting files and directories in a non-intuitive
+                 * order.  The problem is every time you add a file (or subdir) to a directory, you
+                 * update that directory's mtime.  So if you want an accurate backup --including the
+                 * mtimes on all your directories-- you need to reset those directory mtimes last.
+                 * Either you track every directory where you've added a file/subdir or just do them all.
+                 * I've elected to do them all because nearly every directory (except empty ones) are
+                 * going to have this issue, regardless of whether the entries in them are newly
+                 * transfered files or existing hardlinked ones.
                  */
                 
-                // if it's a directory, we need it.  hardlinks don't work for directories.
+                // if it's a directory, request it.  hardlinks don't work for directories. we don't
+                // have this mtime at this point in the protocol so we just add it to the list to
+                // request from the client.  when the client actually sends all its data, we'll save
+                // the mtime for processing at the very end.
                 if (S_ISDIR(mode)) {
                     neededFiles.insert(neededFiles.end(), remoteFilename);
                     ++unmodDirs;
@@ -301,29 +349,36 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             DEBUG(D_netproto) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size()
                                    << ", willLink:" << hardLinkList.size());
             
-            /*
+            
+            /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
              * phase 2 - send the client the list of files that we need full copies of
-             * because they've changed or are missing from the previous backup
+             * because they've changed or are missing from the previous backup.
+             * this includes every directory regardless of it changed.
              */
             for (auto &file: neededFiles) {
                 DEBUG(D_netproto) DFMT("server requesting " << file);
                 client.ipcWrite(string(file + NET_DELIM).c_str());
             }
             
+            // tell the client we're done requesting and ready to listen to the replies
             client.ipcWrite(NET_OVER_DELIM);
             
             NOTQUIET && ANIMATE && cout << PB(numFS * 4 - 1) << to_string(numFS * 4 - 2) << ")... " << flush;
             DEBUG(D_netproto) DFMT(fs << " server phase 2 complete; told client we need " << neededFiles.size() << " of " << fileTotal);
             
-            /*
+            
+            /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
              * phase 3 - receive full copies of the files we've requested. they come over
-             * in the order we've requested in the format of 8 bytes for 'size' and then
-             * the 'size' number of bytes of data.
+             * in the order we've requested in the format of 8 bytes each for uid, gid,
+             * mode, mtime, size and then the data ('size' number of bytes).
              */
             for (auto &file: neededFiles) {
-                DEBUG(D_netproto) DFMTNOENDL("server waiting for " << file);
-                auto [errorMsg, mode] = client.ipcReadToFile(slashConcat(currentDir, file), !incTime);
-                DEBUG(D_netproto) DFMTNOPREFIX(" :mode " << mode);
+                DEBUG(D_netproto) DFMT("server waiting for " << file);
+                auto currentFilename = slashConcat(currentDir, file);
+                auto [errorMsg, mode, mtime] = client.ipcReadToFile(currentFilename, !incTime);
+
+                if (S_ISDIR(mode))
+                    dirMtimes.insert(dirMtimes.end(), make_pair(currentFilename, mtime));
                 
                 if (errorMsg.length()) {
                     SCREENERR(fs << " " << errorMsg);
@@ -340,9 +395,18 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             NOTQUIET && ANIMATE && cout << PB(numFS * 4 - 2) << to_string(numFS * 4 - 3) << ")... " << flush;
             DEBUG(D_netproto) DFMT(fs << " server phase 3 complete; received " << plural((int)neededFiles.size(), "file") + " from client");
             
-            /*
-             * phase 4 - create the links for everything that matches the previous backup.
+            
+            /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+             * phase 4 - post-administrative work.
+             * create the hardlinks for everything that matches the previous backup,
+             * symlinks for everything that's a symlink on the remote server, copy
+             * files from the previous backup when maxLinks is reached, and set the
+             * mtime on all directories.
              */
+            
+            /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+             create hard links
+             *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
             for (auto &links: hardLinkList) {
                 mkbasedirs(links.second);
                 
@@ -358,6 +422,9 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 }
             }
             
+            /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+             duplicate (copy) files for maxLinks
+             *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
             for (auto &dups: duplicateList) {
                 mkbasedirs(dups.second);
                 
@@ -388,6 +455,9 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 }
             }
             
+            /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+             create symlinks
+             *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
             char linkBuf[1000];
             for (auto &links: symLinkList) {
                 mkbasedirs(links.second);
@@ -426,6 +496,16 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                     log(config.ifTitle() + " " + fs + " error: unable to dereference symlink " + links.first + ": " + strerror(errno));
                 }
                 
+            }
+            
+            /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+             set mtimes on all directories
+             *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
+            struct utimbuf timeBuf;
+            for (auto &dirTime: dirMtimes) {
+                timeBuf.actime = timeBuf.modtime = dirTime.second;
+                if (utime(dirTime.first.c_str(), &timeBuf))
+                    SCREENERR(log(config.ifTitle() + " " + fs + ": error: unable to call utime() on " + dirTime.first + " - " + strerror(errno)));
             }
             
             DEBUG(D_netproto) DFMT(fs << " server phase 4 complete; created " << plural(hardLinkList.size() - linkErrors, "link")  <<
@@ -485,7 +565,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             to_string(unmodDirs) + ", symlinks: " + to_string(filesSymLinked + receivedSymLinks) +
             (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") +
             ", size: " + approximate(backupSize + backupSaved) + ", usage: " + approximate(backupSize) + maxLinkMsg + ")";
-                
+                        
         log(config.ifTitle() + " " + message1);
         log(config.ifTitle() + " " + message2);
         NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message1 << "\n\t\t" << message2 << endl;
@@ -628,11 +708,11 @@ void fc_mainEngine(vector<string> paths) {
             auto entries = fc_scanToServer(*it, server);
 
             server.ipcWrite(NET_OVER_DELIM);
-            auto changes = fc_sendFilesToServer(server);
+            auto requests = fc_sendFilesToServer(server);
 
             clientTime.stop();
-            log("faub_client request for " + *it + " served " + plurali((int)entries, "entr") +
-                ", " + plural((int)changes, "change") + " in " + clientTime.elapsed());
+            log("faub_client request for " + *it + " served " + plurali(entries, "entr") +
+                ", " + plural(requests, "request") + " in " + clientTime.elapsed());
 
             __int64_t end = (it+1) != paths.end();
             server.ipcWrite(end);
@@ -657,3 +737,6 @@ void fc_mainEngine(vector<string> paths) {
 }
 
 
+void relocateFaubBackups(BackupConfig &config, string newBaseDir) {
+    
+}

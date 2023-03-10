@@ -24,7 +24,7 @@ string oldMessage = ">24H old";
  */
 struct summaryStats {
     bool inProcess;
-    unsigned long lastBackupBytes;
+    size_t lastBackupBytes;
     time_t lastBackupTime;
     size_t totalUsed;
     size_t totalSaved;

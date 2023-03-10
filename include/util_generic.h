@@ -6,6 +6,8 @@
 #include <time.h>
 #include <sys/time.h>
 #include <set>
+#include <iostream>
+
 #include "globals.h"
 #include "math.h"
 #include "globals.h"
@@ -36,6 +38,11 @@ struct DiskStats {
 
     size_t getSize() { return (GLOBALS.useBlocks ? sizeInBlocks : sizeInBytes); }
     size_t getSaved() { return (GLOBALS.useBlocks ? savedInBlocks : savedInBytes); }
+    
+    friend ostream& operator<<(ostream& s, const DiskStats& a) {
+        s << "usedBy:" << a.sizeInBytes << ", usedBk:" << a.sizeInBlocks << ", savBy:" << a.savedInBytes << ", savBk:" << a.savedInBlocks;
+        return s;
+    }
 };
 
 
