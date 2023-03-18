@@ -76,6 +76,8 @@ void showHelp(enum helpType kind) {
             + "   -K, --Cron          Execute all profiles in parallel for cron (equivalent to '-A -x -q')\n\n"
             + "   -0                  Provide a summary of backups; can be combined with -p to limit output\n"
             + "   -1                  Provide detail of backups; can be combined with -p to limit output\n\n"
+            + "   --relocate [newDir] Move all backups to a new directory; use with -p\n"
+            + "   --recalc            Recalculate disk usage for all backups; use with -p\n"
             + "   --install           Install this binary in /usr/local/bin, update directory perms and create the man page\n"
             + "   --installsuid       Install this binary in /usr/local/bin with SUID to run as root; create the man page\n"
             + "   --installman        Only create and install the man page\n\n"

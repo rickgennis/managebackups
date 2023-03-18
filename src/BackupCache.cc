@@ -4,6 +4,8 @@
 #include <set>
 #include <fstream>
 #include <sys/stat.h>
+#include <dirent.h>
+#include <unistd.h>
 
 #include "BackupEntry.h"
 #include "BackupCache.h"
@@ -37,7 +39,7 @@ void BackupCache::updateAges(time_t refTime) {
 }
 
 
-void BackupCache::saveCache() {
+void BackupCache::saveCache(string oldBaseDir, string newBaseDir) {
     ofstream cacheFile;
     
     if (!rawData.size() || !cacheFilename.length())
@@ -54,7 +56,7 @@ void BackupCache::saveCache() {
             // "current" means the file was seen in the most recent filesystem scan.
             if (raw.second.current) {
                 DEBUG(D_cache) DFMT(cacheFilename << ": writing cache entry " << raw.second.class2string());
-                cacheFile << raw.second.class2string() << endl;
+                cacheFile << raw.second.class2string(oldBaseDir, newBaseDir) << endl;
                 ++count;
             }
         }
@@ -75,8 +77,14 @@ void BackupCache::saveCache() {
 }
 
 
-void BackupCache::restoreCache() {
+void BackupCache::restoreCache(bool nukeFirst) {
     ifstream cacheFile;
+
+    if (nukeFirst) {
+        rawData.clear();
+        indexByMD5.clear();
+        indexByFilename.clear();
+    }
     
     cacheFile.open(cacheFilename);
     if (cacheFile.is_open()) {
@@ -307,5 +315,69 @@ void BackupCache::reStatMD5(string md5) {
     }
 }
 
-
+// cleanup old cache files that may refer to no longer existing backups
+// cleanup works across all 1F cache files, regardless of profile or directory
+void BackupCache::cleanup() {
+    DIR *c_dir;
+    struct dirent *c_dirEntry;
+    struct stat statData;
+    const char NEWSFX[] = ".new";
+    
+    if ((c_dir = opendir(GLOBALS.cacheDir.c_str())) != NULL) {
+        
+        ifstream origCacheFile;
+        ofstream newCacheFile;
+        
+        while ((c_dirEntry = readdir(c_dir)) != NULL) {
+            
+            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..") || (strstr(c_dirEntry->d_name, ".1f") == NULL))
+                continue;
+            
+            unsigned int verifiedBackups = 0;
+            string baseFilename = slashConcat(GLOBALS.cacheDir, c_dirEntry->d_name);
+            origCacheFile.open(baseFilename.c_str());
+            
+            if (origCacheFile.is_open()) {
+                newCacheFile.open(string(baseFilename + NEWSFX).c_str());
+                
+                if (newCacheFile.is_open()) {
+                    string cacheData;
+                    while (getline(origCacheFile, cacheData)) {
+                        BackupEntry entry;
+                        
+                        if (entry.string2class(cacheData)) {
+                            
+                            if (!stat(entry.filename.c_str(), &statData)) {
+                                newCacheFile << cacheData << endl;
+                                ++verifiedBackups;
+                            }
+                        }
+                    }
+                    
+                    newCacheFile.close();
+                }
+                else {
+                    SCREENERR(log("error: unable to create " + baseFilename + NEWSFX + " - " + strerror(errno)));
+                    exit(1);
+                }
+                
+                origCacheFile.close();
+                unlink(baseFilename.c_str());
+                
+                if (verifiedBackups) {
+                    if (rename(string(baseFilename + NEWSFX).c_str(), baseFilename.c_str())) {
+                        SCREENERR(log("error: unable to rename " + baseFilename + NEWSFX + " to " + baseFilename));
+                        exit(1);
+                    }
+                }
+                else
+                    unlink(string(baseFilename + NEWSFX).c_str());
+            }
+            else {
+                SCREENERR(log("error: unable to read " + baseFilename + " - " + strerror(errno)));
+                exit(1);
+            }
+        }
+    }
+}
 

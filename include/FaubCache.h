@@ -55,6 +55,8 @@ public:
     void cleanup();
     void recache(string targetDir, time_t deletedtime = 0, bool forceAll = false);
     string getInProcessFilename() { return inProcessFilename; }
+    void renameBaseDirTo(string newDir);
+    string getBaseDir() { return baseDir; }
     
     FaubCache(string path, string profileName);
     FaubCache() {}

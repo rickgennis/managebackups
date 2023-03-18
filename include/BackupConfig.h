@@ -46,6 +46,7 @@ public:
     
     string ifTitle();
     unsigned int removeEmptyDirs(string dir = "", int baseSlashes = 0);
+    void renameBaseDirTo(string newBaseDir);
     
     friend bool operator<(const BackupConfig& b1, const BackupConfig&b2);
     friend bool operator>(const BackupConfig& b1, const BackupConfig&b2);

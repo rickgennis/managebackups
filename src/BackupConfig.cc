@@ -317,7 +317,7 @@ bool BackupConfig::loadConfig(string filename) {
 
 void BackupConfig::loadConfigsCache() {
     if (settings[sDirectory].value.length() && settings[sBackupFilename].value.length()) {
-        cache.cacheFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value);
+        cache.cacheFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".1f";
         struct stat statBuf;
 
         if (!stat(cache.cacheFilename.c_str(), &statBuf))
@@ -548,4 +548,9 @@ size_t BackupConfig::getBloatTarget() {
     }
     
     return target;
+}
+
+void BackupConfig::renameBaseDirTo(string newBaseDir) {
+    settings[sDirectory].value = newBaseDir;
+    saveConfig();
 }

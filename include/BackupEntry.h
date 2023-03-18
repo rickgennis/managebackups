@@ -35,7 +35,7 @@ class BackupEntry {
 
     BackupEntry();
 
-    string class2string();
+    string class2string(string oldBaseDir = "", string newBaseDir = "");
     bool string2class(string data);
 
     BackupEntry* updateAges(time_t refTime = 0);

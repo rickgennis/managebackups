@@ -262,6 +262,8 @@ void scanConfigToCache(BackupConfig &config) {
         return;
     }
 
+    config.cache.cleanup();
+    
     string fnamePattern = "";
     string directory = config.settings[sDirectory].value;
 
@@ -485,6 +487,9 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
 
         // user hasn't specified --diff (that condition is handled after this function returns)
         !GLOBALS.cli.count(CLI_DIFF) && !GLOBALS.cli.count(CLI_DIFFL) &&
+        
+        // or relocate
+        !GLOBALS.cli.count(CLI_RELOCATE) &&
 
         // & user hasn't selected --all/--All where there's a dir configured in at least one (first)
         // profile
@@ -1485,16 +1490,136 @@ bool enoughLocalSpace(BackupConfig &config)
 }
 
 
-void relocate1FBackups(BackupConfig &config, string newBaseDir) {
-    
+void fsMoveBackup(string oldBackup, string newBackup) {
+    cout << BOLDRED << "FILESYSTEM MOVE NOT YET SUPPORTED" << RESET << endl;
 }
 
 
 void relocateBackups(BackupConfig &config, string newBaseDir) {
-    if (config.settings[sFaub].value.length())
-        relocateFaubBackups(config, newBaseDir);
-    else
-        relocate1FBackups(config, newBaseDir);
+    char dirBuf[PATH_MAX+1];
+    
+    if (newBaseDir.find("*") != string::npos || newBaseDir.find("?") != string::npos) {
+        SCREENERR("error: specific directory required (no wildcards)");
+        exit(1);
+    }
+    
+    // prepend pwd
+    if (newBaseDir[0] != '/' && newBaseDir[0] != '~') {
+        if (getcwd(dirBuf, sizeof(dirBuf)) == NULL) {
+            SCREENERR("error: unable to determine the current directory");
+            exit(1);
+        }
+        
+        newBaseDir = slashConcat(dirBuf, newBaseDir);
+    }
+    
+    // handle tilde substitution
+    // most of the time this isn't necessary because the shell does the
+    // substitution before our app is invoked
+    if (newBaseDir[0] == '~') {
+        string user;
+        auto slash = newBaseDir.find("/");
+        
+        if (slash != string::npos)
+            user = newBaseDir.substr(1, slash - 1);
+        else
+            user = newBaseDir.length() ? newBaseDir.substr(1, newBaseDir.length() - 1) : "";
+        
+        auto uid = getUidFromName(user);
+        if (uid < 0) {
+            SCREENERR("error: invalid user reference in ~" << user);
+            exit(1);
+        }
+        
+        auto homeDir = getUserHomeDir(uid);
+        if (!homeDir.length()) {
+            SCREENERR("error: unable to determine home directory for ~" + user);
+            exit(1);
+        }
+        
+        newBaseDir.replace(0, slash, homeDir);
+    }
+    
+    if (mkdirp(newBaseDir)) {
+        SCREENERR("error: unable to create directory " << newBaseDir << " - " << strerror(errno));
+        exit(1);
+    }
+
+    bool isFaub = config.settings[sFaub].value.length();
+    auto oldBaseDir = isFaub ? config.fcache.getBaseDir() : config.settings[sDirectory].value;
+    
+    struct stat statData1;
+    struct stat statData2;
+    
+    if (stat(oldBaseDir.c_str(), &statData1)) {
+        SCREENERR("error: unable to access (stat) " << oldBaseDir << " - " << strerror(errno));
+        exit(1);
+    }
+    
+    if (stat(newBaseDir.c_str(), &statData2)) {
+        SCREENERR("error: unable to access (stat) " << newBaseDir << " - " << strerror(errno));
+        exit(1);
+    }
+    
+    bool sameFS = (statData1.st_dev == statData2.st_dev);
+    
+    // actually move the backup files
+    auto backupIt = config.fcache.getFirstBackup();
+    auto numBackups = config.fcache.getNumberOfBackups();
+
+    NOTQUIET && ANIMATE && cout << "moving backups... ";
+    
+    while (backupIt != config.fcache.getEnd()) {
+        auto backspaces = string(to_string(numBackups).length() + 1, '\b');
+        auto blanks = string(backspaces.length(), ' ');
+        NOTQUIET && ANIMATE && cout << numBackups << " " << flush;
+
+        auto fullBackupOldPath = backupIt->second.getDir();
+        auto fullBackupNewPath = fullBackupOldPath;
+        fullBackupNewPath.replace(0, oldBaseDir.length(), "");
+        fullBackupNewPath = slashConcat(newBaseDir, fullBackupNewPath);
+
+        auto ps = pathSplit(fullBackupNewPath);
+        if (mkdirp(ps.dir)) {
+            SCREENERR("error: unable to mkdir " << ps.dir);
+            exit(1);
+        }
+        
+        if (sameFS) {
+            if (rename(fullBackupOldPath.c_str(), fullBackupNewPath.c_str())) {
+                SCREENERR("error: unable to rename " << fullBackupOldPath << " to " << fullBackupNewPath << " - " << strerror(errno));
+                exit(1);
+            }
+        }
+        else
+            fsMoveBackup(fullBackupOldPath, fullBackupNewPath);
+            
+        NOTQUIET && ANIMATE && cout << backspaces << blanks << backspaces << flush;
+        ++backupIt;
+    }
+
+    NOTQUIET && ANIMATE && cout << "\nupdating config..." << flush;
+    
+    // clean up the directory name (resolve symlinks, and ".." references)
+    // since mv succeeded above realpath() should succeed
+    newBaseDir = realpathcpp(newBaseDir);
+    
+    // update the directory in the config file
+    config.renameBaseDirTo(newBaseDir);
+    
+    NOTQUIET && ANIMATE && cout << "\nupdating caches..." << flush;
+    
+    // update the directory in all the cache files
+    if (isFaub)
+        config.fcache.renameBaseDirTo(newBaseDir);
+    else {
+        config.cache.saveCache(oldBaseDir, newBaseDir);
+        config.cache.restoreCache(true);
+    }
+
+    NOTQUIET && ANIMATE && cout << endl;
+    NOTQUIET && cout << GREEN << log(config.ifTitle() + " relocated backups from " + oldBaseDir + " to " + newBaseDir) << RESET << endl;
+    exit(0);
 }
 
 
@@ -1600,6 +1725,7 @@ int main(int argc, char *argv[]) {
         CLI_CONSOLIDATE, "Consolidate backups after days", cxxopts::value<int>())(
         CLI_RECALC, "Recalculate faub space", cxxopts::value<bool>()->default_value("false"))(
         CLI_BLOAT, "Bloat size warning", cxxopts::value<string>())(
+        CLI_RELOCATE, "Relocate", cxxopts::value<std::string>())(
         CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
 
     try {
@@ -1740,6 +1866,16 @@ int main(int argc, char *argv[]) {
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager);
     
+    if (GLOBALS.cli.count(CLI_RELOCATE)) {
+        if (GLOBALS.cli.count(CLI_PROFILE)) {
+            scanConfigToCache(*currentConfig);
+            relocateBackups(*currentConfig, GLOBALS.cli[CLI_RELOCATE].as<string>());
+        }
+        else
+            SCREENERR("error: specify a profile to relocate (use -p)");
+        exit(1);
+    }
+
     if (GLOBALS.cli.count(CLI_DIFF) || GLOBALS.cli.count(CLI_DIFFL)) {
         if (GLOBALS.cli.count(CLI_PROFILE)) {
             bool basic = GLOBALS.cli.count(CLI_DIFF);  // DIFF not DIFFL

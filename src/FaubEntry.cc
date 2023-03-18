@@ -73,7 +73,6 @@ void FaubEntry::string2stats(string& data) {
 
 bool FaubEntry::loadStats() {
     ifstream cacheFile;
-    string dirhash = MD5string(directory);
 
     cacheFile.open(cacheFilename(SUFFIX_FAUBSTATS));
     if (cacheFile.is_open()) {
@@ -226,3 +225,30 @@ int FaubEntry::filenameDayAge() {
     return floor((time(NULL) - filename2Mtime(directory)) / SECS_PER_DAY);
 }
 
+
+void FaubEntry::renameDirectoryTo(string newDir, string oldDir) {
+    Pcre regex("^(" + oldDir+ ")");
+    
+    auto origStats = cacheFilename(SUFFIX_FAUBSTATS);
+    auto origInodes = cacheFilename(SUFFIX_FAUBINODES);
+    auto origDiff = cacheFilename(SUFFIX_FAUBDIFF);
+    
+    if (regex.search(directory) && regex.matches()) {
+        directory.erase(0, regex.get_match(0).length());
+        directory = slashConcat(newDir, directory);
+    }
+
+    auto newStats = cacheFilename(SUFFIX_FAUBSTATS);
+    auto newInodes = cacheFilename(SUFFIX_FAUBINODES);
+    auto newDiff = cacheFilename(SUFFIX_FAUBDIFF);
+
+    // need to rename these if they exist but if they don't
+    // that's okay too so no need to error out
+    rename(origStats.c_str(), newStats.c_str());
+    rename(origInodes.c_str(), newInodes.c_str());
+    rename(origDiff.c_str(), newDiff.c_str());
+    
+    // still need to call save because the 'directory' variable is written
+    // into the stats file and needs to be updated.
+    saveStats();
+}

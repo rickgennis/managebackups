@@ -55,6 +55,7 @@ public:
     void updateDiffFiles(set<string> files);
     void displayDiffFiles(bool fullPaths = false);
     
+    void renameDirectoryTo(string newDir, string baseDir);
     void removeEntry();
     
     //string getDirNProfile() { return directory + ";;" + profile; }

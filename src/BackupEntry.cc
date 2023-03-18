@@ -19,7 +19,14 @@ BackupEntry::BackupEntry() {
     links = mtime = size = inode = fnameDayAge = dow = date_day = duration = current = name_mtime = 0;
 }
 
-string BackupEntry::class2string() {
+string BackupEntry::class2string(string oldBaseDir, string newBaseDir) {
+    Pcre regex("^(" + oldBaseDir+ ")");
+    
+    if (regex.search(filename) && regex.matches()) {
+        filename.erase(0, regex.get_match(0).length());
+        filename = slashConcat(newBaseDir, filename);
+    }
+    
     return("[" + filename + "]," + md5 + "," + to_string(links) + "," + to_string(mtime) + "," +
             to_string(size) + "," + to_string(duration));
 }

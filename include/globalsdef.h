@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.4.1"
+#define VERSION "1.4.2"
 
 #include "cxxopts.hpp"
 #include "colors.h"
@@ -123,6 +123,7 @@
 #define CLI_CONSOLIDATE "consolidate"
 #define CLI_RECALC "recalc"
 #define CLI_BLOAT "bloat"
+#define CLI_RELOCATE "relocate"
 
 
 // conf file regexes

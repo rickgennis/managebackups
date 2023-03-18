@@ -735,8 +735,3 @@ void fc_mainEngine(vector<string> paths) {
 
     exit(1);
 }
-
-
-void relocateFaubBackups(BackupConfig &config, string newBaseDir) {
-    
-}

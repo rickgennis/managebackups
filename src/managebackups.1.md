@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.4.1
+% MANAGEBACKUPS(1) managebackups 1.4.2
 % Rick Ennis
 % March 2023
 
@@ -102,7 +102,7 @@ Options are relative to the three functions of **managebackups** plus general op
 : Quiet mode is to minimize output; useful for cron invocations where important messages will be seen in the log or via **--notify**.
 
 **-b**, **--blocks**
-: By default faub backup size values are displayed in bytes (KB, MB, GB, etc). Use **--blocks** to instead display disk usage in terms of blocks, like the the 'du' command. This is only relevant for faub-style backups.
+: By default faub backup size values are displayed in bytes (KB, MB, GB, etc). Use **--blocks** to instead display disk usage in terms of 512-byte blocks, like the the 'du' command. This is only relevant for faub-style backups.
 
 **--confdir** [*dir*]
 : Use *dir* for all configuration files. Defaults to /etc/managebackups.
@@ -133,6 +133,9 @@ Options are relative to the three functions of **managebackups** plus general op
 
 **--consolidate** [*days*]
 : Prune backups down to a single backups per day once they're *days* days old. If you take multiple backups of the same profile in the same day (with **--time**), this allows you to keep only a single one after they age to *days* days but haven't reached the full retention policy to be completely deleted.
+
+**--relocate** [*newDir*]
+: Relocating backups for a profile entails updating the internal caches and moving all the backups files in a hardlink-aware way. The **--relocate** option handles both. Use it in conjunction with **-p**.
 
 **--sched** [*hours*]
 : Schedule (via LaunchCtl on MacOS or cron on Linux) **managebackups** to run every *hours* hours with the "-K" option.  If *hours* is 0 or 24 it's interpreted as once a day and will default to 00:15 in the morning.  If set to run once a day **--schedhour** can be specified to use a different single hour. **--schedminute** can be used to specify a different minute offset. **--schedpath** can be used to specify an alternative location if **managebackups** isn't installed in /usr/local/bin.

@@ -179,9 +179,15 @@ string ue(string file);
 
 bool exists(const std::string& name);
 
-string getUserHomeDir();
+string getUserHomeDir(int uid = -1);
+
+int getUidFromName(string userName);
 
 time_t filename2Mtime(string filename);
+
+int forkMvCmd(string oldDir, string newDir);
+
+string realpathcpp(string origPath);
 
 #endif
 

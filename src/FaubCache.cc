@@ -350,3 +350,11 @@ void FaubCache::cleanup() {
         closedir(c_dir);
     }
 }
+
+
+void FaubCache::renameBaseDirTo(string newDir) {
+    for (auto &backup: backups)
+        backup.second.renameDirectoryTo(newDir, baseDir);
+    
+    baseDir = newDir;
+}

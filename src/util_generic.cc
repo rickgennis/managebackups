@@ -153,21 +153,39 @@ string slashConcat(string str1, string str2, string str3) {
 
 s_pathSplit pathSplit(string path) {
     s_pathSplit s;
-
-    auto pos = path.rfind("/");
-    s.file = path.substr(pos + 1);
-    s.dir = path.substr(0, pos);
-
-    if (!pos)
-        s.dir = "/";
-
-    if (pos == string::npos) {
-        if (s.file == "..") {
-            s.dir = "..";
-            s.file = ".";
+    
+    if (path.length() > 1) {
+        auto pos = path.rfind("/");
+        s.file = path.substr(pos + 1);
+        s.dir = path.substr(0, pos);
+        
+        if (!pos)
+            s.dir = "/";
+        
+        if (pos == string::npos) {
+            if (s.file == "..") {
+                s.dir = "..";
+                s.file = ".";
+            }
+            else
+                s.dir = ".";
         }
-        else 
-            s.dir = ".";
+    }
+    else {
+        if (path.length()) {
+            if (path[0] == '/') {
+                s.dir = "/";
+                s.file = "";
+            }
+            else {
+                s.dir = ".";
+                s.file = path;
+            }
+        }
+        else {
+            s.dir = "";
+            s.file = "";
+        }
     }
 
     return s;
@@ -984,13 +1002,30 @@ bool exists(const std::string& name) {
 }
 
 
-string getUserHomeDir() {
+string getUserHomeDir(int uid) {
     char *homeDir;
     
-    if ((homeDir = getenv("HOME")) == NULL)
-        homeDir = getpwuid(getuid())->pw_dir;
+    if ((homeDir = getenv("HOME")) != NULL)
+        return homeDir;
+    
+    auto h = getpwuid(uid == -1 ? getuid() : uid);
+    if (h != NULL)
+        return h->pw_dir;
 
-    return homeDir;
+    return "";
+}
+
+
+int getUidFromName(string userName) {
+    if (!userName.length())
+        return getuid();
+    
+    struct passwd* pwd;
+    pwd = getpwnam(userName.c_str());
+    if (pwd == NULL)
+        return -1;
+    
+    return pwd->pw_uid;
 }
 
 
@@ -1022,4 +1057,38 @@ time_t filename2Mtime(string filename) {
     fileTime.tm_isdst = -1;
 
     return mktime(&fileTime);
+}
+
+
+int forkMvCmd(string oldDir, string newDir) {
+    // actually move the backup files.  this is tempting to do internally
+    // but if you look at the source to the mv command there are more one-
+    // off special cases than you can count.  may as well let it do what
+    // it's good at.
+    auto mv = locateBinary("/bin/mv");
+    
+    auto pid = fork();
+    if (pid < 0) {
+        SCREENERR(string("error: unable to execute fork to run mv - ") + strerror(errno));
+        exit(1);
+    }
+    
+    if (pid) {
+        int status;
+        
+        pid = wait(&status);
+        if (WIFEXITED(status))
+            return status;
+        
+        return -1;
+    }
+
+    execl(mv.c_str(), mv.c_str(), oldDir.c_str(), newDir.c_str(), 0);
+    exit(0);
+}
+
+
+string realpathcpp(string origPath) {
+    char tmpBuf[PATH_MAX+1];
+    return (realpath(origPath.c_str(), tmpBuf) == NULL ? "" : tmpBuf);
 }
