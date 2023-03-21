@@ -77,17 +77,17 @@ void BackupCache::saveCache(string oldBaseDir, string newBaseDir) {
 }
 
 
-void BackupCache::restoreCache(bool nukeFirst) {
+bool BackupCache::restoreCache(bool nukeFirst) {
     ifstream cacheFile;
 
-    if (nukeFirst) {
-        rawData.clear();
-        indexByMD5.clear();
-        indexByFilename.clear();
-    }
-    
     cacheFile.open(cacheFilename);
     if (cacheFile.is_open()) {
+        
+        if (nukeFirst) {
+            rawData.clear();
+            indexByMD5.clear();
+            indexByFilename.clear();
+        }
         
         unsigned int count = 0;
         string cacheData;
@@ -100,9 +100,10 @@ void BackupCache::restoreCache(bool nukeFirst) {
         
         cacheFile.close();
         DEBUG(D_cache) DFMT("loaded " << count << " cache entries from " << cacheFilename);
+        return true;
     }
-    else
-        log("unable to read cache file " + cacheFilename);
+    
+    return false;
 }
 
 

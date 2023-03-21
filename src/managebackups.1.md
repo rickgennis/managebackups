@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.4.2
+% MANAGEBACKUPS(1) managebackups 1.4.4
 % Rick Ennis
 % March 2023
 
@@ -135,7 +135,7 @@ Options are relative to the three functions of **managebackups** plus general op
 : Prune backups down to a single backups per day once they're *days* days old. If you take multiple backups of the same profile in the same day (with **--time**), this allows you to keep only a single one after they age to *days* days but haven't reached the full retention policy to be completely deleted.
 
 **--relocate** [*newDir*]
-: Relocating backups for a profile entails updating the internal caches and moving all the backups files in a hardlink-aware way. The **--relocate** option handles both. Use it in conjunction with **-p**.
+: Relocating backups for a profile entails updating the internal caches, updating the profile's configuration and moving all the backups files in a hardlink-aware way. The **--relocate** option handles all three of these. Use it in conjunction with **-p**.
 
 **--sched** [*hours*]
 : Schedule (via LaunchCtl on MacOS or cron on Linux) **managebackups** to run every *hours* hours with the "-K" option.  If *hours* is 0 or 24 it's interpreted as once a day and will default to 00:15 in the morning.  If set to run once a day **--schedhour** can be specified to use a different single hour. **--schedminute** can be used to specify a different minute offset. **--schedpath** can be used to specify an alternative location if **managebackups** isn't installed in /usr/local/bin.
@@ -150,7 +150,7 @@ Options are relative to the three functions of **managebackups** plus general op
 : Specify the path to **managebackups** if it isn't installed in /usr/local/bin.  See **--sched**.
 
 **--recalc**
-: Recalcuate all disk usage for a profile. This should never be necessary.
+: Recalcuate all disk usage for a profile. Use with -p.  This should never be necessary.
 
 ## 1. Take Backups Options
 Backups options are noted as {1F} for single-file applicable, {FB} for faub-backup applicable, or {both}.

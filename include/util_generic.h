@@ -59,6 +59,27 @@ struct DiskStats {
      _a < _b ? _a : _b; })
 
 
+#define mytimersub(tvp, uvp, vvp)                         \
+    do {                                                  \
+        (vvp)->tv_sec = (tvp)->tv_sec - (uvp)->tv_sec;    \
+        (vvp)->tv_usec = (tvp)->tv_usec - (uvp)->tv_usec; \
+        if ((vvp)->tv_usec < 0) {                         \
+            (vvp)->tv_sec--;                              \
+            (vvp)->tv_usec += 1000000;                    \
+        }                                                 \
+    } while (0)
+
+#define mytimeradd(tvp, uvp, vvp)                         \
+    do {                                                  \
+        (vvp)->tv_sec = (tvp)->tv_sec + (uvp)->tv_sec;    \
+        (vvp)->tv_usec = (tvp)->tv_usec + (uvp)->tv_usec; \
+        if ((vvp)->tv_usec >= 1000000) {                  \
+            (vvp)->tv_sec++;                              \
+            (vvp)->tv_usec -= 1000000;                    \
+        }                                                 \
+    } while (0)
+
+
 string cppgetenv(string variable);
 
 string plural(size_t number, string text);
@@ -70,35 +91,43 @@ string log(string message);
 struct timeval mktimeval(time_t secs);
 
 string timeDiff(struct timeval start, struct timeval end = mktimeval(GLOBALS.startupTime), int maxUnits = 2, int precision = 2);
+string timeDiffSingle(struct timeval, int maxUnits = 2, int precision = 2);
 
 vector<string> perlSplit(string regex, string haystack);
 
+
 class timer {
     string duration;
+    struct timeval startTime;
+    struct timeval endTime;
+    struct timeval spentTime;
 
-    public:
-        struct timeval startTime;
-        struct timeval endTime;
-    
+    public:    
         void start() { gettimeofday(&startTime, NULL); duration = ""; }
-        void stop() { gettimeofday(&endTime, NULL); }
-
-        time_t seconds() { 
-            unsigned long totalus = (endTime.tv_sec * MILLION + endTime.tv_usec) - (startTime.tv_sec * MILLION + startTime.tv_usec);
-            return floor(1.0 * totalus / MILLION);
-
-            auto r = endTime.tv_sec - startTime.tv_sec - (endTime.tv_usec > startTime.tv_usec ? 1 : 0); 
-            return(r > 0 ? r : 0); 
+        void stop() {
+            gettimeofday(&endTime, NULL);
+            struct timeval diffTime;
+            struct timeval tempTime;
+            mytimersub(&endTime, &startTime, &diffTime);
+            mytimeradd(&diffTime, &spentTime, &tempTime);
+            spentTime = tempTime;
         }
+    
+        void restart() { spentTime.tv_sec = spentTime.tv_usec = 0; start(); }
+    
+        time_t seconds() { return (spentTime.tv_sec); }
+        long int useconds() { return (spentTime.tv_usec); }
 
         string elapsed(int precision = 2) {
             if (!duration.length()) 
-                duration = timeDiff(startTime, endTime, 3, precision);
+                duration = timeDiffSingle(spentTime, 3, precision);
 
             return(duration);
         }
 
-        timer() { startTime.tv_sec = 0; startTime.tv_usec = 0; }
+    time_t getEndTimeSecs() { return endTime.tv_sec; }
+        
+    timer() { startTime.tv_sec = startTime.tv_usec = endTime.tv_sec = endTime.tv_usec = spentTime.tv_sec = spentTime.tv_usec = 0; }
 };
 
 

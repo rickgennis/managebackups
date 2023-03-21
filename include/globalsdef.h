@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.4.2"
+#define VERSION "1.4.4"
 
 #include "cxxopts.hpp"
 #include "colors.h"
@@ -36,6 +36,7 @@
 #define CONF_DIR "/etc/managebackups"
 #define CACHE_DIR "/var/managebackups/caches"
 #define TMP_OUTPUT_DIR "/tmp/managebackups_output"
+#define GLOBALSTATSFILE "lastrun.stats"
 
 #define DFMT(x) cerr << BOLDGREEN << __FUNCTION__ << ": " << RESET << GREEN << x << RESET << endl
 #define DFMTNOENDL(x) cerr << BOLDGREEN << __FUNCTION__ << ": " << RESET << GREEN << x << RESET

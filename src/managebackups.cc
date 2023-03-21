@@ -55,6 +55,7 @@
 
 #include <filesystem>
 #include <iostream>
+#include <fstream>
 
 #include "syslog.h"
 #include "unistd.h"
@@ -199,9 +200,16 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache, 
                             cache.addOrUpdate(*pCacheEntry->updateAges(GLOBALS.startupTime), true);
                             continue;
                         }
+                        else {
+                            if (!pCacheEntry->md5.length()) { DEBUG(D_scan) DFMT("{no md5} " + fullFilename); }
+                            else
+                                if (pCacheEntry->size != statData.st_size) { DEBUG(D_scan) DFMT("{size change} " + fullFilename); }
+                            else
+                                if (!pCacheEntry->mtime) { DEBUG(D_scan) DFMT("{no mtime}" + fullFilename); }
+                            else
+                                if (pCacheEntry->mtime != statData.st_mtime) { DEBUG(D_scan) DFMT("{mtime change} " + fullFilename); }
+                        }
                     }
-                    // else
-                    //     cerr << fullFilename << " not found in cache; " << cache.size() << endl;
 
                     // otherwise let's update the cache with everything we just read and
                     // then calculate a new md5
@@ -1213,8 +1221,7 @@ bool performTripwire(BackupConfig &config)
  *
  * Perform a backup, saving it to the configured filename.
  *******************************************************************************/
-void performBackup(BackupConfig &config)
-{
+void performBackup(BackupConfig &config) {
     bool incTime = str2bool(config.settings[sIncTime].value);
     string setFname = config.settings[sBackupFilename].value;
     string setDir = config.settings[sDirectory].value;
@@ -1293,7 +1300,7 @@ void performBackup(BackupConfig &config)
             cacheEntry.inode = statData.st_ino;
             cacheEntry.size = statData.st_size;
             cacheEntry.duration = backupTime.seconds();
-            cacheEntry.updateAges(backupTime.endTime.tv_sec);
+            cacheEntry.updateAges(backupTime.getEndTimeSecs());
             cacheEntry.calculateMD5();
 
             // rename the file
@@ -1399,6 +1406,22 @@ void performBackup(BackupConfig &config)
         notify(config,
                errorcom(config.ifTitle(), "backup command failed to generate any output") + "\n",
                false);
+    
+    /*
+       periodically we need to walk the cache and throw out backups that no longer exist
+       (likely manually deleted outside of managebackups).  after a backup is as good a
+       time as any.
+     */
+    
+    for (auto &backup: config.cache.indexByFilename)
+        if (!exists(backup.first)) {
+            auto rawIt = config.cache.rawData.find(backup.second);
+            if (rawIt != config.cache.rawData.end()) {
+                log(config.ifTitle() + " " + backup.first + " has vanished, updating cache");
+                config.cache.remove(rawIt->second);
+                config.cache.updated = true;
+            }
+        }
 }
 
 /*******************************************************************************
@@ -1471,11 +1494,9 @@ bool enoughLocalSpace(BackupConfig &config)
              << "), required=" << requiredSpace << " (" << approximate(requiredSpace) << ")");
 
         if (availableSpace < requiredSpace) {
-            notify(config,
-                   errorcom(config.ifTitle(), "error: insufficient space (" +
-                                                  approximate(availableSpace) +
-                                                  ") to start a new backup, " +
-                                                  approximate(requiredSpace) + " required."), true);
+            notify(config, errorcom(config.ifTitle(), "error: insufficient space (" +
+                approximate(availableSpace) + ") to start a new backup, " +
+                approximate(requiredSpace) + " required."), true);
             return false;
         }
     }
@@ -1490,8 +1511,51 @@ bool enoughLocalSpace(BackupConfig &config)
 }
 
 
-void fsMoveBackup(string oldBackup, string newBackup) {
+void moveBackupCrossFS(string oldBackup, string newBackup) {
     cout << BOLDRED << "FILESYSTEM MOVE NOT YET SUPPORTED" << RESET << endl;
+    exit(1);
+}
+
+
+bool moveBackup(string fullBackupOldPath, string oldBaseDir, string newBaseDir, bool sameFS, unsigned long numBackups) {
+    static int count = 0;
+    bool result = true;
+    auto fullBackupNewPath = fullBackupOldPath;
+    auto pos = fullBackupNewPath.find(oldBaseDir);
+    if (pos != string::npos)
+        fullBackupNewPath.replace(pos, oldBaseDir.length(), "");
+    fullBackupNewPath = slashConcat(newBaseDir, fullBackupNewPath);
+
+    auto backspaces = string(to_string(numBackups).length() + 1, '\b');
+    auto blanks = string(backspaces.length(), ' ');
+    NOTQUIET && ANIMATE && cout << numBackups << " " << flush;
+    
+    auto ps = pathSplit(fullBackupNewPath);
+    if (mkdirp(ps.dir)) {
+        SCREENERR("error: unable to mkdir " << ps.dir);
+        exit(1);
+    }
+    
+    if (sameFS) {
+        if (exists(fullBackupOldPath)) {
+            if (rename(fullBackupOldPath.c_str(), fullBackupNewPath.c_str())) {
+                SCREENERR("error: unable to rename " << fullBackupOldPath << " to " << fullBackupNewPath << " - " << strerror(errno));
+                if (count)
+                    SCREENERR("\nSome backups were successfully renamed. Correct the permission issue and rerun\n" <<
+                              "the --relocate to maintain a consistent state.");
+                exit(1);
+            }
+        }
+        else
+            result = false;
+    }
+    else
+        moveBackupCrossFS(fullBackupOldPath, fullBackupNewPath);
+        
+    NOTQUIET && ANIMATE && cout << backspaces << blanks << backspaces << flush;
+    ++count;
+    
+    return result;
 }
 
 
@@ -1539,15 +1603,20 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
         
         newBaseDir.replace(0, slash, homeDir);
     }
-    
+
+    bool isFaub = config.settings[sFaub].value.length();
+    auto oldBaseDir = isFaub ? config.fcache.getBaseDir() : config.settings[sDirectory].value;
+ 
+    if (newBaseDir == oldBaseDir) {
+        NOTQUIET && cout << GREEN << "backups for " << config.settings[sTitle].value << " are already in " << oldBaseDir << RESET << endl;
+        exit(0);
+    }
+ 
     if (mkdirp(newBaseDir)) {
         SCREENERR("error: unable to create directory " << newBaseDir << " - " << strerror(errno));
         exit(1);
     }
-
-    bool isFaub = config.settings[sFaub].value.length();
-    auto oldBaseDir = isFaub ? config.fcache.getBaseDir() : config.settings[sDirectory].value;
-    
+   
     struct stat statData1;
     struct stat statData2;
     
@@ -1562,64 +1631,109 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
     }
     
     bool sameFS = (statData1.st_dev == statData2.st_dev);
-    
-    // actually move the backup files
-    auto backupIt = config.fcache.getFirstBackup();
-    auto numBackups = config.fcache.getNumberOfBackups();
-
+    auto numBackups = isFaub ? config.fcache.getNumberOfBackups() : config.cache.rawData.size();
     NOTQUIET && ANIMATE && cout << "moving backups... ";
-    
-    while (backupIt != config.fcache.getEnd()) {
-        auto backspaces = string(to_string(numBackups).length() + 1, '\b');
-        auto blanks = string(backspaces.length(), ' ');
-        NOTQUIET && ANIMATE && cout << numBackups << " " << flush;
 
-        auto fullBackupOldPath = backupIt->second.getDir();
-        auto fullBackupNewPath = fullBackupOldPath;
-        fullBackupNewPath.replace(0, oldBaseDir.length(), "");
-        fullBackupNewPath = slashConcat(newBaseDir, fullBackupNewPath);
-
-        auto ps = pathSplit(fullBackupNewPath);
-        if (mkdirp(ps.dir)) {
-            SCREENERR("error: unable to mkdir " << ps.dir);
-            exit(1);
+    // actually move the backup files
+    if (isFaub) {
+        auto backupIt = config.fcache.getFirstBackup();
+        while (backupIt != config.fcache.getEnd()) {
+            if (!moveBackup(backupIt->second.getDir(), oldBaseDir, newBaseDir, sameFS, numBackups)) {
+                log(config.ifTitle() + " " + backupIt->second.getDir() + " has vanished, updating cache");
+                config.fcache.removeBackup(backupIt);
+            }
+            ++backupIt;
         }
-        
-        if (sameFS) {
-            if (rename(fullBackupOldPath.c_str(), fullBackupNewPath.c_str())) {
-                SCREENERR("error: unable to rename " << fullBackupOldPath << " to " << fullBackupNewPath << " - " << strerror(errno));
-                exit(1);
+    }
+    else
+        for (auto fIdx_it = config.cache.indexByFilename.begin(), next_it = fIdx_it;
+             fIdx_it != config.cache.indexByFilename.end(); fIdx_it = next_it) {
+            // the second iterator (next_it) is necessary because a function called within
+            // this loop (config.cache.remove()) calls erase() on our primary iterator. next_it allows
+            // the loop to track the next value for the iterator without dereferencing a deleted
+            // pointer.
+            ++next_it;
+            
+            if (!moveBackup(fIdx_it->first, oldBaseDir, newBaseDir, sameFS, numBackups)) {
+                auto rawIt = config.cache.rawData.find(fIdx_it->second);
+                if (rawIt != config.cache.rawData.end()) {
+                    log(config.ifTitle() + " " + fIdx_it->first + " has vanished, updating cache");
+                    config.cache.remove(rawIt->second);
+                    config.cache.updated = true;
+                }
             }
         }
-        else
-            fsMoveBackup(fullBackupOldPath, fullBackupNewPath);
-            
-        NOTQUIET && ANIMATE && cout << backspaces << blanks << backspaces << flush;
-        ++backupIt;
-    }
 
     NOTQUIET && ANIMATE && cout << "\nupdating config..." << flush;
     
     // clean up the directory name (resolve symlinks, and ".." references)
     // since mv succeeded above realpath() should succeed
     newBaseDir = realpathcpp(newBaseDir);
-    
+
     // update the directory in the config file
     config.renameBaseDirTo(newBaseDir);
-    
+
     NOTQUIET && ANIMATE && cout << "\nupdating caches..." << flush;
     
     // update the directory in all the cache files
     if (isFaub)
         config.fcache.renameBaseDirTo(newBaseDir);
     else {
+        config.cache.setCacheFilename(GLOBALS.cacheDir + "/" + MD5string(config.settings[sDirectory].value + config.settings[sBackupFilename].value));
         config.cache.saveCache(oldBaseDir, newBaseDir);
         config.cache.restoreCache(true);
     }
 
     NOTQUIET && ANIMATE && cout << endl;
-    NOTQUIET && cout << GREEN << log(config.ifTitle() + " relocated backups from " + oldBaseDir + " to " + newBaseDir) << RESET << endl;
+    NOTQUIET && cout << GREEN << log(config.ifTitle() + " " + plural(numBackups, "backup") + " successfully relocated from " + oldBaseDir + " to " + newBaseDir) << RESET << endl;
     exit(0);
+}
+
+
+void saveGlobalStats(unsigned long stats, unsigned long md5s, string elapsedTime) {
+    ofstream ofile;
+    
+    ofile.open(GLOBALS.cacheDir + "/" + GLOBALSTATSFILE);
+    if (ofile.is_open()) {
+        ofile << stats << endl;
+        ofile << md5s << endl;
+        ofile << elapsedTime << endl;
+     
+        ofile.close();
+    }
+    
+    if (getuid() != geteuid())
+        chown(string(GLOBALS.cacheDir + "/" + GLOBALSTATSFILE).c_str(), geteuid(), getegid());
+}
+
+
+bool getGlobalStats(unsigned long& stats, unsigned long& md5s, string& elapsedTime) {
+    fstream ifile;
+    
+    ifile.open(GLOBALS.cacheDir + "/" + GLOBALSTATSFILE, ios::in);
+    if (ifile.is_open()) {
+        try {
+            string data;
+
+            getline(ifile, data);
+            stats = stol(data);
+            
+            getline(ifile, data);
+            md5s = stol(data);
+            
+            getline(ifile, elapsedTime);
+            
+            ifile.close();
+        }
+        catch (...) {
+            unlink(string(GLOBALS.cacheDir + "/" + GLOBALSTATSFILE).c_str());
+            return false;
+        }
+        
+        return true;
+    }
+    
+    return false;
 }
 
 
@@ -2191,6 +2305,20 @@ int main(int argc, char *argv[]) {
     DEBUG(D_any)
     DFMT("stats: " << BOLDGREEN << GLOBALS.statsCount << RESET << GREEN << ", md5s: " << BOLDGREEN
                    << GLOBALS.md5Count << RESET << GREEN << ", total time: " << BOLDGREEN
-                   << AppTimer.elapsed(3));
+                   << AppTimer.elapsed(3) << YELLOW << " (current run)");
+    
+    unsigned long oldStats;
+    unsigned long oldMd5s;
+    string oldElapsed;
+    
+    if (getGlobalStats(oldStats, oldMd5s, oldElapsed)) {
+        DEBUG(D_any)
+        DFMT("stats: " << BOLDGREEN << oldStats << RESET << GREEN << ", md5s: " << BOLDGREEN
+                       << oldMd5s << RESET << GREEN << ", total time: " << BOLDGREEN
+                       << oldElapsed << YELLOW << " (previous run)");
+    }
+    
+    saveGlobalStats(GLOBALS.statsCount, GLOBALS.md5Count, AppTimer.elapsed(3));
+    
     return 0;
 }

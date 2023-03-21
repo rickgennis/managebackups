@@ -13,13 +13,14 @@
 using namespace std;
 
 class BackupCache {
+    string cacheFilename;
+
 public:
     map<unsigned int, BackupEntry> rawData;
     map<string, set<unsigned int> > indexByMD5;
     map<string, unsigned int, cmpName> indexByFilename;
     bool updated;
     string inProcess;
-    string cacheFilename;
     
     BackupEntry* getByFilename(string filename);
     set<BackupEntry*> getByMD5(string md5);
@@ -32,8 +33,9 @@ public:
     string size(string md5);
     string fullDump();
     
+    void setCacheFilename(string filename) { cacheFilename = filename + ".1f"; }
     void saveCache(string oldBaseDir = "", string newBaseDir = "");  // only specify base dirs when relocating
-    void restoreCache(bool nukeFirst = false);
+    bool restoreCache(bool nukeFirst = false);
     void saveAtEnd(bool shouldSave = 1) { updated = shouldSave; }
     
     void cleanup();

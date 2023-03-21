@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <pwd.h>
 #include <vector>
 #include <set>
@@ -362,14 +363,13 @@ string seconds2hms(time_t seconds) {
 }
 
 
-string timeDiff(struct timeval start, struct timeval end, int maxUnits, int precision) {
-    unsigned long totalus = (end.tv_sec * MILLION + end.tv_usec) - (start.tv_sec * MILLION + start.tv_usec);
-    unsigned long secs = floor(1.0 * totalus / MILLION);
-    unsigned long us = secs ? totalus % (secs * MILLION) : totalus;
-    unsigned long offset = secs;
+string timeDiffSingle(struct timeval duration, int maxUnits, int precision) {
+    auto secs = duration.tv_sec;
+    auto us = duration.tv_usec;
+    auto offset = secs;
     int unitsUsed = 0;
     string result;
-    map<unsigned long, string> units { 
+    map<unsigned long, string> units {
         { 31556952, "year" },
         { 2592000, "month" },
         { 604800, "week" },
@@ -414,6 +414,14 @@ string timeDiff(struct timeval start, struct timeval end, int maxUnits, int prec
     }
 
     return(result.length() ? result : "0 seconds");
+}
+
+
+string timeDiff(struct timeval start, struct timeval end, int maxUnits, int precision) {
+    struct timeval diffTime;
+    mytimersub(&end, &start, &diffTime);
+
+    return timeDiffSingle(diffTime, maxUnits, precision);
 }
 
 
