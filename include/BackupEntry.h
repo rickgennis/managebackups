@@ -39,7 +39,7 @@ class BackupEntry {
     bool string2class(string data);
 
     BackupEntry* updateAges(time_t refTime = 0);
-    bool calculateMD5();
+    bool calculateMD5(string reason = "");
 };
 
 #endif

@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.4.4
+% MANAGEBACKUPS(1) managebackups 1.4.5
 % Rick Ennis
 % March 2023
 
@@ -37,7 +37,7 @@ Options are relative to the three functions of **managebackups** plus general op
 : Displays help text.
 
 **-v**[*options*]
-: Provide verbose debugging output. Brilliant (albeit overkill in this context) debugging logic borrowed from Philip Hazel's Exim Mail Transport Agent. **-v** by itself enables the default list of debugging contexts.  Contexts can be added or subtracted by name. For example, **-v+cache** provides the default set plus caching whereas **-v-all+cache** provides only caching. **-v+all** gives everything (**--vv**, two dashes, two v's, is a synonym for all). Longer combinations can be strung together as well (**-v-all+cache+prune+scan**). Note spaces are not supported in the -v string. Valid contexts are:
+: Provide verbose debugging output. Brilliant (albeit overkill in this situation) debugging logic borrowed from Philip Hazel's Exim Mail Transport Agent. **-v** by itself enables the default list of debugging contexts.  Contexts can be added or subtracted by name. For example, **-v+cache** provides the default set plus caching whereas **-v-all+cache** provides only caching. **-v+all** gives everything (**--vv**, two dashes, two v's, is a synonym for all). Longer combinations can be strung together as well (**-v-all+cache+prune+scan**). Note spaces are not supported in the -v string. Valid contexts are:
 
         * backup (default)
         * cache
@@ -131,11 +131,14 @@ Options are relative to the three functions of **managebackups** plus general op
 **--diffl** [*string*]
 : Similar to **--diff** except display the full path (long form) of the changed files within the context of the matching backup.
 
-**--consolidate** [*days*]
-: Prune backups down to a single backups per day once they're *days* days old. If you take multiple backups of the same profile in the same day (with **--time**), this allows you to keep only a single one after they age to *days* days but haven't reached the full retention policy to be completely deleted.
+**--compare** [*string*]
+: {FB} Compare two backups within a profile and show the size change of each file.  Unlike **--diff** the comparison can be with any other backup in the set - specify **--compare** twice, once to name each backup.  Files are displayed if they don't share the same inodes bewteen both backups.  Note that if a file exceeds **--maxlinks** and gets assigned a new inode (even though the file content is identical) it will also show up in a **--compare**.  See **--threshold**.
+
+**--threshold** [*limit*]
+: {FB} Specify a threshold to filter **--compare** listings. *limit* is assumed to be in bytes unless a suffix is specified (K, M, G, T, P, E, Z, Y).  Alternatively *limit* can be a percentage (e.g. 25%).  If the absolute value of the difference between the size of the file in backupA and the size of the file in backupB is greater than or equal to the *limit* then the file is included in the output. A file that exists in only one of the two backups matches any percentage.  Defaults to 0 to include all changes. 
 
 **--relocate** [*newDir*]
-: Relocating backups for a profile entails updating the internal caches, updating the profile's configuration and moving all the backups files in a hardlink-aware way. The **--relocate** option handles all three of these. Use it in conjunction with **-p**.
+: Relocating backups for a profile entails updating the internal caches, updating the profile's configuration and moving all the backups' files in a hardlink-aware way. The **--relocate** option handles all three of these. Use it in conjunction with **-p**.
 
 **--sched** [*hours*]
 : Schedule (via LaunchCtl on MacOS or cron on Linux) **managebackups** to run every *hours* hours with the "-K" option.  If *hours* is 0 or 24 it's interpreted as once a day and will default to 00:15 in the morning.  If set to run once a day **--schedhour** can be specified to use a different single hour. **--schedminute** can be used to specify a different minute offset. **--schedpath** can be used to specify an alternative location if **managebackups** isn't installed in /usr/local/bin.
@@ -161,8 +164,11 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 **--file** [*filename*]
 : {1F} Use *filename* as the base filename to create for new backups.  The date and optionally time are inserted before the extension, or if no extension, at the end.  A filename of mybackup.tgz will become mybackup-YYYYMMDD.tgz.
 
+**--faub** [*cmd*]
+: {FB} Use *cmd* to perform a Faub-style backup. *cmd* should be double-quoted.  Ultimately *cmd* should execute **managebackups** with **--path** or **-s** on the server to be backed up.  If the backup is of the localhost *cmd* can simply be "managebackups -s filesystemToBeBackedup".  If the backup is of a remote host *cmd* needs to execute **managebackups** on that remote server, such as via ssh.  See the FAUB-STYLE BACKUPS section below. 
+
 **-c**, **--command** [*cmd*]
-: {1F} Use *cmd* to perform a backup.  *cmd* should be double-quoted and may include as many pipes as desired. Have the command send the backed up data to its STDOUT.  For example, **--cmd** "tar -cz /mydata" or **--cmd** "/usr/bin/tar -c /opt | /usr/bin/gzip -n".  **-c** is replaced with **--faub** in a faub-backup configuration.
+: {1F} Use *cmd* to perform a single-file backup.  *cmd* should be double-quoted and may include as many pipes as desired. Have the command send the backed up data to its STDOUT.  For example, **--cmd** "tar -cz /mydata" or **--cmd** "/usr/bin/tar -c /opt | /usr/bin/gzip -n".  **-c** is replaced with **--faub** in a faub-backup configuration.
 
 **--mode** [*mode*]
 : {1F} chmod newly created backups to *mode*, which is specified in octal. Defaults to 0600.
@@ -210,7 +216,7 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 : {1F} Require *minsftpspace* free space on the remote SFTP server before SFTPing a file. *minsftpspace* is assumed to be in bytes unless a suffix is specified (K, M, G, T, P, E, Z, Y).
 
 **--nobackup**
-: {both} Disable performing backups for this run. To disable permanently moving forward, remove the "command" directive from the profile's config file.
+: {both} Disable performing backups for this run. To disable permanently moving forward, remove the "command" & "faub" directives from the profile's config file.
 
 **--leaveoutput**
 : {both} Leave the output from any commands that are executed (create a backup, ssh, SFTP, etc) in a file under /tmp/managebackups_output. This can help facilitate diagnosing authentication or configuration errors.
@@ -237,6 +243,9 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 
 **-y**, **--years**, **--yearly**
 : Specify the number of yearly backups to keep. Defaults to 2.
+
+**--consolidate** [*days*]
+: Prune backups down to a single backups per day once they're *days* days old. If you take multiple backups of the same profile in the same day (with **--time**), this allows you to keep only a single one after they age to *days* days but haven't reached the full retention policy to be completely deleted.
 
 ## 3. Linking Options
 
@@ -273,7 +282,7 @@ Aside from access to read the files being backed up (on a remote server or local
 The first three of these can be achieved by moving the log/cache/backup files into a directory that **managebackups** has write access to. Alternatively, **managebackups** can be made suid or sgid (see **--install** and **--installsuid**). The fourth permission issue has no workaround. If you wish to use faub-style backups **managebackups** needs to run as root either via **--installsuid**, sudo or via the root user.  Without root access faub-style backups can be created but all files will have the same owner.
 
 # FAUB-STYLE BACKUPS
-Faub-style backups require **managebackups** to be installed on both the backup server and the server being backed up.  In most cases, both invocations will need to be run as root in order to replicate the file owners/groups/perms from one machine to the other.  On the server side (the machine doing the backing up), the configuration will require:
+Faub-style backups require **managebackups** to be installed on both the backup server and the server being backed up.  In most cases, both invocations will need to be run as root in order to replicate the file owners/groups/perms from one machine to the other.  On the server side (the machine doing the backing up) the configuration will require:
 
 - **--directory**
 - **--faub**

@@ -12,6 +12,7 @@
 #include "colors.h"
 #include "debug.h"
 
+extern void cleanupAndExitOnError();
 
 using namespace pcrepp;
 
@@ -114,7 +115,8 @@ void BackupConfig::saveConfig() {
         cerr << "These locations can be overriden via --confdir, --cachedir or the environment variables\n";
         cerr << "MB_CONFDIR, MB_CACHEDIR." << endl;
         log("error: unable to create " + temp_filename + " (directory not writable?)");
-        exit(1);
+        cleanupAndExitOnError();
+        
     }
 
     string usersDelimiter = ": ";
@@ -162,7 +164,7 @@ void BackupConfig::saveConfig() {
             log("error: unable to process the directive on line " + to_string(line) + " of " + config_filename);
             cerr << "error: unable to process the directive on line " << line << " of " << config_filename << endl;
             cerr << "    " << dataLine << endl;
-            exit(1);
+            cleanupAndExitOnError();
         }
 
         oldFile.close();

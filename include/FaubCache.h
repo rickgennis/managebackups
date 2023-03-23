@@ -35,6 +35,7 @@ private:
     string inProcessFilename;
     
     void restoreCache_internal(string backupDir);
+    map<string, FaubEntry, cmpName>::iterator findBackup(string backupDir);
     
 public:
     void restoreCache(string profileName);
@@ -54,6 +55,7 @@ public:
     
     void updateDiffFiles(string backupDir, set<string> files);
     void displayDiffFiles(string backupDir, bool fullPaths = false);
+    void compare(string backupA, string backupB, string threshold);
     
     void cleanup();
     void recache(string targetDir, time_t deletedtime = 0, bool forceAll = false);

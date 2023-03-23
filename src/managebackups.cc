@@ -190,6 +190,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache, 
                     // if the cache has an existing md5 and the cache's mtime and size match
                     // what we just read from disk, consider the cache valid.  only update
                     // the inode & age info.
+                    string reason;
                     BackupEntry *pCacheEntry;
                     if ((pCacheEntry = cache.getByFilename(fullFilename)) != NULL) {
                         if (pCacheEntry->md5.length() && pCacheEntry->size == statData.st_size &&
@@ -201,15 +202,18 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache, 
                             continue;
                         }
                         else {
-                            if (!pCacheEntry->md5.length()) { DEBUG(D_scan) DFMT("{no md5} " + fullFilename); }
+                            if (!pCacheEntry->md5.length()) { reason = "{no md5}"; }
                             else
-                                if (pCacheEntry->size != statData.st_size) { DEBUG(D_scan) DFMT("{size change} " + fullFilename); }
+                                if (pCacheEntry->size != statData.st_size) { reason = "{size change}"; }
                             else
-                                if (!pCacheEntry->mtime) { DEBUG(D_scan) DFMT("{no mtime}" + fullFilename); }
+                                if (!pCacheEntry->mtime) { reason = "{no mtime}"; }
                             else
-                                if (pCacheEntry->mtime != statData.st_mtime) { DEBUG(D_scan) DFMT("{mtime change} " + fullFilename); }
+                                if (pCacheEntry->mtime != statData.st_mtime) { reason = "{mtime change}"; }
+                            else
+                                reason = "{?}";
                         }
                     }
+                    else { reason = "{not in cache}"; }
 
                     // otherwise let's update the cache with everything we just read and
                     // then calculate a new md5
@@ -221,7 +225,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache, 
                     cacheEntry.size = statData.st_size;
                     cacheEntry.updateAges(GLOBALS.startupTime);
 
-                    if (cacheEntry.calculateMD5()) {
+                    if (cacheEntry.calculateMD5(reason)) {
                         cache.addOrUpdate(cacheEntry, true, true);
                     }
                     else {
@@ -498,6 +502,9 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
         
         // or relocate
         !GLOBALS.cli.count(CLI_RELOCATE) &&
+        
+        // or compare
+        !GLOBALS.cli.count(CLI_COMPARE) &&
 
         // & user hasn't selected --all/--All where there's a dir configured in at least one (first)
         // profile
@@ -505,7 +512,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
            GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP)) &&
           configManager.configs.size() &&
           configManager.configs[0].settings[sDirectory].value.length())) {
-        SCREENERR("error: --directory is required");
+        SCREENERR("error: --directory is required, or a --profile previously saved with a directory");
         exit(1);
     }
 
@@ -1450,9 +1457,8 @@ void setupUserDirectories()
  *
  * Catch the configured signals and clean up any inprocess backup.
  *******************************************************************************/
-void sigTermHandler(int sig)
-{
-    string reason = (sig ? "interrupt" : "timeout");
+void sigTermHandler(int sig) {
+    string reason = (sig > 0 ? "interrupt" : !sig ? "timeout" : "error");
 
     if (GLOBALS.interruptFilename.length()) {
         cerr << "\n" << reason << ": aborting backup, cleaning up " << GLOBALS.interruptFilename << "... ";
@@ -1466,27 +1472,33 @@ void sigTermHandler(int sig)
         }
 
         cerr << "done." << endl;
-        log("error: operation aborted on " + reason + (sig ? " " + to_string(sig) : "") + " (" +
+        log("operation aborted on " + reason + (sig ? ", signal " + to_string(sig) : "") + " (" +
             GLOBALS.interruptFilename + ")");
     }
     else
-        log("error: operation aborted on " + reason);
+        log("operation aborted on " + reason + (sig > 0 ? " (signal " + to_string(sig) + ")" : ""));
 
     if (GLOBALS.interruptLock.length()) unlink(GLOBALS.interruptLock.c_str());
 
     exit(1);
 }
 
-bool enoughLocalSpace(BackupConfig &config)
-{
+
+// descriptive function name for exit
+void cleanupAndExitOnError() {
+    sigTermHandler(-1);
+}
+
+
+bool enoughLocalSpace(BackupConfig &config) {
     auto requiredSpace = approx2bytes(config.settings[sMinSpace].value);
 
     DEBUG(D_backup) DFMT("required for backup: " << requiredSpace);
     if (!requiredSpace) return true;
-
+    
     struct statfs fs;
     if (!statfs(config.settings[sDirectory].value.c_str(), &fs)) {
-        auto availableSpace = fs.f_bsize * fs.f_bavail;
+        auto availableSpace = (uint64_t)fs.f_bsize * fs.f_bavail;
 
         DEBUG(D_backup)
         DFMT(config.settings[sDirectory].value
@@ -1836,6 +1848,8 @@ int main(int argc, char *argv[]) {
         CLI_SCHEDHOUR, "Schedule hour", cxxopts::value<int>())(
         CLI_SCHEDMIN, "Schedule minute", cxxopts::value<int>())(
         CLI_SCHEDPATH, "Schedule path", cxxopts::value<string>())(
+        CLI_COMPARE, "Compare two backups", cxxopts::value<vector<string>>())(
+        CLI_THRESHOLD, "Comparison threshold", cxxopts::value<string>())(
         CLI_CONSOLIDATE, "Consolidate backups after days", cxxopts::value<int>())(
         CLI_RECALC, "Recalculate faub space", cxxopts::value<bool>()->default_value("false"))(
         CLI_BLOAT, "Bloat size warning", cxxopts::value<string>())(
@@ -1848,7 +1862,7 @@ int main(int argc, char *argv[]) {
         GLOBALS.color = !(GLOBALS.cli[CLI_QUIET].as<bool>() || GLOBALS.cli[CLI_NOCOLOR].as<bool>());
         GLOBALS.stats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2);
         GLOBALS.useBlocks = GLOBALS.cli.count(CLI_USEBLOCKS);
-
+        
         if (GLOBALS.cli.count(CLI_USER))
             setupUserDirectories();
 
@@ -2009,6 +2023,27 @@ int main(int argc, char *argv[]) {
         }
     }
     
+    if (GLOBALS.cli.count(CLI_COMPARE)) {
+        if (GLOBALS.cli.count(CLI_COMPARE) != 2) {
+            SCREENERR("error: --" << CLI_COMPARE << " needs to be specified twice (the two backups to compare)");
+            exit(1);
+        }
+        
+        if (!GLOBALS.cli.count(CLI_PROFILE)) {
+            SCREENERR("error: specify a profile to compare (use -p)");
+            exit(1);
+        }
+        scanConfigToCache(*currentConfig);
+        auto v = GLOBALS.cli[CLI_COMPARE].as<vector<string>>();
+        currentConfig->fcache.compare(v[0], v[1], GLOBALS.cli.count(CLI_THRESHOLD) ? GLOBALS.cli[CLI_THRESHOLD].as<string>() : "");
+        exit(0);
+    }
+    else
+        if (GLOBALS.cli.count(CLI_THRESHOLD)) {
+            SCREENERR("error: --" << CLI_THRESHOLD << " is only valid in the context of --" << CLI_COMPARE);
+            exit(1);
+        }
+    
     if (GLOBALS.cli.count(CLI_RECALC)) {
         if (!GLOBALS.cli.count(CLI_PROFILE)) {
             SCREENERR("--recalc requires a profile (use -p)");
@@ -2058,7 +2093,7 @@ int main(int argc, char *argv[]) {
                         NOTQUIET && cerr << "[ALL] previous profile lock (running as pid " << pid <<
                         ") released due to --force" << endl;
                         log("[ALL] previous lock (pid " + to_string(pid) + ") released due to --force");
-                        currentConfig->setLockPID(0);
+                        GLOBALS.interruptLock = currentConfig->setLockPID(0);
                     }
                     if (GLOBALS.startupTime - lockTime < 60 * 60 * 24) {
                         NOTQUIET &&cerr << "[ALL] profile is locked while previous invocation is "
@@ -2231,7 +2266,7 @@ int main(int argc, char *argv[]) {
                             NOTQUIET && cerr << currentConfig->ifTitle() << " previous profile lock (running as pid " << pid <<
                             ") released due to --force" << endl;
                             log("[ALL] previous lock (pid " + to_string(pid) + ") released due to --force");
-                            currentConfig->setLockPID(0);
+                            GLOBALS.interruptLock = currentConfig->setLockPID(0);
                         }
                         if (GLOBALS.startupTime - lockTime < 60 * 60 * 24) {
                             NOTQUIET &&cerr << currentConfig->ifTitle() <<
@@ -2290,7 +2325,7 @@ int main(int argc, char *argv[]) {
         }
         catch (MBException &e) {
             log("aborting due to " + e.detail());
-            sigTermHandler(0);
+            cleanupAndExitOnError();
         }
 
         DEBUG(D_any) DFMT("completed primary tasks");

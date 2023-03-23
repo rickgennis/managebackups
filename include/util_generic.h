@@ -142,7 +142,7 @@ s_pathSplit pathSplit(string path);
 string slashConcat(string str1, string str2);
 string slashConcat(string str1, string str2, string str3);
 
-string MD5file(string filename, bool quiet = 0);
+string MD5file(string filename, bool quiet = 0, string reason = "");
 string MD5string(string data);
 
 string onevarsprintf(string format, string data);

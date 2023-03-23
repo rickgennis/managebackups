@@ -193,11 +193,12 @@ s_pathSplit pathSplit(string path) {
 }
 
 
-string MD5file(string filename, bool quiet) {
+string MD5file(string filename, bool quiet, string reason) {
     FILE *inputFile;
 
     if ((inputFile = fopen(filename.c_str(), "rb")) != NULL) {
-        string message = "MD5 " + filename + "...";
+        string message = "MD5 " + filename + (reason.length() ? " " + reason : "...");
+
         if (!quiet)
             cout << message << flush;
 

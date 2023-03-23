@@ -14,7 +14,7 @@
 #include "exception.h"
 
 
-extern void sigTermHandler(int sig);
+extern void cleanupAndExitOnError();
 
 tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string backupDir, time_t sinceTime, string profileName);
 
@@ -255,8 +255,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 if (remoteFilename.substr(0, 4) == "##* ") {
                     remoteFilename.erase(0, 4);
                     log(config.ifTitle() + " " + fs + " " + remoteFilename);
-                    sigTermHandler(0);
-                    exit(10);
+                    cleanupAndExitOnError();
                 }
                 
                 ++fileTotal;
@@ -644,8 +643,7 @@ size_t fc_scanToServer(string entryName, IPC_Base& server) {
             else {
                 log("error: can't open " + entryName + " - " + strerror(errno));
                 server.ipcWrite(string(string("##* error: client instance unable to read ") + entryName + " - " + strerror(errno) + NET_DELIM).c_str());
-                sigTermHandler(0);
-                exit(5);
+                cleanupAndExitOnError();
             }
         }
         else {
@@ -733,5 +731,5 @@ void fc_mainEngine(vector<string> paths) {
         log("error: faub client caught unknown exception");
     }
 
-    exit(1);
+    cleanupAndExitOnError();
 }

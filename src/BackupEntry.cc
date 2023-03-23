@@ -95,8 +95,8 @@ BackupEntry* BackupEntry::updateAges(time_t refTime) {
 }
 
 
-bool BackupEntry::calculateMD5() {
-    md5 = MD5file(filename, !NOTQUIET || !ANIMATE);
+bool BackupEntry::calculateMD5(string reason) {
+    md5 = MD5file(filename, !NOTQUIET || !ANIMATE, reason);
 
     if (md5.length())
         ++GLOBALS.md5Count;

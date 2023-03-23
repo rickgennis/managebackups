@@ -199,6 +199,7 @@ void install(string myBinary, bool suid) {
     
         installman();        
 
+        cout << BOLDRED << "Use 'man managebackups' for full detail." << RESET << "\n";
         cout << BOLDBLUE << "Installation complete." << RESET << endl;
         return;
         

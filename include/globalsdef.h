@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.4.4"
+#define VERSION "1.4.5"
 
 #include "cxxopts.hpp"
 #include "colors.h"
@@ -125,6 +125,8 @@
 #define CLI_RECALC "recalc"
 #define CLI_BLOAT "bloat"
 #define CLI_RELOCATE "relocate"
+#define CLI_COMPARE "compare"
+#define CLI_THRESHOLD "threshold"
 
 
 // conf file regexes

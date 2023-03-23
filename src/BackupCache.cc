@@ -14,6 +14,8 @@
 #include "colors.h"
 #include "debug.h"
 
+extern void cleanupAndExitOnError();
+
 
 using namespace std;
 
@@ -207,7 +209,7 @@ void BackupCache::addOrUpdate(BackupEntry updatedEntry, bool markCurrent, bool m
         else {
             // entry is in the filenameIndex but not the raw data.  should never get here.
             SCREENERR("LOGIC ERROR - NO RAW DATA");
-            exit(1);
+            cleanupAndExitOnError();
         }
     }
 }
@@ -359,16 +361,17 @@ void BackupCache::cleanup() {
                 }
                 else {
                     SCREENERR(log("error: unable to create " + baseFilename + NEWSFX + " - " + strerror(errno)));
-                    exit(1);
+                    cleanupAndExitOnError();
                 }
                 
                 origCacheFile.close();
                 unlink(baseFilename.c_str());
                 
                 if (verifiedBackups) {
+                    unlink(baseFilename.c_str());
                     if (rename(string(baseFilename + NEWSFX).c_str(), baseFilename.c_str())) {
-                        SCREENERR(log("error: unable to rename " + baseFilename + NEWSFX + " to " + baseFilename));
-                        exit(1);
+                        SCREENERR(log("error: unable to rename " + baseFilename + NEWSFX + " to " + baseFilename + " - " + strerror(errno)));
+                        cleanupAndExitOnError();
                     }
                 }
                 else
@@ -376,7 +379,7 @@ void BackupCache::cleanup() {
             }
             else {
                 SCREENERR(log("error: unable to read " + baseFilename + " - " + strerror(errno)));
-                exit(1);
+                cleanupAndExitOnError();
             }
         }
     }

@@ -246,13 +246,11 @@ void FaubCache::updateDiffFiles(string backupDir, set<string> files) {
 }
 
 
-void FaubCache::displayDiffFiles(string backupDir, bool fullPaths) {
+map<string, FaubEntry, cmpName>::iterator FaubCache::findBackup(string backupDir) {
     set<string> contenders;
     auto backupIt = backups.find(backupDir);
 
-    if (backupIt != backups.end())
-        backupIt->second.displayDiffFiles();
-    else {
+    if (backupIt == backups.end()) {
         Pcre regex(backupDir);
         map<string, FaubEntry, cmpName>::iterator match;
 
@@ -264,7 +262,7 @@ void FaubCache::displayDiffFiles(string backupDir, bool fullPaths) {
         }
 
         if (contenders.size() == 1)
-            match->second.displayDiffFiles(fullPaths);
+            return match;
         else
             if (contenders.size() > 1) {
                 cout << "error: multiple backups match -" << endl;
@@ -274,6 +272,155 @@ void FaubCache::displayDiffFiles(string backupDir, bool fullPaths) {
             }
             else
                 cerr << "unable to find " << backupDir << " in cache." << endl;
+    }
+    
+    return backups.end();
+}
+
+
+void FaubCache::displayDiffFiles(string backupDir, bool fullPaths) {
+    auto backup = findBackup(backupDir);
+    
+    if (backup != backups.end())
+        backup->second.displayDiffFiles(fullPaths);
+}
+
+
+void compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
+    map<string, string> subDirs;
+    map<string, bool> seenFiles;
+    DIR *c_dir;
+    struct dirent *c_dirEntry;
+    struct stat statDataA;
+    struct stat statDataB;
+    
+    /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+     walk directory aFile
+     *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
+
+    if ((c_dir = opendir(dirA.c_str())) != NULL) {
+        while ((c_dirEntry = readdir(c_dir)) != NULL) {
+            
+            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+                continue;
+     
+            auto aFile = slashConcat(dirA, c_dirEntry->d_name);
+            auto bFile = slashConcat(dirB, c_dirEntry->d_name);
+            
+            if (lstat(aFile.c_str(), &statDataA)) {
+                SCREENERR("error: unable to stat " << aFile << " - " << strerror(errno));
+                exit(1);
+            }
+            
+            if (lstat(bFile.c_str(), &statDataB)) {
+                SCREENERR("error: unable to stat " << bFile << " - " << strerror(errno));
+                exit(1);
+            }
+            
+            seenFiles.insert(seenFiles.end(), pair<string, bool>(aFile, false));  // bool value is unused
+            
+            if (statDataA.st_ino != statDataB.st_ino) {
+                if (S_ISDIR(statDataA.st_mode))
+                    subDirs.insert(subDirs.end(), pair<string, string>(aFile, bFile));
+                else {
+                    auto sizeChange = statDataA.st_size - statDataB.st_size;
+
+                    if (percent) {
+                        long p = 0;
+                        
+                        if (statDataA.st_size)
+                            p = floor((double)abs(sizeChange) / (double)statDataA.st_size * 100.0);
+                        else
+                            if (sizeChange)
+                                p = threshold;
+                        
+                        if (percent >= threshold)
+                            cout << BOLDRED << "[" << p << "%]\t" << RESET << aFile << endl;
+                    }
+                    else
+                        if (abs(sizeChange) >= threshold)
+                            cout << BOLDRED << "[" << (sizeChange >= 0 ? "+" : "-") << approximate(abs(sizeChange)) << "]\t" << RESET << aFile << endl;
+                }
+            }
+        }
+        closedir(c_dir);
+    }
+
+    
+    /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+     walk directory bFile
+     *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
+
+    if ((c_dir = opendir(dirB.c_str())) != NULL) {
+        while ((c_dirEntry = readdir(c_dir)) != NULL) {
+            
+            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+                continue;
+     
+            auto aFile = slashConcat(dirA, c_dirEntry->d_name);
+            auto bFile = slashConcat(dirB, c_dirEntry->d_name);
+            
+            if (seenFiles.find(aFile) != seenFiles.end())
+                continue;
+            
+            if (lstat(bFile.c_str(), &statDataB)) {
+                SCREENERR("error: unable to stat " << bFile << " - " << strerror(errno));
+                exit(1);
+            }
+                
+            if (percent || statDataB.st_size >= threshold)
+                cout << BOLDRED << "[+" << approximate(statDataB.st_size) << "]\t" << RESET << aFile << endl;
+        }
+        closedir(c_dir);
+    }
+    
+    
+    /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+     walk subdirs
+     *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
+
+    for (auto &dirs: subDirs)
+        compareDirs(dirs.first, dirs.second, threshold, percent);
+}
+
+
+void FaubCache::compare(string backupA, string backupB, string givenThreshold) {
+    Pcre threshRE("(\\d+)\\s*(%)*");
+    bool percent = false;
+    size_t threshold = 0;
+    
+    // no threshold
+    if (!givenThreshold.length()) {
+        // above defaults are perfect
+    }
+    else
+        // percentage threshold
+        if (threshRE.search(givenThreshold) && threshRE.matches() > 1) {
+            threshold = stoll(threshRE.get_match(0));
+            percent = true;
+        }
+        else {
+            try {
+                // parse number and suffix
+                threshold = approx2bytes(givenThreshold);
+            }
+            catch (...) {
+                SCREENERR("error: invalid threshold; use a raw number of bytes, a number with a suffix (e.g. 5K) or a percentage (e.g. 15%)");
+                exit(1);
+            }
+        }
+    
+    auto b1 = findBackup(backupA);
+    auto b2 = findBackup(backupB);
+    
+    if (b1 != backups.end() && b2 != backups.end()) {
+        auto b1Base = b1->second.getDir();
+        auto b2Base = b2->second.getDir();
+        
+        cout << BOLDYELLOW << "[" << BOLDBLUE << b1Base << BOLDYELLOW << "]\n";
+        cout << BOLDYELLOW << "[" << BOLDBLUE << b2Base << BOLDYELLOW << "]" << RESET << endl;
+        
+        compareDirs(b1Base, b2Base, threshold, percent);
     }
 }
 
