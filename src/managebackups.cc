@@ -1850,6 +1850,7 @@ int main(int argc, char *argv[]) {
         CLI_SCHEDPATH, "Schedule path", cxxopts::value<string>())(
         CLI_COMPARE, "Compare two backups", cxxopts::value<vector<string>>())(
         CLI_THRESHOLD, "Comparison threshold", cxxopts::value<string>())(
+        CLI_COMPFOCUS, "Focus on substantial compare changes only", cxxopts::value<bool>()->default_value("false"))(
         CLI_CONSOLIDATE, "Consolidate backups after days", cxxopts::value<int>())(
         CLI_RECALC, "Recalculate faub space", cxxopts::value<bool>()->default_value("false"))(
         CLI_BLOAT, "Bloat size warning", cxxopts::value<string>())(
@@ -2126,6 +2127,7 @@ int main(int argc, char *argv[]) {
 #define BoolParamIfSpecified(x) (GLOBALS.cli.count(x) ? string(" --") + x : "")
 #define ValueParamIfSpecified(x) \
     (GLOBALS.cli.count(x) ? " " + currentConfig->settings[settingMap[x]].execParam : "")
+        
         string commonSwitches =
             string(NOTQUIET ? "" : " -q") + BoolParamIfSpecified(CLI_TEST) +
             BoolParamIfSpecified(CLI_NOBACKUP) + BoolParamIfSpecified(CLI_NOPRUNE) +

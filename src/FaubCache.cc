@@ -312,14 +312,14 @@ void compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
                 exit(1);
             }
             
-            if (lstat(bFile.c_str(), &statDataB)) {
-                SCREENERR("error: unable to stat " << bFile << " - " << strerror(errno));
-                exit(1);
-            }
+            if (lstat(bFile.c_str(), &statDataB))
+                statDataB.st_ino = statDataB.st_size = 0;  // file doesn't exist in the other backup
             
             seenFiles.insert(seenFiles.end(), pair<string, bool>(aFile, false));  // bool value is unused
             
             if (statDataA.st_ino != statDataB.st_ino) {
+                auto fileType = getFilesystemEntryType(statDataA.st_mode);
+                
                 if (S_ISDIR(statDataA.st_mode))
                     subDirs.insert(subDirs.end(), pair<string, string>(aFile, bFile));
                 else {
@@ -335,11 +335,13 @@ void compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
                                 p = threshold;
                         
                         if (percent >= threshold)
-                            cout << BOLDRED << "[" << p << "%]\t" << RESET << aFile << endl;
+                            if (!GLOBALS.cli.count(CLI_COMPFOCUS) || (GLOBALS.cli.count(CLI_COMPFOCUS) && fileType != 'l' && fileType != 'd'))
+                                cout << BOLDRED << blockp(to_string(p) + "%", 4) << " [" << fileType << "]  " << RESET << aFile << endl;
                     }
                     else
                         if (abs(sizeChange) >= threshold)
-                            cout << BOLDRED << "[" << (sizeChange >= 0 ? "+" : "-") << approximate(abs(sizeChange)) << "]\t" << RESET << aFile << endl;
+                            if (!GLOBALS.cli.count(CLI_COMPFOCUS) || (GLOBALS.cli.count(CLI_COMPFOCUS) && fileType != 'l' && fileType != 'd'))
+                                cout << BOLDRED << blockp((sizeChange >= 0 ? "+" : "-") + approximate(abs(sizeChange)), 5) << RESET << " [" << fileType << "]  " << RESET << aFile << endl;
                 }
             }
         }
@@ -362,14 +364,17 @@ void compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
             
             if (seenFiles.find(aFile) != seenFiles.end())
                 continue;
-            
+
             if (lstat(bFile.c_str(), &statDataB)) {
                 SCREENERR("error: unable to stat " << bFile << " - " << strerror(errno));
                 exit(1);
             }
-                
+
+            auto fileType = getFilesystemEntryType(statDataB.st_mode);
+
             if (percent || statDataB.st_size >= threshold)
-                cout << BOLDRED << "[+" << approximate(statDataB.st_size) << "]\t" << RESET << aFile << endl;
+                if (!GLOBALS.cli.count(CLI_COMPFOCUS) || (GLOBALS.cli.count(CLI_COMPFOCUS) && fileType != 'l' && fileType != 'd'))
+                    cout << BOLDRED << blockp("+" + approximate(statDataB.st_size), 5) << RESET << " [" << fileType << "]  " << RESET << bFile << endl;
         }
         closedir(c_dir);
     }

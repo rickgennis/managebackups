@@ -1101,3 +1101,44 @@ string realpathcpp(string origPath) {
     char tmpBuf[PATH_MAX+1];
     return (realpath(origPath.c_str(), tmpBuf) == NULL ? "" : tmpBuf);
 }
+
+
+char getFilesystemEntryType(mode_t mode) {
+    char c = '?';
+    
+    if (S_ISREG(mode))
+        c = '-';
+    else
+        if (S_ISDIR(mode))
+            c = 'd';
+    else
+        if (S_ISLNK(mode))
+            c = 'l';
+    else
+        if (S_ISSOCK(mode))
+            c = 's';
+    else
+        if (S_ISCHR(mode))
+            c = 'c';
+    else
+        if (S_ISBLK(mode))
+            c = 'b';
+    else
+        if (S_ISFIFO(mode))
+            c = 'p';
+    
+    return c;
+}
+
+
+char getFilesystemEntryType(string entry) {
+    struct stat statData;
+    
+    if (!stat(entry.c_str(), &statData))
+        return getFilesystemEntryType(statData.st_mode);
+    
+    log("error: unable to stat " + entry + " - " + strerror(errno));
+    
+    return '?';
+}
+

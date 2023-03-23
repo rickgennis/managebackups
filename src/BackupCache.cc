@@ -324,7 +324,7 @@ void BackupCache::cleanup() {
     DIR *c_dir;
     struct dirent *c_dirEntry;
     struct stat statData;
-    const char NEWSFX[] = ".new";
+    const string newSuffix = ".new";
     
     if ((c_dir = opendir(GLOBALS.cacheDir.c_str())) != NULL) {
         
@@ -333,15 +333,18 @@ void BackupCache::cleanup() {
         
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
             
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..") || (strstr(c_dirEntry->d_name, ".1f") == NULL))
+            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..") ||
+                (strstr(c_dirEntry->d_name, ".1f") == NULL) || (strstr(c_dirEntry->d_name, newSuffix.c_str()) != NULL))
                 continue;
             
             unsigned int verifiedBackups = 0;
             string baseFilename = slashConcat(GLOBALS.cacheDir, c_dirEntry->d_name);
+            string newFilename = baseFilename + newSuffix;
+            
             origCacheFile.open(baseFilename.c_str());
             
             if (origCacheFile.is_open()) {
-                newCacheFile.open(string(baseFilename + NEWSFX).c_str());
+                newCacheFile.open(newFilename.c_str());
                 
                 if (newCacheFile.is_open()) {
                     string cacheData;
@@ -360,7 +363,7 @@ void BackupCache::cleanup() {
                     newCacheFile.close();
                 }
                 else {
-                    SCREENERR(log("error: unable to create " + baseFilename + NEWSFX + " - " + strerror(errno)));
+                    SCREENERR(log("error: unable to create " + newFilename+ " - " + strerror(errno)));
                     cleanupAndExitOnError();
                 }
                 
@@ -368,20 +371,20 @@ void BackupCache::cleanup() {
                 unlink(baseFilename.c_str());
                 
                 if (verifiedBackups) {
-                    unlink(baseFilename.c_str());
-                    if (rename(string(baseFilename + NEWSFX).c_str(), baseFilename.c_str())) {
-                        SCREENERR(log("error: unable to rename " + baseFilename + NEWSFX + " to " + baseFilename + " - " + strerror(errno)));
+                    if (rename(newFilename.c_str(), baseFilename.c_str())) {
+                        SCREENERR(log("error: unable to rename " + newFilename + " to " + baseFilename + " - " + strerror(errno)));
                         cleanupAndExitOnError();
                     }
                 }
                 else
-                    unlink(string(baseFilename + NEWSFX).c_str());
+                    unlink(newFilename.c_str());
             }
             else {
                 SCREENERR(log("error: unable to read " + baseFilename + " - " + strerror(errno)));
                 cleanupAndExitOnError();
             }
         }
+        closedir(c_dir);
     }
 }
 

@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.4.5
+% MANAGEBACKUPS(1) managebackups 1.4.5a
 % Rick Ennis
 % March 2023
 
@@ -132,10 +132,13 @@ Options are relative to the three functions of **managebackups** plus general op
 : Similar to **--diff** except display the full path (long form) of the changed files within the context of the matching backup.
 
 **--compare** [*string*]
-: {FB} Compare two backups within a profile and show the size change of each file.  Unlike **--diff** the comparison can be with any other backup in the set - specify **--compare** twice, once to name each backup.  Files are displayed if they don't share the same inodes bewteen both backups.  Note that if a file exceeds **--maxlinks** and gets assigned a new inode (even though the file content is identical) it will also show up in a **--compare**.  See **--threshold**.
+: {FB} Compare two backups within a profile and show the type & size change of each file.  Unlike **--diff** the comparison can be with any other backup in the profile set.  This is done by walking the backup directory structure instead of using the cache, meaning it will be slower. Files are displayed if they don't share the same inodes bewteen both backups.  Note that if a file exceeds **--maxlinks** and gets assigned a new inode (even though the file content is identical) it will also show up in a **--compare**.  Files are shown in the first backup, unless the given file only exists in the second backup. Specify **--compare** twice, once to name each backup. See **--threshold** & **--compfocus**.
 
 **--threshold** [*limit*]
 : {FB} Specify a threshold to filter **--compare** listings. *limit* is assumed to be in bytes unless a suffix is specified (K, M, G, T, P, E, Z, Y).  Alternatively *limit* can be a percentage (e.g. 25%).  If the absolute value of the difference between the size of the file in backupA and the size of the file in backupB is greater than or equal to the *limit* then the file is included in the output. A file that exists in only one of the two backups matches any percentage.  Defaults to 0 to include all changes. 
+
+**--compfocus**
+: {FB} Hardlink aren't an option for directories or symlinks, meaning directories and symlinks will show up on a **--compare** even if the data hasn't changed.  **--compfocus** omits directories and symlinks to increase the focus on files that actually changed.  See **--compare**.
 
 **--relocate** [*newDir*]
 : Relocating backups for a profile entails updating the internal caches, updating the profile's configuration and moving all the backups' files in a hardlink-aware way. The **--relocate** option handles all three of these. Use it in conjunction with **-p**.
@@ -271,16 +274,6 @@ Rather than specifying the two settings individually, there's also a Failsafe Pa
 # PROFILE CONFIG FILES
 Profile configuration files are managed by **managebackups** though they can be edited by hand if that's easier than lengthy commandline arguments. Each profile equates to a .conf file under /etc/managebackups. Commandline arguments are automatically persisted to a configuration file when both a profile name (**--profile**) and **-save** are specified. Comments (#) are supported.
 
-# PERMISSIONS
-Aside from access to read the files being backed up (on a remote server or locally) **managebackups** requires local write access for multiple tasks:
-
-- writing to the log file (default /var/log/managebackups.log)
-- writing its cache files (default /var/managebackups/caches)
-- creating the local backup in the configured directory
-- setting owners/groups/perms on faub-style backup files
-
-The first three of these can be achieved by moving the log/cache/backup files into a directory that **managebackups** has write access to. Alternatively, **managebackups** can be made suid or sgid (see **--install** and **--installsuid**). The fourth permission issue has no workaround. If you wish to use faub-style backups **managebackups** needs to run as root either via **--installsuid**, sudo or via the root user.  Without root access faub-style backups can be created but all files will have the same owner.
-
 # FAUB-STYLE BACKUPS
 Faub-style backups require **managebackups** to be installed on both the backup server and the server being backed up.  In most cases, both invocations will need to be run as root in order to replicate the file owners/groups/perms from one machine to the other.  On the server side (the machine doing the backing up) the configuration will require:
 
@@ -300,6 +293,19 @@ Without the authorized_keys2 file you would need the options in your faub config
     --faub "ssh dataserver sudo managebackups --path /usr/local/bin"
     
 Complications with configuration of faub, particularly if ssh is involved, are much easier to debug given the output of the various subcommands.  See **--leaveoutput**.
+
+# EXAMINING BACKUPS
+**managebackups** implements several functions to inspect the difference between individual Faub-style backups within a profile.  The **--diff** and **--diffl** options provide a fast interface to list all the files that have changed between a given backup and the chronologically previous one.  The **--compare** option provides a slower interface that can be used between any two backups in the profile set and includes more details about what's different (size change & file type).
+
+# PERMISSIONS
+Aside from access to read the files being backed up (on a remote server or locally) **managebackups** requires local write access for multiple tasks:
+
+- writing to the log file (default /var/log/managebackups.log)
+- writing its cache files (default /var/managebackups/caches)
+- creating the local backup in the configured directory
+- setting owners/groups/perms on faub-style backup files
+
+The first three of these can be achieved by moving the log/cache/backup files into a directory that **managebackups** has write access to. Alternatively, **managebackups** can be made suid or sgid (see **--install** and **--installsuid**). The fourth permission issue has no workaround. If you wish to use faub-style backups **managebackups** needs to run as root either via **--installsuid**, sudo or via the root user.  Without root access faub-style backups can be created but all files will have the same owner.
 
 # ENVIRONMENT VARIABLES
 Environment variables are overriden by **--user**, **--confdir**, **--cachedir**, and **--logdir**.

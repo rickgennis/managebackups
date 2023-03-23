@@ -730,6 +730,4 @@ void fc_mainEngine(vector<string> paths) {
         cerr << "faub client caught unknown exception" << endl;
         log("error: faub client caught unknown exception");
     }
-
-    cleanupAndExitOnError();
 }

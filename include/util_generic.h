@@ -218,5 +218,8 @@ int forkMvCmd(string oldDir, string newDir);
 
 string realpathcpp(string origPath);
 
+char getFilesystemEntryType(mode_t mode);
+char getFilesystemEntryType(string entry);
+
 #endif
 
