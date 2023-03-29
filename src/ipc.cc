@@ -497,7 +497,7 @@ PipeExec::PipeExec(string command, unsigned int timeout) : IPC_Base(0, 0, timeou
 void PipeExec::pickupTheKids() {
     bool done = true;
     
-    // if any previous child prods have been reaped, check them first in our global list.
+    // if any previous child procs have been reaped, check them first in our global list.
     // loop through the list of child procs we're looking to reap
     for (auto procIt = procs.begin(); procIt != procs.end(); ++procIt) {
         
@@ -841,5 +841,4 @@ string firstAvailIDForDir(string dir) {
     char result[100];
     snprintf(result, sizeof(result), "%s%c", lastID.substr(0, lastID.length() - 1).c_str(), c);
     return(result);
-
 }

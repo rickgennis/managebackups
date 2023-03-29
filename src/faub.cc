@@ -155,7 +155,28 @@ void fs_startServer(BackupConfig& config) {
 }
 
 
-#define PB(x) string(5 + to_string(x).length(), '\b')
+string progress(int numFS, int fsComplete = 0, int stepsComplete = 0) {
+    const int totalSteps = 7;
+    static int prevLength = 0;
+    string result;
+    
+    // start with backspaces to erase our previous message
+    if (prevLength)
+        result = string(prevLength, '\b') + string(prevLength, ' ') + string(prevLength, '\b');
+    
+    // numFS = 0 can be used to just backspace over the last status and blank it out
+    if (numFS) {
+        int target = numFS * totalSteps;
+        int current = fsComplete * totalSteps + stepsComplete;
+        string currentProgress = to_string(int((float)current / (float)target * 100)) + "%";
+        prevLength = (int)currentProgress.length();
+        result += currentProgress;
+    }
+
+    return result;
+}
+
+
 void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir, string currentDir) {
     size_t maxLinksReached = 0;
     string remoteFilename;
@@ -179,7 +200,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     /*
      FAUB PROTOCOL - 4 PHASES
      
-     Note: The term filesystem is used here very loosely to mean a directory structive the client
+     Note: The term filesystem is used here very loosely to mean a directory structure the client
      wants to backup (--path option).  It doesn't really need to coorelate to a filesystem.
      
      1. Client (server being backed up) sends a list comprised of a full path and its mtime for
@@ -190,27 +211,29 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
      3. Client send the full detail (uid, gid, mode, mtime, size and the full content of the file)
         for each requested item, which the server writes to disk as newly backed up entries.
      4. Server finishes administrative tasks:
-            - hard links all files that haven't changed from the previous backup to the previous backup
-            - symlinks all entries that are symlinks on the remote server to their entries in the previous backup
+            - hard links all files that haven't changed from the previous backup to the current backup
+            - symlinks all entries that are symlinks on the remote server to their specified targets
             - copies files from the previous backup to the current if maxLinks is exceeeded
             - sets the mtime on all directories in the newly created backup
      */
     
-    try {
+    try {       
         DEBUG(D_faub) DFMT("current: " << currentDir);
         DEBUG(D_faub) DFMT("previous: " << prevDir);
         
-        // record number of filesystems the client is going to send
-        auto numFS = client.ipcRead();
-        
+        // record number of filesystems the client is going to send (again, not really "filesystems")
+        auto totalFS = client.ipcRead();
+        int completeFS = 0;
+
         currentDir += tempExtension;
-        string screenMessage = config.ifTitle() + " backing up to temp dir " + currentDir + " (" + to_string(numFS * 4) +  ")... ";
+        string screenMessage = config.ifTitle() + " backing up to temp dir " + currentDir + "... ";
         string backspaces = string(screenMessage.length(), '\b');
         string blankspaces = string(screenMessage.length() , ' ');
         NOTQUIET && ANIMATE && cout << screenMessage << flush;
         DEBUG(D_any) cerr << "\n";
         DEBUG(D_netproto) DFMT("faub server ready to receive");
-        
+        NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 0) << flush;
+
         log(config.ifTitle() + " starting backup to " + currentDir);
         GLOBALS.interruptFilename = currentDir;  // interruptFilename gets cleaned up on SIGTERM & SIGINT
         bool incTime = str2bool(config.settings[sIncTime].value);
@@ -344,7 +367,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 }
             }
             
-            NOTQUIET && ANIMATE && cout << PB(numFS * 4) << to_string(numFS * 4 - 1) << ")... " << flush;
+            NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 1) << flush;
             DEBUG(D_netproto) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size()
                                    << ", willLink:" << hardLinkList.size());
             
@@ -362,7 +385,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             // tell the client we're done requesting and ready to listen to the replies
             client.ipcWrite(NET_OVER_DELIM);
             
-            NOTQUIET && ANIMATE && cout << PB(numFS * 4 - 1) << to_string(numFS * 4 - 2) << ")... " << flush;
+            NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 2) << flush;
             DEBUG(D_netproto) DFMT(fs << " server phase 2 complete; told client we need " << neededFiles.size() << " of " << fileTotal);
             
             
@@ -391,7 +414,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                         ++receivedSymLinks;
             }
             
-            NOTQUIET && ANIMATE && cout << PB(numFS * 4 - 2) << to_string(numFS * 4 - 3) << ")... " << flush;
+            NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 3) << flush;
             DEBUG(D_netproto) DFMT(fs << " server phase 3 complete; received " << plural((int)neededFiles.size(), "file") + " from client");
             
             
@@ -420,7 +443,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                     log(config.ifTitle() + " " + fs + " error: unable to link " + links.second + " to " + links.first + " - " + strerror(errno));
                 }
             }
-            
+            NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 4) << flush;
+
             /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
              duplicate (copy) files for maxLinks
              *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
@@ -453,7 +477,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                     }
                 }
             }
-            
+            NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 5) << flush;
+
             /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
              create symlinks
              *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
@@ -496,7 +521,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 }
                 
             }
-            
+            NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 6) << flush;
+
             /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
              set mtimes on all directories
              *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
@@ -506,7 +532,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 if (utime(dirTime.first.c_str(), &timeBuf))
                     SCREENERR(log(config.ifTitle() + " " + fs + ": error: unable to call utime() on " + dirTime.first + " - " + strerror(errno)));
             }
-            
+
+            NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 7) << flush;
             DEBUG(D_netproto) DFMT(fs << " server phase 4 complete; created " << plural(hardLinkList.size() - linkErrors, "link")  <<
                                    " to previously backed up files" << (linkErrors ? string(" (" + plural(linkErrors, "error") + ")") : ""));
             log(config.ifTitle() + " processed " + fs + ": " + plurali((int)fileTotal - checkpointTotal, "entr") + ", " +
@@ -515,13 +542,13 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             filesModified += neededFiles.size();
             filesHardLinked += hardLinkList.size();
             filesSymLinked += symLinkList.size();
-            --numFS;
+            ++completeFS;
             
         } while (client.ipcRead());
-        
+
         // note finish time
         backupTime.stop();
-        NOTQUIET && ANIMATE && cout << backspaces << blankspaces << backspaces << flush;
+        NOTQUIET && ANIMATE && cout << progress(0) << backspaces << blankspaces << backspaces << flush;
         
         // if time isn't included we may be about to overwrite a previous backup for this date
         if (!incTime)
@@ -596,7 +623,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
 
 /*
- * fc_scanToServer()
+ * fc_scanToServer() - faub client
  * Scan a filesystem, sending the filenames and their associated mtime's back
  * to the remote server. This is the client's side of phase 1.
  */
@@ -661,7 +688,7 @@ size_t fc_scanToServer(string entryName, IPC_Base& server) {
 }
 
 /*
- * fc_sendFilesToServer()
+ * fc_sendFilesToServer() - faub client
  * Receive a list of files from the server (client side of phase 2) and
  * send each file back to the server (client side of phase 3).
  */

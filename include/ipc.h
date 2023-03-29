@@ -74,6 +74,10 @@ class TCP_Socket : public IPC_Base {
 };
 
 
+/********************************************************************
+   ProcDetail is used internally by PipeExec for tracking processes.
+   You never need to instantiate anything of this type.
+ *******************************************************************/
 typedef struct ProcDetail {
     int writefd[2];
     int readfd[2];
@@ -104,6 +108,7 @@ struct find_ProcDetail {
  * This adds standard pipe functionality to IPC_Base.  It supports:
  *  - CLI parsing & execution with all pipes (2>-style redirects excluded)
  *  - auto pipe connections (stdout of proc1 to stdin of proc2, etc)
+ *  - interface to write to first proc and/or read from last proc in pipe chain
  *  - debugging output of stderr to /tmp files 
  *
  * Examples:

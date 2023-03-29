@@ -1142,3 +1142,53 @@ char getFilesystemEntryType(string entry) {
     return '?';
 }
 
+
+void processDirectory(string directory, string pattern, bool exclude, void (*processor)(string, void *), void *passData, int maxDepth) {
+    DIR *c_dir;
+    struct dirent *c_dirEntry;
+    struct stat statData;
+    vector<string> subDirs;
+    Pcre patternRE(pattern);
+    
+    if (!maxDepth)
+        return;
+    
+    if ((c_dir = opendir(ue(directory).c_str())) != NULL) {
+        while ((c_dirEntry = readdir(c_dir)) != NULL) {
+
+            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+                continue;
+
+            string filename = slashConcat(directory, c_dirEntry->d_name);
+            
+            if (!stat(filename.c_str(), &statData)) {
+                
+                // process directories
+                if (S_ISDIR(statData.st_mode)) {
+                    subDirs.insert(subDirs.end(), filename);
+                    processor(filename, passData);
+                }
+                else {
+                    // filter for patterns
+                    if (pattern.length()) {
+                        bool found = patternRE.search(filename);
+                        
+                        if (exclude && found)
+                            continue;
+                        
+                        if (!exclude && !found)
+                            continue;
+                    }
+                    
+                    // process regular files
+                    processor(filename, passData);
+                }
+            }
+        }
+        
+        closedir(c_dir);
+    }
+    
+    for (auto &dir: subDirs)
+        processDirectory(dir, pattern, exclude, processor, passData, maxDepth > -1 ? maxDepth - 1 : -1);
+}

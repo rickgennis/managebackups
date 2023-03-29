@@ -324,7 +324,9 @@ void BackupCache::cleanup() {
     DIR *c_dir;
     struct dirent *c_dirEntry;
     struct stat statData;
-    const string newSuffix = ".new";
+    const string suffixNew = ".new";
+    const string suffix1f = ".1f";
+    const string suffixUpdate = ".updating";
     
     if ((c_dir = opendir(GLOBALS.cacheDir.c_str())) != NULL) {
         
@@ -333,55 +335,65 @@ void BackupCache::cleanup() {
         
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
             
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..") ||
-                (strstr(c_dirEntry->d_name, ".1f") == NULL) || (strstr(c_dirEntry->d_name, newSuffix.c_str()) != NULL))
+            if (!strcmp(c_dirEntry->d_name, ".") ||
+                !strcmp(c_dirEntry->d_name, "..") ||
+                (strstr(c_dirEntry->d_name, suffix1f.c_str()) == NULL) ||
+                (strstr(c_dirEntry->d_name, suffixNew.c_str()) != NULL) ||
+                (strstr(c_dirEntry->d_name, suffixUpdate.c_str()) != NULL))
                 continue;
             
-            unsigned int verifiedBackups = 0;
             string baseFilename = slashConcat(GLOBALS.cacheDir, c_dirEntry->d_name);
-            string newFilename = baseFilename + newSuffix;
+            string workingFilename = baseFilename + suffixUpdate;
+            string newFilename = baseFilename + suffixNew;
             
-            origCacheFile.open(baseFilename.c_str());
-            
-            if (origCacheFile.is_open()) {
-                newCacheFile.open(newFilename.c_str());
+            // simplistic locking -- only one process succeeds at the rename when -K is elected
+            if (!rename(baseFilename.c_str(), workingFilename.c_str())) {
+                unsigned int verifiedBackups = 0;
                 
-                if (newCacheFile.is_open()) {
-                    string cacheData;
-                    while (getline(origCacheFile, cacheData)) {
-                        BackupEntry entry;
-                        
-                        if (entry.string2class(cacheData)) {
+                origCacheFile.open(workingFilename.c_str());
+                
+                if (origCacheFile.is_open()) {
+                    newCacheFile.open(newFilename.c_str());
+                    
+                    if (newCacheFile.is_open()) {
+                        string cacheData;
+                        while (getline(origCacheFile, cacheData)) {
+                            BackupEntry entry;
                             
-                            if (!stat(entry.filename.c_str(), &statData)) {
-                                newCacheFile << cacheData << endl;
-                                ++verifiedBackups;
+                            if (entry.string2class(cacheData)) {
+                                
+                                if (!stat(entry.filename.c_str(), &statData)) {
+                                    newCacheFile << cacheData << endl;
+                                    ++verifiedBackups;
+                                }
                             }
                         }
+                        
+                        newCacheFile.close();
                     }
-                    
-                    newCacheFile.close();
-                }
-                else {
-                    SCREENERR(log("error: unable to create " + newFilename+ " - " + strerror(errno)));
-                    cleanupAndExitOnError();
-                }
-                
-                origCacheFile.close();
-                unlink(baseFilename.c_str());
-                
-                if (verifiedBackups) {
-                    if (rename(newFilename.c_str(), baseFilename.c_str())) {
-                        SCREENERR(log("error: unable to rename " + newFilename + " to " + baseFilename + " - " + strerror(errno)));
+                    else {
+                        SCREENERR(log("error: unable to create " + newFilename+ " - " + strerror(errno)));
+                        rename(workingFilename.c_str(), baseFilename.c_str());
                         cleanupAndExitOnError();
                     }
+                    
+                    origCacheFile.close();
+                    unlink(workingFilename.c_str());
+                    
+                    if (verifiedBackups) {
+                        if (rename(newFilename.c_str(), baseFilename.c_str())) {
+                            SCREENERR(log("error: unable to rename " + newFilename + " to " + baseFilename + " (cache lost) - " + strerror(errno)));
+                            cleanupAndExitOnError();
+                        }
+                    }
+                    else
+                        unlink(newFilename.c_str());
                 }
-                else
-                    unlink(newFilename.c_str());
-            }
-            else {
-                SCREENERR(log("error: unable to read " + baseFilename + " - " + strerror(errno)));
-                cleanupAndExitOnError();
+                else {
+                    SCREENERR(log("error: unable to read " + baseFilename + " - " + strerror(errno)));
+                    rename(workingFilename.c_str(), baseFilename.c_str());
+                    cleanupAndExitOnError();
+                }
             }
         }
         closedir(c_dir);

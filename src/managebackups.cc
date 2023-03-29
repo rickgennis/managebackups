@@ -59,6 +59,7 @@
 
 #include "syslog.h"
 #include "unistd.h"
+#include <utime.h>
 
 #ifdef __APPLE__
 #include <sys/mount.h>
@@ -567,7 +568,7 @@ string pruneShouldKeep(BackupConfig &config, string filename, int filenameAge, i
 void pruneFaubBackups(BackupConfig &config)
 {
     DEBUG(D_prune) DFMT("weeklies set to dow " << dw(config.settings[sDOW].ivalue()));
-    DEBUG(D_prune) DFMT("examining " << config.fcache.getNumberOfBackups() << " backup(s) for "
+    DEBUG(D_prune) DFMT("examining " << plural(config.fcache.getNumberOfBackups(), "backup") << " for "
         << config.settings[sTitle].value);
 
     size_t backupAge = 0, backupCountOnDay = 0;
@@ -1523,9 +1524,112 @@ bool enoughLocalSpace(BackupConfig &config) {
 }
 
 
-void moveBackupCrossFS(string oldBackup, string newBackup) {
-    cout << BOLDRED << "FILESYSTEM MOVE NOT YET SUPPORTED" << RESET << endl;
-    exit(1);
+void moveBackupCrossFS(string oldBackup, string newBackup, map<ino_t, string> &inodeMap) {
+    DIR *c_dir;
+    struct dirent *c_dirEntry;
+    map<string, string> subDirs;
+    struct stat statData;
+
+    // create the top-level directory
+    if (!lstat(oldBackup.c_str(), &statData)) {
+        mkdirp(newBackup);
+        if (chmod(newBackup.c_str(), statData.st_mode)) {
+            SCREENERR("error: unable to chmod " + newBackup + " - " + strerror(errno));
+            exit(1);
+        }
+        
+        if (chown(newBackup.c_str(), statData.st_uid, statData.st_gid)){
+            SCREENERR("errror: unable to chown " + newBackup + " - " + strerror(errno));
+            exit(1);
+        }
+
+        struct utimbuf timeBuf;
+        timeBuf.actime = timeBuf.modtime = statData.st_mode;
+        if (utime(newBackup.c_str(), &timeBuf)) {
+            SCREENERR("error: unable to set utime on " + newBackup + " - " + strerror(errno));
+            exit(1);
+        }
+    }
+    else {
+        SCREENERR("error: unable to stat " + oldBackup + " - " + strerror(errno));
+        exit(1);
+    }
+    
+    // process the directory
+    if ((c_dir = opendir(ue(oldBackup).c_str())) != NULL) {
+        while ((c_dirEntry = readdir(c_dir)) != NULL) {
+            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+                continue;
+            
+            string oldFilename = slashConcat(ue(oldBackup), c_dirEntry->d_name);
+            string newFilename = slashConcat(ue(newBackup), c_dirEntry->d_name);
+            
+            if (!stat(oldFilename.c_str(), &statData)) {
+                if (S_ISDIR(statData.st_mode))
+                    subDirs.insert(subDirs.end(), make_pair(oldFilename, newFilename));
+                else {
+                    auto inodeEntry = inodeMap.find(statData.st_ino);
+                    
+                    // duplicate hard links
+                    if (inodeEntry != inodeMap.end())
+                        link(inodeEntry->second.c_str(), newFilename.c_str());
+                    else {
+                        // translate symlinks
+                        if (S_ISLNK(statData.st_mode)) {
+                            char linkPath[PATH_MAX];
+                            int len = (int)readlink(oldFilename.c_str(), linkPath, sizeof(linkPath));
+                            linkPath[len] = 0;
+                            if (len > -1) {
+                                if (symlink(newFilename.c_str(), linkPath)) {
+                                    SCREENERR("error: unable to create symlink " + newFilename + " to " + linkPath + " - " + strerror(errno));
+                                    exit(1);
+                                }
+                            }
+                            else {
+                                SCREENERR("error: unable to read symlink " + oldFilename + " - " + strerror(errno));
+                                exit(1);
+                            }
+                        }
+                        else {
+                            // copy regular files
+                            if (!copyFile(oldFilename, newFilename)) {
+                                SCREENERR("error: unable to copy " + oldFilename + " to " + newFilename + " - " + strerror(errno));
+                                exit(1);
+                            }
+                            
+                            inodeMap.insert(inodeMap.end(), make_pair(statData.st_ino, oldFilename));
+
+                            if (chmod(newFilename.c_str(), statData.st_mode)) {
+                                SCREENERR("error: unable to chmod directory " + newFilename + " - " + strerror(errno))
+                                exit(1);
+                            }
+                            
+                            if (chown(newFilename.c_str(), statData.st_uid, statData.st_gid)) {
+                                SCREENERR("error: unable to chown directory " + newFilename + " - " + strerror(errno));
+                                exit(1);
+                            }
+                            
+                            struct utimbuf timeBuf;
+                            timeBuf.actime = timeBuf.modtime = statData.st_mtime;
+                            if (utime(newFilename.c_str(), &timeBuf)) {
+                                SCREENERR("error: unable to set utime() on " + newFilename + " - " + strerror(errno));
+                                exit(1);
+                            }
+                        }
+                    }
+                }
+            }
+            else {
+                SCREENERR("error: cross-filesystem move interrupted, unable to stat " + oldFilename + " - " + strerror(errno));
+                exit(1);
+            }
+        }
+        closedir(c_dir);
+        
+        for (auto &dir: subDirs)
+            moveBackupCrossFS(dir.first, dir.second, inodeMap);
+    }
+
 }
 
 
@@ -1561,9 +1665,11 @@ bool moveBackup(string fullBackupOldPath, string oldBaseDir, string newBaseDir, 
         else
             result = false;
     }
-    else
-        moveBackupCrossFS(fullBackupOldPath, fullBackupNewPath);
-        
+    else {
+        map<ino_t, string> inodeMap;
+        moveBackupCrossFS(fullBackupOldPath, fullBackupNewPath, inodeMap);
+    }
+    
     NOTQUIET && ANIMATE && cout << backspaces << blanks << backspaces << flush;
     ++count;
     

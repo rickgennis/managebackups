@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.4.5a
+% MANAGEBACKUPS(1) managebackups 1.4.6
 % Rick Ennis
 % March 2023
 
@@ -358,6 +358,8 @@ Example output from **managebackups -1 -p faub** (faub-style backup example)
     Mods is the number of modified files in that backup compared to the previous backup.
 
 # EXAMPLES
+
+## Single-File Backups
 **managebackups --profile homedirs --directory /var/backups --file homedirs.tgz --cmd "tar -cz /home" --weekly 2 --notify me@zmail.com --prune --save**
 : Create a gzipped backup of /home and store it in /var/backups/YYYY/MM/homedirs-YYYYMMDD.tgz. Override the weekly retention to 2 while keeping the daily, monthly and yearly settings at their defaults. This performs pruning and linking with their default settings and emails on failure. Because **--save** is include, all of the settings are associated with the homedirs profile, allowing the same command to be run again (or cron'd) simply as **managebackups -p homedirs**.
 
@@ -385,9 +387,11 @@ Example output from **managebackups -1 -p faub** (faub-style backup example)
 **managebackups -p mymac --recreate --test**
 : Recreate the mymac config file using the standard format. Previously existing comments and formatting is thrown away. The **-test** option skips all primary functions (no backups, pruning or linking is done) so only the config file is updated.
 
+## Faub-Style Backups
 **managebackups -p artemis --directory /opt/backups --faub "ssh artemis managebackups --path /usr/local/bin --path /etc" --prune --fp --save**
-: Take a new faub-style backup of server artemis' /etc and /usr/local/bin directories, saving them locally to /opt/backups.  Prune older copies of this backup that have aged out.  Note: faub-backups assume **managebackups** is installed on the remote (in this case artemis) server.
+: Take a new faub-style backup of server artemis' /etc and /usr/local/bin directories, saving them locally to /opt/backups.  Prune older copies of this backup that have aged out.  Note: faub-backups assume **managebackups** is installed on the remote (in this case artemis) server. This example also assumes **managebackups** is installed suid-root on both servers, otherwise one or both invocations of **managebackups** would require sudo.
 
+## General
 **managebackups -1**
 : Show details of all backups taken that are associated with each profile. Additionally **-p** [*profile*] could be specified to limit the output to a single profile.
 

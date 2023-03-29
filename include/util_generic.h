@@ -221,5 +221,7 @@ string realpathcpp(string origPath);
 char getFilesystemEntryType(mode_t mode);
 char getFilesystemEntryType(string entry);
 
+void processDirectory(string directory, string pattern, bool exclude, void (*processor)(string, void *), void *passData, int maxDepth = -1);
+
 #endif
 
