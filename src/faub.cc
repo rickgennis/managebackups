@@ -155,28 +155,6 @@ void fs_startServer(BackupConfig& config) {
 }
 
 
-string progress(int numFS, int fsComplete = 0, int stepsComplete = 0) {
-    const int totalSteps = 7;
-    static int prevLength = 0;
-    string result;
-    
-    // start with backspaces to erase our previous message
-    if (prevLength)
-        result = string(prevLength, '\b') + string(prevLength, ' ') + string(prevLength, '\b');
-    
-    // numFS = 0 can be used to just backspace over the last status and blank it out
-    if (numFS) {
-        int target = numFS * totalSteps;
-        int current = fsComplete * totalSteps + stepsComplete;
-        string currentProgress = to_string(int((float)current / (float)target * 100)) + "%";
-        prevLength = (int)currentProgress.length();
-        result += currentProgress;
-    }
-
-    return result;
-}
-
-
 void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir, string currentDir) {
     size_t maxLinksReached = 0;
     string remoteFilename;
@@ -232,7 +210,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         NOTQUIET && ANIMATE && cout << screenMessage << flush;
         DEBUG(D_any) cerr << "\n";
         DEBUG(D_netproto) DFMT("faub server ready to receive");
-        NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 0) << flush;
+        NOTQUIET && ANIMATE && cout << progressPercentage((int)totalFS, 7, completeFS, 0) << flush;
 
         log(config.ifTitle() + " starting backup to " + currentDir);
         GLOBALS.interruptFilename = currentDir;  // interruptFilename gets cleaned up on SIGTERM & SIGINT
@@ -367,7 +345,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 }
             }
             
-            NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 1) << flush;
+            NOTQUIET && ANIMATE && cout << progressPercentage((int)totalFS, 7, completeFS, 1) << flush;
             DEBUG(D_netproto) DFMT(fs << " server phase 1 complete; total:" << fileTotal << ", need:" << neededFiles.size()
                                    << ", willLink:" << hardLinkList.size());
             
@@ -385,7 +363,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             // tell the client we're done requesting and ready to listen to the replies
             client.ipcWrite(NET_OVER_DELIM);
             
-            NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 2) << flush;
+            NOTQUIET && ANIMATE && cout << progressPercentage((int)totalFS, 7, completeFS, 2) << flush;
             DEBUG(D_netproto) DFMT(fs << " server phase 2 complete; told client we need " << neededFiles.size() << " of " << fileTotal);
             
             
@@ -414,7 +392,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                         ++receivedSymLinks;
             }
             
-            NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 3) << flush;
+            NOTQUIET && ANIMATE && cout << progressPercentage((int)totalFS, 7, completeFS, 3) << flush;
             DEBUG(D_netproto) DFMT(fs << " server phase 3 complete; received " << plural((int)neededFiles.size(), "file") + " from client");
             
             
@@ -443,7 +421,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                     log(config.ifTitle() + " " + fs + " error: unable to link " + links.second + " to " + links.first + " - " + strerror(errno));
                 }
             }
-            NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 4) << flush;
+            NOTQUIET && ANIMATE && cout << progressPercentage((int)totalFS, 7, completeFS, 4) << flush;
 
             /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
              duplicate (copy) files for maxLinks
@@ -453,31 +431,17 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 
                 if (!copyFile(dups.first, dups.second)) {
                     ++linkErrors;
-                    SCREENERR(fs << " error: unable to copy (due to maxed out links) " << dups.first << " to " << dups.second << " - " << strerror(errno));
-                    log(config.ifTitle() + " " + fs + " error: unable to copy (due to maxed out links) " + dups.first + " to " + dups.second + " - " + strerror(errno));
+                    SCREENERR(fs << " error: unable to copy (attempted due to maxed out links) " << dups.first << " to " << dups.second << " - " << strerror(errno));
+                    log(config.ifTitle() + " " + fs + " error: unable to copy (attempted due to maxed out links) " + dups.first + " to " + dups.second + " - " + strerror(errno));
                 }
                 else {
                     struct stat statData;
                     ++GLOBALS.statsCount;
-                    if (!lstat(dups.first.c_str(), &statData)) {
-                        if (lchown(dups.second.c_str(), statData.st_uid, statData.st_gid)) {
-                            SCREENERR(fs << " error: unable to chown " << dups.second << ": " << strerror(errno));
-                            log(config.ifTitle() + " " + fs + " error: unable to chown " + dups.second + ": " + strerror(errno));
-                        }
-                        
-                        if (chmod(dups.second.c_str(), statData.st_mode)) {
-                            SCREENERR(fs << " error: unable to chmod " << dups.second << ": " << strerror(errno));
-                            log(config.ifTitle() + " " + fs + " error: unable to chmod " + dups.second + ": " + strerror(errno));
-                        }
-                        
-                        struct timeval tv[2];
-                        tv[0].tv_sec  = tv[1].tv_sec  = statData.st_mtime;
-                        tv[0].tv_usec = tv[1].tv_usec = 0;
-                        lutimes(dups.second.c_str(), tv);
-                    }
+                    if (!lstat(dups.first.c_str(), &statData))
+                        setFilePerms(dups.second, statData, false);
                 }
             }
-            NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 5) << flush;
+            NOTQUIET && ANIMATE && cout << progressPercentage((int)totalFS, 7, completeFS, 5) << flush;
 
             /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
              create symlinks
@@ -521,7 +485,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 }
                 
             }
-            NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 6) << flush;
+            NOTQUIET && ANIMATE && cout << progressPercentage((int)totalFS, 7, completeFS, 6) << flush;
 
             /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
              set mtimes on all directories
@@ -533,7 +497,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                     SCREENERR(log(config.ifTitle() + " " + fs + ": error: unable to call utime() on " + dirTime.first + " - " + strerror(errno)));
             }
 
-            NOTQUIET && ANIMATE && cout << progress((int)totalFS, completeFS, 7) << flush;
+            NOTQUIET && ANIMATE && cout << progressPercentage((int)totalFS, 7, completeFS, 7) << flush;
             DEBUG(D_netproto) DFMT(fs << " server phase 4 complete; created " << plural(hardLinkList.size() - linkErrors, "link")  <<
                                    " to previously backed up files" << (linkErrors ? string(" (" + plural(linkErrors, "error") + ")") : ""));
             log(config.ifTitle() + " processed " + fs + ": " + plurali((int)fileTotal - checkpointTotal, "entr") + ", " +
@@ -548,7 +512,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
 
         // note finish time
         backupTime.stop();
-        NOTQUIET && ANIMATE && cout << progress(0) << backspaces << blankspaces << backspaces << flush;
+        NOTQUIET && ANIMATE && cout << progressPercentage(0) << backspaces << blankspaces << backspaces << flush;
         
         // if time isn't included we may be about to overwrite a previous backup for this date
         if (!incTime)

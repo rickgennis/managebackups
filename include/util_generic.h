@@ -5,6 +5,7 @@
 #include <string>
 #include <time.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <set>
 #include <iostream>
 
@@ -153,7 +154,10 @@ string seconds2hms(time_t seconds);
 
 string dw(int which);
 
-int mkdirp(string dir);
+void setFilePerms(string filename, struct stat &statData, bool exitOnError = true);
+
+int mkdirp(string dir, mode_t mode = 0775);
+void mkdirp(string dir, struct stat &statData);
 
 string trimSpace(const string &s);
 
@@ -221,7 +225,17 @@ string realpathcpp(string origPath);
 char getFilesystemEntryType(mode_t mode);
 char getFilesystemEntryType(string entry);
 
-void processDirectory(string directory, string pattern, bool exclude, void (*processor)(string, void *), void *passData, int maxDepth = -1);
+struct processorFileData {
+    string filename;
+    string origDir;
+    struct stat statData;
+    void *dataPtr;
+};
+
+void processDirectory(string directory, string pattern, bool exclude, void (*processor)(processorFileData&), void *passData, int maxDepth = -1, string internalUseDir = "");
+
+string progressPercentage(int totalIterations, int totalSteps = 7,
+                    int iterationsComplete = 0, int stepsComplete = 0, string detail = "");
 
 #endif
 

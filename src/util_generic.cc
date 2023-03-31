@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <utime.h>
 #include <pwd.h>
 #include <vector>
 #include <set>
@@ -432,12 +433,36 @@ string dw(int which) {
 }
 
 
-int mkdirp(string dir) {
+void setFilePerms(string filename, struct stat &statData, bool exitOnError) {
+    if (lchmod(filename.c_str(), statData.st_mode)) {
+        SCREENERR(log("error: unable to chmod " + filename + " - " + strerror(errno)));
+        if (exitOnError)
+            exit(1);
+    }
+    
+    if (lchown(filename.c_str(), statData.st_uid, statData.st_gid)){
+        SCREENERR(log("error: unable to chown " + filename + " - " + strerror(errno)));
+        if (exitOnError)
+            exit(1);
+    }
+    
+    struct timeval tv[2];
+    tv[0].tv_sec  = tv[1].tv_sec  = statData.st_mtime;
+    tv[0].tv_usec = tv[1].tv_usec = 0;
+    if (lutimes(filename.c_str(), tv)) {
+        SCREENERR(log("error: unable to set utime on " + filename + " - " + strerror(errno)));
+        if (exitOnError)
+            exit(1);
+    }
+}
+
+
+int mkdirp(string dir, mode_t mode) {
     struct stat statBuf;
     int result = 0;
 
     if (stat(dir.c_str(), &statBuf) == -1) {
-        char data[1500];
+        char data[PATH_MAX];
         strcpy(data, dir.c_str());
         char *p = strtok(data, "/");
         string path;
@@ -446,7 +471,7 @@ int mkdirp(string dir) {
             path += string("/") + p;   
 
             if (stat(path.c_str(), &statBuf) == -1)
-               result = mkdir(path.c_str(), 0775);
+               result = mkdir(path.c_str(), mode);
 
             if (result)
                 return(result);
@@ -456,6 +481,12 @@ int mkdirp(string dir) {
     }
 
     return 0;
+}
+
+
+void mkdirp(string dir, struct stat &statData) {
+    mkdirp(dir);
+    setFilePerms(dir, statData);
 }
 
 
@@ -1143,13 +1174,19 @@ char getFilesystemEntryType(string entry) {
 }
 
 
-void processDirectory(string directory, string pattern, bool exclude, void (*processor)(string, void *), void *passData, int maxDepth) {
+void processDirectory(string directory, string pattern, bool exclude, void (*processor)(processorFileData&), void *passData, int maxDepth, string internalUseDir) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
-    struct stat statData;
     vector<string> subDirs;
     Pcre patternRE(pattern);
+    processorFileData file;
+    file.dataPtr = passData;
     
+    if (internalUseDir.length())
+        file.origDir = internalUseDir;
+    else
+        file.origDir = directory;
+
     if (!maxDepth)
         return;
     
@@ -1159,19 +1196,19 @@ void processDirectory(string directory, string pattern, bool exclude, void (*pro
             if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
                 continue;
 
-            string filename = slashConcat(directory, c_dirEntry->d_name);
+            file.filename = slashConcat(directory, c_dirEntry->d_name);
             
-            if (!stat(filename.c_str(), &statData)) {
+            if (!stat(file.filename.c_str(), &file.statData)) {
                 
                 // process directories
-                if (S_ISDIR(statData.st_mode)) {
-                    subDirs.insert(subDirs.end(), filename);
-                    processor(filename, passData);
+                if (S_ISDIR(file.statData.st_mode)) {
+                    subDirs.insert(subDirs.end(), file.filename);
+                    processor(file);
                 }
                 else {
                     // filter for patterns
                     if (pattern.length()) {
-                        bool found = patternRE.search(filename);
+                        bool found = patternRE.search(file.filename);
                         
                         if (exclude && found)
                             continue;
@@ -1181,7 +1218,7 @@ void processDirectory(string directory, string pattern, bool exclude, void (*pro
                     }
                     
                     // process regular files
-                    processor(filename, passData);
+                    processor(file);
                 }
             }
         }
@@ -1190,5 +1227,31 @@ void processDirectory(string directory, string pattern, bool exclude, void (*pro
     }
     
     for (auto &dir: subDirs)
-        processDirectory(dir, pattern, exclude, processor, passData, maxDepth > -1 ? maxDepth - 1 : -1);
+        processDirectory(dir, pattern, exclude, processor, passData, maxDepth > -1 ? maxDepth - 1 : -1, file.origDir);
+}
+
+
+
+string progressPercentage(int totalIterations, int totalSteps,
+                    int iterationsComplete, int stepsComplete, string detail) {
+    static int prevLength = 0;
+    string result;
+    
+    // start with backspaces to erase our previous message
+    if (totalIterations < 0)
+        prevLength = 0;
+    else
+        if (prevLength)
+            result = string(prevLength, '\b') + string(prevLength, ' ') + string(prevLength, '\b');
+    
+    // numFS = 0 can be used to just backspace over the last status and blank it out
+    if (totalIterations > 0) {
+        int target = totalIterations * totalSteps;
+        int current = iterationsComplete * totalSteps + stepsComplete;
+        string currentProgress = to_string(int((float)current / (float)target * 100)) + "% " + detail + " ";
+        prevLength = (int)currentProgress.length();
+        result += currentProgress;
+    }
+
+    return result;
 }

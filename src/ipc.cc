@@ -128,11 +128,8 @@ tuple<string, int, time_t> IPC_Base::ipcReadToFile(string filename, bool preDele
 
     // handle directories that are specifically sent
     if (S_ISDIR(mode)) {
-        if (mkdirp(filename))
+        if (mkdirp(filename, mode))
             errorMsg += (errorMsg.length() ? "\n" : "") + string("error: unable to mkdir ") + filename + ": " + strerror(errno);
-
-        if (chmod(filename.c_str(), mode))
-            errorMsg += (errorMsg.length() ? "\n" : "") + string("error: unable to chmod directory ") + filename + ": " + strerror(errno);
 
         if (chown(filename.c_str(), (int)uid, (int)gid))
             errorMsg += (errorMsg.length() ? "\n" : "") + string("error: unable to chown directory ") + filename + ": " + strerror(errno);
