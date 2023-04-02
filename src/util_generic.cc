@@ -434,11 +434,12 @@ string dw(int which) {
 
 
 void setFilePerms(string filename, struct stat &statData, bool exitOnError) {
-    if (lchmod(filename.c_str(), statData.st_mode)) {
-        SCREENERR(log("error: unable to chmod " + filename + " - " + strerror(errno)));
-        if (exitOnError)
-            exit(1);
-    }
+    if (!S_ISLNK(statData.st_mode))
+        if (chmod(filename.c_str(), statData.st_mode)) {
+            SCREENERR(log("error: unable to chmod " + filename + " - " + strerror(errno)));
+            if (exitOnError)
+                exit(1);
+        }
     
     if (lchown(filename.c_str(), statData.st_uid, statData.st_gid)){
         SCREENERR(log("error: unable to chown " + filename + " - " + strerror(errno)));

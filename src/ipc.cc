@@ -55,9 +55,19 @@ ssize_t IPC_Base::ipcRead(void *data, size_t count) {
     }
     else
         if (result == -1)
-            log(string("error on select() of read: ") + strerror(errno));
-        else
-            return read(readFd, (char*)data + dataLen, count);
+            throw MBException(string("error on select() of read: ") + strerror(errno));
+        else {
+            auto bytes = read(readFd, (char*)data + dataLen, count);
+           
+            if (bytes == -1) {
+                ++ioErrors;
+                
+                if (ioErrors > 2)
+                    throw MBException(string("multiple errors on network read - ") + strerror(errno));
+            }
+            else
+                return bytes;
+        }
 
     return 0;
 }
@@ -108,13 +118,19 @@ string IPC_Base::ipcReadTo(string delimiter) {
         }
 
         auto bytes = read(readFd, rawBuf, sizeof(rawBuf));
-
-        if (bytes) {
-            string tempStr(rawBuf, bytes);
-            strBuf += tempStr;
+        if (bytes == -1) {
+            ++ioErrors;
+            
+            if (ioErrors > 2)
+                throw MBException(string("multiple errors on network read - ") + strerror(errno));
         }
         else
-            return "";
+            if (bytes) {
+                string tempStr(rawBuf, bytes);
+                strBuf += tempStr;
+            }
+            else
+                return "";
     }
 }
 

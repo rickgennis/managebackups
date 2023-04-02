@@ -1729,7 +1729,7 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
     if (isFaub) {
         auto backupIt = config.fcache.getFirstBackup();
         while (backupIt != config.fcache.getEnd()) {
-            NOTQUIET && ANIMATE && cout << progressPercentage(numBackups, 1, distance(config.fcache.getFirstBackup(), backupIt), 1, backupIt->second.getDir()) << flush;
+            NOTQUIET && ANIMATE && cout << progressPercentage(numBackups, 1, (int)distance(config.fcache.getFirstBackup(), backupIt), 1, backupIt->second.getDir()) << flush;
             if (!moveBackup(backupIt->second.getDir(), oldBaseDir, newBaseDir, sameFS, numBackups, fsData)) {
                 log(config.ifTitle() + " " + backupIt->second.getDir() + " has vanished, updating cache");
                 config.fcache.removeBackup(backupIt);
