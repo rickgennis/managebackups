@@ -16,30 +16,6 @@
 
 extern void cleanupAndExitOnError();
 
-tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string backupDir, time_t sinceTime, string profileName);
-
-
-/*
- * mostRecentBackupDirSince(backupBaseDir, sinceDir)
- *
- * backupBaseDir is the backup dir root (e.g. /tmp/mybackups)
- * sinceDir is a specific full backup path (e.g. /tmp/mybackups/2023/012/the-backup-20230106)
- */
-string mostRecentBackupDirSince(int baseSlashes, string backupBaseDir, string sinceDir, string profileName) {
-    struct stat statData;
-    time_t sinceTime = 0;
-
-    ++GLOBALS.statsCount;
-    if (!stat(sinceDir.c_str(), &statData))
-        sinceTime = statData.st_mtime;
-    else
-        sinceTime = time(NULL);
-
-    auto [fname, fmtime] = mostRecentBackupDirSinceInternal(baseSlashes, backupBaseDir, sinceTime, profileName);
-    return fname;
-}
-
-
 tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string backupDir, time_t sinceTime, string profileName) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
@@ -51,8 +27,7 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
     Pcre matchSpec(DATE_REGEX);
     if (matchSpec.search(backupDir)) {
 
-        ++GLOBALS.statsCount;
-        if (!stat(ue(backupDir).c_str(), &statData)) {
+        if (!mystat(ue(backupDir), &statData)) {
             DEBUG(D_faub) DFMT("returning " << backupDir);
             return {backupDir, statData.st_mtime};
         }
@@ -63,13 +38,12 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
     if ((c_dir = opendir(ue(backupDir).c_str())) != NULL) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
 
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..") || strstr(c_dirEntry->d_name, ".tmp.") != NULL)
                continue;
 
             string fullFilename = backupDir + "/" + string(c_dirEntry->d_name);
 
-            ++GLOBALS.statsCount;
-            if (!stat(fullFilename.c_str(), &statData)) {
+            if (!mystat(fullFilename, &statData)) {
 
                 if (S_ISDIR(statData.st_mode)) {
                     auto slashDiff = count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes;
@@ -107,6 +81,26 @@ tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string b
     }
 
     return {recentName, recentTime};
+}
+
+
+/*
+ * mostRecentBackupDirSince(backupBaseDir, sinceDir)
+ *
+ * backupBaseDir is the backup dir root (e.g. /tmp/mybackups)
+ * sinceDir is a specific full backup path (e.g. /tmp/mybackups/2023/012/the-backup-20230106)
+ */
+string mostRecentBackupDirSince(int baseSlashes, string backupBaseDir, string sinceDir, string profileName) {
+    struct stat statData;
+    time_t sinceTime = 0;
+
+    if (!mystat(sinceDir, &statData))
+        sinceTime = statData.st_mtime;
+    else
+        sinceTime = time(NULL);
+
+    auto [fname, fmtime] = mostRecentBackupDirSinceInternal(baseSlashes, backupBaseDir, sinceTime, profileName);
+    return fname;
 }
 
 
@@ -162,13 +156,13 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     string localCurFilename;
     string originalCurrentDir = currentDir;
     struct stat statData;
-    ssize_t fileTotal = 0;
-    ssize_t filesModified = 0;
-    ssize_t filesHardLinked = 0;
-    ssize_t filesSymLinked = 0;
-    ssize_t receivedSymLinks = 0;
-    ssize_t unmodDirs = 0;
-    unsigned int linkErrors = 0;
+    size_t fileTotal = 0;
+    size_t filesModified = 0;
+    size_t filesHardLinked = 0;
+    size_t filesSymLinked = 0;
+    size_t receivedSymLinks = 0;
+    size_t unmodDirs = 0;
+    size_t linkErrors = 0;
     string tempExtension = ".tmp." + to_string(GLOBALS.pid);
 
     // note start time
@@ -303,8 +297,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 }
                 else {
                     // lstat the previous backup's copy of the file and compare the mtimes
-                    ++GLOBALS.statsCount;
-                    int statResult = lstat(localPrevFilename.c_str(), &statData);
+                    int statResult = mylstat(localPrevFilename, &statData);
                     
                     if (prevDir.length() && !statResult && statData.st_mtime == mtime) {
                         
@@ -315,8 +308,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                          */
                         struct stat statData2;
                         if ((statData.st_nlink >= maxLinksAllowed) &&
-                            ((!incTime && lstat(localCurFilename.c_str(), &statData2)) || incTime)) {
-                            if (!incTime) ++GLOBALS.statsCount;
+                            ((!incTime && mylstat(localCurFilename, &statData2)) || incTime)) {
                             duplicateList.insert(duplicateList.end(), pair<string, string>(localPrevFilename, localCurFilename));
                             ++maxLinksReached;
                             DEBUG(D_netproto) DFMTNOPREFIX("[matches, but links maxed]");
@@ -339,7 +331,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                         // ones we need the client to send in full
                         neededFiles.insert(neededFiles.end(), remoteFilename);
                         modifiedFiles.insert(modifiedFiles.end(), remoteFilename);
-                        DEBUG(D_netproto) DFMTNOPREFIX("[" << (!prevDir.length() ? "no prev dir" : statResult < 0 ? "unable to stat" :
+                        DEBUG(D_netproto) DFMTNOPREFIX("[" << (!prevDir.length() ? "no prev dir" : statResult < 0 ? "unable to stat " + localPrevFilename :
                                                                string("mtime mismatch (") + to_string(statData.st_mtime) + "; " + to_string(mtime)) << "]");
                     }
                 }
@@ -436,8 +428,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 }
                 else {
                     struct stat statData;
-                    ++GLOBALS.statsCount;
-                    if (!lstat(dups.first.c_str(), &statData))
+                    if (!mylstat(dups.first, &statData))
                         setFilePerms(dups.second, statData, false);
                 }
             }
@@ -459,8 +450,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                 if (bytes >= 0 && bytes < sizeof(linkBuf)) {
                     linkBuf[bytes] = 0;
                     if (!symlink(linkBuf, links.second.c_str())) {
-                        ++GLOBALS.statsCount;
-                        if (!lstat(links.first.c_str(), &statData)) {
+                        if (!mylstat(links.first, &statData)) {
                             if (lchown(links.second.c_str(), statData.st_uid, statData.st_gid)) {
                                 SCREENERR(fs << " error: unable to chown symlink " << links.second << ": " << strerror(errno));
                                 log(config.ifTitle() + " " + fs + " error: unable to chown symlink " + links.second + ": " + strerror(errno));
@@ -585,6 +575,24 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     }
 }
 
+struct scanToServerDataType {
+    size_t totalEntries;
+    IPC_Base *server;
+};
+
+
+bool scanToServerCallback(pdCallbackData &file) {
+    scanToServerDataType *data = (scanToServerDataType*)file.dataPtr;
+    
+    data->totalEntries++;
+    data->server->ipcWrite(string(file.filename + NET_DELIM).c_str());
+    data->server->ipcWrite(file.statData.st_mtime);
+    data->server->ipcWrite(file.statData.st_mode);
+    DEBUG(D_netproto) DFMT("client provided stats on " << file.filename);
+    
+    return true;
+}
+
 
 /*
  * fc_scanToServer() - faub client
@@ -592,63 +600,14 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
  * to the remote server. This is the client's side of phase 1.
  */
 size_t fc_scanToServer(string entryName, IPC_Base& server) {
-    DIR *c_dir;
-    struct dirent *c_dirEntry;
-    struct stat statData;
-    size_t totalEntries = 0;
-    vector<string> subDirs;
+    scanToServerDataType data;
+    data.server = &server;
+    data.totalEntries = 0;
     
     entryName.erase(remove(entryName.begin(), entryName.end(), '\\'), entryName.end());
+    processDirectory(entryName, "", false, scanToServerCallback, &data);
     
-    ++GLOBALS.statsCount;
-    if (!lstat(entryName.c_str(), &statData)) {
-        if (S_ISDIR(statData.st_mode)) {
-            
-            if ((c_dir = opendir(ue(entryName).c_str())) != NULL) {
-                while ((c_dirEntry = readdir(c_dir)) != NULL) {
-                    
-                    if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
-                        continue;
-                    
-                    string fullFilename = entryName + "/" + string(c_dirEntry->d_name);
-                    
-                    ++GLOBALS.statsCount;
-                    if (!lstat(fullFilename.c_str(), &statData)) {
-                        ++totalEntries;
-                        server.ipcWrite(string(fullFilename + NET_DELIM).c_str());
-                        server.ipcWrite(statData.st_mtime);
-                        server.ipcWrite(statData.st_mode);
-                        DEBUG(D_netproto) DFMT("client provided stats on " << fullFilename);
-                        
-                        if (S_ISDIR(statData.st_mode))
-                            subDirs.insert(subDirs.end(), fullFilename);
-                    }
-                    else
-                        log("error: stat failed for " + fullFilename);
-                }
-                closedir(c_dir);
-
-                for (auto &dir: subDirs)
-                    totalEntries += fc_scanToServer(dir, server);
-            }
-            else {
-                log("error: can't open " + entryName + " - " + strerror(errno));
-                server.ipcWrite(string(string("##* error: client instance unable to read ") + entryName + " - " + strerror(errno) + NET_DELIM).c_str());
-                cleanupAndExitOnError();
-            }
-        }
-        else {
-            // if one of the top-level "filesystems" / "directories" given to --path on the client
-            // isn't a directory but instead a file, handle it here
-            ++totalEntries;
-            server.ipcWrite(string(entryName + NET_DELIM).c_str());
-            server.ipcWrite(statData.st_mtime);
-            server.ipcWrite(statData.st_mode);
-            DEBUG(D_netproto) DFMT("client provided stats on " << entryName);
-        }
-    }
-    
-    return totalEntries;
+    return data.totalEntries;
 }
 
 /*

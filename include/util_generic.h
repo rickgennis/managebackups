@@ -225,17 +225,24 @@ string realpathcpp(string origPath);
 char getFilesystemEntryType(mode_t mode);
 char getFilesystemEntryType(string entry);
 
-struct processorFileData {
+struct pdCallbackData {
     string filename;
     string origDir;
     struct stat statData;
     void *dataPtr;
 };
 
-void processDirectory(string directory, string pattern, bool exclude, void (*processor)(processorFileData&), void *passData, int maxDepth = -1, string internalUseDir = "");
+string processDirectory(string directory, string pattern, bool exclude, bool (*processor)(pdCallbackData&), void *passData, int maxDepth = -1, string internalUseDir = "");
 
 string progressPercentage(int totalIterations, int totalSteps = 7,
                     int iterationsComplete = 0, int stepsComplete = 0, string detail = "");
+
+int mylstat(string filename, struct stat *buf);
+int mystat(string filename, struct stat *buf);
+
+string errtext(bool format = true);
+
+tuple<string, string> clearMessage(string message);
 
 #endif
 

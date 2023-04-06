@@ -306,8 +306,7 @@ void BackupCache::reStatMD5(string md5) {
             auto raw_it = rawData.find(fileID);
             
             if (raw_it != rawData.end()) {
-                ++GLOBALS.statsCount;
-                if (!stat(raw_it->second.filename.c_str(), &statBuf)) {
+                if (!mystat(raw_it->second.filename, &statBuf)) {
                     raw_it->second.links = statBuf.st_nlink;
                     raw_it->second.mtime = statBuf.st_mtime;
                     raw_it->second.inode = statBuf.st_ino;
@@ -318,85 +317,72 @@ void BackupCache::reStatMD5(string md5) {
     }
 }
 
-// cleanup old cache files that may refer to no longer existing backups
-// cleanup works across all 1F cache files, regardless of profile or directory
-void BackupCache::cleanup() {
-    DIR *c_dir;
-    struct dirent *c_dirEntry;
-    struct stat statData;
+
+bool cleanupCallback(pdCallbackData &file) {
+    ifstream origCacheFile;
+    ofstream newCacheFile;
     const string suffixNew = ".new";
-    const string suffix1f = ".1f";
     const string suffixUpdate = ".updating";
+    string baseFilename = slashConcat(GLOBALS.cacheDir, file.filename);
+    string workingFilename = baseFilename + suffixUpdate;
+    string newFilename = baseFilename + suffixNew;
     
-    if ((c_dir = opendir(GLOBALS.cacheDir.c_str())) != NULL) {
+    // simplistic locking -- only one process succeeds at the rename when -K is elected
+    if (!S_ISDIR(file.statData.st_mode) && !rename(baseFilename.c_str(), workingFilename.c_str())) {
+        unsigned int verifiedBackups = 0;
         
-        ifstream origCacheFile;
-        ofstream newCacheFile;
+        origCacheFile.open(workingFilename.c_str());
         
-        while ((c_dirEntry = readdir(c_dir)) != NULL) {
+        if (origCacheFile.is_open()) {
+            newCacheFile.open(newFilename.c_str());
             
-            if (!strcmp(c_dirEntry->d_name, ".") ||
-                !strcmp(c_dirEntry->d_name, "..") ||
-                (strstr(c_dirEntry->d_name, suffix1f.c_str()) == NULL) ||
-                (strstr(c_dirEntry->d_name, suffixNew.c_str()) != NULL) ||
-                (strstr(c_dirEntry->d_name, suffixUpdate.c_str()) != NULL))
-                continue;
-            
-            string baseFilename = slashConcat(GLOBALS.cacheDir, c_dirEntry->d_name);
-            string workingFilename = baseFilename + suffixUpdate;
-            string newFilename = baseFilename + suffixNew;
-            
-            // simplistic locking -- only one process succeeds at the rename when -K is elected
-            if (!rename(baseFilename.c_str(), workingFilename.c_str())) {
-                unsigned int verifiedBackups = 0;
-                
-                origCacheFile.open(workingFilename.c_str());
-                
-                if (origCacheFile.is_open()) {
-                    newCacheFile.open(newFilename.c_str());
+            if (newCacheFile.is_open()) {
+                string cacheData;
+                while (getline(origCacheFile, cacheData)) {
+                    BackupEntry entry;
                     
-                    if (newCacheFile.is_open()) {
-                        string cacheData;
-                        while (getline(origCacheFile, cacheData)) {
-                            BackupEntry entry;
-                            
-                            if (entry.string2class(cacheData)) {
-                                
-                                if (!stat(entry.filename.c_str(), &statData)) {
-                                    newCacheFile << cacheData << endl;
-                                    ++verifiedBackups;
-                                }
-                            }
-                        }
+                    if (entry.string2class(cacheData)) {
                         
-                        newCacheFile.close();
-                    }
-                    else {
-                        SCREENERR(log("error: unable to create " + newFilename+ " - " + strerror(errno)));
-                        rename(workingFilename.c_str(), baseFilename.c_str());
-                        cleanupAndExitOnError();
-                    }
-                    
-                    origCacheFile.close();
-                    unlink(workingFilename.c_str());
-                    
-                    if (verifiedBackups) {
-                        if (rename(newFilename.c_str(), baseFilename.c_str())) {
-                            SCREENERR(log("error: unable to rename " + newFilename + " to " + baseFilename + " (cache lost) - " + strerror(errno)));
-                            cleanupAndExitOnError();
+                        if (exists(entry.filename)) {
+                            newCacheFile << cacheData << endl;
+                            ++verifiedBackups;
                         }
                     }
-                    else
-                        unlink(newFilename.c_str());
                 }
-                else {
-                    SCREENERR(log("error: unable to read " + baseFilename + " - " + strerror(errno)));
-                    rename(workingFilename.c_str(), baseFilename.c_str());
+                
+                newCacheFile.close();
+            }
+            else {
+                SCREENERR(log("error: unable to create " + newFilename+ " - " + strerror(errno)));
+                rename(workingFilename.c_str(), baseFilename.c_str());
+                cleanupAndExitOnError();
+            }
+            
+            origCacheFile.close();
+            unlink(workingFilename.c_str());
+            
+            if (verifiedBackups) {
+                if (rename(newFilename.c_str(), baseFilename.c_str())) {
+                    SCREENERR(log("error: unable to rename " + newFilename + " to " + baseFilename + " (cache lost) - " + strerror(errno)));
                     cleanupAndExitOnError();
                 }
             }
+            else
+                unlink(newFilename.c_str());
         }
-        closedir(c_dir);
+        else {
+            SCREENERR(log("error: unable to read " + baseFilename + " - " + strerror(errno)));
+            rename(workingFilename.c_str(), baseFilename.c_str());
+            cleanupAndExitOnError();
+        }
     }
+    
+    return true;
 }
 
+
+// cleanup old cache files that may refer to no longer existing backups
+// cleanup works across all 1F cache files, regardless of profile or directory
+void BackupCache::cleanup() {
+    processDirectory(GLOBALS.cacheDir, ".1f$", false, cleanupCallback, NULL);
+}

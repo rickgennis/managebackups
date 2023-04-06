@@ -332,6 +332,9 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
         cout << plural((int)bkups, "backup") << "\n";
         cout << approximate(stats.getSize() + stats.getSaved(), precisionLevel, statDetail == 3 || statDetail == 5) << " using "
             << approximate(stats.getSize(), precisionLevel, statDetail == 3 || statDetail == 5) << " on disk (saved " << saved << "%)\n";
+
+        if (config.fcache.getInProcessFilename().length())
+            cout << YELLOW << config.fcache.getInProcessFilename() << RESET << " (in process)" << endl;
         
         // determine the backup max filename length and rention match counts
         set<string> dayUnique;
@@ -515,6 +518,10 @@ void _displayDetailedStats(BackupConfig& config, int statDetail) {
     cout << "Directory: " << config.settings[sDirectory].value << " (" << config.settings[sBackupFilename].value << ")\n";
     cout << plural((int)rawSize, "backup") << ", " << plural((int)md5Size, "unique") << "\n";
     cout << approximate(bytesUsed + bytesSaved, precisionLevel, statDetail == 3 || statDetail == 5) << " using " << approximate(bytesUsed, precisionLevel, statDetail == 3 || statDetail == 5) << " on disk (saved " << saved << "%)\n";
+    
+    if (config.cache.inProcess.length())
+        cout << YELLOW << config.fcache.getInProcessFilename() << RESET << " (in process)" << endl;
+
     cout << "Retention stats:\n";
     cout << "\t• " << numDay << " of " << config.settings[sDays].ivalue() << " daily\n";
     cout << "\t• " << numWeek << " of " << config.settings[sWeeks].ivalue() << " weekly\n";

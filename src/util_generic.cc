@@ -462,7 +462,7 @@ int mkdirp(string dir, mode_t mode) {
     struct stat statBuf;
     int result = 0;
 
-    if (stat(dir.c_str(), &statBuf) == -1) {
+    if (mystat(dir, &statBuf) == -1) {
         char data[PATH_MAX];
         strcpy(data, dir.c_str());
         char *p = strtok(data, "/");
@@ -471,7 +471,7 @@ int mkdirp(string dir, mode_t mode) {
         while (p) {
             path += string("/") + p;   
 
-            if (stat(path.c_str(), &statBuf) == -1)
+            if (mystat(path, &statBuf) == -1)
                result = mkdir(path.c_str(), mode);
 
             if (result)
@@ -862,7 +862,7 @@ bool rmrf(string item) {
     struct stat statData;
     vector<string> subDirs;
 
-    if (!lstat(item.c_str(), &statData)) {
+    if (!mylstat(item, &statData)) {
         if (S_ISDIR(statData.st_mode)) {
             
             if ((c_dir = opendir(item.c_str())) != NULL) {
@@ -879,7 +879,7 @@ bool rmrf(string item) {
                         else
                             if (unlink(filename.c_str())) {
                                 closedir(c_dir);
-                                log("error: unable to remove " + filename + " - " + strerror(errno));
+                                SCREENERR(log("error: unable to remove " + filename + errtext()));
                                 return false;
                             }
                     }
@@ -893,14 +893,14 @@ bool rmrf(string item) {
 
                 // remove this directory itself
                 if (rmdir(item.c_str())) {
-                    log("error: unable to remove " + item + " - " + strerror(errno));
+                    SCREENERR(log("error: unable to remove " + item + errtext()));
                     return false;
                 }
             }
         }
         else
             if (unlink(item.c_str())) {
-                log("error: unable to remove " + item + " - " + strerror(errno));
+                SCREENERR(log("error: unable to remove " + item + errtext()));
                 return false;
             }
     }
@@ -1014,7 +1014,7 @@ int copyFile(string srcFile, string destFile) {
     std::ifstream inF(srcFile, ios_base::in | ios_base::binary);
     if (!inF) return 0;
 
-    std::ofstream outF(destFile, ios_base::out | ios_base::binary);
+    std::ofstream outF(destFile, ios_base::out | ios_base::binary | ios_base::trunc);
     if (!outF) return 0;
 
     char buffer[32 * 1024];
@@ -1038,8 +1038,7 @@ string ue(string file) {
 
 bool exists(const std::string& name) {
     struct stat statBuffer;
-    ++GLOBALS.statsCount;
-    return (stat(name.c_str(), &statBuffer) == 0);
+    return (mystat(name, &statBuffer) == 0);
 }
 
 
@@ -1110,7 +1109,7 @@ int forkMvCmd(string oldDir, string newDir) {
     
     auto pid = fork();
     if (pid < 0) {
-        SCREENERR(string("error: unable to execute fork to run mv - ") + strerror(errno));
+        SCREENERR(string("error: unable to execute fork to run mv") + errtext());
         exit(1);
     }
     
@@ -1175,60 +1174,109 @@ char getFilesystemEntryType(string entry) {
 }
 
 
-void processDirectory(string directory, string pattern, bool exclude, void (*processor)(processorFileData&), void *passData, int maxDepth, string internalUseDir) {
+/*
+   processDirectory() recurses down the specified directory calling the provided
+   callback() function on each filesystem entry (be it a directory, symlink or file).
+   the callback needs to return true for processing to continue otherwise the rest
+   of the recursion is aborted.
+ 
+   a regex pattern can be provided to filter filenames, along with whether the pattern
+   should be used as include or exclude criteria.  in either case the pattern is only
+   applied to filenames; by contrast *all* directories are considered and passed to
+   callback().
+ 
+   maxDepth can be specified to only go x subdirectory levels deep.
+ 
+   callback() is passed a structure that contains the full path of the filename to
+   process, its stat() information, and a void pointer that can be setup before processing
+   begins to pass any additional data into or out of the callback() functions.
+ 
+   processDirectory() returns a blank string on success.  on error, the error is logged,
+   shown on the screen (via SCREENERR) and returned to the calling function.
+ */
+
+string processDirectory(string directory, string pattern, bool exclude, bool (*callback)(pdCallbackData&), void *passData, int maxDepth, string internalUseDir) {
     DIR *c_dir;
     struct dirent *c_dirEntry;
     vector<string> subDirs;
     Pcre patternRE(pattern);
-    processorFileData file;
+    pdCallbackData file;
     file.dataPtr = passData;
     
     if (internalUseDir.length())
         file.origDir = internalUseDir;
     else
         file.origDir = directory;
-
-    if (!maxDepth)
-        return;
     
-    if ((c_dir = opendir(ue(directory).c_str())) != NULL) {
-        while ((c_dirEntry = readdir(c_dir)) != NULL) {
-
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
-                continue;
-
-            file.filename = slashConcat(directory, c_dirEntry->d_name);
-            
-            if (!stat(file.filename.c_str(), &file.statData)) {
+    if (!maxDepth)
+        return "";
+    
+    if (!mylstat(directory, &file.statData)) {
+        file.filename = ue(directory);
                 
-                // process directories
-                if (S_ISDIR(file.statData.st_mode)) {
-                    subDirs.insert(subDirs.end(), file.filename);
-                    processor(file);
-                }
-                else {
-                    // filter for patterns
-                    if (pattern.length()) {
-                        bool found = patternRE.search(file.filename);
-                        
-                        if (exclude && found)
-                            continue;
-                        
-                        if (!exclude && !found)
-                            continue;
-                    }
+        if (S_ISDIR(file.statData.st_mode)) {
+            
+            if ((c_dir = opendir(directory.c_str())) != NULL) {
+                while ((c_dirEntry = readdir(c_dir)) != NULL) {
                     
-                    // process regular files
-                    processor(file);
+                    if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+                        continue;
+                    
+                    file.filename = slashConcat(directory, c_dirEntry->d_name);
+                    
+                    if (!mylstat(file.filename, &file.statData)) {
+                        
+                        // process directories
+                        if (S_ISDIR(file.statData.st_mode)) {
+                            subDirs.insert(subDirs.end(), file.filename);
+                            if (!callback(file)) {
+                                subDirs.clear();
+                                break;
+                            }
+                        }
+                        else {
+                            // filter for patterns
+                            if (pattern.length()) {
+                                bool found = patternRE.search(file.filename);
+                                
+                                if (exclude && found)
+                                    continue;
+                                
+                                if (!exclude && !found)
+                                    continue;
+                            }
+                            
+                            // process regular files
+                            if (!callback(file)) {
+                                subDirs.clear();
+                                break;
+                            }
+                        }
+                    }
                 }
+                
+                closedir(c_dir);
+            }
+            else {
+                string err = "error: unable to open " + ue(directory) + errtext();;
+                SCREENERR(log(err));
+                return err;
             }
         }
-        
-        closedir(c_dir);
+        else
+            // only relevant for the top-level entry we're initially called with
+            callback(file);
+    }
+    else {
+        string err = "error: stat failed for " + file.filename + errtext();
+        SCREENERR(log(err));
+        return err;
     }
     
     for (auto &dir: subDirs)
-        processDirectory(dir, pattern, exclude, processor, passData, maxDepth > -1 ? maxDepth - 1 : -1, file.origDir);
+        processDirectory(dir, pattern, exclude, callback, passData, maxDepth > -1 ? maxDepth - 1 : -1, file.origDir);
+    
+    return "";
 }
 
 
@@ -1255,4 +1303,30 @@ string progressPercentage(int totalIterations, int totalSteps,
     }
 
     return result;
+}
+
+
+int mylstat(string filename, struct stat *buf) {
+    ++GLOBALS.statsCount;
+    return (lstat(filename.c_str(), buf));
+}
+
+
+int mystat(string filename, struct stat *buf) {
+    ++GLOBALS.statsCount;
+    return (stat(filename.c_str(), buf));
+}
+
+
+string errtext(bool format) {
+    return((format ? " - " : "") + string(strerror(errno)));
+}
+
+
+tuple<string, string> clearMessage(string message) {
+    auto len = message.length();
+    string bs = string(len, '\b');
+    string sp = string(len, ' ');
+    
+    return {message, bs + sp + bs};
 }

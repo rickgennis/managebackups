@@ -35,28 +35,20 @@ int ConfigManager::findConfig(string title) {
 }
 
 
-ConfigManager::ConfigManager() {
-    DIR *c_dir;
-    struct dirent *c_dirEntry;
-
-    if ((c_dir = opendir(ue(GLOBALS.confDir).c_str())) != NULL ) {
-        Pcre regEx(".*\\.conf$");
-
-        // loop through *.conf files
-        while ((c_dirEntry = readdir(c_dir)) != NULL) {
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..") || 
-                    !strcmp(c_dirEntry->d_name, "managebackups.conf") || !regEx.search(string(c_dirEntry->d_name)))
-                continue;
-
-            string fullFilename = slashConcat(GLOBALS.confDir, c_dirEntry->d_name);
-            BackupConfig backupConfig;
-            backupConfig.loadConfig(fullFilename);
-            configs.insert(configs.begin(), backupConfig);
-        }
-
-        closedir(c_dir);
+bool configMgrCallback(pdCallbackData &file) {
+    if (!S_ISDIR(file.statData.st_mode)) {
+        vector<BackupConfig> *configs = (vector<BackupConfig>*)file.dataPtr;
+        BackupConfig backupConfig;
+        backupConfig.loadConfig(file.filename);
+        configs->insert(configs->begin(), backupConfig);
     }
+    
+    return true;
+}
 
+    
+ConfigManager::ConfigManager() {
+    processDirectory(ue(GLOBALS.confDir), "\\.conf$", false, configMgrCallback, &configs);
     activeConfig = -1;
     sort(configs.begin(), configs.end());
 }

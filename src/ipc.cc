@@ -55,7 +55,7 @@ ssize_t IPC_Base::ipcRead(void *data, size_t count) {
     }
     else
         if (result == -1)
-            throw MBException(string("error on select() of read: ") + strerror(errno));
+            throw MBException(string("error on select() of read - ") + strerror(errno));
         else {
             auto bytes = read(readFd, (char*)data + dataLen, count);
            
@@ -145,15 +145,15 @@ tuple<string, int, time_t> IPC_Base::ipcReadToFile(string filename, bool preDele
     // handle directories that are specifically sent
     if (S_ISDIR(mode)) {
         if (mkdirp(filename, mode))
-            errorMsg += (errorMsg.length() ? "\n" : "") + string("error: unable to mkdir ") + filename + ": " + strerror(errno);
-
+            errorMsg += (errorMsg.length() ? "\n" : "") + string("error: unable to mkdir ") + filename + errtext();
+        
         if (chown(filename.c_str(), (int)uid, (int)gid))
-            errorMsg += (errorMsg.length() ? "\n" : "") + string("error: unable to chown directory ") + filename + ": " + strerror(errno);
+            errorMsg += (errorMsg.length() ? "\n" : "") + string("error: unable to chown directory ") + filename + errtext();
 
         struct utimbuf timeBuf;
         timeBuf.actime = timeBuf.modtime = mtime;
         if (utime(filename.c_str(), &timeBuf))
-            errorMsg += "error: unable to set utime() on " + filename + " - " + strerror(errno);
+            errorMsg += "error: unable to set utime() on " + filename + errtext();
         
         return {errorMsg, mode, mtime};
     }
@@ -169,10 +169,10 @@ tuple<string, int, time_t> IPC_Base::ipcReadToFile(string filename, bool preDele
             unlink(filename.c_str());
 
         if (symlink(target, filename.c_str()))
-            return {("error: unable to create symlink (" + filename + "): " + strerror(errno)), -1, 0};
+            return {("error: unable to create symlink " + filename + errtext()), -1, 0};
 
         if (lchown(filename.c_str(), (int)uid, (int)gid))
-            return {("error: unable to chown symlink " + filename + ": " + strerror(errno)), -1, 0};
+            return {("error: unable to chown symlink " + filename + errtext()), -1, 0};
 
         struct timeval tv[2];
         tv[0].tv_sec  = tv[1].tv_sec  = mtime;

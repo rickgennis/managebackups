@@ -91,6 +91,7 @@ void FaubCache::restoreCache(string profileName) {
     Pcre tempRE("\\.tmp\\.\\d+$");
 
     coreProfile = profileName;
+    DEBUG(D_faub) DFMT(profileName);
     
     dirQueue.push(baseDir);
     auto baseSlashes = count(baseDir.begin(), baseDir.end(), '/');
@@ -98,6 +99,7 @@ void FaubCache::restoreCache(string profileName) {
     while (dirQueue.size()) {
         currentDir = dirQueue.front();
         dirQueue.pop();
+        DEBUG(D_faub) DFMT("processing " << currentDir);
 
         if ((c_dir = opendir(ue(currentDir).c_str())) != NULL) {
             while ((c_dirEntry = readdir(c_dir)) != NULL) {
@@ -108,8 +110,7 @@ void FaubCache::restoreCache(string profileName) {
                 struct stat statData;
                 string fullFilename = slashConcat(currentDir, c_dirEntry->d_name);
                 
-                ++GLOBALS.statsCount;
-                if (!stat(fullFilename.c_str(), &statData)) {
+                if (!mystat(fullFilename, &statData)) {
                     
                     if (S_ISDIR(statData.st_mode)) {
                         // regardless of the starting (baseDir) directory, we're only interested in subdirs
@@ -224,6 +225,8 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
     
     if (forceAll)
         cout << "caches updated for " << plural(recached, "backup") << "." << endl;
+    
+    DEBUG(D_faub) DFMT("complete");
 }
 
 
@@ -446,6 +449,7 @@ void FaubCache::cleanup() {
     string cacheFilename;
     struct stat statData;
     
+    DEBUG(D_faub) DFMT("starting");
     if ((c_dir = opendir(ue(GLOBALS.cacheDir).c_str())) != NULL) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
 
@@ -470,7 +474,7 @@ void FaubCache::cleanup() {
                 
                 // if the backup directory referenced in the cache file no longer exists
                 // delete the cache file
-                if (stat(backupDir.c_str(), &statData)) {
+                if (mystat(backupDir, &statData)) {
                     auto targetMtime = filename2Mtime(backupDir);
   
                     if (profileName.length()) {
@@ -478,11 +482,11 @@ void FaubCache::cleanup() {
                         auto parentDir = backupDir;
                         auto ps = pathSplit(parentDir);
 
-                        while (parentDir.find("/") != string::npos && !yearRE.search(ps.file)) {
+                        while (parentDir.length() > 1 && parentDir.find("/") != string::npos && !yearRE.search(ps.file)) {
                             parentDir = ps.dir;
                             ps = pathSplit(parentDir);
                         }
-                        
+
                         auto bdir = pathSplit(parentDir).dir;
                         if (profileName == coreProfile && bdir == baseDir) {
                             DEBUG(D_any) DFMT(backupDir << " no longer exists; will recalculate usage of subsequent backup");
@@ -501,6 +505,8 @@ void FaubCache::cleanup() {
         }        
         closedir(c_dir);
     }
+    
+    DEBUG(D_faub) DFMT("complete");
 }
 
 

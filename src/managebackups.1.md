@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.4.7a
+% MANAGEBACKUPS(1) managebackups 1.4.7c
 % Rick Ennis
 % March 2023
 
@@ -120,7 +120,7 @@ Options are relative to the three functions of **managebackups** plus general op
 : Lock the specified profile (or all profiles if **-a** or **-A**) for the duration of this run.  All subsequent attempts to run this profile while the first one is still running will be skipped.  The profile is automatically unlocked when the first invocation finishes. Locks are respected on every run but only taken out when **-x** or **--lock** is specified.  i.e. a **-x** run will successfully lock the profile even for other invocations that fail to specify **-x**.
 
 **--force**
-: Override any existing lock and force the backup to start.
+: If used when executing a profile **--force** will override any existing lock and force the profile to run (backup, prune, etc). If used with **--relocate**, **--force** will make every attempt to continue a previously failed **--relocate** by handling errors.  Some assumptions are made in this context.  For example, if a backup is to be renamed A to B and A no longer exists but B already does, it's assumed to have previously succeeded and processing continues.  If a symlink needs to be created and is found to already exist, its deleted and recreated automatically.
 
 **--tripwire** [*string*]
 : The tripwire setting can be used as a rudimentary guard against ransomware or other encryption attacks. It can't protect your local backups but will both alert you immediately and stop processing (no pruning, linking or backing up) if the tripwire check fails.  The check is defined as a filename (or list of filenames) and their MD5 values. If any of the MD5s change, the check fails and the alert is triggered.  For example, if you're backing up /etc you can create a bogus test file such as /etc/tripdata.txt and then configure **managebackups** with **--tripwire "/etc/tripdata.txt: xxx"** where xxx is the correct MD5 of the file. Multiple entries can be separated with commas ("/etc/foo: xxx, /etc/fish: yyy, /usr/local/foo: zzz"). Only local computer tripwire files are supported at this time.

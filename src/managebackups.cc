@@ -154,9 +154,8 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache, 
             string fullFilename = slashConcat(directory, c_dirEntry->d_name);
             auto slashDiff = count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes;
 
-            ++GLOBALS.statsCount;
             struct stat statData;
-            if (!stat(fullFilename.c_str(), &statData)) {
+            if (!mystat(fullFilename, &statData)) {
                 if (S_ISDIR(statData.st_mode)) {
                     // to avoid walking into any faub-style backup directories we only go 2 level deeper than
                     // the starting directory (x/2023/01) or 3 levels deeper if the last subdir is a two-digit int
@@ -264,6 +263,9 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache, 
  * Wrapper function for parseDirToCache().
  *******************************************************************************/
 void scanConfigToCache(BackupConfig &config) {
+    auto [message, noMessage] = clearMessage("updating cache for " + config.settings[sDirectory].value + "... ");
+    NOTQUIET && ANIMATE && cout << message << flush;
+    
     if (config.settings[sFaub].value.length()) {
         config.fcache.restoreCache(config.settings[sDirectory].value, config.settings[sTitle].value);
       
@@ -272,6 +274,7 @@ void scanConfigToCache(BackupConfig &config) {
         // the user manually deleted a backup unbeknown to us.
         config.fcache.cleanup();
         
+        NOTQUIET && ANIMATE && cout << noMessage << flush;
         return;
     }
 
@@ -294,6 +297,7 @@ void scanConfigToCache(BackupConfig &config) {
 
     auto baseSlashes = (int)count(directory.begin(), directory.end(), '/');
     parseDirToCache(directory, fnamePattern, config.cache, baseSlashes);
+    NOTQUIET && ANIMATE && cout << noMessage << flush;
 }
 
 /*******************************************************************************
@@ -480,8 +484,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
     if (currentConf == &tempConfig) {
         if (bProfile && bSave) {
             tempConfig.config_filename =
-                slashConcat(GLOBALS.confDir, safeFilename(tempConfig.settings[sTitle].value)) +
-                ".conf";
+                slashConcat(GLOBALS.confDir, safeFilename(tempConfig.settings[sTitle].value)) + ".conf";
             tempConfig.temp = false;
         }
 
@@ -611,17 +614,22 @@ void pruneFaubBackups(BackupConfig &config)
             ++cacheEntryIt;
         }
         else {
+            auto [message, noMessage] = clearMessage("removing " + cacheEntryIt->first + "...");
+            NOTQUIET && ANIMATE && cout << message << flush;
+
             if (rmrf(cacheEntryIt->second.getDir())) {
-                NOTQUIET &&cout << "\t• removed " << cacheEntryIt->second.getDir() << (shouldConsolidate ? " (consolidation)" : "" ) << endl;
+                NOTQUIET && ANIMATE && cout << noMessage << flush;
+                
+                NOTQUIET && cout << "\t• removed " << cacheEntryIt->second.getDir() << (shouldConsolidate ? " (consolidation)" : "" ) << endl;
                 log(config.ifTitle() + " removed " + cacheEntryIt->second.getDir() +
                     " (age=" + to_string(mtimeDayAge) + ", dow=" + dw(filenameDOW) + ")" + (shouldConsolidate ? " consolidation" : "" ));
                 DEBUG(D_prune) DFMT("completed removal of " << cacheEntryIt->second.getDir() << (shouldConsolidate ? " (consolidation)" : "" ));
             }
             else {
-                log(config.ifTitle() + " unable to remove " + (shouldConsolidate ? " (consolidation) " : "" ) + cacheEntryIt->second.getDir() + ": " +
-                    strerror(errno));
-                SCREENERR(string("unable to remove ") + (shouldConsolidate ? " (consolidation) " : "" ) + cacheEntryIt->second.getDir() + ": " +
-                          strerror(errno));
+                NOTQUIET && ANIMATE && cout << noMessage << flush;
+                
+                log(config.ifTitle() + " unable to remove " + (shouldConsolidate ? " (consolidation) " : "" ) + cacheEntryIt->second.getDir() + errtext());
+                SCREENERR(string("unable to remove ") + (shouldConsolidate ? " (consolidation) " : "" ) + cacheEntryIt->second.getDir() + errtext());
             }
          
             auto deadBackupIt = cacheEntryIt++;
@@ -786,10 +794,8 @@ void pruneBackups(BackupConfig &config)
                     DEBUG(D_prune) DFMT("completed removal of " << raw_it->second.filename);
                 }
                 else {
-                    log(config.ifTitle() + " unable to remove " + (shouldConsolidate ? " (consolidation) " : "") + raw_it->second.filename + ": " +
-                        strerror(errno));
-                    SCREENERR(string("unable to remove ") + (shouldConsolidate ? " (consolidation) " : "") + raw_it->second.filename + ": " +
-                              strerror(errno));
+                    log(config.ifTitle() + " unable to remove " + (shouldConsolidate ? " (consolidation) " : "") + raw_it->second.filename + errtext());
+                    SCREENERR(string("unable to remove ") + (shouldConsolidate ? " (consolidation) " : "") + raw_it->second.filename + errtext());
                 }
             }
         }
@@ -941,18 +947,17 @@ void updateLinks(BackupConfig &config)
                                 }
                             }
                             else {
-                                SCREENERR("error: unable to link " << detail << " ("
-                                                                   << strerror(errno) << ")");
-                                log(config.ifTitle() + " error: unable to link " + detail);
+                                SCREENERR("error: unable to link " << detail << errtext());
+                                log(config.ifTitle() + " error: unable to link " + detail + errtext());
                             }
                         }
                         else {
                             SCREENERR("error: unable to remove " << raw_it->second.filename
-                                                                 << " in prep to link it ("
-                                                                 << strerror(errno) << ")");
+                                                                 << " in prep to link it"
+                                                                 << errtext());
                             log(config.ifTitle() + " error: unable to remove " +
-                                raw_it->second.filename + " in prep to link it (" +
-                                strerror(errno) + ")");
+                                raw_it->second.filename + " in prep to link it" +
+                                errtext());
                         }
                     }
                 }
@@ -1189,7 +1194,7 @@ bool performTripwire(BackupConfig &config)
         for (string tripPair : tripPairs) {
             auto tripItem = perlSplit("\\s*:\\s*", tripPair);
 
-            if (!stat(tripItem[0].c_str(), &statData)) {
+            if (!mystat(tripItem[0], &statData)) {
                 string md5 = MD5file(tripItem[0].c_str(), true);
 
                 if (!md5.length()) {
@@ -1294,7 +1299,7 @@ void performBackup(BackupConfig &config) {
 
     // determine results
     struct stat statData;
-    if (!stat(string(backupFilename + tempExtension).c_str(), &statData)) {
+    if (!mystat(string(backupFilename + tempExtension), &statData)) {
         if (statData.st_size >= approx2bytes(config.settings[sMinSize].value)) {
             backup.flushErrors();
 
@@ -1465,7 +1470,7 @@ void sigTermHandler(int sig) {
         cerr << "\n" << reason << ": aborting backup, cleaning up " << GLOBALS.interruptFilename << "... ";
 
         struct stat statData;
-        if (!stat(GLOBALS.interruptFilename.c_str(), &statData)) {
+        if (!mystat(GLOBALS.interruptFilename, &statData)) {
             if (S_ISDIR(statData.st_mode)) 
                 rmrf(GLOBALS.interruptFilename);             // faub-style
             else
@@ -1530,7 +1535,7 @@ struct crossFSDataType {
 };
 
 
-void crossFSProcessor(processorFileData& file) {
+bool crossFSCallback(pdCallbackData &file) {
     crossFSDataType *newDataPtr;
     newDataPtr = (crossFSDataType*)file.dataPtr;
     
@@ -1539,7 +1544,7 @@ void crossFSProcessor(processorFileData& file) {
     newFilename.replace(0, file.origDir.length(), "");
     newFilename = slashConcat(newDataPtr->newDir, newFilename);
     
-    if (!lstat(oldFilename.c_str(), &file.statData)) {
+    if (!mylstat(oldFilename, &file.statData)) {
         if (S_ISDIR(file.statData.st_mode))
             mkdirp(newFilename, file.statData);
         else {
@@ -1548,7 +1553,7 @@ void crossFSProcessor(processorFileData& file) {
             // duplicate hard links
             if (inodeEntry != newDataPtr->iMap.end()) {
                 if (link(inodeEntry->second.c_str(), newFilename.c_str())) {
-                    SCREENERR("error: unable to create hard link " + newFilename + " - " + strerror(errno));
+                    SCREENERR("error: unable to create hard link " + newFilename + errtext());
                     exit(1);
                 }
             }
@@ -1560,20 +1565,32 @@ void crossFSProcessor(processorFileData& file) {
                     linkPath[len] = 0;
                     if (len > -1) {
                         if (symlink(linkPath, newFilename.c_str())) {
-                            SCREENERR("error: unable to create symlink " + newFilename + " to " + linkPath + " - " + strerror(errno));
-                            exit(1);
+                            
+                            if (errno == EEXIST && GLOBALS.cli.count(CLI_FORCE)) {
+                                if (!unlink(newFilename.c_str()) && !symlink(linkPath, newFilename.c_str()))
+                                    setFilePerms(newFilename, file.statData);
+                                else {
+                                    SCREENERR("error: unable to recreate existing symlink " + newFilename + " to " + linkPath + errtext());
+                                    exit(1);
+                                }
+                            }
+                            else {
+                                SCREENERR("error: unable to create symlink " + newFilename + " to " + linkPath + errtext());
+                                exit(1);
+                            }
                         }
-                        setFilePerms(newFilename, file.statData);
+                        else
+                            setFilePerms(newFilename, file.statData);
                     }
                     else {
-                        SCREENERR("error: unable to read symlink " + oldFilename + " - " + strerror(errno));
+                        SCREENERR("error: unable to read symlink " + oldFilename + errtext());
                         exit(1);
                     }
                 }
                 else {
                     // copy regular files
                     if (!copyFile(oldFilename, newFilename)) {
-                        SCREENERR("error: unable to copy " + oldFilename + " to " + newFilename + " - " + strerror(errno));
+                        SCREENERR("error: unable to copy " + oldFilename + " to " + newFilename + errtext());
                         exit(1);
                     }
                     
@@ -1584,9 +1601,11 @@ void crossFSProcessor(processorFileData& file) {
         }
     }
     else {
-        SCREENERR("error: cross-filesystem move interrupted, unable to stat " + oldFilename + " - " + strerror(errno));
+        SCREENERR("error: cross-filesystem move interrupted, unable to stat " + oldFilename + errtext());
         exit(1);
     }
+    
+    return true;
 }
 
 
@@ -1594,21 +1613,22 @@ void moveBackupCrossFS(string oldBackupDir, string newBackupDir, crossFSDataType
     struct stat statData;
 
     // create the top-level directory
-    if (!lstat(oldBackupDir.c_str(), &statData))
+    if (!mylstat(oldBackupDir, &statData))
         mkdirp(newBackupDir, statData);
     else {
-        SCREENERR("error: unable to stat " + oldBackupDir + " - " + strerror(errno));
+        SCREENERR("error: unable to stat " + oldBackupDir + errtext());
         exit(1);
     }
     
     fsData.newDir = newBackupDir;
-    processDirectory(oldBackupDir, "", false, crossFSProcessor, &fsData);
+    processDirectory(oldBackupDir, "", false, crossFSCallback, &fsData);
 }
 
 
 bool moveBackup(string fullBackupOldPath, string oldBaseDir, string newBaseDir, bool sameFS, unsigned long numBackups, crossFSDataType& fsData) {
     static int count = 0;
     bool result = true;
+    struct stat statData;
     auto fullBackupNewPath = fullBackupOldPath;
     auto pos = fullBackupNewPath.find(oldBaseDir);
     if (pos != string::npos)
@@ -1624,15 +1644,23 @@ bool moveBackup(string fullBackupOldPath, string oldBaseDir, string newBaseDir, 
     if (sameFS) {
         if (exists(fullBackupOldPath)) {
             if (rename(fullBackupOldPath.c_str(), fullBackupNewPath.c_str())) {
-                SCREENERR("error: unable to rename " << fullBackupOldPath << " to " << fullBackupNewPath << " - " << strerror(errno));
-                if (count)
-                    SCREENERR("\nSome backups were successfully renamed. Correct the permission issue and rerun\n" <<
-                              "the --relocate to maintain a consistent state.");
-                exit(1);
+                
+                if (errno != ENOENT || !GLOBALS.cli.count(CLI_FORCE) || mystat(fullBackupNewPath, &statData)) {
+                    SCREENERR("error: unable to rename " << fullBackupOldPath << " to " << fullBackupNewPath << errtext());
+                    if (count)
+                        SCREENERR("\nSome backups were successfully renamed. Correct the permission issue and rerun\n" <<
+                                  "the --relocate to maintain a consistent state.");
+                    exit(1);
+                }
             }
         }
         else
-            result = false;
+            if (!GLOBALS.cli.count(CLI_FORCE) || !exists(fullBackupNewPath))
+                result = false;
+        /* else
+           we silently consider it a success becauase the source is missing but
+           the destination exists and --force was specified.
+         */
     }
     else {
         moveBackupCrossFS(fullBackupOldPath, fullBackupNewPath, fsData);
@@ -1698,20 +1726,20 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
     }
  
     if (mkdirp(newBaseDir)) {
-        SCREENERR("error: unable to create directory " << newBaseDir << " - " << strerror(errno));
+        SCREENERR("error: unable to create directory " << newBaseDir << errtext());
         exit(1);
     }
    
     struct stat statData1;
     struct stat statData2;
     
-    if (stat(oldBaseDir.c_str(), &statData1)) {
-        SCREENERR("error: unable to access (stat) " << oldBaseDir << " - " << strerror(errno));
+    if (mystat(oldBaseDir, &statData1)) {
+        SCREENERR("error: unable to access (stat) " << oldBaseDir << errtext());
         exit(1);
     }
     
-    if (stat(newBaseDir.c_str(), &statData2)) {
-        SCREENERR("error: unable to access (stat) " << newBaseDir << " - " << strerror(errno));
+    if (mystat(newBaseDir, &statData2)) {
+        SCREENERR("error: unable to access (stat) " << newBaseDir << errtext());
         exit(1);
     }
     
@@ -2386,7 +2414,7 @@ int main(int argc, char *argv[]) {
                     int newnice = nice(currentConfig->settings[sNice].ivalue());
                     DEBUG(D_any) DFMT("set nice value of " << currentConfig->settings[sNice].ivalue() << " (previous " << n << ", got " << newnice << ")");
                     if (newnice == -1 && errno)
-                        log(currentConfig->ifTitle() + " unable to set nice value - " + strerror(errno));
+                        log(currentConfig->ifTitle() + " unable to set nice value" + errtext());
                 }
 
                 scanConfigToCache(*currentConfig);

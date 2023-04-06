@@ -90,9 +90,9 @@ void BackupConfig::saveConfig() {
     if (!config_filename.length()) {
         string baseName = settings[sTitle].value.length() ? settings[sTitle].value : "default"; 
         struct stat statBuf;
-        if (stat((GLOBALS.confDir + baseName + ".conf").c_str(), &statBuf)) {
+        if (mystat((GLOBALS.confDir + baseName + ".conf"), &statBuf)) {
             int suffix = 1;
-            while (stat((GLOBALS.confDir + baseName + to_string(suffix) + ".conf").c_str(), &statBuf)) 
+            while (mystat((GLOBALS.confDir + baseName + to_string(suffix) + ".conf"), &statBuf))
                 ++suffix;
 
             config_filename = GLOBALS.confDir + baseName + to_string(suffix) + ".conf";
@@ -311,7 +311,10 @@ bool BackupConfig::loadConfig(string filename) {
         DEBUG(D_config) DFMT("successfully parsed [" << settings[sTitle].value << "] config from " << filename);
 
         return 1;
-    }    
+    }
+    else {
+        SCREENERR(log("error: unable to read " + filename + errtext()));
+    }
 
     return 0;
 }
@@ -345,6 +348,7 @@ unsigned int BackupConfig::removeEmptyDirs(string directory, int baseSlashes) {
 
     int numBaseSlashes = baseSlashes ? baseSlashes : (int)count(startDir.begin(), startDir.end(), '/');
 
+    /* this is unique logic so processDirectory() won't work; let's traverse the directories here instead */
     if ((c_dir = opendir(ue(startDir).c_str())) != NULL) {
         unsigned int entryCount = 0;
 
@@ -354,14 +358,13 @@ unsigned int BackupConfig::removeEmptyDirs(string directory, int baseSlashes) {
                continue; 
 
             ++entryCount;
-            ++GLOBALS.statsCount;
             struct stat statData;
             string fullFilename = slashConcat(startDir, c_dirEntry->d_name);
 
             auto depth = count(fullFilename.begin(), fullFilename.end(), '/') - numBaseSlashes;
             bool entIsDay = (string(c_dirEntry->d_name).length() == 2 && isdigit(c_dirEntry->d_name[0]) && isdigit(c_dirEntry->d_name[1]));
 
-            if ((depth < 3 || (depth == 3 && entIsDay)) && !stat(fullFilename.c_str(), &statData)) {
+            if ((depth < 3 || (depth == 3 && entIsDay)) && !mystat(fullFilename, &statData)) {
                 if (S_ISDIR(statData.st_mode)) {
                     subDirs.insert(subDirs.end(), fullFilename);
                 }

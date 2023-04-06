@@ -51,3 +51,8 @@ fw:
 both:
 	make && make fw
 
+skip:
+	/usr/local/bin/publish skip
+	tar --no-xattrs -C /Users/rennis --exclude "*.o" --exclude "help.cc" -czf /tmp/managebackups.tgz managebackups
+	scp /tmp/managebackups.tgz compile1@fw:/data
+	ssh compile2@fw 
