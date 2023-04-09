@@ -25,7 +25,7 @@ void installman() {
     string manPath = "/usr/local/share/man/man1";
 
     struct stat statBuf;
-    if (stat(manPath.c_str(), &statBuf)) {
+    if (mystat(manPath, &statBuf)) {
         if (mkdirp(manPath)) {
             SCREENERR("error: unable to create " << manPath);
             return;
@@ -94,7 +94,7 @@ void install(string myBinary, bool suid) {
         mode_t setuidmode = S_ISUID | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 
         // mkdir -p GLOBALS.confDir
-        if (stat(GLOBALS.confDir.c_str(), &statBuf)) {
+        if (mystat(GLOBALS.confDir, &statBuf)) {
             if (mkdirp(GLOBALS.confDir)) {
                 SCREENERR("error: unable to create " << GLOBALS.confDir);                
                 goto bailout;
@@ -103,7 +103,7 @@ void install(string myBinary, bool suid) {
         }
 
         // mkdir -p GLOBALS.cacheDir
-        if (stat(GLOBALS.cacheDir.c_str(), &statBuf)) {
+        if (mystat(GLOBALS.cacheDir, &statBuf)) {
             if (mkdirp(GLOBALS.cacheDir)) {
                 SCREENERR("error: unable to create " << GLOBALS.cacheDir);
                 goto bailout;
@@ -139,7 +139,7 @@ void install(string myBinary, bool suid) {
         }
         cout << "chmod 2770 " << GLOBALS.cacheDir << " (success)\n";
 
-        if (stat("/usr/local/bin", &statBuf)) {
+        if (mystat("/usr/local/bin", &statBuf)) {
             if (mkdirp("/usr/local/bin")) {
                 SCREENERR("error: unable to create /usr/local/bin");
                 goto bailout;

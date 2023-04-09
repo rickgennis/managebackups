@@ -124,9 +124,91 @@ void verifyTripwireParams(string param)
     }
 }
 
+
+struct parseDirDataType {
+    Pcre *tempRE;
+    BackupCache *cache;
+};
+
+
+bool parseDirCallback(pdCallbackData &file) {
+    parseDirDataType *data = (parseDirDataType*)file.dataPtr;
+    
+    // first test for an in-process file.  if its in process, is it old and abandoned?
+    // if so, delete it.  if not old, note the in process filename and skip the rest
+    auto ps = pathSplit(file.filename);
+    if (data->tempRE->search(ps.file)) {
+        DEBUG(D_scan) DFMT("in-process file found (" << file.filename << ")");
+        
+        if (GLOBALS.startupTime - file.statData.st_mtime > 3600 * 5) {
+            DEBUG(D_scan) DFMT("removing abandoned in-process file (" << file.filename << ")");
+            unlink(file.filename.c_str());
+        }
+        else
+            data->cache->inProcess = file.filename;
+    }
+    else {
+        auto shouldCalculateMD5 = true;
+        
+        // not an in-process file, let's make sure its in the cache.
+        // if the cache has an existing md5 and the cache's mtime and size match
+        // what we just read from disk, consider the cache valid.  only update
+        // the inode & age info.
+        string reason;
+        BackupEntry *pCacheEntry;
+        if ((pCacheEntry = data->cache->getByFilename(file.filename)) != NULL) {
+            if (pCacheEntry->md5.length() && pCacheEntry->size == file.statData.st_size &&
+                pCacheEntry->mtime && pCacheEntry->mtime == file.statData.st_mtime) {
+                pCacheEntry->links = file.statData.st_nlink;
+                pCacheEntry->inode = file.statData.st_ino;
+
+                data->cache->addOrUpdate(*pCacheEntry->updateAges(GLOBALS.startupTime), true);
+                shouldCalculateMD5 = false;
+            }
+            else {
+                if (!pCacheEntry->md5.length()) { reason = "{no md5}"; }
+                else
+                    if (pCacheEntry->size != file.statData.st_size) { reason = "{size change}"; }
+                else
+                    if (!pCacheEntry->mtime) { reason = "{no mtime}"; }
+                else
+                    if (pCacheEntry->mtime != file.statData.st_mtime) { reason = "{mtime change}"; }
+                else
+                    reason = "{?}";
+            }
+        }
+        else
+            reason = "{not in cache}";
+
+        if (shouldCalculateMD5) {
+            // otherwise let's update the cache with everything we just read and
+            // then calculate a new md5
+            BackupEntry cacheEntry;
+            cacheEntry.filename = file.filename;
+            cacheEntry.links = file.statData.st_nlink;
+            cacheEntry.mtime = file.statData.st_mtime;
+            cacheEntry.inode = file.statData.st_ino;
+            cacheEntry.size = file.statData.st_size;
+            cacheEntry.updateAges(GLOBALS.startupTime);
+            
+            if (cacheEntry.calculateMD5(reason)) {
+                data->cache->addOrUpdate(cacheEntry, true, true);
+            }
+            else {
+                log("error: unable to read " + file.filename + " (MD5)" + errtext());
+                SCREENERR("error: unable to read " << file.filename << " (MD5)" + errtext());
+            }
+        }
+    }
+    
+    return true;
+}
+
+    
 /*******************************************************************************
- * parseDirToCache(directory, fnamePattern, cache, baseSlashes)
+ * parseDirToCache(directory, fnamePattern, cache)
  *
+ * [for single-file backups only]
  * Recursively walk the given directory looking for all files that match the
  * fnamePattern (all directories are considered, regardless of their name matching
  * the pattern). For all matching filenames, compare them to the given cache.
@@ -139,123 +221,16 @@ void verifyTripwireParams(string param)
  *
  *  (c) if a file isn't in the cache create the entry and treat it as (b) above
  *******************************************************************************/
-void parseDirToCache(string directory, string fnamePattern, BackupCache &cache, int baseSlashes)
-{
-    DIR *c_dir;
-    struct dirent *c_dirEntry;
-    Pcre fnameRE(fnamePattern);
+void parseDirToCache(string directory, string fnamePattern, BackupCache &cache) {
     Pcre tempRE("\\.tmp\\.\\d+$");
-    vector<string> subDirs;
-
-    if ((c_dir = opendir(ue(directory).c_str())) != NULL) {
-        while ((c_dirEntry = readdir(c_dir)) != NULL) {
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..")) continue;
-
-            string fullFilename = slashConcat(directory, c_dirEntry->d_name);
-            auto slashDiff = count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes;
-
-            struct stat statData;
-            if (!mystat(fullFilename, &statData)) {
-                if (S_ISDIR(statData.st_mode)) {
-                    // to avoid walking into any faub-style backup directories we only go 2 level deeper than
-                    // the starting directory (x/2023/01) or 3 levels deeper if the last subdir is a two-digit int
-                    // for day (x/2023/01/03).
-                    if (slashDiff < 3 ||
-                            (slashDiff == 3 && string(c_dirEntry->d_name).length() == 2 &&
-                             isdigit(c_dirEntry->d_name[0]) && isdigit(c_dirEntry->d_name[1])))
-                        subDirs.insert(subDirs.end(), fullFilename);
-                }
-                else {
-                    // filter for filename if specified
-                    if (fnamePattern.length() && !fnameRE.search(string(c_dirEntry->d_name))) {
-                        DEBUG(D_scan) DFMT("skip name mismatch: " << fullFilename);
-                        continue;
-                    }
-
-                    if (tempRE.search(string(c_dirEntry->d_name))) {
-                        DEBUG(D_scan) DFMT("in-process file found (" << c_dirEntry->d_name << ")");
-
-                        if (GLOBALS.startupTime - statData.st_mtime > 3600 * 5) {
-                            DEBUG(D_scan)
-                            DFMT("removing abandoned in-process file (" << c_dirEntry->d_name
-                                                                        << ")");
-                            unlink(fullFilename.c_str());
-                        }
-                        else
-                            cache.inProcess = fullFilename;
-
-                        continue;
-                    }
-
-                    // if the cache has an existing md5 and the cache's mtime and size match
-                    // what we just read from disk, consider the cache valid.  only update
-                    // the inode & age info.
-                    string reason;
-                    BackupEntry *pCacheEntry;
-                    if ((pCacheEntry = cache.getByFilename(fullFilename)) != NULL) {
-                        if (pCacheEntry->md5.length() && pCacheEntry->size == statData.st_size &&
-                            pCacheEntry->mtime && pCacheEntry->mtime == statData.st_mtime) {
-                            pCacheEntry->links = statData.st_nlink;
-                            pCacheEntry->inode = statData.st_ino;
-
-                            cache.addOrUpdate(*pCacheEntry->updateAges(GLOBALS.startupTime), true);
-                            continue;
-                        }
-                        else {
-                            if (!pCacheEntry->md5.length()) { reason = "{no md5}"; }
-                            else
-                                if (pCacheEntry->size != statData.st_size) { reason = "{size change}"; }
-                            else
-                                if (!pCacheEntry->mtime) { reason = "{no mtime}"; }
-                            else
-                                if (pCacheEntry->mtime != statData.st_mtime) { reason = "{mtime change}"; }
-                            else
-                                reason = "{?}";
-                        }
-                    }
-                    else { reason = "{not in cache}"; }
-
-                    // otherwise let's update the cache with everything we just read and
-                    // then calculate a new md5
-                    BackupEntry cacheEntry;
-                    cacheEntry.filename = fullFilename;
-                    cacheEntry.links = statData.st_nlink;
-                    cacheEntry.mtime = statData.st_mtime;
-                    cacheEntry.inode = statData.st_ino;
-                    cacheEntry.size = statData.st_size;
-                    cacheEntry.updateAges(GLOBALS.startupTime);
-
-                    if (cacheEntry.calculateMD5(reason)) {
-                        cache.addOrUpdate(cacheEntry, true, true);
-                    }
-                    else {
-                        log("error: unable to read " + fullFilename + " (MD5)");
-                        SCREENERR("error: unable to read " << fullFilename << " (MD5)");
-                    }
-                }
-            }
-            else {
-                // stat errors can happen if two copies of managebackups are running concurrently
-                // and the other instance deletes the file between our readdir() and stat().  that's
-                // legit and normal. I can't think of a situation where we'd have perms to readdir()
-                // but not to stat(). so that may be the only scenario where we could land in this
-                // block. in which case its not worth reporting. it would just be a distraction.
-                /*
-                log("error: unable to stat " + fullFilename);
-                SCREENERR("error: unable to stat " << fullFilename);
-                */
-            }
-        }
-        closedir(c_dir);
-
-        for (auto &dir: subDirs)
-            parseDirToCache(dir, fnamePattern, cache, baseSlashes);
-    }
-    else {
-        SCREENERR("error: unable to read " << directory);
-        log("error: unable to read " + directory);
-    }
+    parseDirDataType data;
+    data.tempRE = &tempRE;
+    data.cache = &cache;
+        
+    processDirectoryBackups(ue(directory), fnamePattern, false, parseDirCallback, &data, SINGLE_ONLY);
 }
+
+
 
 /*******************************************************************************
  * scanConfigToCache(config)
@@ -295,8 +270,7 @@ void scanConfigToCache(BackupConfig &config) {
     else
         fnamePattern = DATE_REGEX;
 
-    auto baseSlashes = (int)count(directory.begin(), directory.end(), '/');
-    parseDirToCache(directory, fnamePattern, config.cache, baseSlashes);
+    parseDirToCache(directory, fnamePattern, config.cache);
     NOTQUIET && ANIMATE && cout << noMessage << flush;
 }
 
@@ -1867,7 +1841,7 @@ bool getGlobalStats(unsigned long& stats, unsigned long& md5s, string& elapsedTi
 int main(int argc, char *argv[]) {
     timer AppTimer;
     AppTimer.start();
-    
+            
     signal(SIGTERM, sigTermHandler);
     signal(SIGINT, sigTermHandler);
 

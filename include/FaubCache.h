@@ -66,6 +66,9 @@ public:
     FaubCache(string path, string profileName);
     FaubCache() {}
     ~FaubCache() {}
+    
+    friend bool fcCleanupCallback(pdCallbackData &file);
+    friend bool restoreCacheCallback(pdCallbackData &file);
 };
 
 #endif

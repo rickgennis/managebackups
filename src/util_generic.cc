@@ -637,7 +637,7 @@ vector<string> expandWildcardSub(string fileSpec, string baseDir, int index) {
 
                 // does the current file match the current fileSpec's regex?
                 if (matchSpec.search(c_dirEntry->d_name)) {
-                    if (!lstat(string(baseDir + "/" + c_dirEntry->d_name).c_str(), &statData)) {
+                    if (!mylstat(baseDir + "/" + c_dirEntry->d_name, &statData)) {
 
                         // if this matching dir entry is a subdirectory, add it to the list to call recursively
                         if (S_ISDIR(statData.st_mode))
@@ -813,33 +813,28 @@ string blockp(string data, int width) {
 }
 
 
+bool catdirCallback(pdCallbackData &file) {
+    ifstream aFile;
+    
+    aFile.open(file.filename);
+    if (aFile.is_open()) {
+        string data;
+
+        while (getline(aFile, data))
+           *(string*)(file.dataPtr) += data + "\n";
+
+        aFile.close();
+    }
+    
+    return true;
+}
+
 
 string catdir(string dir) {
     string result;
-    DIR *c_dir;
-    struct dirent *c_dirEntry;
-
-    if ((c_dir = opendir(dir.c_str())) != NULL) {
-        while ((c_dirEntry = readdir(c_dir)) != NULL) {
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
-                continue;
-
-            ifstream aFile;
-            aFile.open(dir + "/" + c_dirEntry->d_name);
-
-            if (aFile.is_open()) {
-                string data;
-
-                while (getline(aFile, data)) 
-                    result += data + "\n";
-
-                aFile.close();
-            }
-
-        }
-        closedir(c_dir);
-    }
-
+    
+    processDirectory(dir, "", false, catdirCallback, &result);
+    
     size_t p;
     while ((p = result.find("\r\n")) != string::npos)
         result.erase(p, 1);
@@ -850,7 +845,7 @@ string catdir(string dir) {
     if (result.back() == '\n')
         result.pop_back();
 
-    return(result);
+    return result;
 }
 
 
@@ -871,7 +866,7 @@ bool rmrf(string item) {
                         continue;
                     
                     string filename = slashConcat(item, c_dirEntry->d_name);
-                    if (!lstat(filename.c_str(), &statData)) {
+                    if (!mylstat(filename, &statData)) {
                         
                         // save directories in a list to do after we close this fd
                         if (S_ISDIR(statData.st_mode))
@@ -916,6 +911,7 @@ int mkbasedirs(string path) {
     return -1;
 }
 
+
 DiskStats dus(string path) {    // du -s
     set<ino_t> seenInodes;
     set<ino_t> newInodes;
@@ -923,48 +919,49 @@ DiskStats dus(string path) {    // du -s
 }
 
 
-DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes) {    // du -s
-    vector<string> subDirs;
-    DIR *dir;
-    struct stat statData;
-    struct dirent *dirEnt;
-    DiskStats ds;
+struct dsDataType {
+    DiskStats *ds;
+    set<ino_t> *seenI;
+    set<ino_t> *newI;
+};
+
+
+bool dsCallback(pdCallbackData &file) {
+    dsDataType *data = (dsDataType*)file.dataPtr;
     
-    if ((dir = opendir(path.c_str())) == NULL) {
-        perror(path.c_str());
-        return DiskStats(0, 0, 0, 0);
-    }
-
-    while ((dirEnt = readdir(dir)) != NULL) {
-        if (!strcmp(dirEnt->d_name, ".") || !strcmp(dirEnt->d_name, ".."))
-            continue;
-        
-        string fullFilename = path + "/" + dirEnt->d_name;
-        ++GLOBALS.statsCount;
-        if (lstat(fullFilename.c_str(), &statData) < 0)
-            log("error: stat(" + fullFilename + "): " + strerror(errno));
-        else {
-            if (seenInodes.find(statData.st_ino) != seenInodes.end() ||
-                newInodes.find(statData.st_ino) != newInodes.end()) {
-                ds.savedInBytes += statData.st_size;
-                ds.savedInBlocks += 512 * statData.st_blocks;
-            }
-            else {
-                ds.sizeInBytes += statData.st_size;
-                ds.sizeInBlocks += 512 * statData.st_blocks;
-            }
-            
-            newInodes.insert(statData.st_ino);
-            
-            if (S_ISDIR(statData.st_mode))
-                subDirs.insert(subDirs.end(), fullFilename);
+    if (!S_ISDIR(file.statData.st_mode) && !S_ISLNK(file.statData.st_mode)) {
+        if (data->seenI->find(file.statData.st_ino) != data->seenI->end() ||
+            data->newI->find(file.statData.st_ino) != data->newI->end()) {
+            data->ds->savedInBytes += file.statData.st_size;
+            data->ds->savedInBlocks += 512 * file.statData.st_blocks;
         }
+        else {
+            data->ds->sizeInBytes += file.statData.st_size;
+            data->ds->sizeInBlocks += 512 * file.statData.st_blocks;
+        }
+        
+        data->newI->insert(file.statData.st_ino);
     }
-    closedir(dir);
 
-    for (auto &subDir: subDirs)
-        ds += dus(subDir, seenInodes, newInodes);
-            
+    return true;
+}
+
+
+/*
+   du -s
+   stat'ing a directory entry itself (not the contents) or a symlink returns a definitive
+   size specific to that entry.  For reasons I don't understand the CLI 'du' command ignores
+   those numbers and doesn't add them to a given subdirectory's total.  Maybe they know
+   something I don't.  So this function is specifically excluding them as well in the callback.
+ */
+DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes) {
+    DiskStats ds;
+    dsDataType data;
+    data.ds = &ds;
+    data.seenI = &seenInodes;
+    data.newI = &newInodes;
+
+    processDirectory(path, "", false, dsCallback, &data);
     return ds;
 }
 
@@ -1100,11 +1097,8 @@ time_t filename2Mtime(string filename) {
 }
 
 
+// forkMvCmd is currently unused
 int forkMvCmd(string oldDir, string newDir) {
-    // actually move the backup files.  this is tempting to do internally
-    // but if you look at the source to the mv command there are more one-
-    // off special cases than you can count.  may as well let it do what
-    // it's good at.
     auto mv = locateBinary("/bin/mv");
     
     auto pid = fork();
@@ -1165,10 +1159,10 @@ char getFilesystemEntryType(mode_t mode) {
 char getFilesystemEntryType(string entry) {
     struct stat statData;
     
-    if (!stat(entry.c_str(), &statData))
+    if (!mystat(entry, &statData))
         return getFilesystemEntryType(statData.st_mode);
     
-    log("error: unable to stat " + entry + " - " + strerror(errno));
+    log("error: unable to stat " + entry + errtext());
     
     return '?';
 }
@@ -1196,39 +1190,33 @@ char getFilesystemEntryType(string entry) {
  */
 
 string processDirectory(string directory, string pattern, bool exclude, bool (*callback)(pdCallbackData&), void *passData, int maxDepth, string internalUseDir) {
-    DIR *c_dir;
-    struct dirent *c_dirEntry;
+    DIR *dir;
+    struct dirent *dirEntry;
     vector<string> subDirs;
     Pcre patternRE(pattern);
     pdCallbackData file;
     file.dataPtr = passData;
-    
-    if (internalUseDir.length())
-        file.origDir = internalUseDir;
-    else
-        file.origDir = directory;
-    
-    if (!maxDepth)
-        return "";
-    
+    file.origDir = internalUseDir.length() ? internalUseDir : directory;
+        
     if (!mylstat(directory, &file.statData)) {
         file.filename = ue(directory);
                 
         if (S_ISDIR(file.statData.st_mode)) {
             
-            if ((c_dir = opendir(directory.c_str())) != NULL) {
-                while ((c_dirEntry = readdir(c_dir)) != NULL) {
+            if ((dir = opendir(directory.c_str())) != NULL) {
+                while ((dirEntry = readdir(dir)) != NULL) {
                     
-                    if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+                    if (!strcmp(dirEntry->d_name, ".") || !strcmp(dirEntry->d_name, ".."))
                         continue;
                     
-                    file.filename = slashConcat(directory, c_dirEntry->d_name);
+                    file.filename = slashConcat(directory, dirEntry->d_name);
                     
                     if (!mylstat(file.filename, &file.statData)) {
                         
                         // process directories
                         if (S_ISDIR(file.statData.st_mode)) {
                             subDirs.insert(subDirs.end(), file.filename);
+                            
                             if (!callback(file)) {
                                 subDirs.clear();
                                 break;
@@ -1255,7 +1243,7 @@ string processDirectory(string directory, string pattern, bool exclude, bool (*c
                     }
                 }
                 
-                closedir(c_dir);
+                closedir(dir);
             }
             else {
                 string err = "error: unable to open " + ue(directory) + errtext();;
@@ -1264,7 +1252,7 @@ string processDirectory(string directory, string pattern, bool exclude, bool (*c
             }
         }
         else
-            // only relevant for the top-level entry we're initially called with
+            // in case we're given an initial file instead of directory
             callback(file);
     }
     else {
@@ -1272,13 +1260,71 @@ string processDirectory(string directory, string pattern, bool exclude, bool (*c
         SCREENERR(log(err));
         return err;
     }
-    
-    for (auto &dir: subDirs)
-        processDirectory(dir, pattern, exclude, callback, passData, maxDepth > -1 ? maxDepth - 1 : -1, file.origDir);
+
+    // recurse through subdirs
+    if (maxDepth != 1)
+        for (auto &dir: subDirs)
+            processDirectory(dir, pattern, exclude, callback, passData, maxDepth > -1 ? maxDepth - 1 : -1, file.origDir);
     
     return "";
 }
 
+
+struct internalPDBDataType {
+    bool (*realCallback)(pdCallbackData&);
+    void *realDataPtr;
+    int baseSlashes;
+    backupTypes backupType;
+
+};
+
+
+bool pdBackupsCallback(pdCallbackData &file) {
+    internalPDBDataType *data = (internalPDBDataType*)file.dataPtr;
+    pdCallbackData passedFile;
+    passedFile.filename = file.filename;
+    passedFile.statData = file.statData;
+    passedFile.dataPtr = data->realDataPtr;
+
+    auto depth = count(file.filename.begin(), file.filename.end(), '/') - data->baseSlashes;
+    auto dirPs = pathSplit(pathSplit(file.filename).dir);
+    auto filePs = pathSplit(file.filename);
+    bool dirIsDay = (dirPs.file.length() == 2 && isdigit(dirPs.file[0]) && isdigit(dirPs.file[1]));
+    bool entIsDay = (filePs.file.length() == 2 && isdigit(filePs.file[0]) && isdigit(filePs.file[1]));
+
+    // make sure we're in the year/month or year/month/day subdirs
+    if ((depth == 3 && !entIsDay) || (depth == 4 && dirIsDay)) {
+
+        // handle directories
+        if (S_ISDIR(file.statData.st_mode)) {
+            if (data->backupType != SINGLE_ONLY)
+                return data->realCallback(passedFile);
+        }
+        
+        // handle files
+        else
+            if (data->backupType != FAUB_ONLY)
+                return data->realCallback(passedFile);
+    }
+    
+    return true;
+}
+
+
+/*
+   processDirectoryBackups() is a version of processDirectory that only returns backups.
+   for single-file backups the file is returned, for faub backups the containing directory
+   is returned.  backupType specifies which types to return.
+ */
+string processDirectoryBackups(string directory, string pattern, bool exclude, bool (*callback)(pdCallbackData&), void *passData, backupTypes backupType, int maxDepth) {
+    internalPDBDataType data;
+    data.realCallback = callback;
+    data.realDataPtr = passData;
+    data.backupType = backupType;
+    data.baseSlashes = (int)count(directory.begin(), directory.end(), '/');
+
+    return processDirectory(directory, pattern, exclude, pdBackupsCallback, &data, maxDepth == -1 ? 4 : maxDepth);
+}
 
 
 string progressPercentage(int totalIterations, int totalSteps,

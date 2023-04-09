@@ -232,10 +232,11 @@ struct pdCallbackData {
     void *dataPtr;
 };
 
-string processDirectory(string directory, string pattern, bool exclude, bool (*processor)(pdCallbackData&), void *passData, int maxDepth = -1, string internalUseDir = "");
+enum backupTypes { SINGLE_ONLY, FAUB_ONLY, ALL_BACKUPS };
+string processDirectory(string directory, string pattern, bool exclude, bool (*callback)(pdCallbackData&), void *passData, int maxDepth = -1, string internalUseDir = "");
+string processDirectoryBackups(string directory, string pattern, bool exclude, bool (*callback)(pdCallbackData&), void *passData, backupTypes backupType, int maxDepth = -1);
 
-string progressPercentage(int totalIterations, int totalSteps = 7,
-                    int iterationsComplete = 0, int stepsComplete = 0, string detail = "");
+string progressPercentage(int totalIterations, int totalSteps = 7, int iterationsComplete = 0, int stepsComplete = 0, string detail = "");
 
 int mylstat(string filename, struct stat *buf);
 int mystat(string filename, struct stat *buf);

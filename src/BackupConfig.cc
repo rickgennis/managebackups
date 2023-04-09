@@ -341,28 +341,28 @@ void BackupConfig::fullDump() {
 
 
 unsigned int BackupConfig::removeEmptyDirs(string directory, int baseSlashes) {
-    DIR *c_dir;
-    struct dirent *c_dirEntry;
+    DIR *dir;
+    struct dirent *dirEntry;
     vector<string> subDirs;
     string startDir = directory.length() ? directory : settings[sDirectory].value;
 
     int numBaseSlashes = baseSlashes ? baseSlashes : (int)count(startDir.begin(), startDir.end(), '/');
 
-    /* this is unique logic so processDirectory() won't work; let's traverse the directories here instead */
-    if ((c_dir = opendir(ue(startDir).c_str())) != NULL) {
+    /* this is unique logic (needs depth-first) so processDirectory() won't work; let's traverse the directories here instead */
+    if ((dir = opendir(ue(startDir).c_str())) != NULL) {
         unsigned int entryCount = 0;
 
-        while ((c_dirEntry = readdir(c_dir)) != NULL) {
+        while ((dirEntry = readdir(dir)) != NULL) {
 
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
+            if (!strcmp(dirEntry->d_name, ".") || !strcmp(dirEntry->d_name, ".."))
                continue; 
 
             ++entryCount;
             struct stat statData;
-            string fullFilename = slashConcat(startDir, c_dirEntry->d_name);
+            string fullFilename = slashConcat(startDir, dirEntry->d_name);
 
             auto depth = count(fullFilename.begin(), fullFilename.end(), '/') - numBaseSlashes;
-            bool entIsDay = (string(c_dirEntry->d_name).length() == 2 && isdigit(c_dirEntry->d_name[0]) && isdigit(c_dirEntry->d_name[1]));
+            bool entIsDay = (string(dirEntry->d_name).length() == 2 && isdigit(dirEntry->d_name[0]) && isdigit(dirEntry->d_name[1]));
 
             if ((depth < 3 || (depth == 3 && entIsDay)) && !mystat(fullFilename, &statData)) {
                 if (S_ISDIR(statData.st_mode)) {
@@ -370,7 +370,7 @@ unsigned int BackupConfig::removeEmptyDirs(string directory, int baseSlashes) {
                 }
             }
         }
-        closedir(c_dir);
+        closedir(dir);
         
         for (auto &dir: subDirs) {
             if (!removeEmptyDirs(dir, numBaseSlashes)) {

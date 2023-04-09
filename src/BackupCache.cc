@@ -318,7 +318,7 @@ void BackupCache::reStatMD5(string md5) {
 }
 
 
-bool cleanupCallback(pdCallbackData &file) {
+bool bcCleanupCallback(pdCallbackData &file) {
     ifstream origCacheFile;
     ofstream newCacheFile;
     const string suffixNew = ".new";
@@ -384,5 +384,5 @@ bool cleanupCallback(pdCallbackData &file) {
 // cleanup old cache files that may refer to no longer existing backups
 // cleanup works across all 1F cache files, regardless of profile or directory
 void BackupCache::cleanup() {
-    processDirectory(GLOBALS.cacheDir, ".1f$", false, cleanupCallback, NULL);
+    processDirectory(GLOBALS.cacheDir, ".1f$", false, bcCleanupCallback, NULL);
 }

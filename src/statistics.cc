@@ -57,7 +57,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
 
 #ifdef __APPLE__
         struct stat statBuf;
-        if (inProcessFilename.length() && !stat(inProcessFilename.c_str(), &statBuf))
+        if (inProcessFilename.length() && !mystat(inProcessFilename, &statBuf))
             processAge = seconds2hms(GLOBALS.startupTime - statBuf.st_birthtime);
 #endif
 
@@ -132,7 +132,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         struct stat statBuf;
 
 #ifdef __APPLE__
-        if (config.cache.inProcess.length() && !stat(config.cache.inProcess.c_str(), &statBuf))
+        if (config.cache.inProcess.length() && !mystat(config.cache.inProcess, &statBuf))
             processAge = seconds2hms(GLOBALS.startupTime - statBuf.st_birthtime);
 #endif
 

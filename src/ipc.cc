@@ -327,7 +327,7 @@ ssize_t IPC_Base::ipcWrite(__int64_t data) {
 void IPC_Base::ipcSendDirEntry(string filename) {
     struct stat statData;
 
-    if (!lstat(filename.c_str(), &statData) && statData.st_mode) {
+    if (!mylstat(filename, &statData) && statData.st_mode) {
         ipcWrite(statData.st_uid);
         ipcWrite(statData.st_gid);
         ipcWrite(statData.st_mode);
@@ -354,7 +354,7 @@ void IPC_Base::ipcSendRawFile(string filename, __int64_t fileSize) {
 
     struct stat statData;
     if (!fileSize)
-        lstat(filename.c_str(), &statData);
+        mylstat(filename, &statData);
     else
         statData.st_size = fileSize;
 

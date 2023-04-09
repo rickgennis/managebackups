@@ -79,82 +79,94 @@ void FaubCache::restoreCache_internal(string backupDir) {
 }
 
 
+struct restoreCacheDataType {
+    FaubCache *fc;
+    queue<string> *q;
+    string currentDir;
+    int baseSlashes;
+    Pcre *tempRE;
+};
+
+
+bool restoreCacheCallback(pdCallbackData &file) {
+    restoreCacheDataType *data = (restoreCacheDataType*)file.dataPtr;
+    
+    if (S_ISDIR(file.statData.st_mode)) {
+        /* regardless of the starting (baseDir) directory, we're only interested in subdirs
+           exactly 2 levels lower because that's where our backups will live. e.g.
+           baseDir = /tmp/backups then we're looking for things like /tmp/backups/2023/01.
+           or 3 levels lower if --time is used and hence we get a "day" subdir.
+         
+           this is a bit different.  instead of letting processDirectory() queue up all the
+           subdirs it finds and recursively handle them itself, we limit that with the
+           maxDepth = 1 parameter, and only queue up the subdirs we're interested in here
+           in the callback function (see the push() call).
+         */
+        auto depth = count(file.filename.begin(), file.filename.end(), '/') - data->baseSlashes;
+        auto dirPs = pathSplit(data->currentDir);
+        auto filePs = pathSplit(file.filename);
+        bool dirIsDay = (dirPs.file.length() == 2 && isdigit(dirPs.file[0]) && isdigit(dirPs.file[1]));
+        bool entIsDay = (filePs.file.length() == 2 && isdigit(filePs.file[0]) && isdigit(filePs.file[1]));
+                
+        if (depth == 3 || (depth == 4 && dirIsDay)) {
+            // next we make sure the subdir matches our profile name
+            if (file.filename.find(string("/") + data->fc->coreProfile + "-") != string::npos) {
+                
+                // check for in process backups
+                if (data->tempRE->search(file.filename)) {
+                    data->fc->inProcessFilename = file.filename;
+                    
+                    if (GLOBALS.startupTime - file.statData.st_mtime > 60*60*5) {
+                        if (GLOBALS.cli.count(CLI_TEST))
+                            cout << YELLOW << " TESTMODE: would have cleaned up abandoned in-process backup at " + file.filename + " (" + timeDiff(mktimeval(file.statData.st_mtime)) + ")" << RESET << endl;
+                        else
+                            if (rmrf(file.filename))
+                                log("warning: cleaned up abandoned in-process backup at " + file.filename + " (" + timeDiff(mktimeval(file.statData.st_mtime)) + ")");
+                            else
+                                log("error: unable to remove abandoned in-process backup at " + file.filename + " (running as uid " + to_string(geteuid()) + ")");
+                    }
+                }
+                else {
+                    if (data->fc->backups.find(file.filename) == data->fc->backups.end()) {
+                        data->fc->restoreCache_internal(file.filename);
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        if (depth < 3 || (depth == 3 && entIsDay))
+            data->q->push(file.filename);
+    }
+    
+    return true;
+}
+
+
 /*
    load or reload all profile name-matching entries from disk.
    don't reload anything that's already in the cache.
  */
-void FaubCache::restoreCache(string profileName) {
-    DIR *c_dir;
-    struct dirent *c_dirEntry;
-    queue<string> dirQueue;
-    string currentDir;
-    Pcre tempRE("\\.tmp\\.\\d+$");
 
+void FaubCache::restoreCache(string profileName) {
+    queue<string> dirQueue;
+    restoreCacheDataType data;
+    data.fc = this;
+    data.q = &dirQueue;
+    Pcre tempRE("\\.tmp\\.\\d+$");
+    data.tempRE = &tempRE;
+    
     coreProfile = profileName;
     DEBUG(D_faub) DFMT(profileName);
     
     dirQueue.push(baseDir);
-    auto baseSlashes = count(baseDir.begin(), baseDir.end(), '/');
+    data.baseSlashes = (int)count(baseDir.begin(), baseDir.end(), '/');
 
     while (dirQueue.size()) {
-        currentDir = dirQueue.front();
+        data.currentDir = dirQueue.front();
         dirQueue.pop();
-        DEBUG(D_faub) DFMT("processing " << currentDir);
-
-        if ((c_dir = opendir(ue(currentDir).c_str())) != NULL) {
-            while ((c_dirEntry = readdir(c_dir)) != NULL) {
-                
-                if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
-                    continue;
-                
-                struct stat statData;
-                string fullFilename = slashConcat(currentDir, c_dirEntry->d_name);
-                
-                if (!mystat(fullFilename, &statData)) {
-                    
-                    if (S_ISDIR(statData.st_mode)) {
-                        // regardless of the starting (baseDir) directory, we're only interested in subdirs
-                        // exactly 2 levels lower because that's where our backups will live. e.g.
-                        // baseDir = /tmp/backups then we're looking for things like /tmp/backups/2023/01.
-                        // or 3 levels lower if --time is used and hence we get a "day" subdir.
-                        auto depth = count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes;
-                        auto ps = pathSplit(currentDir);
-                        bool dirIsDay = (ps.file.length() == 2 && isdigit(ps.file[0]) && isdigit(ps.file[1]));
-                        bool entIsDay = (string(c_dirEntry->d_name).length() == 2 && isdigit(c_dirEntry->d_name[0]) && isdigit(c_dirEntry->d_name[1]));
-                        
-                        if (depth == 3 || (depth == 4 && dirIsDay)) {
-                            // next we make sure the subdir matches our profile name
-                            if (fullFilename.find(string("/") + profileName + "-") != string::npos) {
-                                // check for in process backups
-                                if (tempRE.search(fullFilename)) {
-                                    inProcessFilename = fullFilename;
-                                    
-                                    if (GLOBALS.startupTime - statData.st_mtime > 60*60*5) {
-                                        if (GLOBALS.cli.count(CLI_TEST))
-                                            cout << YELLOW << " TESTMODE: would have cleaned up abandoned in-process backup at " + fullFilename + " (" + timeDiff(mktimeval(statData.st_mtime)) + ")" << RESET << endl;
-                                        else
-                                            if (rmrf(fullFilename))
-                                                log("warning: cleaned up abandoned in-process backup at " + fullFilename + " (" + timeDiff(mktimeval(statData.st_mtime)) + ")");
-                                            else
-                                                log("error: unable to remove abandoned in-process backup at " + fullFilename + " (running as uid " + to_string(geteuid()) + ")");
-                                    }
-                                }
-                                else {
-                                    if (backups.find(fullFilename) == backups.end()) {
-                                        restoreCache_internal(fullFilename);
-                                        continue;
-                                    }
-                                }
-                            }
-                        }
-                        
-                        if (depth < 3 || (depth == 3 && entIsDay))
-                            dirQueue.push(fullFilename);
-                    }
-                }
-            }
-            closedir(c_dir);
-        }
+        DEBUG(D_faub) DFMT("processing " << data.currentDir);
+        processDirectory(ue(data.currentDir), "", false, restoreCacheCallback, &data, 1);
     }
 
     // all backups are loaded; now see which are missing stats and recache them
@@ -310,12 +322,12 @@ void compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
             auto aFile = slashConcat(dirA, c_dirEntry->d_name);
             auto bFile = slashConcat(dirB, c_dirEntry->d_name);
             
-            if (lstat(aFile.c_str(), &statDataA)) {
+            if (mylstat(aFile, &statDataA)) {
                 SCREENERR("error: unable to stat " << aFile << " - " << strerror(errno));
                 exit(1);
             }
             
-            if (lstat(bFile.c_str(), &statDataB))
+            if (mylstat(bFile, &statDataB))
                 statDataB.st_ino = statDataB.st_size = 0;  // file doesn't exist in the other backup
             
             seenFiles.insert(seenFiles.end(), pair<string, bool>(aFile, false));  // bool value is unused
@@ -368,7 +380,7 @@ void compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
             if (seenFiles.find(aFile) != seenFiles.end())
                 continue;
 
-            if (lstat(bFile.c_str(), &statDataB)) {
+            if (mylstat(bFile, &statDataB)) {
                 SCREENERR("error: unable to stat " << bFile << " - " << strerror(errno));
                 exit(1);
             }
@@ -433,6 +445,62 @@ void FaubCache::compare(string backupA, string backupB, string givenThreshold) {
 }
 
 
+bool fcCleanupCallback(pdCallbackData &file) {
+    ifstream cacheFile;
+    string backupDir, fullId, profileName;
+    string cacheFilename;
+    struct stat statData;
+    FaubCache *fc = (FaubCache*)file.dataPtr;
+    
+    cacheFile.open(file.filename);
+
+    if (cacheFile.is_open()) {
+        cacheFile >> fullId;
+        cacheFile.close();
+        
+        backupDir = fullId;
+        
+        auto pos = fullId.find(";;");
+        if (pos != string::npos) {
+            profileName = fullId.substr(pos + 2, string::npos);
+            backupDir.erase(backupDir.find(";;"));  // erase the profile name portion
+        }
+        
+        // if the backup directory referenced in the cache file no longer exists
+        // delete the cache file
+        if (mystat(backupDir, &statData)) {
+            auto targetMtime = filename2Mtime(backupDir);
+
+            if (profileName.length()) {
+                Pcre yearRE("^20\\d{2}$");
+                auto parentDir = backupDir;
+                auto ps = pathSplit(parentDir);
+
+                while (parentDir.length() > 1 && parentDir.find("/") != string::npos && !yearRE.search(ps.file)) {
+                    parentDir = ps.dir;
+                    ps = pathSplit(parentDir);
+                }
+
+                auto bdir = pathSplit(parentDir).dir;
+                if (profileName == fc->coreProfile && bdir == fc->baseDir) {
+                    DEBUG(D_any) DFMT(backupDir << " no longer exists; will recalculate usage of subsequent backup");
+                    unlink(cacheFilename.c_str());
+                    cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBSTATS), string(SUFFIX_FAUBSTATS).length(), SUFFIX_FAUBINODES);
+                    unlink(cacheFilename.c_str());
+                    cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBINODES), string(SUFFIX_FAUBINODES).length(), SUFFIX_FAUBDIFF);
+                    unlink(cacheFilename.c_str());
+  
+                    // re-dus the next backup
+                    fc->recache("", targetMtime);
+                }
+            }
+        }
+    }
+    
+    return true;
+}
+
+
 /* cleanup()
  Walk through this cache's files looking for cache's that reference backups
  that no longer exist (have been removed).  When one is found, we delete the
@@ -442,70 +510,10 @@ void FaubCache::compare(string backupA, string backupB, string givenThreshold) {
  missing from the same dir + profile we re-dus the next one that's found.
  */
 void FaubCache::cleanup() {
-    DIR *c_dir;
-    struct dirent *c_dirEntry;
-    ifstream cacheFile;
-    string backupDir, fullId, profileName;
-    string cacheFilename;
-    struct stat statData;
+    FaubCache *fc = this;
     
     DEBUG(D_faub) DFMT("starting");
-    if ((c_dir = opendir(ue(GLOBALS.cacheDir).c_str())) != NULL) {
-        while ((c_dirEntry = readdir(c_dir)) != NULL) {
-
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..") ||
-                    strstr(c_dirEntry->d_name, SUFFIX_FAUBSTATS) == NULL)
-                continue;
-
-            cacheFilename = slashConcat(GLOBALS.cacheDir, c_dirEntry->d_name);
-            cacheFile.open(cacheFilename);
-
-            if (cacheFile.is_open()) {
-                cacheFile >> fullId;
-                cacheFile.close();
-                
-                backupDir = fullId;
-                
-                auto pos = fullId.find(";;");
-                if (pos != string::npos) {
-                    profileName = fullId.substr(pos + 2, string::npos);
-                    backupDir.erase(backupDir.find(";;"));  // erase the profile name portion
-                }
-                
-                // if the backup directory referenced in the cache file no longer exists
-                // delete the cache file
-                if (mystat(backupDir, &statData)) {
-                    auto targetMtime = filename2Mtime(backupDir);
-  
-                    if (profileName.length()) {
-                        Pcre yearRE("^20\\d{2}$");
-                        auto parentDir = backupDir;
-                        auto ps = pathSplit(parentDir);
-
-                        while (parentDir.length() > 1 && parentDir.find("/") != string::npos && !yearRE.search(ps.file)) {
-                            parentDir = ps.dir;
-                            ps = pathSplit(parentDir);
-                        }
-
-                        auto bdir = pathSplit(parentDir).dir;
-                        if (profileName == coreProfile && bdir == baseDir) {
-                            DEBUG(D_any) DFMT(backupDir << " no longer exists; will recalculate usage of subsequent backup");
-                            unlink(cacheFilename.c_str());
-                            cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBSTATS), string(SUFFIX_FAUBSTATS).length(), SUFFIX_FAUBINODES);
-                            unlink(cacheFilename.c_str());
-                            cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBINODES), string(SUFFIX_FAUBINODES).length(), SUFFIX_FAUBDIFF);
-                            unlink(cacheFilename.c_str());
-          
-                            // re-dus the next backup
-                            recache("", targetMtime);
-                        }
-                    }
-                }
-            }
-        }        
-        closedir(c_dir);
-    }
-    
+    processDirectory(GLOBALS.cacheDir, SUFFIX_FAUBSTATS, false, fcCleanupCallback, fc);
     DEBUG(D_faub) DFMT("complete");
 }
 
