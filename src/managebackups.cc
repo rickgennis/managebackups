@@ -1400,15 +1400,22 @@ void performBackup(BackupConfig &config) {
        time as any.
      */
     
-    for (auto &backup: config.cache.indexByFilename)
-        if (!exists(backup.first)) {
-            auto rawIt = config.cache.rawData.find(backup.second);
+    for (auto fIdx_it = config.cache.indexByFilename.begin(), next_it = fIdx_it; fIdx_it != config.cache.indexByFilename.end(); fIdx_it = next_it) {
+        // the second iterator (next_it) is necessary because a function called within
+        // this loop (config.cache.remove()) calls erase() on our primary iterator. next_it allows
+        // the loop to track the next value for the iterator without dereferencing a deleted
+        // pointer.
+        ++next_it;
+        
+        if (!exists(fIdx_it->first)) {
+            auto rawIt = config.cache.rawData.find(fIdx_it->second);
             if (rawIt != config.cache.rawData.end()) {
-                log(config.ifTitle() + " " + backup.first + " has vanished, updating cache");
+                log(config.ifTitle() + " " + fIdx_it->first + " has vanished, updating cache");
                 config.cache.remove(rawIt->second);
                 config.cache.updated = true;
             }
         }
+    }
 }
 
 /*******************************************************************************
@@ -1748,7 +1755,7 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
             // pointer.
             ++next_it;
             
-            NOTQUIET && ANIMATE && cout << progressPercentage(numBackups, 1, distance(config.cache.indexByFilename.begin(), fIdx_it), 1, fIdx_it->first) << flush;
+            NOTQUIET && ANIMATE && cout << progressPercentage(numBackups, 1, (int)distance(config.cache.indexByFilename.begin(), fIdx_it), 1, fIdx_it->first) << flush;
 
             if (!moveBackup(fIdx_it->first, oldBaseDir, newBaseDir, sameFS, numBackups, fsData)) {
                 auto rawIt = config.cache.rawData.find(fIdx_it->second);

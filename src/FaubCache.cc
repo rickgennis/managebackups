@@ -91,53 +91,24 @@ struct restoreCacheDataType {
 bool restoreCacheCallback(pdCallbackData &file) {
     restoreCacheDataType *data = (restoreCacheDataType*)file.dataPtr;
     
-    if (S_ISDIR(file.statData.st_mode)) {
-        /* regardless of the starting (baseDir) directory, we're only interested in subdirs
-           exactly 2 levels lower because that's where our backups will live. e.g.
-           baseDir = /tmp/backups then we're looking for things like /tmp/backups/2023/01.
-           or 3 levels lower if --time is used and hence we get a "day" subdir.
-         
-           this is a bit different.  instead of letting processDirectory() queue up all the
-           subdirs it finds and recursively handle them itself, we limit that with the
-           maxDepth = 1 parameter, and only queue up the subdirs we're interested in here
-           in the callback function (see the push() call).
-         */
-        auto depth = count(file.filename.begin(), file.filename.end(), '/') - data->baseSlashes;
-        auto dirPs = pathSplit(data->currentDir);
-        auto filePs = pathSplit(file.filename);
-        bool dirIsDay = (dirPs.file.length() == 2 && isdigit(dirPs.file[0]) && isdigit(dirPs.file[1]));
-        bool entIsDay = (filePs.file.length() == 2 && isdigit(filePs.file[0]) && isdigit(filePs.file[1]));
-                
-        if (depth == 3 || (depth == 4 && dirIsDay)) {
-            // next we make sure the subdir matches our profile name
-            if (file.filename.find(string("/") + data->fc->coreProfile + "-") != string::npos) {
-                
-                // check for in process backups
-                if (data->tempRE->search(file.filename)) {
-                    data->fc->inProcessFilename = file.filename;
-                    
-                    if (GLOBALS.startupTime - file.statData.st_mtime > 60*60*5) {
-                        if (GLOBALS.cli.count(CLI_TEST))
-                            cout << YELLOW << " TESTMODE: would have cleaned up abandoned in-process backup at " + file.filename + " (" + timeDiff(mktimeval(file.statData.st_mtime)) + ")" << RESET << endl;
-                        else
-                            if (rmrf(file.filename))
-                                log("warning: cleaned up abandoned in-process backup at " + file.filename + " (" + timeDiff(mktimeval(file.statData.st_mtime)) + ")");
-                            else
-                                log("error: unable to remove abandoned in-process backup at " + file.filename + " (running as uid " + to_string(geteuid()) + ")");
-                    }
-                }
-                else {
-                    if (data->fc->backups.find(file.filename) == data->fc->backups.end()) {
-                        data->fc->restoreCache_internal(file.filename);
-                        return true;
-                    }
-                }
-            }
-        }
+    // check for in process backups
+    if (data->tempRE->search(file.filename)) {
+        data->fc->inProcessFilename = file.filename;
         
-        if (depth < 3 || (depth == 3 && entIsDay))
-            data->q->push(file.filename);
+        if (GLOBALS.startupTime - file.statData.st_mtime > 60*60*5) {
+            if (GLOBALS.cli.count(CLI_TEST))
+                cout << YELLOW << " TESTMODE: would have cleaned up abandoned in-process backup at " + file.filename + " (" + timeDiff(mktimeval(file.statData.st_mtime)) + ")" << RESET << endl;
+            else
+                if (rmrf(file.filename))
+                    log("warning: cleaned up abandoned in-process backup at " + file.filename + " (" + timeDiff(mktimeval(file.statData.st_mtime)) + ")");
+                else
+                    log("error: unable to remove abandoned in-process backup at " + file.filename + " (running as uid " + to_string(geteuid()) + ")");
+        }
     }
+    else
+        // otherwise see if this backup still needs to be loaded
+        if (data->fc->backups.find(file.filename) == data->fc->backups.end())
+            data->fc->restoreCache_internal(file.filename);
     
     return true;
 }
@@ -149,26 +120,16 @@ bool restoreCacheCallback(pdCallbackData &file) {
  */
 
 void FaubCache::restoreCache(string profileName) {
-    queue<string> dirQueue;
     restoreCacheDataType data;
-    data.fc = this;
-    data.q = &dirQueue;
     Pcre tempRE("\\.tmp\\.\\d+$");
     data.tempRE = &tempRE;
-    
+    data.fc = this;
+
     coreProfile = profileName;
     DEBUG(D_faub) DFMT(profileName);
     
-    dirQueue.push(baseDir);
-    data.baseSlashes = (int)count(baseDir.begin(), baseDir.end(), '/');
-
-    while (dirQueue.size()) {
-        data.currentDir = dirQueue.front();
-        dirQueue.pop();
-        DEBUG(D_faub) DFMT("processing " << data.currentDir);
-        processDirectory(ue(data.currentDir), "", false, restoreCacheCallback, &data, 1);
-    }
-
+    processDirectoryBackups(ue(baseDir), "/" + coreProfile + "-", false, restoreCacheCallback, &data, FAUB_ONLY);
+    
     // all backups are loaded; now see which are missing stats and recache them
     recache("");
 }

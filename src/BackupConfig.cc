@@ -340,6 +340,7 @@ void BackupConfig::fullDump() {
 }
 
 
+// this is fugly and should be refactored
 unsigned int BackupConfig::removeEmptyDirs(string directory, int baseSlashes) {
     DIR *dir;
     struct dirent *dirEntry;

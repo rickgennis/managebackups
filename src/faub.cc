@@ -16,91 +16,45 @@
 
 extern void cleanupAndExitOnError();
 
-tuple<string, time_t> mostRecentBackupDirSinceInternal(int baseSlashes, string backupDir, time_t sinceTime, string profileName) {
-    DIR *c_dir;
-    struct dirent *c_dirEntry;
-    struct stat statData;
+struct mostRecentBDataType {
+    time_t sinceTime;
+    time_t recentTime;
     string recentName;
-    time_t recentTime = 0;
-    vector<string> subDirs;
+    Pcre *dateRE;
+};
+
+
+bool mostRecentBCallback(pdCallbackData &file) {
+    mostRecentBDataType *data = (mostRecentBDataType*)file.dataPtr;
     
-    Pcre matchSpec(DATE_REGEX);
-    if (matchSpec.search(backupDir)) {
-
-        if (!mystat(ue(backupDir), &statData)) {
-            DEBUG(D_faub) DFMT("returning " << backupDir);
-            return {backupDir, statData.st_mtime};
-        }
-
-        return {"", 0};
-    }
-
-    if ((c_dir = opendir(ue(backupDir).c_str())) != NULL) {
-        while ((c_dirEntry = readdir(c_dir)) != NULL) {
-
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, "..") || strstr(c_dirEntry->d_name, ".tmp.") != NULL)
-               continue;
-
-            string fullFilename = backupDir + "/" + string(c_dirEntry->d_name);
-
-            if (!mystat(fullFilename, &statData)) {
-
-                if (S_ISDIR(statData.st_mode)) {
-                    auto slashDiff = count(fullFilename.begin(), fullFilename.end(), '/') - baseSlashes;
-
-                    if (slashDiff < 3 || (slashDiff == 3 && 
-                                string(c_dirEntry->d_name).length() == 2 && isdigit(c_dirEntry->d_name[0]) && isdigit(c_dirEntry->d_name[1]))) {
-                        DEBUG(D_faub) DFMT("adding " << fullFilename << " to recursion list");
-                        subDirs.insert(subDirs.end(), fullFilename);
-                    }
-                    
-                    if (slashDiff > 2 && slashDiff < 5) {
-                        // next we make sure the subdir matches our profile name
-                        if (fullFilename.find(profileName) != string::npos) {
-                            DEBUG(D_faub) DFMT("name match on " << fullFilename << ", checking times");
-                           
-                            if ((statData.st_mtime > recentTime) && ((statData.st_mtime < sinceTime) || !sinceTime)) {
-                                DEBUG(D_faub) DFMT("valid times on " << fullFilename << ", noting");
-                                recentTime = statData.st_mtime;
-                                recentName = fullFilename;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        closedir(c_dir);
+    DEBUG(D_faub) DFMT("considering " << file.filename << " with mtime " << file.statData.st_mtime);
+    
+    if (file.statData.st_mtime > data->recentTime && ((file.statData.st_mtime < data->sinceTime || !data->sinceTime))) {
+        data->recentTime = file.statData.st_mtime;
+        data->recentName = file.filename;
         
-        for (auto &dir: subDirs) {
-            auto [fname, fmtime] = mostRecentBackupDirSinceInternal(baseSlashes, dir, sinceTime, profileName);
-            if ((fmtime > recentTime) && ((fmtime < sinceTime) || !sinceTime)) {
-                recentTime = fmtime;
-                recentName = fname;
-            }
-        }
+        DEBUG(D_faub) DFMT("new most recent backup (" << file.filename << ")");
     }
-
-    return {recentName, recentTime};
+    
+    return true;
 }
 
 
-/*
- * mostRecentBackupDirSince(backupBaseDir, sinceDir)
- *
- * backupBaseDir is the backup dir root (e.g. /tmp/mybackups)
- * sinceDir is a specific full backup path (e.g. /tmp/mybackups/2023/012/the-backup-20230106)
- */
-string mostRecentBackupDirSince(int baseSlashes, string backupBaseDir, string sinceDir, string profileName) {
+string mostRecentBackupDirSince(string backupDir, string sinceDir, string profileName) {
+    Pcre dateRE(DATE_REGEX);
+    mostRecentBDataType data;
+    data.dateRE = &dateRE;
+    data.recentTime = 0;
+
     struct stat statData;
-    time_t sinceTime = 0;
-
     if (!mystat(sinceDir, &statData))
-        sinceTime = statData.st_mtime;
+        data.sinceTime = statData.st_mtime;
     else
-        sinceTime = time(NULL);
-
-    auto [fname, fmtime] = mostRecentBackupDirSinceInternal(baseSlashes, backupBaseDir, sinceTime, profileName);
-    return fname;
+        data.sinceTime = time(NULL);
+    
+    processDirectoryBackups(backupDir, "/" + profileName + "-", false, mostRecentBCallback, &data, FAUB_ONLY);
+    
+    return data.recentName;
 }
 
 
@@ -132,9 +86,8 @@ void fs_startServer(BackupConfig& config) {
     if (GLOBALS.cli.count(CLI_NOBACKUP))
         return;
 
-    auto baseSlashes = (int)count(config.settings[sDirectory].value.begin(), config.settings[sDirectory].value.end(), '/');
     string newDir = newBackupDir(config);
-    string prevDir = mostRecentBackupDirSince(baseSlashes, config.settings[sDirectory].value, newDir, config.settings[sTitle].value);
+    string prevDir = mostRecentBackupDirSince(config.settings[sDirectory].value, newDir, config.settings[sTitle].value);
 
     if (GLOBALS.cli.count(CLI_TEST)) {
         cout << YELLOW << config.ifTitle() << " TESTMODE: would have begun backup by executing \"" << config.settings[sFaub].value << "\"" << endl;

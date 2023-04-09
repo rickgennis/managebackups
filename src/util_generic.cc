@@ -1217,6 +1217,17 @@ string processDirectory(string directory, string pattern, bool exclude, bool (*c
                         if (S_ISDIR(file.statData.st_mode)) {
                             subDirs.insert(subDirs.end(), file.filename);
                             
+                            // filter for patterns
+                            if (pattern.length()) {
+                                bool found = patternRE.search(file.filename);
+                                
+                                if (exclude && found)
+                                    continue;
+                                
+                                if (!exclude && !found)
+                                    continue;
+                            }
+
                             if (!callback(file)) {
                                 subDirs.clear();
                                 break;
@@ -1327,8 +1338,7 @@ string processDirectoryBackups(string directory, string pattern, bool exclude, b
 }
 
 
-string progressPercentage(int totalIterations, int totalSteps,
-                    int iterationsComplete, int stepsComplete, string detail) {
+string progressPercentage(int totalIterations, int totalSteps, int iterationsComplete, int stepsComplete, string detail) {
     static int prevLength = 0;
     string result;
     

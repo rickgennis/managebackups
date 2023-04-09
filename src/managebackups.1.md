@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.4.7c
+% MANAGEBACKUPS(1) managebackups 1.4.8
 % Rick Ennis
 % March 2023
 
@@ -404,4 +404,7 @@ Example output from **managebackups -1 -p faub** (faub-style backup example)
 - OpenSSL (1.1.1s) for calculation of MD5s
 - pcre (8.45) for support of regular expressions
 - pcre++ (0.9.5) as a C++ interface to pcre
+
+# DISK USAGE
+Disk usage is a nuanced concept.  Not only can it be reported in specific bytes (kilobytes, megabytes, etc) used, it can also be reported in disk blocks used, since a full block is the minimum allocatable space and anything less than that will use a full block anyway.  By default, the 'du' command reports in blocks.  Another complication is directory entries and symlinks (the directory itself, not its contents;  the symlink itself, not what it's pointing to).  They take up a small amount of space.  The stat() system call returns details on that space but for some reason the 'du' command ignores those.  **managebackups** provides two implmentations.  By default it reports specific bytes used.  Given the **--blocks** option, it shows the blocks used.  In both cases, the tiny amount of space used by directories and symlinks is ignored, again, like 'du'.
 
