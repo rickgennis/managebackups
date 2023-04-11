@@ -237,7 +237,7 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache) 
  *
  * Wrapper function for parseDirToCache().
  *******************************************************************************/
-void scanConfigToCache(BackupConfig &config) {
+void scanConfigToCache(BackupConfig &config, bool skipFaubCleanup = false) {
     auto [message, noMessage] = clearMessage("updating cache for " + config.settings[sDirectory].value + "... ");
     NOTQUIET && ANIMATE && cout << message << flush;
     
@@ -247,7 +247,11 @@ void scanConfigToCache(BackupConfig &config) {
         // clean up old cache files and recalculate any missing disk usage
         // this primarily catches recalculations that are necessary because
         // the user manually deleted a backup unbeknown to us.
-        config.fcache.cleanup();
+        
+        // cleanup is also called from pruneBackups().  if we're going to do a
+        // prune later, skipFaubCleanup will tell us we can skip it for now.
+        if (!skipFaubCleanup)
+            config.fcache.cleanup();
         
         NOTQUIET && ANIMATE && cout << noMessage << flush;
         return;
@@ -269,6 +273,14 @@ void scanConfigToCache(BackupConfig &config) {
     }
     else
         fnamePattern = DATE_REGEX;
+
+    if (!exists(directory)) {
+        if (mkdirp(directory)) {
+            NOTQUIET && ANIMATE && cout << noMessage << flush;
+            SCREENERR("error: unable to create directory " << directory << errtext());
+            exit(1);
+        }
+    }
 
     parseDirToCache(directory, fnamePattern, config.cache);
     NOTQUIET && ANIMATE && cout << noMessage << flush;
@@ -616,14 +628,10 @@ void pruneFaubBackups(BackupConfig &config)
     config.fcache.cleanup();
 }
 
-/*******************************************************************************
- * pruneBackups(config)
- *
- * Apply the full rentetion policy inclusive of all safety checks.
- *******************************************************************************/
-void pruneBackups(BackupConfig &config)
-{
-    if (GLOBALS.cli.count(CLI_NOPRUNE)) return;
+
+bool shouldPrune(BackupConfig &config) {
+    if (GLOBALS.cli.count(CLI_NOPRUNE))
+        return false;
 
     if (!str2bool(config.settings[sPruneLive].value) && !GLOBALS.cli.count(CLI_QUIET)) {
         SCREENERR("warning: while a core feature, managebackups doesn't prune old backups\n"
@@ -633,7 +641,7 @@ void pruneBackups(BackupConfig &config)
                   << "\t--days " << config.settings[sDays].value << "\n\t--weeks "
                   << config.settings[sWeeks].value << "\n\t--months " << config.settings[sMonths].value
                   << "\n\t--years " << config.settings[sYears].value);
-        return;
+        return false;
     }
 
     // failsafe checks
@@ -644,6 +652,7 @@ void pruneBackups(BackupConfig &config)
     if (fb > 0 && fd > 0) {
         int minValidBackups = 0;
 
+        // faub style failsafe
         if (config.settings[sFaub].value.length()) {
             auto cacheEntryIt = config.fcache.getFirstBackup();
             while (cacheEntryIt != config.fcache.getEnd()) {
@@ -658,9 +667,11 @@ void pruneBackups(BackupConfig &config)
                                   << " (age=" << cacheEntryIt->second.mtimeDayAge << ")" << descrip);
                 ++cacheEntryIt;
 
-                if (minValidBackups >= fb) break;
+                if (minValidBackups >= fb)
+                    break;
             }
         }
+        // single-file style failsafe
         else {
             for (auto &fnameIdx : config.cache.indexByFilename) {
                 auto raw_it = config.cache.rawData.find(fnameIdx.second);
@@ -671,11 +682,11 @@ void pruneBackups(BackupConfig &config)
                     descrip = " [valid for fs]";
                 }
 
-                DEBUG(D_prune)
-                DFMT("failsafe: " << raw_it->second.filename << " (age=" << raw_it->second.fnameDayAge
+                DEBUG(D_prune) DFMT("failsafe: " << raw_it->second.filename << " (age=" << raw_it->second.fnameDayAge
                                   << ")" << descrip);
 
-                if (minValidBackups >= fb) break;
+                if (minValidBackups >= fb)
+                    break;
             }
         }
 
@@ -687,12 +698,24 @@ void pruneBackups(BackupConfig &config)
 
             SCREENERR("warning: " << message);
             log(config.ifTitle() + " " + message);
-            return;
+            return false;
         }
-        DEBUG(D_prune)
-        DFMT("failsafe passed with " << plural(minValidBackups, "backup") << " ("
+        
+        DEBUG(D_prune) DFMT("failsafe passed with " << plural(minValidBackups, "backup") << " ("
                                      << fb << " required) in the last " << plural(fd, "day"));
     }
+    
+    return true;
+}
+
+
+/*******************************************************************************
+ * pruneBackups(config)
+ *
+ * Apply the full rentetion policy inclusive of all safety checks.
+ *******************************************************************************/
+void pruneBackups(BackupConfig &config) {
+
 
     /* safety checks complete - begin pruning */
 
@@ -1481,7 +1504,8 @@ bool enoughLocalSpace(BackupConfig &config) {
     auto requiredSpace = approx2bytes(config.settings[sMinSpace].value);
 
     DEBUG(D_backup) DFMT("required for backup: " << requiredSpace);
-    if (!requiredSpace) return true;
+    if (!requiredSpace)
+        return true;
     
     struct statfs fs;
     if (!statfs(config.settings[sDirectory].value.c_str(), &fs)) {
@@ -2398,17 +2422,24 @@ int main(int argc, char *argv[]) {
                         log(currentConfig->ifTitle() + " unable to set nice value" + errtext());
                 }
 
-                scanConfigToCache(*currentConfig);
+                auto willPrune = shouldPrune(*currentConfig);
+                
+                scanConfigToCache(*currentConfig, willPrune);
                 if (performTripwire(*currentConfig)) {
 
                     /* faub configurations */
                     if (currentConfig->settings[sFaub].value.length()) {
-                        pruneBackups(*currentConfig);
+                        if (willPrune)
+                            pruneBackups(*currentConfig);
+                        
                         fs_startServer(*currentConfig);
                     }
                     else {  /* single file configurations */
-                        pruneBackups(*currentConfig);
+                        if (willPrune)
+                            pruneBackups(*currentConfig);
+                        
                         updateLinks(*currentConfig);
+                        
                         if (enoughLocalSpace(*currentConfig)) {
                             performBackup(*currentConfig);
                         }

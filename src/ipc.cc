@@ -818,29 +818,26 @@ string PipeExec::errorOutput() {
 }
 
 
+bool firstAvailIDCallback(pdCallbackData &file) {
+    string *lastID = (string*)file.dataPtr;
+    
+    auto delimit = file.filename.find(":");
+    
+    if (delimit != string::npos) {
+        auto id = file.filename.substr(0, delimit);
+        
+        if (*lastID < id)
+            *lastID = id;
+    }
+
+    return true;
+}
+
+
 string firstAvailIDForDir(string dir) {
-    DIR *c_dir;
-    struct dirent *c_dirEntry;
     string lastID = "";
 
-    if ((c_dir = opendir(ue(dir).c_str())) != NULL) {
-        while ((c_dirEntry = readdir(c_dir)) != NULL) {
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
-                continue;
-
-            auto filename = string(c_dirEntry->d_name);
-            auto delimit = filename.find(":");
-
-            if (delimit != string::npos) {
-                auto id = filename.substr(0, delimit);
-
-                if (lastID < id)
-                    lastID = id;
-            }
-        }
-
-        closedir(c_dir);
-    }
+    processDirectory(ue(dir), "", false, firstAvailIDCallback, &lastID, 1);
 
     if (!lastID.length())
         return "A";

@@ -38,7 +38,7 @@
 #define TMP_OUTPUT_DIR "/tmp/managebackups_output"
 #define GLOBALSTATSFILE "lastrun.stats"
 
-#define DFMT(x) cerr << BOLDGREEN << __FUNCTION__ << ": " << RESET << GREEN << x << RESET << endl
+#define DFMT(x) (cerr << BOLDGREEN << __FUNCTION__ << ": " << RESET << GREEN << x << RESET << endl)
 #define DFMTNOENDL(x) cerr << BOLDGREEN << __FUNCTION__ << ": " << RESET << GREEN << x << RESET
 #define DFMTNOPREFIX(x) cerr << GREEN << x << RESET << endl
 

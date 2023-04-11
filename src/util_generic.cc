@@ -1267,7 +1267,7 @@ string processDirectory(string directory, string pattern, bool exclude, bool (*c
             callback(file);
     }
     else {
-        string err = "error: stat failed for " + file.filename + errtext();
+        string err = "error: stat failed for " + directory + errtext();
         SCREENERR(log(err));
         return err;
     }

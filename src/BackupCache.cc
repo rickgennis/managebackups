@@ -347,6 +347,8 @@ bool bcCleanupCallback(pdCallbackData &file) {
                             newCacheFile << cacheData << endl;
                             ++verifiedBackups;
                         }
+                        else
+                            log(entry.filename + " has vanished, updating cache");
                     }
                 }
                 

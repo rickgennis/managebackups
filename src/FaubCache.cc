@@ -410,7 +410,6 @@ bool fcCleanupCallback(pdCallbackData &file) {
     ifstream cacheFile;
     string backupDir, fullId, profileName;
     string cacheFilename;
-    struct stat statData;
     FaubCache *fc = (FaubCache*)file.dataPtr;
     
     cacheFile.open(file.filename);
@@ -429,7 +428,7 @@ bool fcCleanupCallback(pdCallbackData &file) {
         
         // if the backup directory referenced in the cache file no longer exists
         // delete the cache file
-        if (mystat(backupDir, &statData)) {
+        if (!exists(backupDir)) {
             auto targetMtime = filename2Mtime(backupDir);
 
             if (profileName.length()) {
@@ -444,6 +443,7 @@ bool fcCleanupCallback(pdCallbackData &file) {
 
                 auto bdir = pathSplit(parentDir).dir;
                 if (profileName == fc->coreProfile && bdir == fc->baseDir) {
+                    log(backupDir + " has vanished, updating cache");
                     DEBUG(D_any) DFMT(backupDir << " no longer exists; will recalculate usage of subsequent backup");
                     unlink(cacheFilename.c_str());
                     cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBSTATS), string(SUFFIX_FAUBSTATS).length(), SUFFIX_FAUBINODES);
@@ -463,7 +463,7 @@ bool fcCleanupCallback(pdCallbackData &file) {
 
 
 /* cleanup()
- Walk through this cache's files looking for cache's that reference backups
+ Walk through this cache's files looking for caches that reference backups
  that no longer exist (have been removed).  When one is found, we delete the
  cache files. But we also look for the next backup matching the same dir +
  profile name as the deleted one and recalculate (dus) its disk usage because
@@ -473,9 +473,7 @@ bool fcCleanupCallback(pdCallbackData &file) {
 void FaubCache::cleanup() {
     FaubCache *fc = this;
     
-    DEBUG(D_faub) DFMT("starting");
     processDirectory(GLOBALS.cacheDir, SUFFIX_FAUBSTATS, false, fcCleanupCallback, fc);
-    DEBUG(D_faub) DFMT("complete");
 }
 
 
