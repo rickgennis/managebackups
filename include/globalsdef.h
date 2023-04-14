@@ -2,10 +2,11 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.4.8"
+#define VERSION "1.4.9"
 
 #include "cxxopts.hpp"
 #include "colors.h"
+#include "debug.h"
 #include <set>
 
 /*
@@ -38,7 +39,8 @@
 #define TMP_OUTPUT_DIR "/tmp/managebackups_output"
 #define GLOBALSTATSFILE "lastrun.stats"
 
-#define DFMT(x) (cerr << BOLDGREEN << __FUNCTION__ << ": " << RESET << GREEN << x << RESET << endl)
+#define DFMT(x) (cerr << ((GLOBALS.debugSelector & D_exec) ? string("pid ") + to_string(getpid()) + " " : "") << BOLDGREEN << __FUNCTION__ << ": " << RESET << GREEN << x << RESET << endl)
+
 #define DFMTNOENDL(x) cerr << BOLDGREEN << __FUNCTION__ << ": " << RESET << GREEN << x << RESET
 #define DFMTNOPREFIX(x) cerr << GREEN << x << RESET << endl
 
@@ -107,7 +109,7 @@
 #define CLI_RECREATE "recreate"
 #define CLI_TRIPWIRE "tripwire"
 #define CLI_NOTIFYEVERY "notifyevery"
-#define CLI_MAILFROM "from"
+#define CLI_MAILFROM "mailfrom"
 #define CLI_LEAVEOUTPUT "leaveoutput"
 #define CLI_FAUB "faub"
 #define CLI_PATHS "path"
@@ -128,6 +130,7 @@
 #define CLI_COMPARE "compare"
 #define CLI_THRESHOLD "threshold"
 #define CLI_COMPFOCUS "compfocus"
+#define CLI_UUID "uuid"      /* not really a valid CLI option just used as a setting */
 
 
 // conf file regexes
@@ -168,6 +171,7 @@
 #define RE_GID "(gid)"
 #define RE_CONSOLIDATE "(consolidate)"
 #define RE_BLOAT "(bloat)"
+#define RE_UUID "(uuid|id)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"

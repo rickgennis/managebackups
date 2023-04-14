@@ -521,7 +521,7 @@ void PipeExec::pickupTheKids() {
             if (GLOBALS.reapedPids.find(procIt->childPID) != GLOBALS.reapedPids.end()) {
                 GLOBALS.reapedPids.erase(procIt->childPID);
                 procIt->reaped = true;
-                DEBUG(D_exec) DFMT("pid " + to_string(GLOBALS.pid) + " successfully reaped child pid " + to_string(procIt->childPID) + "*");
+                DEBUG(D_exec) DFMT("successfully reaped child pid " + to_string(procIt->childPID) + "* (" + plural(procs.size(), "child proc") + " outstanding)");
             }
             else
                 // if not then that's still a valid pid that's outstanding and we need to
@@ -549,7 +549,7 @@ void PipeExec::pickupTheKids() {
             for (auto procIt = procs.begin(); procIt != procs.end(); ++procIt) {
                 if (procIt->childPID == pid) {
                     procIt->reaped = pidFound = true;
-                    DEBUG(D_exec) DFMT("pid " + to_string(GLOBALS.pid) + " successfully reaped child pid " + to_string(pid));
+                    DEBUG(D_exec) DFMT("successfully reaped child pid " + to_string(pid) + " (" + plural(procs.size(), "child proc") + " outstanding)");
                     
                     // bail early if we've hit both conditions (a pid found & a pid not found)
                     if (!done)
@@ -645,7 +645,7 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
         showError("error: unable to mkdir " + errorDir + ": " + strerror(errno));
 
     string commandID = firstAvailIDForDir(errorDir);
-    DEBUG(D_exec) DFMT(to_string(getpid()) + " preparing full command [" << origCommand << "]");
+    DEBUG(D_exec) DFMT("parent forking child in prep to run [" << origCommand << "]");
 
     /* Each pipe in the exec string denotes a separate proc.
      
@@ -693,7 +693,7 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
                 // parents) - execute the command
                 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
                 if (procIt != procs.begin()) {  // if not first proc
-                    DEBUG(D_exec) DFMT(to_string(getpid()) + " executing mid command [" << procIt->command << "] with pipes " << procIt->writefd[0] << " & " << procIt->writefd[1]);
+                    DEBUG(D_exec) DFMT("child executing [" << procIt->command << "] with pipes " << procIt->writefd[0] << " & " << procIt->writefd[1]);
 
                     // redirect stderr to a file
                     if (!noErrToDisk)
@@ -736,7 +736,7 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
             // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
             // Last Proc: PARENT - execute the last command
             // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-            DEBUG(D_exec) DFMT(to_string(getpid()) + " executing final command [" << procIt->command << "]");
+            DEBUG(D_exec) DFMT("child executing final command [" << procIt->command << "]");
 
             // redirect stderr to a file
             if (!noErrToDisk)

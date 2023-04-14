@@ -13,7 +13,7 @@ using namespace pcrepp;
 enum SetType { INT, STRING, BOOL, OCTAL, SIZE };
 enum SetSpecifier { sTitle, sDirectory, sBackupFilename, sBackupCommand, sDays, sWeeks, sMonths, sYears, sFailsafeBackups, sFailsafeDays,
     sSCPTo, sSFTPTo, sPruneLive, sNotify, sMaxLinks, sIncTime, sNos, sMinSize, sDOW, sFP, sMode, sMinSpace, sMinSFTPSpace, sNice, sTripwire, 
-    sNotifyEvery, sMailFrom, sLeaveOutput, sFaub, sUID, sGID, sConsolidate, sBloat };
+    sNotifyEvery, sMailFrom, sLeaveOutput, sFaub, sUID, sGID, sConsolidate, sBloat, sUUID };
 
 extern map<string, int>settingMap;
 

@@ -47,7 +47,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
     string processAge;
 
     // handle faub configs first
-    if (config.settings[sFaub].value.length()) {
+    if (config.isFaub()) {
         if (config.fcache.size() < 1) {
             resultStats.stringOutput[0] = config.settings[sTitle].value;
             return resultStats;
@@ -316,7 +316,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
 bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
     int precisionLevel = statDetail > 3 ? 0 : statDetail > 1 ? 1 : -1;
 
-    if (config.settings[sFaub].value.length() && config.fcache.size()) {
+    if (config.isFaub() && config.fcache.size()) {
         auto line = horizontalLine(60);
         auto bkups = config.fcache.getNumberOfBackups();
         auto stats = config.fcache.getTotalStats();
@@ -541,7 +541,8 @@ void _displayDetailedStats(BackupConfig& config, int statDetail) {
         // lookup the the raw data detail
         auto raw_it = config.cache.rawData.find(backup.second);
         if (raw_it != config.cache.rawData.end()) {
-            string monthYear = vars2MY(raw_it->second.date_month, raw_it->second.date_year);
+            string monthYear = raw_it->second.date_month > 0 && raw_it->second.date_month < 13 && raw_it->second.date_year < 3000 && raw_it->second.date_year > 0
+                ? vars2MY(raw_it->second.date_month, raw_it->second.date_year) : "[Unknown]";
 
             // print the month header
             if (lastMonthYear != monthYear) {
@@ -600,7 +601,7 @@ void _displayDetailedStats(BackupConfig& config, int statDetail) {
                         raw_it->second.filename.c_str(), approximate(raw_it->second.size, precisionLevel, statDetail == 3 || statDetail == 5).c_str(),
                         seconds2hms(raw_it->second.duration).c_str(),
                         raw_it->second.date_month == 1 && raw_it->second.date_day == 1 ? "Year" : raw_it->second.date_day == 1 ? "Mnth" : raw_it->second.dow == config.settings[sDOW].ivalue() ? "Week" : "Day",
-                        raw_it->second.links, timeDiff(mktimeval(prectime ? raw_it->second.mtime : raw_it->second.name_mtime)).c_str());
+                        raw_it->second.links, raw_it->second.mtime ? timeDiff(mktimeval(prectime ? raw_it->second.mtime : raw_it->second.name_mtime)).c_str() : "?");
 
             // if there's more than 1 file with this MD5 then color code it as a set; otherwise no color
             if (config.cache.getByMD5(raw_it->second.md5).size() > 1) {

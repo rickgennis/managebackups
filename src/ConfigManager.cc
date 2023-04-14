@@ -40,7 +40,7 @@ bool configMgrCallback(pdCallbackData &file) {
         vector<BackupConfig> *configs = (vector<BackupConfig>*)file.dataPtr;
         BackupConfig backupConfig;
         backupConfig.loadConfig(file.filename);
-        configs->insert(configs->begin(), backupConfig);
+        configs->emplace(configs->begin(), backupConfig);
     }
     
     return true;

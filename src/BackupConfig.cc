@@ -66,6 +66,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_GID, RE_GID, INT, "-1"));
     settings.insert(settings.end(), Setting(CLI_CONSOLIDATE, RE_CONSOLIDATE, INT, "0"));
     settings.insert(settings.end(), Setting(CLI_BLOAT, RE_BLOAT, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_UUID, RE_UUID, STRING, ""));
     // CLI_PATHS is intentionally left out because its only accessed via CLI
     // and never as a Setting.  to implement it as a Setting would require a new
     // type (vector<string>) to be setup and parse and there's really no benefit.
@@ -73,8 +74,10 @@ BackupConfig::BackupConfig(bool makeTemp) {
 
 
 BackupConfig::~BackupConfig() {
-    if (modified)
+/*    if (modified) {
         saveConfig();
+        modified = 0;
+    }*/
 }
 
 
@@ -85,7 +88,7 @@ void BackupConfig::saveConfig() {
     // don't save temp configs
     if (temp)
         return;
-
+    
     // construct a unique config filename if not already specified
     if (!config_filename.length()) {
         string baseName = settings[sTitle].value.length() ? settings[sTitle].value : "default"; 
@@ -99,6 +102,8 @@ void BackupConfig::saveConfig() {
         }
     }
 
+    NOTQUIET && cout << "\t• saving profile " << settings[sTitle].value << " (" << config_filename << ")" << endl;
+    
     if (GLOBALS.cli.count(CLI_RECREATE))
         unlink(config_filename.c_str());
 
@@ -174,7 +179,14 @@ void BackupConfig::saveConfig() {
         // differ from the defaults, write them to the new file.
         for (auto &setting: settings)
             if (!setting.seen && (setting.value != setting.defaultValue)) {
-                newFile << setting.display_name << usersDelimiter << setting.value << endl;
+                
+                // for UUID add a comment
+                if (setting.display_name == CLI_UUID)
+                    newFile << setting.display_name << usersDelimiter << setting.value << "\t\t# links config to cache (do not change)"<< endl;
+                else
+                    // if fp is set then don't add fs_days or fs_backups
+                    if (!str2bool(settings[sFP].value) || (setting.display_name != CLI_FS_DAYS && setting.display_name != CLI_FS_BACKUPS))
+                        newFile << setting.display_name << usersDelimiter << setting.value << endl;
             }
     }
     else {
@@ -308,6 +320,17 @@ bool BackupConfig::loadConfig(string filename) {
         }
             
         configFile.close();
+        
+        // if there's no UUID for this profile create one
+        if (!settings[sUUID].value.length()) {
+            char hostname[1024];
+            if (gethostname(hostname, sizeof(hostname)))
+                hostname[0] = 0;
+            
+            settings[sUUID].value = MD5string(to_string(time(NULL)) + to_string(getpid()) + string(hostname) + to_string(getuid()) + settings[sTitle].value);
+            modified = true;
+        }
+        
         DEBUG(D_config) DFMT("successfully parsed [" << settings[sTitle].value << "] config from " << filename);
 
         return 1;

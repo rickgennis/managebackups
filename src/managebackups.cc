@@ -237,21 +237,17 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache) 
  *
  * Wrapper function for parseDirToCache().
  *******************************************************************************/
-void scanConfigToCache(BackupConfig &config, bool skipFaubCleanup = false) {
+void scanConfigToCache(BackupConfig &config) {
     auto [message, noMessage] = clearMessage("updating cache for " + config.settings[sDirectory].value + "... ");
     NOTQUIET && ANIMATE && cout << message << flush;
     
-    if (config.settings[sFaub].value.length()) {
+    if (config.isFaub()) {
         config.fcache.restoreCache(config.settings[sDirectory].value, config.settings[sTitle].value);
       
         // clean up old cache files and recalculate any missing disk usage
         // this primarily catches recalculations that are necessary because
         // the user manually deleted a backup unbeknown to us.
-        
-        // cleanup is also called from pruneBackups().  if we're going to do a
-        // prune later, skipFaubCleanup will tell us we can skip it for now.
-        if (!skipFaubCleanup)
-            config.fcache.cleanup();
+        config.fcache.cleanup();
         
         NOTQUIET && ANIMATE && cout << noMessage << flush;
         return;
@@ -293,8 +289,7 @@ void scanConfigToCache(BackupConfig &config, bool skipFaubCleanup = false) {
  * profile was selected created a temp one that will be used, but not persisted
  * to disk. Validate required commandline options.
  *******************************************************************************/
-BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
-{
+BackupConfig *selectOrSetupConfig(ConfigManager &configManager) {
     string profile;
     BackupConfig tempConfig(true);
     BackupConfig *currentConf = &tempConfig;
@@ -320,6 +315,12 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
                     exit(1);
                 }
 
+        if (currentConf->settings[sTitle].value != GLOBALS.cli[CLI_PROFILE].as<string>() && bSave) {
+            SCREENERR("error: the specified partial profile name matches an existing profile (" << currentConf->settings[sTitle].value
+                      << ");\nprovide a unique name for a new profile or the exact name to update " << currentConf->settings[sTitle].value);
+            exit(1);
+        }
+            
         currentConf->loadConfigsCache();
     }
     else {
@@ -366,7 +367,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager)
                     // creating a new profile (i.e. when --save is also given).  otherwise -p can be
                     // a partial string used to match an existing profile.  so if there's no --save
                     // and therefore we may have a partial match value given on the commandline,
-                    // don't update the value of our setting with the commandline specification.
+                    // don't update the value of the profile name itself with the commandline specification.
                     // instead, break.
                     if ((setting.display_name == CLI_PROFILE) && !bSave)
                         break;
@@ -653,7 +654,7 @@ bool shouldPrune(BackupConfig &config) {
         int minValidBackups = 0;
 
         // faub style failsafe
-        if (config.settings[sFaub].value.length()) {
+        if (config.isFaub()) {
             auto cacheEntryIt = config.fcache.getFirstBackup();
             while (cacheEntryIt != config.fcache.getEnd()) {
                 descrip = "";
@@ -715,11 +716,7 @@ bool shouldPrune(BackupConfig &config) {
  * Apply the full rentetion policy inclusive of all safety checks.
  *******************************************************************************/
 void pruneBackups(BackupConfig &config) {
-
-
-    /* safety checks complete - begin pruning */
-
-    if (config.settings[sFaub].value.length()) {
+    if (config.isFaub()) {
         pruneFaubBackups(config);
 
         if (!GLOBALS.cli.count(CLI_TEST)) {
@@ -1238,8 +1235,7 @@ void performBackup(BackupConfig &config) {
     string setCommand = config.settings[sBackupCommand].value;
     string tempExtension = ".tmp." + to_string(GLOBALS.pid);
 
-    if (!setFname.length() || GLOBALS.cli.count(CLI_NOBACKUP) || !setCommand.length() ||
-        config.settings[sFaub].value.length())
+    if (!setFname.length() || GLOBALS.cli.count(CLI_NOBACKUP) || !setCommand.length() || config.isFaub())
         return;
 
     // setup path names and filenames
@@ -1722,8 +1718,7 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
         newBaseDir.replace(0, slash, homeDir);
     }
 
-    bool isFaub = config.settings[sFaub].value.length();
-    auto oldBaseDir = isFaub ? config.fcache.getBaseDir() : config.settings[sDirectory].value;
+    auto oldBaseDir = config.isFaub() ? config.fcache.getBaseDir() : config.settings[sDirectory].value;
  
     if (newBaseDir == oldBaseDir) {
         NOTQUIET && cout << GREEN << "backups for " << config.settings[sTitle].value << " are already in " << oldBaseDir << RESET << endl;
@@ -1750,7 +1745,7 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
     
     bool sameFS = (statData1.st_dev == statData2.st_dev);
     
-    auto numBackups = isFaub ? config.fcache.getNumberOfBackups() : config.cache.rawData.size();
+    auto numBackups = config.isFaub() ? config.fcache.getNumberOfBackups() : config.cache.rawData.size();
     NOTQUIET && ANIMATE && cout << "moving backups " << (sameFS ? "[local filesystem]... " : "[cross-filesystem]... ");
 
     // declare the crossFSDataType to hold the inode map.  we pass this to all the moveBackup() calls so it can use it
@@ -1759,7 +1754,7 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
     progressPercentage(-1);
  
     // actually move the backup files
-    if (isFaub) {
+    if (config.isFaub()) {
         auto backupIt = config.fcache.getFirstBackup();
         while (backupIt != config.fcache.getEnd()) {
             NOTQUIET && ANIMATE && cout << progressPercentage(numBackups, 1, (int)distance(config.fcache.getFirstBackup(), backupIt), 1, backupIt->second.getDir()) << flush;
@@ -1803,7 +1798,7 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
     NOTQUIET && ANIMATE && cout << "\nupdating caches..." << flush;
     
     // update the directory in all the cache files
-    if (isFaub)
+    if (config.isFaub())
         config.fcache.renameBaseDirTo(newBaseDir);
     else {
         config.cache.setCacheFilename(GLOBALS.cacheDir + "/" + MD5string(config.settings[sDirectory].value + config.settings[sBackupFilename].value));
@@ -1936,6 +1931,7 @@ int main(int argc, char *argv[]) {
         CLI_SCPTO, "SCP to", cxxopts::value<std::string>())(
         CLI_SFTPTO, "SFTP to", cxxopts::value<std::string>())(
         CLI_NICE, "Nice value", cxxopts::value<int>())(
+        CLI_MAILFROM, "Send mail from", cxxopts::value<std::string>())(
         CLI_STATS1, "Stats summary", cxxopts::value<bool>()->default_value("false"))(
         CLI_STATS2, "Stats detail", cxxopts::value<bool>()->default_value("false"))(
         CLI_PRUNE, "Enable pruning", cxxopts::value<bool>()->default_value("false"))(
@@ -2109,6 +2105,9 @@ int main(int argc, char *argv[]) {
     DEBUG(D_any) DFMT("about to setup config...");
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager);
+
+    if (currentConfig->modified)
+        currentConfig->saveConfig();
     
     if (GLOBALS.cli.count(CLI_RELOCATE)) {
         if (GLOBALS.cli.count(CLI_PROFILE)) {
@@ -2422,20 +2421,19 @@ int main(int argc, char *argv[]) {
                         log(currentConfig->ifTitle() + " unable to set nice value" + errtext());
                 }
 
-                auto willPrune = shouldPrune(*currentConfig);
+                scanConfigToCache(*currentConfig);
                 
-                scanConfigToCache(*currentConfig, willPrune);
                 if (performTripwire(*currentConfig)) {
 
                     /* faub configurations */
-                    if (currentConfig->settings[sFaub].value.length()) {
-                        if (willPrune)
+                    if (currentConfig->isFaub()) {
+                        if (shouldPrune(*currentConfig))
                             pruneBackups(*currentConfig);
                         
                         fs_startServer(*currentConfig);
                     }
                     else {  /* single file configurations */
-                        if (willPrune)
+                        if (shouldPrune(*currentConfig))
                             pruneBackups(*currentConfig);
                         
                         updateLinks(*currentConfig);
