@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.4.9
+% MANAGEBACKUPS(1) managebackups 1.5
 % Rick Ennis
 % March 2023
 
@@ -250,6 +250,18 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 **--consolidate** [*days*]
 : Prune backups down to a single backups per day once they're *days* days old. If you take multiple backups of the same profile in the same day (with **--time**), this allows you to keep only a single one after they age to *days* days but haven't reached the full retention policy to be completely deleted.
 
+**--fs_days** [*days*]
+: Failsafe - Require *backups* backups (see **--fs_backups**) within the last *days* days before pruning will begin.  See FAILSAFE below.
+
+**--fs_backups** [*backups*]
+: Failsafe - Require *backups* backups within the last *days* days (see **--fs_days**) before pruning will begin.  See FAILSAFE below.
+
+**--fs_limit** [*backups*]
+: Failsafe - Limit pruning to a max of *backups* backups per run.  i.e. if *backups* is 4 then no more than 4 backups will be pruned for the current profile per run.  See FAILSAFE below.
+
+**--fp**
+: Failsafe paranoid - See FAILSAFE below.
+
 ## 3. Linking Options
 
 **-l**, **--maxlinks** [*links*]
@@ -269,7 +281,9 @@ Notification scripts are passed a single parameter, which is a message describin
 # FAILSAFE
 **managebackups** can use a failsafe check to make sure that if backups begin failing, it won't continue to prune (remove) old/good ones. The failsafe check has two components: the number of successful backups required (B) and the number of days (D) for a contextual timeframe. To pass the check and allow pruning, there must be at least B valid backups within the last D days. These values can be specified individually via **--fs_backups** and **--fs_days**. By default the failsafe check is disabled.
 
-Rather than specifying the two settings individually, there's also a Failsafe Paranoid option (**--fp**) which sets backups to 1 and days to 2. In other words, there has to be a valid backup within the last two days before pruning is allowed.
+The failsave also has a limit option, **--fs_limit**.  When a limit is given, it's interpreted as the maximum number of backups to prune for this profile in a single run.
+
+Rather than specifying the settings individually, there's also a Failsafe Paranoid option (**--fp**) which sets backups to 1, days to 2, and limit to 2. In other words, there has to be a valid backup within the last two days before pruning is allowed; and if allowed, a max of 2 backups will be pruned per run.
 
 # PROFILE CONFIG FILES
 Profile configuration files are managed by **managebackups** though they can be edited by hand if that's easier than lengthy commandline arguments. Each profile equates to a .conf file under /etc/managebackups. Commandline arguments are automatically persisted to a configuration file when both a profile name (**--profile**) and **-save** are specified. Comments (#) are supported.
@@ -397,6 +411,32 @@ Example output from **managebackups -1 -p faub** (faub-style backup example)
 
 **managebackups -0**
 : Show a one-line summary for each backup profile. The summary includes detail on the most recent backup as well as the number of backups, age ranges and total disk space.
+
+## Interrogate Backups
+**managebackups -0 -p laptop**
+
+    April 2023                                                   Size  Used  Dirs  SymLks  Mods  Duration  Type  Age
+    /Users/rennis/backups/2023/04/14/laptop-2023-04-14@17:20:09  3.2G  962K    1K      26     6  00:00:54  Day   6 days, 23 hours
+    /Users/rennis/backups/2023/04/14/laptop-2023-04-14@17:57:12  3.2G  1.7M    1K      26    26  00:00:03  Day   6 days, 23 hours
+    /Users/rennis/backups/2023/04/21/laptop-2023-04-21@16:13:26  3.2G  4.8M    1K      26    31  00:00:03  Day   46 minutes, 44 seconds
+    /Users/rennis/backups/2023/04/21/laptop-2023-04-21@16:51:32  3.2G  4.5M    1K      26    29  00:00:13  Day   8 minutes, 28 seconds
+    /Users/rennis/backups/2023/04/21/laptop-2023-04-21@16:55:33  3.2G  622K    1K      26     1  00:00:28  Day   4 minutes, 7 seconds
+
+**managebackups -p laptop --diff 21@16:55**
+
+    /Users/rennis/managebackups/.git/refs/heads/master
+    /Users/rennis/managebackups/bin/managebackups
+    /Users/rennis/managebackups/obj/BackupCache.o
+    /usr/local/bin/managebackups
+
+**managebackups -p laptop --compare 17:2 --compare 55:53** 
+
+    [/Users/rennis/backups/2023/04/14/laptop-2023-04-14@17:20:09]
+    [/Users/rennis/backups/2023/04/21/laptop-2023-04-21@16:55:33]
+    +192 [-]  /Users/rennis/backups/2023/04/14/laptop-2023-04-14@17:57:12/Users/rennis/managebackups/src/statistics.cc
+    +118 [-]  /Users/rennis/backups/2023/04/14/laptop-2023-04-14@17:57:12/Users/rennis/managebackups/src/ipc.cc
+    +213 [-]  /Users/rennis/backups/2023/04/14/laptop-2023-04-14@17:57:12/Users/rennis/managebackups/src/BackupCache.cc
+    +16K [-]  /Users/rennis/backups/2023/04/14/laptop-2023-04-14@17:57:12/usr/local/bin/managebackups
 
 # DEPENDENCIES
 **managebackups** uses three open-source libraries. These are statically compiled in under MacOS and dynamically linked under Linux.

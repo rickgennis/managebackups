@@ -67,6 +67,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_CONSOLIDATE, RE_CONSOLIDATE, INT, "0"));
     settings.insert(settings.end(), Setting(CLI_BLOAT, RE_BLOAT, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_UUID, RE_UUID, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_FS_SLOW, RE_FSSLOW, INT, "0"));
     // CLI_PATHS is intentionally left out because its only accessed via CLI
     // and never as a Setting.  to implement it as a Setting would require a new
     // type (vector<string>) to be setup and parse and there's really no benefit.
@@ -130,6 +131,7 @@ void BackupConfig::saveConfig() {
 
         string dataLine;
         unsigned int line = 0;
+        bool bFailsafeParanoid = str2bool(settings[sFP].value);
 
         try {
             // loop through lines of the existing config file
@@ -139,14 +141,23 @@ void BackupConfig::saveConfig() {
                 // compare the line against each of the config settings until there's a match
                 bool identified = false;
                 if (!reBlank.search(dataLine)) {
+                    
                     for (auto &setting: settings) {
+                        
                         if (setting.regex.search(dataLine) && setting.regex.matches() > 2) {
                             usersDelimiter = setting.regex.get_match(1);
-                            newFile << setting.regex.get_match(0) << setting.regex.get_match(1) << 
-                                (setting.data_type == BOOL ? (str2bool(setting.value) ? "true" : "false") : setting.value) << 
+                            
+                            // don't write fs_days, fs_backups or fs_slow if fp is set
+                            if (!bFailsafeParanoid || (bFailsafeParanoid && (setting.display_name != CLI_FS_DAYS && setting.display_name != CLI_FS_BACKUPS && setting.display_name != CLI_FS_SLOW))) {
+                                newFile << setting.regex.get_match(0) << setting.regex.get_match(1) <<
+                                (setting.data_type == BOOL ? (str2bool(setting.value) ? "true" : "false") : setting.value) <<
                                 (setting.regex.matches() > 3 ? setting.regex.get_match(3) : "")  << endl;
-                            setting.seen = identified = true;
-                            break;
+                                setting.seen = identified = true;
+                                break;
+                            }
+                            else
+                                if (setting.display_name == CLI_FS_DAYS || setting.display_name == CLI_FS_BACKUPS || setting.display_name == CLI_FS_SLOW)
+                                    setting.seen = identified = true;
                         }
                     }
 

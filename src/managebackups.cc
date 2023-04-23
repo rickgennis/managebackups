@@ -451,21 +451,22 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager) {
     if (str2bool(currentConf->settings[sFP].value)) {
         currentConf->settings[sFailsafeDays].value = "2";
         currentConf->settings[sFailsafeBackups].value = "1";
+        currentConf->settings[sFailsafeSlow].value = "2";
     }
 
     // convert --fp (failsafe paranoid) to its separate settings
     if (GLOBALS.cli.count(CLI_FS_FP)) {
-        if (GLOBALS.cli.count(CLI_FS_DAYS) || GLOBALS.cli.count(CLI_FS_BACKUPS)) {
-            SCREENERR("error: --fp is mutually exclusive with --fs_days & --fs_backups");
+        if (GLOBALS.cli.count(CLI_FS_DAYS) || GLOBALS.cli.count(CLI_FS_BACKUPS) || GLOBALS.cli.count(CLI_FS_SLOW)) {
+            SCREENERR("error: --" << CLI_FS_FP << " is mutually exclusive with --" << CLI_FS_DAYS << ", --" << CLI_FS_BACKUPS << ", --" << CLI_FS_SLOW);
             exit(1);
         }
 
-        if (bSave && (currentConf->settings[sFailsafeDays].value != "2" ||
-                      currentConf->settings[sFailsafeBackups].value != "1"))
+        if (bSave)  // this needed here?
             currentConf->modified = 1;
 
         currentConf->settings[sFailsafeDays].value = "2";
         currentConf->settings[sFailsafeBackups].value = "1";
+        currentConf->settings[sFailsafeSlow].value = "2";
     }
 
     if (currentConf == &tempConfig) {
@@ -517,8 +518,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager) {
  * criteria.
  *******************************************************************************/
 string pruneShouldKeep(BackupConfig &config, string filename, int filenameAge, int filenameDOW,
-                       int filenameDay, int filenameMonth, int filenameYear)
-{
+                       int filenameDay, int filenameMonth, int filenameYear) {
     //  daily
     if (config.settings[sDays].ivalue() && filenameAge <= config.settings[sDays].ivalue())
         return string("keep_daily: ") + filename + " (age=" + to_string(filenameAge) +
@@ -555,16 +555,22 @@ string pruneShouldKeep(BackupConfig &config, string filename, int filenameAge, i
  * Apply the full rentetion policy for Faub configs.  Safety checks are already
  * handled in pruneBackups() which is what called us here.
  *******************************************************************************/
-void pruneFaubBackups(BackupConfig &config)
-{
+void pruneFaubBackups(BackupConfig &config) {
     DEBUG(D_prune) DFMT("weeklies set to dow " << dw(config.settings[sDOW].ivalue()));
     DEBUG(D_prune) DFMT("examining " << plural(config.fcache.getNumberOfBackups(), "backup") << " for "
         << config.settings[sTitle].value);
 
-    size_t backupAge = 0, backupCountOnDay = 0;
-    
+    size_t backupAge = 0, backupCountOnDay = 0, backupsPruned = 0;
+    auto fsSlowLimit = config.settings[sFailsafeSlow].ivalue();
+
     auto cacheEntryIt = config.fcache.getFirstBackup();
     while (cacheEntryIt != config.fcache.getEnd()) {
+       
+        if (fsSlowLimit && backupsPruned >= fsSlowLimit) {
+            DEBUG(D_prune) DFMT("failsafe_limit reached; " << plural(fsSlowLimit, "backup") << " pruned, aborting further prunes");
+            break;
+        }
+        
         auto mtimeDayAge = cacheEntryIt->second.mtimeDayAge;
         auto filenameDOW = cacheEntryIt->second.dow;
         auto filenameDayAge = cacheEntryIt->second.filenameDayAge();
@@ -611,6 +617,7 @@ void pruneFaubBackups(BackupConfig &config)
                 log(config.ifTitle() + " removed " + cacheEntryIt->second.getDir() +
                     " (age=" + to_string(mtimeDayAge) + ", dow=" + dw(filenameDOW) + ")" + (shouldConsolidate ? " consolidation" : "" ));
                 DEBUG(D_prune) DFMT("completed removal of " << cacheEntryIt->second.getDir() << (shouldConsolidate ? " (consolidation)" : "" ));
+                ++backupsPruned;
             }
             else {
                 NOTQUIET && ANIMATE && cout << noMessage << flush;
@@ -730,7 +737,8 @@ void pruneBackups(BackupConfig &config) {
     set<string> changedMD5s;
     DEBUG(D_prune) DFMT("weeklies set to dow " << dw(config.settings[sDOW].ivalue()));
 
-    size_t backupAge = 0, backupCountOnDay= 0;
+    size_t backupAge = 0, backupCountOnDay = 0, backupsPruned = 0;
+    auto fsSlowLimit = config.settings[sFailsafeSlow].ivalue();
     
     // loop through the filename index sorted by filename (i.e. all backups by age)
     for (auto fIdx_it = config.cache.indexByFilename.begin(), next_it = fIdx_it;
@@ -742,6 +750,11 @@ void pruneBackups(BackupConfig &config) {
         // pointer.
         ++next_it;
 
+        if (fsSlowLimit && backupsPruned >= fsSlowLimit) {
+            DEBUG(D_prune) DFMT("failsafe_slow limit reached (" << plural(fsSlowLimit, "backup") << " pruned, aborting further prunes");
+            break;
+        }
+        
         auto raw_it = config.cache.rawData.find(fIdx_it->second);
 
         if (raw_it != config.cache.rawData.end()) {
@@ -782,10 +795,12 @@ void pruneBackups(BackupConfig &config) {
                     log(config.ifTitle() + " removed " + raw_it->second.filename +
                         " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")" + (shouldConsolidate ? " consolidation" : ""));
 
+                    auto fname = raw_it->second.filename;
                     changedMD5s.insert(raw_it->second.md5);
                     config.cache.remove(raw_it->second);
                     config.cache.updated = true;  // updated causes the cache to get saved in the BackupCache destructor
-                    DEBUG(D_prune) DFMT("completed removal of " << raw_it->second.filename);
+                    DEBUG(D_prune) DFMT("completed removal of " << fname);
+                    ++backupsPruned;
                 }
                 else {
                     log(config.ifTitle() + " unable to remove " + (shouldConsolidate ? " (consolidation) " : "") + raw_it->second.filename + errtext());
@@ -1926,6 +1941,7 @@ int main(int argc, char *argv[]) {
         CLI_SAVE, "Save config", cxxopts::value<bool>()->default_value("false"))(
         CLI_FS_BACKUPS, "Failsafe Backups", cxxopts::value<int>())(
         CLI_FS_DAYS, "Failsafe Days", cxxopts::value<int>())(
+        CLI_FS_SLOW, "Failsafe Slow", cxxopts::value<int>())(
         CLI_FS_FP, "Failsafe Paranoid", cxxopts::value<bool>()->default_value("false"))(
         CLI_DIR, "Directory", cxxopts::value<std::string>())(
         CLI_SCPTO, "SCP to", cxxopts::value<std::string>())(
@@ -2254,6 +2270,7 @@ int main(int argc, char *argv[]) {
                                            : "") +
             ValueParamIfSpecified(CLI_FAUB) + ValueParamIfSpecified(CLI_PATHS) +
             ValueParamIfSpecified(CLI_FS_FP) + ValueParamIfSpecified(CLI_FS_BACKUPS) +
+            ValueParamIfSpecified(CLI_FS_SLOW) +
             ValueParamIfSpecified(CLI_FS_DAYS) + ValueParamIfSpecified(CLI_TIME) +
             ValueParamIfSpecified(CLI_MODE) + ValueParamIfSpecified(CLI_MINSPACE) +
             ValueParamIfSpecified(CLI_MINSFTPSPACE) + ValueParamIfSpecified(CLI_DOW) +

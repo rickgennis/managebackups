@@ -642,7 +642,7 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
     
     errorDir = string(TMP_OUTPUT_DIR) + "/" + (procName.length() ? safeFilename(procName) : "pid_" + to_string(getpid())) + "/";
     if (mkdirp(errorDir))
-        showError("error: unable to mkdir " + errorDir + ": " + strerror(errno));
+        showError("error: unable to mkdir " + errorDir + errtext());
 
     string commandID = firstAvailIDForDir(errorDir);
     DEBUG(D_exec) DFMT("parent forking child in prep to run [" << origCommand << "]");
@@ -677,7 +677,7 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
     for (auto procIt = procs.begin(); procIt != procs.end(); ++procIt) {
         string commandPrefix = procIt->command.substr(0, procIt->command.find(" "));
         string stderrFname = errorDir + commandID + ":" + to_string(distance(procs.begin(), procIt)) + "." + safeFilename(commandPrefix) + ".stderr";
-
+        
         if (procIt != procs.end() - 1) {  // if not last proc
             if (procIt == procs.begin())
                 pipe(procIt->readfd);  // extra pipe for our dummy entry to communicate with the calling app
@@ -821,7 +821,7 @@ string PipeExec::errorOutput() {
 bool firstAvailIDCallback(pdCallbackData &file) {
     string *lastID = (string*)file.dataPtr;
     
-    auto delimit = file.filename.find(":");
+    auto delimit = pathSplit(file.filename).file.find(":");
     
     if (delimit != string::npos) {
         auto id = file.filename.substr(0, delimit);

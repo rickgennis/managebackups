@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.4.9"
+#define VERSION "1.5"
 
 #include "cxxopts.hpp"
 #include "colors.h"
@@ -68,6 +68,7 @@
 #define CLI_YEARS "years"
 #define CLI_FS_BACKUPS "fs_backups"
 #define CLI_FS_DAYS "fs_days"
+#define CLI_FS_SLOW "fs_limit"
 #define CLI_FS_FP "fp"
 #define CLI_SCPTO "scp"
 #define CLI_SFTPTO "sftp"
@@ -149,6 +150,7 @@
 #define RE_YEARS "(yearly|yearlies|years)"
 #define RE_FSBACKUPS "(fs_backups|fb|failsafe_backups)"
 #define RE_FSDAYS "(fs_days|fd|failsafe_days)"
+#define RE_FSSLOW "(fs_limit)"
 #define RE_FS_FP "(fp)"
 #define RE_NOTIFY "(notify)"
 #define RE_NOS "(nos)"
