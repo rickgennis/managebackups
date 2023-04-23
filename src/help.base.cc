@@ -61,7 +61,8 @@ void showHelp(enum helpType kind) {
             + "   --consolidate [x]   Prune down to a single backups of the profilel per day after its x days old.\n"
             + "   --fs_backups [b]    FAILSAFE: Require b backups before pruning\n"
             + "   --fs_days [d]       FAILSAFE: within the last d days.\n"
-            + "   --fp                FAILSAFE: Paranoid mode; sets --fs_backups 1 --fs_days 2\n"
+            + "   --fs_limit [b]       FAILSAFE: limit prunes to b deletes per run\n"
+            + "   --fp                FAILSAFE: Paranoid mode; sets --fs_backups 1 --fs_days 2 --fs_limit 2\n"
             + "\n" + string(BOLDBLUE) + "HARD LINKING\n" + RESET
             + "   -l, --maxlinks [x]  Max number of links to a file (default 200).\n"
             + "\n" + string(BOLDBLUE) + "GENERAL\n" + RESET
