@@ -24,10 +24,12 @@ BackupCache::BackupCache(string filename) {
     cacheFilename = filename;
 }
 
+
 BackupCache::BackupCache() {
     updated = false;
     inProcess = "";
 }
+
 
 BackupCache::~BackupCache() {
     if (updated && cacheFilename.length())
@@ -101,7 +103,7 @@ bool BackupCache::restoreCache(bool nukeFirst) {
         }
         
         cacheFile.close();
-        DEBUG(D_cache) DFMT("loaded " << count << " cache entries from " << cacheFilename);
+        DEBUG(D_cache) DFMT("loaded " << plurali(count, "cache entr") << " from " << cacheFilename);
         return true;
     }
     

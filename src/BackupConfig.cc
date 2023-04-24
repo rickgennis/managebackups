@@ -520,7 +520,7 @@ void BackupConfig::setPreviousFailures(unsigned int count) {
 size_t BackupConfig::getRecentAvgSize(int maxBackups) {
     auto cacheSize = cache.indexByFilename.size();
     auto fcacheSize = fcache.size();
-    size_t runningTotal = 0, temp = 0;
+    size_t runningTotal = 0;
     int counted = 0;
     
     if (cacheSize > fcacheSize) {
@@ -530,10 +530,9 @@ size_t BackupConfig::getRecentAvgSize(int maxBackups) {
             while (--backupIt != cache.indexByFilename.begin() && counted < maxBackups) {
                 auto rawIt = cache.rawData.find(backupIt->second);
                 if (rawIt != cache.rawData.end()) {
-                    temp += rawIt->second.size;
                     
                     // check for overflow
-                    if (temp < 0)
+                    if (runningTotal > SIZE_MAX - rawIt->second.size)
                         break;
                     
                     ++counted;
@@ -546,13 +545,10 @@ size_t BackupConfig::getRecentAvgSize(int maxBackups) {
         
         if (fcacheSize)
             while (--backupIt != fcache.getFirstBackup() && counted < maxBackups) {
-                temp += backupIt->second.ds.sizeInBytes;
                 
                 // check for overflow
-                if (temp < 0) {
-                    --counted;
+                if (runningTotal > SIZE_MAX - backupIt->second.ds.sizeInBytes)
                     break;
-                }
                 
                 ++counted;
                 runningTotal += backupIt->second.ds.sizeInBytes;
