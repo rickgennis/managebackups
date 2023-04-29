@@ -59,7 +59,7 @@ ssize_t IPC_Base::ipcRead(void *data, size_t count) {
         else {
             auto bytes = read(readFd, (char*)data + dataLen, count);
            
-            if (bytes == -1) {
+            if (bytes < 1) {
                 ++ioErrors;
                 
                 if (ioErrors > 2)
@@ -118,7 +118,7 @@ string IPC_Base::ipcReadTo(string delimiter) {
         }
 
         auto bytes = read(readFd, rawBuf, sizeof(rawBuf));
-        if (bytes == -1) {
+        if (bytes < 1) {
             ++ioErrors;
             
             if (ioErrors > 2)

@@ -197,27 +197,37 @@ void FaubEntry::updateDiffFiles(set<string> files) {
 }
 
 
-void FaubEntry::displayDiffFiles(bool fullPaths) {
+bool FaubEntry::displayDiffFiles() {
     ifstream cacheFile;
     string data;
-
+    bool headerShown = false;
+    
     cacheFile.open(cacheFilename(SUFFIX_FAUBDIFF));
     if (cacheFile.is_open()) {
         while (1) {
-            cacheFile >> data;
-             if (cacheFile.eof())
-                 break;
-
-            if (fullPaths)
-                data = slashConcat(directory, data);
+            getline(cacheFile, data);
+            
+            if (cacheFile.eof())
+                break;
+            
+            data = slashConcat(directory, data);
+            
+            // only print the header if we have valid output, in case
+            // we have to try a second approach (compareDirs()), which will
+            // print its own header
+            if (!headerShown) {
+                cout << BOLDYELLOW << "[" << BOLDBLUE << directory << BOLDYELLOW << "]\n" << RESET;
+                headerShown = true;
+            }
             
             cout << data << endl;
         }
-
+        
         cacheFile.close();
+        return true;
     }
-    else
-        cout << "no diff files found." << endl;
+
+    return false;
 }
 
 

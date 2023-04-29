@@ -148,7 +148,7 @@ void FaubCache::restoreCache(string profileName) {
  the profile and run dus() on any that we don't already have cached stats on.
  */
 void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
-    map<string, FaubEntry>::iterator prevBackup = backups.end();
+    myMapIT prevBackup = backups.end();
     unsigned int recached = 0;
 
     if (targetDir.length() && backups.find(targetDir) == backups.end())
@@ -222,13 +222,28 @@ void FaubCache::updateDiffFiles(string backupDir, set<string> files) {
 }
 
 
-map<string, FaubEntry, cmpName>::iterator FaubCache::findBackup(string backupDir) {
+myMapIT FaubCache::findBackup(string backupDir, myMapIT backupIT) {
     set<string> contenders;
+    
+    if (backupIT != backups.end()) {
+        if (backupIT != backups.begin())
+            return --backupIT;
+        
+        return backups.end();
+    }
+    else
+        if (!backupDir.length()) {
+            if (backups.rbegin() != backups.rend())
+                return (++backups.rbegin()).base();
+            
+            return backups.end();
+        }
+    
     auto backupIt = backups.find(backupDir);
 
     if (backupIt == backups.end()) {
         Pcre regex(backupDir);
-        map<string, FaubEntry, cmpName>::iterator match;
+        myMapIT match;
 
         for (auto it = backups.begin(); it != backups.end(); ++it) {
             if (regex.search(it->first)) {
@@ -239,7 +254,7 @@ map<string, FaubEntry, cmpName>::iterator FaubCache::findBackup(string backupDir
 
         if (contenders.size() == 1)
             return match;
-        else
+        else {
             if (contenders.size() > 1) {
                 cout << "error: multiple backups match -" << endl;
                 for (auto &bkup: contenders)
@@ -248,38 +263,44 @@ map<string, FaubEntry, cmpName>::iterator FaubCache::findBackup(string backupDir
             }
             else
                 cerr << "unable to find " << backupDir << " in cache." << endl;
+            exit(1);
+        }
     }
     
     return backups.end();
 }
 
 
-void FaubCache::displayDiffFiles(string backupDir, bool fullPaths) {
-    auto backup = findBackup(backupDir);
+bool FaubCache::displayDiffFiles(string backupDir) {
+    auto backup = findBackup(backupDir, backups.end());
     
     if (backup != backups.end())
-        backup->second.displayDiffFiles(fullPaths);
+        return backup->second.displayDiffFiles();
+
+    return false;
 }
 
 
-void compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
+size_t compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
     map<string, string> subDirs;
     map<string, bool> seenFiles;
     DIR *c_dir;
     struct dirent *c_dirEntry;
     struct stat statDataA;
     struct stat statDataB;
+    size_t fileChanges = 0;
+    bool filter = !GLOBALS.cli.count(CLI_COMPAREFILTER);
     
     /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
      walk directory aFile
      *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
-
+    
     if ((c_dir = opendir(dirA.c_str())) != NULL) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
             
             if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
                 continue;
-     
+            
             auto aFile = slashConcat(dirA, c_dirEntry->d_name);
             auto bFile = slashConcat(dirB, c_dirEntry->d_name);
             
@@ -300,7 +321,7 @@ void compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
                     subDirs.insert(subDirs.end(), pair<string, string>(aFile, bFile));
                 else {
                     auto sizeChange = statDataA.st_size - statDataB.st_size;
-
+                    
                     if (percent) {
                         long p = 0;
                         
@@ -311,46 +332,52 @@ void compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
                                 p = threshold;
                         
                         if (percent >= threshold)
-                            if (!GLOBALS.cli.count(CLI_COMPFOCUS) || (GLOBALS.cli.count(CLI_COMPFOCUS) && fileType != 'l' && fileType != 'd'))
+                            if (!filter || (filter && fileType != 'l' && fileType != 'd')) {
                                 cout << BOLDRED << blockp(to_string(p) + "%", 4) << " [" << fileType << "]  " << RESET << aFile << endl;
+                                ++fileChanges;
+                            }
                     }
                     else
                         if (abs(sizeChange) >= threshold)
-                            if (!GLOBALS.cli.count(CLI_COMPFOCUS) || (GLOBALS.cli.count(CLI_COMPFOCUS) && fileType != 'l' && fileType != 'd'))
+                            if (!filter || (filter && fileType != 'l' && fileType != 'd')) {
                                 cout << BOLDRED << blockp((sizeChange >= 0 ? "+" : "-") + approximate(abs(sizeChange)), 5) << RESET << " [" << fileType << "]  " << RESET << aFile << endl;
+                                ++fileChanges;
+                            }
                 }
             }
         }
         closedir(c_dir);
     }
-
+    
     
     /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
      walk directory bFile
      *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
-
+    
     if ((c_dir = opendir(dirB.c_str())) != NULL) {
         while ((c_dirEntry = readdir(c_dir)) != NULL) {
             
             if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
                 continue;
-     
+            
             auto aFile = slashConcat(dirA, c_dirEntry->d_name);
             auto bFile = slashConcat(dirB, c_dirEntry->d_name);
             
             if (seenFiles.find(aFile) != seenFiles.end())
                 continue;
-
+            
             if (mylstat(bFile, &statDataB)) {
                 SCREENERR("error: unable to stat " << bFile << " - " << strerror(errno));
                 exit(1);
             }
-
+            
             auto fileType = getFilesystemEntryType(statDataB.st_mode);
-
+            
             if (percent || statDataB.st_size >= threshold)
-                if (!GLOBALS.cli.count(CLI_COMPFOCUS) || (GLOBALS.cli.count(CLI_COMPFOCUS) && fileType != 'l' && fileType != 'd'))
+                if (!filter || (filter && fileType != 'l' && fileType != 'd')) {
                     cout << BOLDRED << blockp("+" + approximate(statDataB.st_size), 5) << RESET << " [" << fileType << "]  " << RESET << bFile << endl;
+                    ++fileChanges;
+                }
         }
         closedir(c_dir);
     }
@@ -359,9 +386,11 @@ void compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
     /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
      walk subdirs
      *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
-
+    
     for (auto &dirs: subDirs)
-        compareDirs(dirs.first, dirs.second, threshold, percent);
+        fileChanges += compareDirs(dirs.first, dirs.second, threshold, percent);
+    
+    return fileChanges;
 }
 
 
@@ -391,18 +420,16 @@ void FaubCache::compare(string backupA, string backupB, string givenThreshold) {
             }
         }
     
-    auto b1 = findBackup(backupA);
-    auto b2 = findBackup(backupB);
+    auto b1 = findBackup(backupA, backups.end());
+    auto b2 = findBackup(backupB, backupB.length() ? backups.end() : b1);
     
-    if (b1 != backups.end() && b2 != backups.end()) {
-        auto b1Base = b1->second.getDir();
-        auto b2Base = b2->second.getDir();
-        
-        cout << BOLDYELLOW << "[" << BOLDBLUE << b1Base << BOLDYELLOW << "]\n";
-        cout << BOLDYELLOW << "[" << BOLDBLUE << b2Base << BOLDYELLOW << "]" << RESET << endl;
-        
-        compareDirs(b1Base, b2Base, threshold, percent);
-    }
+    auto b1Base = b1->second.getDir();
+    auto b2Base = b2->second.getDir();
+    
+    cout << BOLDYELLOW << "[" << BOLDBLUE << b1Base << BOLDYELLOW << "]\n";
+    cout << "[" << BOLDBLUE << b2Base << BOLDYELLOW << "]" << endl;
+    auto changes = compareDirs(b1Base, b2Base, threshold, percent);
+    cout << BOLDBLUE << plural(changes, "change") << RESET << endl;
 }
 
 

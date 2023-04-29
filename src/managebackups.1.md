@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.5
+% MANAGEBACKUPS(1) managebackups 1.5.1
 % Rick Ennis
 % March 2023
 
@@ -119,26 +119,23 @@ Options are relative to the three functions of **managebackups** plus general op
 **-x**, **--lock**
 : Lock the specified profile (or all profiles if **-a** or **-A**) for the duration of this run.  All subsequent attempts to run this profile while the first one is still running will be skipped.  The profile is automatically unlocked when the first invocation finishes. Locks are respected on every run but only taken out when **-x** or **--lock** is specified.  i.e. a **-x** run will successfully lock the profile even for other invocations that fail to specify **-x**.
 
-**--force**
-: If used when executing a profile **--force** will override any existing lock and force the profile to run (backup, prune, etc). If used with **--relocate**, **--force** will make every attempt to continue a previously failed **--relocate** by handling errors.  Some assumptions are made in this context.  For example, if a backup is to be renamed A to B and A no longer exists but B already does, it's assumed to have previously succeeded and processing continues.  If a symlink needs to be created and is found to already exist, its deleted and recreated automatically.
+**-f**, **--force**
+: If used when executing a profile **--force** will override any existing lock and force the profile to run (backup, prune, etc). If used with **--relocate**, **--force** will make every attempt to continue a previously failed **--relocate** by handling errors.  Some assumptions are made in this context.  For example, if a backup is to be renamed A to B and A no longer exists but B already does, it's assumed to have previously succeeded and processing continues.  If a symlink needs to be created and is found to already exist, its deleted and recreated automatically. If used with **--diff** or **--Diff** the Full Changes form of the diff will be run instead of the Cached Changes.
 
 **--tripwire** [*string*]
 : The tripwire setting can be used as a rudimentary guard against ransomware or other encryption attacks. It can't protect your local backups but will both alert you immediately and stop processing (no pruning, linking or backing up) if the tripwire check fails.  The check is defined as a filename (or list of filenames) and their MD5 values. If any of the MD5s change, the check fails and the alert is triggered.  For example, if you're backing up /etc you can create a bogus test file such as /etc/tripdata.txt and then configure **managebackups** with **--tripwire "/etc/tripdata.txt: xxx"** where xxx is the correct MD5 of the file. Multiple entries can be separated with commas ("/etc/foo: xxx, /etc/fish: yyy, /usr/local/foo: zzz"). Only local computer tripwire files are supported at this time.
 
-**--diff** [*string*]
-: With faub-style backups, **managebackups** tracks the files that have changed between each subsequent backup. The **--diff** option, when given the directory name of a specific backup, will display the changed files between it and the previous backup. The specified backup name can be partial. Note: diff data is cached per backup relative to the previous one.  For example, if you have backups 1, 2, 3, and delete backup 2, a "--diff 3" will not be relative to backup 1.  It'll still show the diff to backup 2, as if 2 were still there.
+**--diff** [*backup*]
+: {FB} Display the differences (files that have changed) between backups.  *backup* can be a partial string that matches any unique backup within the profile.  If **--diff** is specified once, its performed on the matching backup and the chronologically previous backup.  If **--diff** is specified twice, the two given backups are diff'd.  **--force** can be used to generate the full version of the diff when **--diff** is only specified once.  Note that if a file exceeds **--maxlinks** and gets assigned a new inode (even though the file content is identical) it will also show up in a **--diff**.  See **--threshold**.  See EXAMINING BACKUPS below for full detail.
 
-**--diffl** [*string*]
-: Similar to **--diff** except display the full path (long form) of the changed files within the context of the matching backup.
+**--Diff** [*backup*]
+: {FB} Directories & symlinks can't be hardlinked, meaning they would show up on every **--diff** even if the data hasn't changed. To help focus on actual changes **--diff** filters those out.  **--Diff** provides the same functionality, but includes the directories & symlinks.  **--Diff** unfiltering only applies to Full Changes diffs (see EXAMINING BACKUPS).
 
-**--compare** [*string*]
-: {FB} Compare two backups within a profile and show the type & size change of each file.  Unlike **--diff** the comparison can be with any other backup in the profile set.  This is done by walking the backup directory structure instead of using the cache, meaning it will be slower. Files are displayed if they don't share the same inodes bewteen both backups.  Note that if a file exceeds **--maxlinks** and gets assigned a new inode (even though the file content is identical) it will also show up in a **--compare**.  Files are shown in the first backup, unless the given file only exists in the second backup. Specify **--compare** twice, once to name each backup. See **--threshold** & **--compfocus**.
+**--last**
+: {FB} Perform a diff (see **--diff**) on the most recent backup in the profile without having to specify that backup.  Can be combined with **--force** and/or **--threshold**.
 
 **--threshold** [*limit*]
-: {FB} Specify a threshold to filter **--compare** listings. *limit* is assumed to be in bytes unless a suffix is specified (K, M, G, T, P, E, Z, Y).  Alternatively *limit* can be a percentage (e.g. 25%).  If the absolute value of the difference between the size of the file in backupA and the size of the file in backupB is greater than or equal to the *limit* then the file is included in the output. A file that exists in only one of the two backups matches any percentage.  Defaults to 0 to include all changes. 
-
-**--compfocus**
-: {FB} Hardlink aren't an option for directories or symlinks, meaning directories and symlinks will show up on a **--compare** even if the data hasn't changed.  **--compfocus** omits directories and symlinks to increase the focus on files that actually changed.  See **--compare**.
+: {FB} Specify a threshold to filter **--diff** or **--Diff** listings. *limit* is assumed to be in bytes unless a suffix is specified (K, M, G, T, P, E, Z, Y).  Alternatively *limit* can be a percentage (e.g. 25%).  If the absolute value of the difference between the size of the file in backupA and the size of the file in backupB is greater than or equal to the *limit* then the file is included in the output. A file that exists in only one of the two backups matches any percentage.  Defaults to 0 to include all changes. 
 
 **--relocate** [*newDir*]
 : Relocating backups for a profile entails updating the internal caches, updating the profile's configuration and moving all the backups' files in a hardlink-aware way. The **--relocate** option handles all three of these. Use it in conjunction with **-p**.
@@ -309,7 +306,16 @@ Without the authorized_keys2 file you would need the options in your faub config
 Complications with configuration of faub, particularly if ssh is involved, are much easier to debug given the output of the various subcommands.  See **--leaveoutput**.
 
 # EXAMINING BACKUPS
-**managebackups** implements several functions to inspect the difference between individual Faub-style backups within a profile.  The **--diff** and **--diffl** options provide a fast interface to list all the files that have changed between a given backup and the chronologically previous one.  The **--compare** option provides a slower interface that can be used between any two backups in the profile set and includes more details about what's different (size change & file type).
+**managebackups** provides two methods to inspect the difference between individual Faub-style backups within a profile.  
+
+## Type: Cached Changes
+Cached changes are saved when a backup is taken. They provide minimal detail (only the filename), are instantaneous to retrieve, and relative to the chronologically previous backup at the time it was taken.  That means if the previous backup is deleted the cached output --which doesn't change-- will be showing the diffs to a now non-existent backup, *not* to what now appears to be the previous backup.  Cached changes only list files that were added or modified, not deleted.
+
+## Type: Full Changes
+Full changes provide all detail: files that were added, modified or deleted, how much the size of the file changed up or down and whether it's a link, directory or regular file.  Because **managebackups** has to walk the filesystem to determine the differences, this approach is slower.  A full changes diff can be requested of any two backups within the profile, unlike cached changes, which will always compare to the immediately previous one.
+
+## General
+The **--diff** [*backup*] command, if only specified once, will default to Cached Changes and show the changes between the specified *backup* and the immediately previous one (at the time it was taken).  Use **--force** to generate the Full Changes diff instead.  When **--diff** [*backup*] is specified twice (i.e. which two backups to compare), it always does a Full Changes diff.  Note: Because symlinks and directories can't be hardlinked they always show up as changes and are automatically filtered out of the **--diff** output.  To include them use **--Diff** instead.  **--threshold** can be used to further filter the output to only show files that have changed by a certain size or more.  **--last** can be used as a shortcut to run **--diff** on the most recent backup without having to specify the backup itself.
 
 # PERMISSIONS
 Aside from access to read the files being backed up (on a remote server or locally) **managebackups** requires local write access for multiple tasks:
@@ -413,7 +419,7 @@ Example output from **managebackups -1 -p faub** (faub-style backup example)
 : Show a one-line summary for each backup profile. The summary includes detail on the most recent backup as well as the number of backups, age ranges and total disk space.
 
 ## Interrogate Backups
-**managebackups -0 -p laptop**
+**managebackups -1 -p laptop**
 
     April 2023                                                   Size  Used  Dirs  SymLks  Mods  Duration  Type  Age
     /Users/rennis/backups/2023/04/14/laptop-2023-04-14@17:20:09  3.2G  962K    1K      26     6  00:00:54  Day   6 days, 23 hours
@@ -424,12 +430,17 @@ Example output from **managebackups -1 -p faub** (faub-style backup example)
 
 **managebackups -p laptop --diff 21@16:55**
 
+    [/Users/rennis/backups/2023/04/21/laptop-2023-04-21@16:55:33]
     /Users/rennis/managebackups/.git/refs/heads/master
     /Users/rennis/managebackups/bin/managebackups
     /Users/rennis/managebackups/obj/BackupCache.o
     /usr/local/bin/managebackups
 
-**managebackups -p laptop --compare 17:2 --compare 55:53** 
+**managebackups -p laptop --last**
+
+    (identical output to above as this is a synonym for diffing the most recent backup to its immediate predecessor)
+
+**managebackups -p laptop --diff 17:2 --diff 55:53** 
 
     [/Users/rennis/backups/2023/04/14/laptop-2023-04-14@17:20:09]
     [/Users/rennis/backups/2023/04/21/laptop-2023-04-21@16:55:33]

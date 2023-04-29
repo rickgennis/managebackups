@@ -95,7 +95,7 @@ void showHelp(enum helpType kind) {
             + "   -v[options]         Verbose debugging output. See 'man managebackups' for details\n"
             + "   --defaults          Display the default settings for all profiles\n"
             + "   -x, --lock          Lock the current profile for the duration of the run so only one copy can run at a time\n"
-            + "   --force             Override any existing lock and force the backup to start\n"
+            + "   -f, --force         Override any existing locks, recovery from relocate and Full Changes diffs\n"
             + "   --tripwire [string] Define tripwire files of the form 'filename: md5, filename: md5'\n"
             + "\n" + string(BOLDBLUE) + "SCHEDULING (via cron on Linux and launchctl on MacOS)\n" + RESET
             + "   --sched [h]         Schedule managebackups to run every h hours\n"

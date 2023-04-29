@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.5"
+#define VERSION "1.5.1"
 
 #include "cxxopts.hpp"
 #include "colors.h"
@@ -117,8 +117,6 @@
 #define CLI_USEBLOCKS "blocks"
 #define CLI_UID "uid"
 #define CLI_GID "gid"
-#define CLI_DIFF "diff"
-#define CLI_DIFFL "diffl"
 #define CLI_FORCE "force"
 #define CLI_SCHED "sched"
 #define CLI_SCHEDHOUR "schedhour"
@@ -128,9 +126,10 @@
 #define CLI_RECALC "recalc"
 #define CLI_BLOAT "bloat"
 #define CLI_RELOCATE "relocate"
-#define CLI_COMPARE "compare"
+#define CLI_LAST "last"
+#define CLI_COMPARE "diff"
+#define CLI_COMPAREFILTER "Diff"
 #define CLI_THRESHOLD "threshold"
-#define CLI_COMPFOCUS "compfocus"
 #define CLI_UUID "uuid"      /* not really a valid CLI option just used as a setting */
 
 

@@ -53,7 +53,7 @@ public:
     void saveInodes();
     
     void updateDiffFiles(set<string> files);
-    void displayDiffFiles(bool fullPaths = false);
+    bool displayDiffFiles();
     
     void renameDirectoryTo(string newDir, string baseDir);
     void removeEntry();

@@ -10,6 +10,7 @@
 
 using namespace std;
 
+
 /* cmpName is to allow a full path filename (/var/backups/2023/01/mybackup-20230105.tgz)
  to be sorted based on the filename and not the directory.  this is helpful if the same
  profile is run with and without the --time option, resulting in some files being in
@@ -27,6 +28,9 @@ struct cmpName {
 };
 
 
+typedef map<string, FaubEntry, cmpName>::iterator myMapIT;
+
+
 class FaubCache {
 private:
     string baseDir;
@@ -35,7 +39,7 @@ private:
     string inProcessFilename;
     
     void restoreCache_internal(string backupDir);
-    map<string, FaubEntry, cmpName>::iterator findBackup(string backupDir);
+    myMapIT findBackup(string backupDir, myMapIT backupIT);
     
 public:
     void restoreCache(string profileName);
@@ -44,17 +48,17 @@ public:
     long size() { return backups.size(); }
     
     unsigned long getNumberOfBackups() { return backups.size(); }
-    map<string, FaubEntry>::iterator getBackupByDir(string dir) { return backups.find(dir); }
-    map<string, FaubEntry>::iterator getFirstBackup() { return (backups.begin()); }
-    map<string, FaubEntry>::iterator getLastBackup() { return (backups.size() ? --backups.end() : backups.end()); }
-    map<string, FaubEntry>::iterator getEnd() { return backups.end(); }
+    myMapIT getBackupByDir(string dir) { return backups.find(dir); }
+    myMapIT getFirstBackup() { return (backups.begin()); }
+    myMapIT getLastBackup() { return (backups.size() ? --backups.end() : backups.end()); }
+    myMapIT getEnd() { return backups.end(); }
     void removeBackup(map<string, FaubEntry>::iterator which) {
         which->second.removeEntry();
         backups.erase(which);
     }
     
     void updateDiffFiles(string backupDir, set<string> files);
-    void displayDiffFiles(string backupDir, bool fullPaths = false);
+    bool displayDiffFiles(string backupDir);
     void compare(string backupA, string backupB, string threshold);
     
     void cleanup();
