@@ -186,10 +186,10 @@ Given a backup command (tar, etc) \f[B]managebackups\f[R] will execute
 the command, saving the output to a file named with the current date
 (and optionally time).
 By default the resulting filename will be of the form
-\f[I]directory\f[R]/YYYY/MM/\f[I]filename\f[R]-YYYYMMDD.\f[I]ext\f[R].
+\f[I]directory\f[R]/YYYY/MM/\f[I]filename\f[R]-YYYY-MM-DD.\f[I]ext\f[R].
 When time is included the day of month is also added to the directory
 structure
-(\f[I]directory\f[R]/YYYY/MM/DD/\f[I]filename\f[R]-YYYYMMDD-HH::MM:SS.\f[I]ext\f[R]).
+(\f[I]directory\f[R]/YYYY/MM/DD/\f[I]filename\f[R]-YYYY-MM-DD-HH::MM:SS.\f[I]ext\f[R]).
 Note: Without time included (\f[B]\[en]time\f[R]) multiple backups on
 the same day taken with the same settings will overwrite each other
 resulting in a single backup for the day.
@@ -205,10 +205,25 @@ In effect, you only use disk space for changes but get the advantage of
 fully traversable directory trees, which allows interrogation via any
 standard commandline tool.
 Each backup creates a new directory of the form
-\f[I]directory\f[R]/YYYY/MM/\f[I]profile\f[R]-YYYYMMDD.
+\f[I]directory\f[R]/YYYY/MM/\f[I]profile\f[R]-YYYY-MM-DD.
 With the \f[B]\[en]time\f[R] option \[at]HH:MM:SS gets appended as well.
-Note: Faub-style backups require that \f[B]managebackups\f[R] is also
-installed on the remote server that\[cq]s being backed up.
+As an example, determining when /etc/passwd was changed with faub
+backups can be as simple as using ls:
+.IP
+.nf
+\f[C]
+    laptop:\[ti]% ls -l /var/backups/*/*/*/firewall*/etc/passwd
+    -rw-r--r--  56 root  wheel  2206 Dec 29 21:14 /var/backups/2023/03/01/firewall_main-2023-03-01\[at]00:15:17/etc/passwd
+    -rw-r--r--  56 root  wheel  2206 Dec 29 21:14 /var/backups/2023/03/01/firewall_main-2023-03-01\[at]19:48:03/etc/passwd
+    -rw-r--r--  56 root  wheel  2206 Dec 29 21:14 /var/backups/2023/03/01/firewall_main-2023-03-01\[at]21:14:36/etc/passwd
+    -rw-r--r--  56 root  wheel  2206 Dec 29 21:14 /var/backups/2023/04/01/firewall_main-2023-04-01\[at]17:48:19/etc/passwd
+    -rw-r--r--  56 root  wheel  2206 Dec 29 21:14 /var/backups/2023/04/02/firewall_main-2023-04-02\[at]00:15:05/etc/passwd
+    -rw-r--r--  56 root  wheel  2206 Dec 29 21:14 /var/backups/2023/04/02/firewall_main-2023-04-02\[at]04:20:11/etc/passwd
+    -rw-r--r--   3 root  wheel  2245 Apr 02 07:02 /var/backups/2023/04/02/firewall_main-2023-04-02\[at]08:15:13/etc/passwd
+    -rw-r--r--   3 root  wheel  2245 Apr 02 07:02 /var/backups/2023/04/02/firewall_main-2023-04-02\[at]15:07:56/etc/passwd
+    -rw-r--r--   3 root  wheel  2245 Apr 02 07:02 /var/backups/2023/04/02/firewall_main-2023-04-02\[at]21:10:22/etc/passwd
+\f[R]
+.fi
 .SS 2. Prune Backups
 .PP
 \f[B]managebackups\f[R] deletes old backups that have aged out.
@@ -1136,12 +1151,12 @@ number of backups, age ranges and total disk space.
 .IP
 .nf
 \f[C]
-April 2023                                                   Size  Used  Dirs  SymLks  Mods  Duration  Type  Age
-/Users/rennis/backups/2023/04/14/laptop-2023-04-14\[at]17:20:09  3.2G  962K    1K      26     6  00:00:54  Day   6 days, 23 hours
-/Users/rennis/backups/2023/04/14/laptop-2023-04-14\[at]17:57:12  3.2G  1.7M    1K      26    26  00:00:03  Day   6 days, 23 hours
-/Users/rennis/backups/2023/04/21/laptop-2023-04-21\[at]16:13:26  3.2G  4.8M    1K      26    31  00:00:03  Day   46 minutes, 44 seconds
-/Users/rennis/backups/2023/04/21/laptop-2023-04-21\[at]16:51:32  3.2G  4.5M    1K      26    29  00:00:13  Day   8 minutes, 28 seconds
-/Users/rennis/backups/2023/04/21/laptop-2023-04-21\[at]16:55:33  3.2G  622K    1K      26     1  00:00:28  Day   4 minutes, 7 seconds
+April 2023                                          Size  Used  Dirs  SymLks  Mods  Duration  Type  Age
+/var/backups/2023/04/14/laptop-2023-04-14\[at]17:20:09  3.2G  962K    1K      26     6  00:00:54  Day   6 days, 23 hours
+/var/backups/2023/04/14/laptop-2023-04-14\[at]17:57:12  3.2G  1.7M    1K      26    26  00:00:03  Day   6 days, 23 hours
+/var/backups/2023/04/21/laptop-2023-04-21\[at]16:13:26  3.2G  4.8M    1K      26    31  00:00:03  Day   46 minutes, 44 seconds
+/var/backups/2023/04/21/laptop-2023-04-21\[at]16:51:32  3.2G  4.5M    1K      26    29  00:00:13  Day   8 minutes, 28 seconds
+/var/backups/2023/04/21/laptop-2023-04-21\[at]16:55:33  3.2G  622K    1K      26     1  00:00:28  Day   4 minutes, 7 seconds
 \f[R]
 .fi
 .PP
@@ -1149,10 +1164,10 @@ April 2023                                                   Size  Used  Dirs  S
 .IP
 .nf
 \f[C]
-[/Users/rennis/backups/2023/04/21/laptop-2023-04-21\[at]16:55:33]
-/Users/rennis/managebackups/.git/refs/heads/master
-/Users/rennis/managebackups/bin/managebackups
-/Users/rennis/managebackups/obj/BackupCache.o
+[/var/backups/2023/04/21/laptop-2023-04-21\[at]16:55:33]
+/var/managebackups/.git/refs/heads/master
+/var/managebackups/bin/managebackups
+/var/managebackups/obj/BackupCache.o
 /usr/local/bin/managebackups
 \f[R]
 .fi
@@ -1169,12 +1184,12 @@ April 2023                                                   Size  Used  Dirs  S
 .IP
 .nf
 \f[C]
-[/Users/rennis/backups/2023/04/14/laptop-2023-04-14\[at]17:20:09]
-[/Users/rennis/backups/2023/04/21/laptop-2023-04-21\[at]16:55:33]
-+192 [-]  /Users/rennis/backups/2023/04/14/laptop-2023-04-14\[at]17:57:12/Users/rennis/managebackups/src/statistics.cc
-+118 [-]  /Users/rennis/backups/2023/04/14/laptop-2023-04-14\[at]17:57:12/Users/rennis/managebackups/src/ipc.cc
-+213 [-]  /Users/rennis/backups/2023/04/14/laptop-2023-04-14\[at]17:57:12/Users/rennis/managebackups/src/BackupCache.cc
-+16K [-]  /Users/rennis/backups/2023/04/14/laptop-2023-04-14\[at]17:57:12/usr/local/bin/managebackups
+[/var/backups/2023/04/14/laptop-2023-04-14\[at]17:20:09]
+[/var/backups/2023/04/21/laptop-2023-04-21\[at]16:55:33]
++192 [-]  /var/backups/2023/04/14/laptop-2023-04-14\[at]17:57:12/var/managebackups/src/statistics.cc
++118 [-]  /var/backups/2023/04/14/laptop-2023-04-14\[at]17:57:12/var/managebackups/src/ipc.cc
++213 [-]  /var/backups/2023/04/14/laptop-2023-04-14\[at]17:57:12/var/managebackups/src/BackupCache.cc
++16K [-]  /var/backups/2023/04/14/laptop-2023-04-14\[at]17:57:12/usr/local/bin/managebackups
 \f[R]
 .fi
 .SH DEPENDENCIES

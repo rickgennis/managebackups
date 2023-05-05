@@ -40,6 +40,13 @@ bool configMgrCallback(pdCallbackData &file) {
         vector<BackupConfig> *configs = (vector<BackupConfig>*)file.dataPtr;
         BackupConfig backupConfig;
         backupConfig.loadConfig(file.filename);
+        
+        for (auto &config: *configs)
+            if (config.settings[sTitle].value == backupConfig.settings[sTitle].value) {
+                SCREENERR("error: duplicate profile name (" << config.settings[sTitle].value << ") defined in " << file.filename << " and " << config.config_filename);
+                exit(1);
+            }
+            
         configs->emplace(configs->begin(), backupConfig);
     }
     

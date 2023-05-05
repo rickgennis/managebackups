@@ -254,6 +254,10 @@ bool BackupConfig::loadConfig(string filename) {
         try {
             while (getline(configFile, dataLine)) {
                 ++line;
+                
+                // skip blanks and comments
+                if (reBlank.search(dataLine))
+                    continue;
 
                 // compare the line against each of the config settings until there's a match
                 bool identified = false;
@@ -314,7 +318,7 @@ bool BackupConfig::loadConfig(string filename) {
                     }
                 }
 
-                if (!identified && !reBlank.search(dataLine)) {
+                if (!identified) {
                     cout << "error: unrecognized setting on line " << line << " of " << filename << endl;
                     cout << "    " << dataLine << endl; 
                     log("error: unrecognized setting on line " + to_string(line) + " of " + filename);

@@ -2143,7 +2143,7 @@ int main(int argc, char *argv[]) {
                     scanConfigToCache(*currentConfig);
                     
                     if (GLOBALS.cli.count(CLI_LAST)) {
-                        if (!GLOBALS.cli.count(CLI_FORCE)) {
+                        if (!GLOBALS.cli.count(CLI_FORCE) && !GLOBALS.cli.count(CLI_THRESHOLD)) {
                             if (!currentConfig->fcache.displayDiffFiles(""))
                                 currentConfig->fcache.compare("", "", GLOBALS.cli.count(CLI_THRESHOLD) ? GLOBALS.cli[CLI_THRESHOLD].as<string>() : "");
                         }
@@ -2164,7 +2164,7 @@ int main(int argc, char *argv[]) {
                         }
                         
                         if (compareArgs == 1) {
-                            if (!GLOBALS.cli.count(CLI_FORCE)) {
+                            if (!GLOBALS.cli.count(CLI_FORCE) && !GLOBALS.cli.count(CLI_THRESHOLD)) {
                                 
                                 // single file given, look for cached version of diff
                                 // if that fails, fall back to a compare

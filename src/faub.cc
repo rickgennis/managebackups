@@ -520,7 +520,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     }
     catch (MBException &e) {
         notify(config, "\t• " + config.ifTitle() + " Error (exception): " + e.detail(), false);
-        log(config.ifTitle() + "  error (exception): " + e.what());
+        log(config.ifTitle() + "  error (exception): " + e.detail());
     }
     catch (...) {
         notify(config, "\t• " + config.ifTitle() + " Error (exception): unknown", false);
