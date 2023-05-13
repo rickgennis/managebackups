@@ -13,16 +13,18 @@
 #include "FaubCache.h"
 
 
-FaubCache::FaubCache(string path, string profileName) {
+FaubCache::FaubCache(string path, string profileName, string aUuid) {
     baseDir = path;
+    uuid = aUuid;
     
     if (path.length())
         restoreCache(profileName);
 }
 
 
-void FaubCache::restoreCache(string path, string profileName) {
+void FaubCache::restoreCache(string path, string profileName, string aUuid) {
     baseDir = path;
+    uuid = aUuid;
     
     if (path.length())
         restoreCache(profileName);
@@ -31,7 +33,7 @@ void FaubCache::restoreCache(string path, string profileName) {
 
 void FaubCache::restoreCache_internal(string backupDir) {
     Pcre regEx(DATE_REGEX);
-    FaubEntry entry(backupDir, coreProfile);
+    FaubEntry entry(backupDir, coreProfile, uuid);
     auto success = entry.loadStats();
     DEBUG(D_faub|D_cache) DFMT("loading cache for " << backupDir << (success ? ": success" : ": failed"));
     
@@ -150,6 +152,7 @@ void FaubCache::restoreCache(string profileName) {
 void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
     myMapIT prevBackup = backups.end();
     unsigned int recached = 0;
+    auto [message, noMessage] = clearMessage("updating cache for " + targetDir + "... ");
 
     if (targetDir.length() && backups.find(targetDir) == backups.end())
         restoreCache_internal(targetDir);
@@ -171,6 +174,9 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             if (gotPrev)
                 prevBackup->second.loadInodes();
 
+            if (!recached)
+                NOTQUIET && ANIMATE && cout << message << flush;
+            
             ++recached;
             set<ino_t> emptySet;
             auto ds = dus(aBackup->first, gotPrev ? prevBackup->second.inodes : emptySet, aBackup->second.inodes);
@@ -180,9 +186,13 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             aBackup->second.saveStats();
             aBackup->second.saveInodes();
             
-            if (forceAll && NOTQUIET)
-                cout << BOLDBLUE << aBackup->first << "  " << RESET << "size: " << approximate(ds.getSize() + ds.getSaved()) << ", used: " << approximate(ds.getSize()) << endl;
+            if (forceAll && NOTQUIET) {
+                if (ANIMATE)
+                    cout << noMessage;
                 
+                cout << BOLDBLUE << aBackup->first << "  " << RESET << "size: " << approximate(ds.getSize() + ds.getSaved()) << ", used: " << approximate(ds.getSize()) << endl;
+            }
+            
             // the inode list can be long and suck memory.  so let's not let multiple cache entries
             // all keep their inode lists populated at the same time.
             if (gotPrev)
@@ -196,7 +206,10 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
         prevBackup = aBackup;
     }
     
-    if (forceAll)
+    if (recached)
+        NOTQUIET && ANIMATE && !forceAll && cout << noMessage << flush;
+    
+    if (forceAll && NOTQUIET)
         cout << "caches updated for " << plural(recached, "backup") << "." << endl;
     
     DEBUG(D_faub) DFMT("complete");
@@ -494,13 +507,13 @@ bool fcCleanupCallback(pdCallbackData &file) {
  that no longer exist (have been removed).  When one is found, we delete the
  cache files. But we also look for the next backup matching the same dir +
  profile name as the deleted one and recalculate (dus) its disk usage because
- that will have changed.  If multiple backups sequential backups are found
+ that will have changed.  If multiple sequential backups are found
  missing from the same dir + profile we re-dus the next one that's found.
  */
 void FaubCache::cleanup() {
     FaubCache *fc = this;
     
-    processDirectory(GLOBALS.cacheDir, SUFFIX_FAUBSTATS, false, fcCleanupCallback, fc);
+    processDirectory(slashConcat(GLOBALS.cacheDir, uuid), string(SUFFIX_FAUBSTATS) + "$", false, fcCleanupCallback, fc);
 }
 
 

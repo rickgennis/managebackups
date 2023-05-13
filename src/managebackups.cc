@@ -238,18 +238,13 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache) 
  * Wrapper function for parseDirToCache().
  *******************************************************************************/
 void scanConfigToCache(BackupConfig &config) {
-    auto [message, noMessage] = clearMessage("updating cache for " + config.settings[sDirectory].value + "... ");
-    NOTQUIET && ANIMATE && cout << message << flush;
-    
     if (config.isFaub()) {
-        config.fcache.restoreCache(config.settings[sDirectory].value, config.settings[sTitle].value);
+        config.fcache.restoreCache(config.settings[sDirectory].value, config.settings[sTitle].value, config.settings[sUUID].value);
         
         // clean up old cache files and recalculate any missing disk usage
         // this primarily catches recalculations that are necessary because
         // the user manually deleted a backup unbeknown to us.
         config.fcache.cleanup();
-        
-        NOTQUIET && ANIMATE && cout << noMessage << flush;
         return;
     }
     
@@ -272,14 +267,12 @@ void scanConfigToCache(BackupConfig &config) {
     
     if (!exists(directory)) {
         if (mkdirp(directory)) {
-            NOTQUIET && ANIMATE && cout << noMessage << flush;
             SCREENERR("error: unable to create directory " << directory << errtext());
             exit(1);
         }
     }
     
     parseDirToCache(directory, fnamePattern, config.cache);
-    NOTQUIET && ANIMATE && cout << noMessage << flush;
 }
 
 /*******************************************************************************
@@ -315,7 +308,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager) {
                     exit(1);
                 }
         
-        if (currentConf->settings[sTitle].value != GLOBALS.cli[CLI_PROFILE].as<string>() && bSave) {
+        if (currentConf->settings[sTitle].value.length() && currentConf->settings[sTitle].value != GLOBALS.cli[CLI_PROFILE].as<string>() && bSave) {
             SCREENERR("error: the specified partial profile name matches an existing profile (" << currentConf->settings[sTitle].value
                       << ");\nprovide a unique name for a new profile or the exact name to update " << currentConf->settings[sTitle].value);
             exit(1);
@@ -1663,7 +1656,7 @@ bool moveBackup(string fullBackupOldPath, string oldBaseDir, string newBaseDir, 
                     SCREENERR("error: unable to rename " << fullBackupOldPath << " to " << fullBackupNewPath << errtext());
                     if (count)
                         SCREENERR("\nSome backups were successfully renamed. Correct the permission issue and rerun\n" <<
-                                  "the --relocate to maintain a consistent state.");
+                                  "the --relocate to maintain a consistent state.  Use --force if necessary.");
                     exit(1);
                 }
             }
@@ -1814,7 +1807,7 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
     if (config.isFaub())
         config.fcache.renameBaseDirTo(newBaseDir);
     else {
-        config.cache.setCacheFilename(GLOBALS.cacheDir + "/" + MD5string(config.settings[sDirectory].value + config.settings[sBackupFilename].value));
+        config.cache.setUUID(config.settings[sUUID].value);
         config.cache.saveCache(oldBaseDir, newBaseDir);
         config.cache.restoreCache(true);
     }
@@ -2178,7 +2171,7 @@ int main(int argc, char *argv[]) {
                             if (compareArgs == 2)
                                 currentConfig->fcache.compare(v[0], v[1], GLOBALS.cli.count(CLI_THRESHOLD) ? GLOBALS.cli[CLI_THRESHOLD].as<string>() : "");
                             else
-                                SCREENERR("error: don't know how to " << CLI_COMPARE << " more than two backups");
+                                SCREENERR("error: don't know how to --" << CLI_COMPARE << " more than two backups");
                     }
                     
                     exit(0);
@@ -2194,7 +2187,7 @@ int main(int argc, char *argv[]) {
             }
         }
         else {
-            SCREENERR("error: --" << CLI_COMPARE << " is only valid with a profile (use -p)");
+            SCREENERR("error: --" << CLI_COMPARE << " and --" << CLI_LAST << " are only valid with a profile (use -p)");
             exit(1);
         }
     }
@@ -2488,6 +2481,8 @@ int main(int argc, char *argv[]) {
                             performBackup(*currentConfig);
                         }
                     }
+                    
+                    configManager.housekeeping();
                 }
             }
         }

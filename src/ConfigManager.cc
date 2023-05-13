@@ -41,11 +41,11 @@ bool configMgrCallback(pdCallbackData &file) {
         BackupConfig backupConfig;
         backupConfig.loadConfig(file.filename);
         
-        for (auto &config: *configs)
-            if (config.settings[sTitle].value == backupConfig.settings[sTitle].value) {
-                SCREENERR("error: duplicate profile name (" << config.settings[sTitle].value << ") defined in " << file.filename << " and " << config.config_filename);
-                exit(1);
-            }
+        auto foundConfig = find(configs->begin(), configs->end(), backupConfig);
+        if (foundConfig != configs->end()) {
+            SCREENERR("error: duplicate profile name (" << foundConfig->settings[sTitle].value << ") defined in " << file.filename << " and " << foundConfig->config_filename);
+            exit(1);
+        }
             
         configs->emplace(configs->begin(), backupConfig);
     }
@@ -73,3 +73,21 @@ void ConfigManager::loadAllConfigCaches() {
 }
 
 
+bool housekeepingCallback(pdCallbackData &file) {
+    vector<BackupConfig> *configs = (vector<BackupConfig>*)file.dataPtr;
+
+    for (auto &config: *configs) {
+        if (config.settings[sUUID].value == pathSplit(file.filename).file)
+            return true;
+    }
+    
+    rmrf(file.filename);
+    
+    return true;
+}
+
+// scan cache sub-dirs and remove any that are no longer associated
+// with an active profile;  i.e. clean up the cache uuid sub-dirs
+void ConfigManager::housekeeping() {
+    processDirectory(GLOBALS.cacheDir, "/\\w{32}$", false, housekeepingCallback, &configs, 1);
+}

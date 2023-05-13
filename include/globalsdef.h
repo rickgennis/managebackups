@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.5.1"
+#define VERSION "1.5.2"
 
 #include "cxxopts.hpp"
 #include "colors.h"

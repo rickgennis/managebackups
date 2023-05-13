@@ -137,24 +137,20 @@ string log(string message) {
 struct timeval mktimeval(time_t secs) { struct timeval t; t.tv_sec = secs; t.tv_usec = 0; return t; }
 
 
-string slashConcat(string str1, string str2) {
+string slashConcat(string str1, string str2, string str3) {
     if (str1.length() && str1[str1.length() - 1] == '/')
         str1.pop_back();
 
     if (str2.length() && str2[0] == '/')
         str2.erase(0, 1);
 
-    return(str1 + "/" + str2);
-}
-
-
-string slashConcat(string str1, string str2, string str3) {
-    return slashConcat(slashConcat(str1, str2), str3);
+    return (str3.length() ? slashConcat(str1 + "/" + str2, str3) : str1 + "/" + str2);
 }
 
 
 s_pathSplit pathSplit(string path) {
     s_pathSplit s;
+    s.dir = s.file = s.file_ext = s.file_base = "";
     
     if (path.length() > 1) {
         auto pos = path.rfind("/");
@@ -172,24 +168,32 @@ s_pathSplit pathSplit(string path) {
             else
                 s.dir = ".";
         }
+        
+        pos = s.file.rfind(".");
+        
+        if (pos == string::npos)
+            s.file_base = s.file;
+        else {
+            s.file_base = s.file.substr(0, pos);
+            
+            if (pos < s.file.length() - pos)
+                s.file_ext = s.file.substr(pos + 1);
+        }
     }
     else {
         if (path.length()) {
-            if (path[0] == '/') {
+            if (path[0] == '/')
                 s.dir = "/";
-                s.file = "";
-            }
             else {
                 s.dir = ".";
                 s.file = path;
+                
+                if (path[0] != '.')
+                    s.file_base = path;
             }
         }
-        else {
-            s.dir = "";
-            s.file = "";
-        }
     }
-
+    
     return s;
 }
 

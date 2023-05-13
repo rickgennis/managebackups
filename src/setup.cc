@@ -88,8 +88,10 @@ void install(string myBinary, bool suid) {
 
     if (gid) {
         struct stat statBuf;
-        string destbin = "/usr/local/bin/managebackups";
+        string destbindir = "/usr/local/bin/";
+        string destbin = destbindir + "managebackups";
         string cp = locateBinary("cp");
+        string ln = locateBinary("ln");
         mode_t setgidmode = S_ISGID | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
         mode_t setuidmode = S_ISUID | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 
@@ -150,6 +152,12 @@ void install(string myBinary, bool suid) {
         if (cp.length()) {
             system(string(cp + " " + myBinary + " " + destbin).c_str());
             cout << "installed " << destbin << "\n";
+        
+            if (ln.length()) {
+                system(string(ln + " " + destbindir + "managebackups " + destbindir + "mb").c_str());
+                cout << "mb symlink created\n";
+            }
+            
         }
 
         if (suid) {

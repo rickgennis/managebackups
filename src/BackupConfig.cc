@@ -17,14 +17,17 @@ extern void cleanupAndExitOnError();
 using namespace pcrepp;
 
 bool operator<(const BackupConfig& b1, const BackupConfig& b2) {
-    return(b1.settings[sTitle].value < b2.settings[sTitle].value);
+    return (b1.settings[sTitle].value < b2.settings[sTitle].value);
 }
 
 
 bool operator>(const BackupConfig& b1, const BackupConfig& b2) {
-    return(b1.settings[sTitle].value > b2.settings[sTitle].value);
+    return (b1.settings[sTitle].value > b2.settings[sTitle].value);
 }
 
+bool operator==(const BackupConfig& b1, const BackupConfig& b2) {
+    return (b1.settings[sTitle].value == b2.settings[sTitle].value);
+}
 
 BackupConfig::BackupConfig(bool makeTemp) {
     modified = 0;
@@ -360,7 +363,7 @@ bool BackupConfig::loadConfig(string filename) {
 
 void BackupConfig::loadConfigsCache() {
     if (settings[sDirectory].value.length() && settings[sBackupFilename].value.length()) {
-        cache.setCacheFilename(GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value));
+        cache.setUUID(settings[sUUID].value);
 
         if (!cache.restoreCache())
             mkdirp(GLOBALS.cacheDir);
@@ -481,7 +484,7 @@ string BackupConfig::setLockPID(unsigned int pid) {
 
 
 unsigned int BackupConfig::getPreviousFailures() {
-    string stateFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".state";
+    string stateFilename = slashConcat(GLOBALS.cacheDir, settings[sUUID].value, settings[sUUID].value) + ".state";
     unsigned int count = 0;
 
     ifstream stateFile;
@@ -499,7 +502,7 @@ unsigned int BackupConfig::getPreviousFailures() {
 
 
 void BackupConfig::setPreviousFailures(unsigned int count) {
-    string stateFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value) + ".state";
+    string stateFilename = slashConcat(GLOBALS.cacheDir, settings[sUUID].value, settings[sUUID].value) + ".state";
     mkdirp(GLOBALS.cacheDir);
 
     ofstream stateFile;

@@ -18,14 +18,16 @@ using namespace std;
 
 
 class ConfigManager {
-    public:
-        int activeConfig;
-        vector<BackupConfig> configs;
-        int findConfig(string title);
-        void fullDump();
-        void loadAllConfigCaches();
-
-        ConfigManager();
+public:
+    int activeConfig;
+    vector<BackupConfig> configs;
+    int findConfig(string title);
+    void fullDump();
+    void loadAllConfigCaches();
+    
+    void housekeeping();
+    
+    ConfigManager();
 };
 
 #endif

@@ -20,6 +20,7 @@ private:
     // 'directory' in FaubEntry is full.  i.e. /var/backup/2023/01/mybackup-202301@10:15:23
     string directory;
     string profile;
+    string uuid;
     
 public:
     bool updated;
@@ -37,7 +38,7 @@ public:
     unsigned long duration;
     int dow;
     
-    string cacheFilename(string suffix) { return (GLOBALS.cacheDir + "/" + MD5string(directory) + "." + suffix); }
+    string cacheFilename(string suffix) { return (slashConcat(GLOBALS.cacheDir, uuid, MD5string(directory)) + "." + suffix); }
     string getDir() { return directory; }
     
     int filenameDayAge();
@@ -57,11 +58,9 @@ public:
     
     void renameDirectoryTo(string newDir, string baseDir);
     void removeEntry();
-    
-    //string getDirNProfile() { return directory + ";;" + profile; }
-    
+        
     FaubEntry& operator=(const DiskStats& stats);
-    FaubEntry(string dir, string aProfile);
+    FaubEntry(string dir, string aProfile, string aUuid);
     ~FaubEntry();
 };
 

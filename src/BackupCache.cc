@@ -19,12 +19,6 @@ extern void cleanupAndExitOnError();
 
 using namespace std;
 
-BackupCache::BackupCache(string filename) {
-    BackupCache();
-    cacheFilename = filename;
-}
-
-
 BackupCache::BackupCache() {
     updated = false;
     inProcess = "";
@@ -32,7 +26,7 @@ BackupCache::BackupCache() {
 
 
 BackupCache::~BackupCache() {
-    if (updated && cacheFilename.length())
+    if (updated)
         saveCache();
 }
 
@@ -45,11 +39,14 @@ void BackupCache::updateAges(time_t refTime) {
 
 void BackupCache::saveCache(string oldBaseDir, string newBaseDir) {
     ofstream cacheFile;
+    string cFname = cacheFilename();
     
-    if (!rawData.size() || !cacheFilename.length())
+    if (!rawData.size())
         return;
     
-    cacheFile.open(cacheFilename);
+    mkdirp(pathSplit(cFname).dir);
+    
+    cacheFile.open(cFname);
     if (cacheFile.is_open()) {
         unsigned int count = 0;
         
@@ -59,22 +56,22 @@ void BackupCache::saveCache(string oldBaseDir, string newBaseDir) {
             // files need to be able to fall out of the cache if they disappear from the filesystem.
             // "current" means the file was seen in the most recent filesystem scan.
             if (raw.second.current) {
-                DEBUG(D_cache) DFMT(cacheFilename << ": writing cache entry " << raw.second.class2string());
+                DEBUG(D_cache) DFMT(cFname << ": writing cache entry " << raw.second.class2string());
                 cacheFile << raw.second.class2string(oldBaseDir, newBaseDir) << endl;
                 ++count;
             }
         }
         
         cacheFile.close();
-        DEBUG(D_cache) DFMT("cache saved to " << cacheFilename << " (" << count << " entries)");
+        DEBUG(D_cache) DFMT("cache saved to " << cFname << " (" << count << " entries)");
     }
     else {
-        log("unable to save cache to " + cacheFilename);
+        log("unable to save cache to " + cFname);
         
         if (!GLOBALS.saveErrorSeen) {
             GLOBALS.saveErrorSeen = true;
             
-            SCREENERR("warning: unable to save cache to disk (" << cacheFilename << "\n" <<
+            SCREENERR("warning: unable to save cache to disk (" << cFname << "\n" <<
                       "isn't writable); MD5s will continue to be recalculated until corrected.");
         }
     }
@@ -83,8 +80,9 @@ void BackupCache::saveCache(string oldBaseDir, string newBaseDir) {
 
 bool BackupCache::restoreCache(bool nukeFirst) {
     ifstream cacheFile;
+    string cFname = cacheFilename();
 
-    cacheFile.open(cacheFilename);
+    cacheFile.open(cFname);
     if (cacheFile.is_open()) {
         
         if (nukeFirst) {
@@ -103,7 +101,7 @@ bool BackupCache::restoreCache(bool nukeFirst) {
         }
         
         cacheFile.close();
-        DEBUG(D_cache) DFMT("loaded " << plurali(count, "cache entr") << " from " << cacheFilename);
+        DEBUG(D_cache) DFMT("loaded " << plurali(count, "cache entr") << " from " << cFname);
         return true;
     }
     
@@ -392,5 +390,5 @@ bool bcCleanupCallback(pdCallbackData &file) {
 // cleanup old cache files that may refer to no longer existing backups
 // cleanup works across all 1F cache files, regardless of profile or directory
 void BackupCache::cleanup() {
-    processDirectory(GLOBALS.cacheDir, ".1f$", false, bcCleanupCallback, this);
+    processDirectory(slashConcat(GLOBALS.cacheDir, uuid), ".1f$", false, bcCleanupCallback, this);
 }

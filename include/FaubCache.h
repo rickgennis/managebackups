@@ -33,6 +33,7 @@ typedef map<string, FaubEntry, cmpName>::iterator myMapIT;
 
 class FaubCache {
 private:
+    string uuid;
     string baseDir;
     string coreProfile;
     map<string, FaubEntry, cmpName> backups;
@@ -43,7 +44,7 @@ private:
     
 public:
     void restoreCache(string profileName);
-    void restoreCache(string path, string profileName);
+    void restoreCache(string path, string profileName, string aUuid);
     DiskStats getTotalStats();
     long size() { return backups.size(); }
     
@@ -67,7 +68,7 @@ public:
     void renameBaseDirTo(string newDir);
     string getBaseDir() { return baseDir; }
     
-    FaubCache(string path, string profileName);
+    FaubCache(string path, string profileName, string uuid);
     FaubCache() {}
     ~FaubCache() {}
     

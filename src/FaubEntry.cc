@@ -20,8 +20,9 @@ FaubEntry& FaubEntry::operator=(const DiskStats& stats) {
 }
 
 
-FaubEntry::FaubEntry(string dir, string aProfile) {
+FaubEntry::FaubEntry(string dir, string aProfile, string aUuid) {
     directory = dir;
+    uuid = aUuid;
     ds.sizeInBytes = ds.sizeInBlocks = ds.savedInBytes = ds.savedInBlocks = finishTime = duration = modifiedFiles = unchangedFiles = dirs = slinks = 0;
     startDay = startMonth = startYear = mtimeDayAge = dow = 0;
     profile = aProfile;
@@ -94,6 +95,8 @@ void FaubEntry::saveStats() {
     ofstream cacheFile;
     string filename = cacheFilename(SUFFIX_FAUBSTATS);
     
+    mkdirp(pathSplit(filename).dir);
+    
     cacheFile.open(filename);
     if (cacheFile.is_open()) {
         string data = stats2string();
@@ -114,8 +117,11 @@ void FaubEntry::saveStats() {
 void FaubEntry::saveInodes() {
     ofstream cacheFile;
     string inodeData;
+    string filename = cacheFilename(SUFFIX_FAUBINODES);
 
-    cacheFile.open(cacheFilename(SUFFIX_FAUBINODES));
+    mkdirp(pathSplit(filename).dir);
+
+    cacheFile.open(filename);
     if (cacheFile.is_open()) {
         int x = 0;
         for (auto &i: inodes) {
