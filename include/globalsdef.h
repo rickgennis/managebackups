@@ -2,11 +2,13 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.5.2"
+#define VERSION "1.5.2b"
 
 #include "cxxopts.hpp"
 #include "colors.h"
 #include "debug.h"
+
+#include <unistd.h>
 #include <set>
 
 /*

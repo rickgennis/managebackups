@@ -152,7 +152,8 @@ void FaubCache::restoreCache(string profileName) {
 void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
     myMapIT prevBackup = backups.end();
     unsigned int recached = 0;
-    auto [message, noMessage] = clearMessage("updating cache for " + targetDir + "... ");
+    bool nextOneToo = false;
+    auto [message, noMessage] = clearMessage("recalculating disk usage... ");
 
     if (targetDir.length() && backups.find(targetDir) == backups.end())
         restoreCache_internal(targetDir);
@@ -168,7 +169,12 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             
              // if we have no cached data for this backup or its the next sequential backup
              // after the time of a deleted one
-            (!targetDir.length() && ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))) {
+            (!targetDir.length() && ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch)) ||
+            
+            // in the case of walking through all the backups and doing just the ones that are missing stats
+            // (the immediately above condition of this "if") then we also have to re-do the next backup too
+            // because a change in that one could effect the next one
+            nextOneToo) {
             
             bool gotPrev = prevBackup != backups.end();
             if (gotPrev)
@@ -183,9 +189,12 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             DEBUG(D_any) DFMT("dus(" << aBackup->first << ") returned " << ds.sizeInBytes + ds.savedInBytes << " size bytes, " << ds.sizeInBytes << " used bytes");
             aBackup->second.ds = ds;
             aBackup->second.updated = true;
+            aBackup->second.dirs = ds.dirs;
+            aBackup->second.slinks = ds.symLinks;
+            aBackup->second.modifiedFiles = ds.mods;
             aBackup->second.saveStats();
             aBackup->second.saveInodes();
-            
+                        
             if (forceAll && NOTQUIET) {
                 if (ANIMATE)
                     cout << noMessage;
@@ -201,6 +210,17 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             // when we're recaching a single backup no need to loop through the rest of them
             if (targetDir.length() || deletedMatch)
                 break;
+            
+            // the above "break" knocks out targeted backups and redoing the one right after a delete.
+            // what remains are that we're doing all of them (forceAll) or walking through all of them
+            // and just doing the ones that are missing stats.  if it's the latter and we're just updating
+            // missing stats, we need to do one more after each missing stats one.
+            if (!forceAll) {
+                if (!nextOneToo)
+                    nextOneToo = true;
+                else
+                    nextOneToo = false;
+            }
         }
 
         prevBackup = aBackup;
@@ -449,7 +469,6 @@ void FaubCache::compare(string backupA, string backupB, string givenThreshold) {
 bool fcCleanupCallback(pdCallbackData &file) {
     ifstream cacheFile;
     string backupDir, fullId, profileName;
-    string cacheFilename;
     FaubCache *fc = (FaubCache*)file.dataPtr;
     
     cacheFile.open(file.filename);
@@ -485,11 +504,11 @@ bool fcCleanupCallback(pdCallbackData &file) {
                 if (profileName == fc->coreProfile && bdir == fc->baseDir) {
                     log(backupDir + " has vanished, updating cache");
                     DEBUG(D_any) DFMT(backupDir << " no longer exists; will recalculate usage of subsequent backup");
-                    unlink(cacheFilename.c_str());
-                    cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBSTATS), string(SUFFIX_FAUBSTATS).length(), SUFFIX_FAUBINODES);
-                    unlink(cacheFilename.c_str());
-                    cacheFilename.replace(cacheFilename.find(SUFFIX_FAUBINODES), string(SUFFIX_FAUBINODES).length(), SUFFIX_FAUBDIFF);
-                    unlink(cacheFilename.c_str());
+                    unlink(file.filename.c_str());
+                    file.filename.replace(file.filename.find(SUFFIX_FAUBSTATS), string(SUFFIX_FAUBSTATS).length(), SUFFIX_FAUBINODES);
+                    unlink(file.filename.c_str());
+                    file.filename.replace(file.filename.find(SUFFIX_FAUBINODES), string(SUFFIX_FAUBINODES).length(), SUFFIX_FAUBDIFF);
+                    unlink(file.filename.c_str());
   
                     // re-dus the next backup
                     fc->recache("", targetMtime);

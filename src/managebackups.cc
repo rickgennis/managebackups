@@ -1056,8 +1056,7 @@ methodStatus sCpBackup(BackupConfig &config, string backupFilename, string subDi
  * SFTP the backup to the specified destination.
  *******************************************************************************/
 methodStatus sFtpBackup(BackupConfig &config, string backupFilename, string subDir,
-                        string sFtpParams)
-{
+                        string sFtpParams) {
     string sFtpBinary = locateBinary("sftp");
     bool makeDirs = sFtpParams.find("//") == string::npos;
     strReplaceAll(sFtpParams, "//", "/");

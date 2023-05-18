@@ -21,12 +21,21 @@ struct DiskStats {
     size_t sizeInBlocks;
     size_t savedInBytes;
     size_t savedInBlocks;
-
-    DiskStats(size_t szBy = 0, size_t szBk = 0, size_t svBy = 0, size_t svBk = 0) {
+    
+    // these three are just temp storage
+    size_t dirs;
+    size_t symLinks;
+    size_t mods;
+    
+    DiskStats(size_t szBy = 0, size_t szBk = 0, size_t svBy = 0, size_t svBk = 0, size_t sDirs = 0, size_t sSymLinks = 0, size_t sMods = 0) {
         sizeInBytes = szBy;
         sizeInBlocks = szBk;
         savedInBytes = svBy;
         savedInBlocks = svBk;
+        
+        dirs = sDirs;
+        symLinks = sSymLinks;
+        mods = sMods;
     }
 
     DiskStats& operator+=(const DiskStats& a) {
@@ -34,6 +43,9 @@ struct DiskStats {
         sizeInBlocks += a.sizeInBlocks;
         savedInBytes += a.savedInBytes;
         savedInBlocks += a.savedInBlocks;
+        dirs += a.dirs;
+        symLinks += a.symLinks;
+        
         return *this;
     }
 

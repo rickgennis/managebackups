@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.5.2
+% MANAGEBACKUPS(1) managebackups 1.5.2b
 % Rick Ennis
 % March 2023
 
@@ -202,7 +202,7 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 : {both} For script notifications, in addition to the initial failure, notify every *count* failures as well.  See the NOTIFICATIONS section.
 
 **--nice** [*nice*]
-: {both} Specify a nice value for the backup to run as.  Defaults to 10.  Use 0 for normal priority.
+: {both} Specify a nice value for the backup to run as.  Defaults to 0. See "man nice".
 
 **--nos**
 : {both} Notify on successful backups also.

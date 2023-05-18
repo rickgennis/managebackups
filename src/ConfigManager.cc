@@ -81,6 +81,7 @@ bool housekeepingCallback(pdCallbackData &file) {
             return true;
     }
     
+    DEBUG(D_cache) DFMT("removing orphaned cache file " << file.filename);
     rmrf(file.filename);
     
     return true;

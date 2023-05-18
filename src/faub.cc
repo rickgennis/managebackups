@@ -133,7 +133,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
      2. Server compares each full path name and mtime to the previous backup of this
         filesystem (if any) and makes a new list of the ones that have changed.  Those changes
         are sent back to the client as requests.
-     3. Client send the full detail (uid, gid, mode, mtime, size and the full content of the file)
+     3. Client sends the full detail (uid, gid, mode, mtime, size and the full content of the file)
         for each requested item, which the server writes to disk as newly backed up entries.
      4. Server finishes administrative tasks:
             - hard links all files that haven't changed from the previous backup to the current backup
@@ -521,12 +521,15 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     catch (MBException &e) {
         notify(config, "\t• " + config.ifTitle() + " Error (exception): " + e.detail(), false);
         log(config.ifTitle() + "  error (exception): " + e.detail());
+        rmrf(currentDir);
     }
     catch (...) {
         notify(config, "\t• " + config.ifTitle() + " Error (exception): unknown", false);
         log(config.ifTitle() + "  error (exception), unknown");
+        rmrf(currentDir);
     }
 }
+
 
 struct scanToServerDataType {
     size_t totalEntries;

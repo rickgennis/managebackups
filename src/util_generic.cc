@@ -942,10 +942,17 @@ bool dsCallback(pdCallbackData &file) {
         else {
             data->ds->sizeInBytes += file.statData.st_size;
             data->ds->sizeInBlocks += 512 * file.statData.st_blocks;
+            ++data->ds->mods;
         }
         
         data->newI->insert(file.statData.st_ino);
     }
+    else
+        if (S_ISDIR(file.statData.st_mode))
+            ++data->ds->dirs;
+        else
+            if (S_ISLNK(file.statData.st_mode))
+                ++data->ds->symLinks;
 
     return true;
 }
