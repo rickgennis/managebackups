@@ -20,6 +20,7 @@ using namespace std;
 class ConfigManager {
 public:
     int activeConfig;
+    string defaultConfig;
     vector<BackupConfig> configs;
     int findConfig(string title);
     void fullDump();

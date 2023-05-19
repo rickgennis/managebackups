@@ -37,17 +37,27 @@ int ConfigManager::findConfig(string title) {
 
 bool configMgrCallback(pdCallbackData &file) {
     if (!S_ISDIR(file.statData.st_mode)) {
-        vector<BackupConfig> *configs = (vector<BackupConfig>*)file.dataPtr;
+        ConfigManager *configManager = (ConfigManager*)file.dataPtr;
         BackupConfig backupConfig;
         backupConfig.loadConfig(file.filename);
         
-        auto foundConfig = find(configs->begin(), configs->end(), backupConfig);
-        if (foundConfig != configs->end()) {
+        auto foundConfig = find(configManager->configs.begin(), configManager->configs.end(), backupConfig);
+        
+        if (foundConfig != configManager->configs.end()) {
             SCREENERR("error: duplicate profile name (" << foundConfig->settings[sTitle].value << ") defined in " << file.filename << " and " << foundConfig->config_filename);
             exit(1);
         }
+        
+        if (str2bool(backupConfig.settings[sDefault].value)){
+            if (configManager->defaultConfig.length()) {
+                SCREENERR("error: only one profile can be set as the default");
+                exit(1);
+            }
             
-        configs->emplace(configs->begin(), backupConfig);
+            configManager->defaultConfig = backupConfig.settings[sTitle].value;
+        }
+   
+        configManager->configs.emplace(configManager->configs.begin(), backupConfig);
     }
     
     return true;
@@ -55,9 +65,13 @@ bool configMgrCallback(pdCallbackData &file) {
 
     
 ConfigManager::ConfigManager() {
-    processDirectory(ue(GLOBALS.confDir), "\\.conf$", false, configMgrCallback, &configs);
     activeConfig = -1;
+    defaultConfig = "";
+    processDirectory(ue(GLOBALS.confDir), "\\.conf$", false, configMgrCallback, this);
     sort(configs.begin(), configs.end());
+    
+    if (configs.size() == 1)
+        defaultConfig = configs[0].settings[sTitle].value;
 }
 
 

@@ -71,6 +71,8 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_BLOAT, RE_BLOAT, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_UUID, RE_UUID, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_FS_SLOW, RE_FSSLOW, INT, "0"));
+    settings.insert(settings.end(), Setting(CLI_DEFAULT, RE_DEFAULT, BOOL, "false"));
+
     // CLI_PATHS is intentionally left out because its only accessed via CLI
     // and never as a Setting.  to implement it as a Setting would require a new
     // type (vector<string>) to be setup and parse and there's really no benefit.
@@ -149,7 +151,7 @@ void BackupConfig::saveConfig() {
                         
                         if (setting.regex.search(dataLine) && setting.regex.matches() > 2) {
                             usersDelimiter = setting.regex.get_match(1);
-                            
+                                                        
                             // don't write fs_days, fs_backups or fs_slow if fp is set
                             if (!bFailsafeParanoid || (bFailsafeParanoid && (setting.display_name != CLI_FS_DAYS && setting.display_name != CLI_FS_BACKUPS && setting.display_name != CLI_FS_SLOW))) {
                                 newFile << setting.regex.get_match(0) << setting.regex.get_match(1) <<
@@ -200,7 +202,7 @@ void BackupConfig::saveConfig() {
                 else
                     // if fp is set then don't add fs_days or fs_backups
                     if (!str2bool(settings[sFP].value) || (setting.display_name != CLI_FS_DAYS && setting.display_name != CLI_FS_BACKUPS))
-                        newFile << setting.display_name << usersDelimiter << setting.value << endl;
+                        newFile << setting.display_name << usersDelimiter << (setting.data_type == BOOL ? (str2bool(setting.value) ? "true" : "false") : setting.value) << endl;
             }
     }
     else {

@@ -1279,7 +1279,7 @@ string processDirectory(string directory, string pattern, bool exclude, bool (*c
     }
     else {
         string err = "error: stat failed for " + directory + errtext();
-        SCREENERR(log(err));
+        // SCREENERR(log(err));
         return err;
     }
 

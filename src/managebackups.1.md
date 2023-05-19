@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.5.2b
+% MANAGEBACKUPS(1) managebackups 1.6.0
 % Rick Ennis
 % March 2023
 
@@ -77,6 +77,12 @@ Options are relative to the three functions of **managebackups** plus general op
 
 **-p**, **--profile** [*profile*]
 : Use *profile* for the current run.  
+
+**--default**
+: Tag the current profile as the default one; only useful with **--save**. Not to be confused with **--defaults**. See DEFAULT PROFILE below.
+
+**-g**, **--go**
+: Run (backup, prune, link) the default profile. Or can be combined with limiting options like **--nobackup**, **--noprune**. Normally running a profile is achieved by specifying the **--profile** name and **-g** is not required.  **-g** is simply a shortcut for the default profile, if defined.
 
 **--save**
 : Save the currently specified settings (everything on the command line) with the specified profile name.
@@ -351,6 +357,20 @@ Environment variables are overriden by **--user**, **--confdir**, **--cachedir**
 
 **MB_LOGDIR**
 : Directory to use for logging. See also **--logdir**. Defaults to /var/log if writable by the process, otherwise the user's home directory. 
+
+# DEFAULT PROFILE
+On a system with multiple profiles where one is used most of the time that profile can be made the default.  A default profile is automatically selected, without the need to specify it via **-p** for the following options:
+
+        --diff
+        --Diff
+        --last
+        --recalc
+        --relocate
+        --go
+
+Even with a default specified **-p** can always be used to override.
+
+When only one profile is defined it is automatically the default.
 
 # STATS OUTPUT
 Example output from **managebackups -0**

@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.5.2b"
+#define VERSION "1.6.0"
 
 #include "cxxopts.hpp"
 #include "colors.h"
@@ -86,6 +86,7 @@
 #define CLI_TEST "test"
 #define CLI_QUIET "quiet"
 #define CLI_DEFAULTS "defaults"
+#define CLI_DEFAULT "default"
 #define CLI_TIME "time"
 #define CLI_NOBACKUP "nobackup"
 #define CLI_MINSIZE "minsize"
@@ -132,6 +133,7 @@
 #define CLI_COMPARE "diff"
 #define CLI_COMPAREFILTER "Diff"
 #define CLI_THRESHOLD "threshold"
+#define CLI_GO "go"
 #define CLI_UUID "uuid"      /* not really a valid CLI option just used as a setting */
 
 
@@ -175,6 +177,7 @@
 #define RE_CONSOLIDATE "(consolidate)"
 #define RE_BLOAT "(bloat)"
 #define RE_UUID "(uuid|id)"
+#define RE_DEFAULT "(default)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"

@@ -100,6 +100,12 @@ struct methodStatus {
     }
 };
 
+
+bool haveProfile(ConfigManager *cmP = NULL) {
+    return (cmP != NULL && cmP->activeConfig > -1 ? !cmP->configs[cmP->activeConfig].temp : GLOBALS.cli.count(CLI_PROFILE));
+}
+
+
 /*******************************************************************************
  * verifyTripwireParams(param)
  *
@@ -275,6 +281,22 @@ void scanConfigToCache(BackupConfig &config) {
     parseDirToCache(directory, fnamePattern, config.cache);
 }
 
+
+void saveErrorAndExit() {
+    SCREENERR(
+              "error: --profile must be specified in order to --save settings.\n"
+              << "Once saved --profile becomes a macro for all settings specified with the "
+              "--save.\n"
+              << "For example, these two commands would do the same things:\n\n"
+              << "\tmanagebackups --profile myback --directory /etc --file etc.tgz --daily 5 "
+              "--save\n"
+              << "\tmanagebackups --profile myback\n\n"
+              << "Options specified with a profile that's aleady been saved will override that\n"
+              << "option for this run only (unless --save is given again).");
+    exit(1);
+}
+
+
 /*******************************************************************************
  * selectOrSetupConfig(configManager)
  *
@@ -282,7 +304,7 @@ void scanConfigToCache(BackupConfig &config) {
  * profile was selected created a temp one that will be used, but not persisted
  * to disk. Validate required commandline options.
  *******************************************************************************/
-BackupConfig *selectOrSetupConfig(ConfigManager &configManager) {
+BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaultProfile = false) {
     string profile;
     BackupConfig tempConfig(true);
     BackupConfig *currentConf = &tempConfig;
@@ -316,26 +338,26 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager) {
         
         currentConf->loadConfigsCache();
     }
-    else {
-        if (bSave) {
-            SCREENERR(
-                      "error: --profile must be specified in order to --save settings.\n"
-                      << "Once saved --profile becomes a macro for all settings specified with the "
-                      "--save.\n"
-                      << "For example, these two commands would do the same things:\n\n"
-                      << "\tmanagebackups --profile myback --directory /etc --file etc.tgz --daily 5 "
-                      "--save\n"
-                      << "\tmanagebackups --profile myback\n\n"
-                      << "Options specified with a profile that's aleady been saved will override that\n"
-                      << "option for this run only (unless --save is given again).");
-            exit(1);
+    else
+        if (allowDefaultProfile) {
+            if (bSave)
+                saveErrorAndExit();
+            
+            if (configManager.defaultConfig.length()) {
+                configManager.activeConfig = configManager.findConfig(configManager.defaultConfig) - 1;
+                currentConf = &configManager.configs[configManager.activeConfig];
+                
+            }
         }
-        
-        if (GLOBALS.stats || GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_CRONS))
-            configManager.loadAllConfigCaches();
-        else
-            currentConf->loadConfigsCache();
-    }
+        else {
+            if (bSave)
+                saveErrorAndExit();
+            
+            if (GLOBALS.stats || GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_CRONS))
+                configManager.loadAllConfigCaches();
+            else
+                currentConf->loadConfigsCache();
+        }
     
     // if any other settings are given on the command line, incorporate them into the selected
     // config. that config will be the one found from --profile above (if any), or a temp config
@@ -464,8 +486,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager) {
     
     if (currentConf == &tempConfig) {
         if (bProfile && bSave) {
-            tempConfig.config_filename =
-            slashConcat(GLOBALS.confDir, safeFilename(tempConfig.settings[sTitle].value)) + ".conf";
+            tempConfig.config_filename = slashConcat(GLOBALS.confDir, safeFilename(tempConfig.settings[sTitle].value)) + ".conf";
             tempConfig.temp = false;
         }
         
@@ -1923,6 +1944,7 @@ int main(int argc, char *argv[]) {
         string("b,") + CLI_USEBLOCKS, "Use blocks disk usage", cxxopts::value<bool>()->default_value("false"))(
         string("s,") + CLI_PATHS, "Faub paths", cxxopts::value<std::vector<std::string>>())(
         string("f,") + CLI_FORCE, "Force various things", cxxopts::value<bool>()->default_value("false"))(
+        string("g,") + CLI_GO, "Begin processing default profile", cxxopts::value<bool>()->default_value("false"))(
         CLI_FILE, "Filename", cxxopts::value<std::string>())(
         CLI_LAST, "Last diff", cxxopts::value<bool>()->default_value("false"))(
         CLI_FAUB, "Faub backup", cxxopts::value<std::string>())(
@@ -1942,6 +1964,7 @@ int main(int argc, char *argv[]) {
         CLI_PRUNE, "Enable pruning", cxxopts::value<bool>()->default_value("false"))(
         CLI_NOPRUNE, "Disable pruning", cxxopts::value<bool>()->default_value("false"))(
         CLI_DEFAULTS, "Show defaults", cxxopts::value<bool>()->default_value("false"))(
+        CLI_DEFAULT, "Set as default", cxxopts::value<bool>()->default_value("false"))(
         CLI_TIME, "Include time", cxxopts::value<bool>()->default_value("false"))(
         CLI_NOBACKUP, "Don't backup", cxxopts::value<bool>()->default_value("false"))(
         CLI_NOCOLOR, "Disable color", cxxopts::value<bool>()->default_value("false"))(
@@ -1977,7 +2000,6 @@ int main(int argc, char *argv[]) {
         options.allow_unrecognised_options();  // to support -v...
         GLOBALS.cli = options.parse(argc, argv);
         GLOBALS.color = !(GLOBALS.cli[CLI_QUIET].as<bool>() || GLOBALS.cli[CLI_NOCOLOR].as<bool>());
-        GLOBALS.stats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2);
         GLOBALS.useBlocks = GLOBALS.cli.count(CLI_USEBLOCKS);
         
         if (GLOBALS.cli.count(CLI_USER))
@@ -2021,16 +2043,20 @@ int main(int argc, char *argv[]) {
                       << "\nUse --help for a list of options.");
             exit(1);
         }
+        
+        GLOBALS.stats = GLOBALS.cli.count(CLI_STATS1) || GLOBALS.cli.count(CLI_STATS2) || argc == 1 || (argc == 2 && GLOBALS.debugSelector);
     }
     catch (cxxopts::OptionParseException &e) {
         cerr << "managebackups: " << e.what() << endl;
         exit(1);
     }
     
+    /*
     if (argc == 1) {
         showHelp(hSyntax);
         exit(0);
     }
+    */
     
     if (GLOBALS.cli.count(CLI_DEFAULTS)) {
         showHelp(hDefaults);
@@ -2109,13 +2135,13 @@ int main(int argc, char *argv[]) {
     
     DEBUG(D_any) DFMT("about to setup config...");
     ConfigManager configManager;
-    auto currentConfig = selectOrSetupConfig(configManager);
+    auto currentConfig = selectOrSetupConfig(configManager, GLOBALS.cli.count(CLI_GO) || GLOBALS.cli.count(CLI_COMPARE) || GLOBALS.cli.count(CLI_COMPAREFILTER)|| GLOBALS.cli.count(CLI_LAST) || GLOBALS.cli.count(CLI_RECALC) || GLOBALS.cli.count(CLI_RELOCATE));
     
     if (currentConfig->modified)
         currentConfig->saveConfig();
     
     if (GLOBALS.cli.count(CLI_RELOCATE)) {
-        if (GLOBALS.cli.count(CLI_PROFILE)) {
+        if (haveProfile(&configManager)) {
             scanConfigToCache(*currentConfig);
             relocateBackups(*currentConfig, GLOBALS.cli[CLI_RELOCATE].as<string>());
         }
@@ -2127,10 +2153,14 @@ int main(int argc, char *argv[]) {
     auto compareArgs = GLOBALS.cli.count(CLI_COMPARE) + GLOBALS.cli.count(CLI_COMPAREFILTER);
     if (compareArgs || GLOBALS.cli.count(CLI_LAST)) {
         
-        if (GLOBALS.cli.count(CLI_PROFILE)) {
+        if (haveProfile(&configManager)) {
             
             if (!(compareArgs && GLOBALS.cli.count(CLI_LAST))) {
-                
+                if (GLOBALS.cli.count(CLI_GO)) {
+                    SCREENERR("error: --" << CLI_GO << " is mutually-exclusive with --" << CLI_COMPARE << ", --" << CLI_COMPAREFILTER << ", and --" << CLI_LAST);
+                    exit(1);
+                }
+                    
                 if (currentConfig->isFaub()) {
                     scanConfigToCache(*currentConfig);
                     
@@ -2197,7 +2227,7 @@ int main(int argc, char *argv[]) {
     }
     
     if (GLOBALS.cli.count(CLI_RECALC)) {
-        if (!GLOBALS.cli.count(CLI_PROFILE)) {
+        if (!haveProfile(&configManager)) {
             SCREENERR("--recalc requires a profile (use -p)");
             exit(2);
         }
