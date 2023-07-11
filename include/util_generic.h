@@ -161,7 +161,7 @@ string MD5string(string data);
 
 string onevarsprintf(string format, string data);
 
-string approximate(size_t size, int maxUnits = -1, bool commas = false);
+string approximate(size_t size, int maxUnits = -1, bool commas = false, bool base10 = false);
 
 string seconds2hms(time_t seconds);
 

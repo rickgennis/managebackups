@@ -327,7 +327,7 @@ void scheduleLaunchCtl(string& appPath) {
             command.replace(command.find("UID"), 3, to_string(uid));
             if (!system(string(command + devnull).c_str())) {
 
-                cout << "successfully created property file (" << plistFn << ")\n";
+                cout << "successfully created property file (" << plistFn << ").\n";
                 cout << "successfully scheduled to run ";
                 if (offset == 0 || offset == 24)
                     cout << "daily." << endl;

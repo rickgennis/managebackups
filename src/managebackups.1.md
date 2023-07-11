@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.6.0
+% MANAGEBACKUPS(1) managebackups 1.6.1a
 % Rick Ennis
 % March 2023
 
@@ -43,46 +43,23 @@ In configurations using a single file backup where all backups are fulls, and th
 Backup profiles are a collection of settings describing a backup set -- its directory to save backups to, the command to take the backups, how many weekly copies to keep, etc.  Once a profile is associated with a collection of options, all of those options are invoked when the profile is specified, unless an overriding option is also given.
 
 # OPTIONS
-Options are relative to the three functions of **managebackups** plus general options.
+Options are categorized by the three functions of **managebackups** plus general options.
 
 ## 0. General Options
 **--help**
 : Displays help text.
 
-**-v**[*options*]
-: Provide verbose debugging output. Brilliant (albeit overkill in this situation) debugging logic borrowed from Philip Hazel's Exim Mail Transport Agent. **-v** by itself enables the default list of debugging contexts.  Contexts can be added or subtracted by name. For example, **-v+cache** provides the default set plus caching whereas **-v-all+cache** provides only caching. **-v+all** gives everything (**--vv**, two dashes, two v's, is a synonym for all). Longer combinations can be strung together as well (**-v-all+cache+prune+scan**). Note spaces are not supported in the -v string. Valid contexts are:
-
-        * backup (default)
-        * cache
-        * config
-        * exec
-        * faub
-        * link (default)
-        * netproto
-        * notify
-        * prune (default)
-        * scan (default)
-        * transfer
-        * tripwire
-
-
 **--install**
-: **managebackups** needs write access under /var to store caches of MD5s and under /etc/managebackups to update configs from commandline parameters. It can run entirely as root. But to facilitate a safer setup, it can be configured to run setgid as group "daemon" and the required directories configured to allow writes from that group. **--install** installs the **managebackups** binary in /usr/local/bin (setgid), creates the config and cache directories (writable by "daemon") and installs the man page in /usr/local/share/man/man1. It's designed for a one-time execution as **sudo managebackups --install** after which root access is no longer required. Alternatively, all files (config, cache, log) can be written under the calling user's home directory via the **--user** option.  But for that setup **--user** must be specified on every invocation.  See **--user** for more detail.
+: Install the **managebackups** binary (SGID daemon) to /usr/local/bin and create the man page. This supports single-file backups.  For use as "sudo managebackups --install". See PERMISSIONS below.
 
 **--installsuid**
-: Install **managebackups** in /usr/local/bin as SUID root. With this configuration Faub-style backups can set appropriate owners/groups from the remote systems being backed up while still allowing single-file backups to be saved as the executing user (via --uid and --gid parameters). Config & cache directories and the man page are also created.
+: Install the **managebackups** binary (SUID root) to /usr/local/bin and create the man page.  This supports both single-file and Faub-style backups.  For use as "sudo managebackups --installsuid". See PERMISSIONS below.
 
 **--installman**
 : Only install the man page to /usr/local/share/man/man1.
 
 **-p**, **--profile** [*profile*]
 : Use *profile* for the current run.  
-
-**--default**
-: Tag the current profile as the default one; only useful with **--save**. Not to be confused with **--defaults**. See DEFAULT PROFILE below.
-
-**-g**, **--go**
-: Run (backup, prune, link) the default profile. Or can be combined with limiting options like **--nobackup**, **--noprune**. Normally running a profile is achieved by specifying the **--profile** name and **-g** is not required.  **-g** is simply a shortcut for the default profile, if defined.
 
 **--save**
 : Save the currently specified settings (everything on the command line) with the specified profile name.
@@ -102,6 +79,9 @@ Options are relative to the three functions of **managebackups** plus general op
 **-K**, **--Cron**
 : Parallel cron execution.  Equivalent to "-A -x -q".
 
+**-g**, **--go**
+: Run (backup, prune, link) the default profile. Or can be combined with limiting options like **--nobackup**, **--noprune**. Normally running a profile is achieved by specifying the **--profile** name and **-g** is not required.  **-g** is simply a shortcut for the default profile, if defined.
+
 **-0**
 : Provide a summary of backups. **-0** can be specified up to 5 times for different formatting of sizes. It can also be combined with -p to limit output to a single profile.
 
@@ -110,6 +90,9 @@ Options are relative to the three functions of **managebackups** plus general op
 
 **--test**
 : Run in test mode. No changes are actually made to disk (no backups, pruning or linking).
+
+**--default**
+: Tag the current profile as the default one; only useful with **--save**. Not to be confused with **--defaults**. See DEFAULT PROFILE below.
 
 **--defaults**
 : Display the default settings for all profiles.
@@ -173,6 +156,22 @@ Options are relative to the three functions of **managebackups** plus general op
 
 **--recalc**
 : Recalcuate all disk usage for a profile. Use with -p.  This should never be necessary.
+
+**-v**[*options*]
+: Provide verbose debugging output. Brilliant (albeit overkill in this situation) debugging logic borrowed from Philip Hazel's Exim Mail Transport Agent. **-v** by itself enables the default list of debugging contexts.  Contexts can be added or subtracted by name. For example, **-v+cache** provides the default set plus caching whereas **-v-all+cache** provides only caching. **-v+all** gives everything (**--vv**, two dashes, two v's, is a synonym for all). Longer combinations can be strung together as well (**-v-all+cache+prune+scan**). Note spaces are not supported in the -v string. Valid contexts are:
+
+        * backup (default)
+        * cache
+        * config
+        * exec
+        * faub
+        * link (default)
+        * netproto
+        * notify
+        * prune (default)
+        * scan (default)
+        * transfer
+        * tripwire
 
 ## 1. Take Backups Options
 Backups options are noted as {1F} for single-file applicable, {FB} for faub-backup applicable, or {both}.
@@ -265,6 +264,9 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 
 **--consolidate** [*days*]
 : Prune backups down to a single backups per day once they're *days* days old. If you take multiple backups of the same profile in the same day (with **--time**), this allows you to keep only a single one after they age to *days* days but haven't reached the full retention policy to be completely deleted.
+
+**--dataonly**
+: {FB} Only retain backups with changed data. Backups with no changes (identical copies of the previous backup) are removed immediately.
 
 **--fs_days** [*days*]
 : Failsafe - Require *backups* backups (see **--fs_backups**) within the last *days* days before pruning will begin.  See FAILSAFE below.

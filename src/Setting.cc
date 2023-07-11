@@ -37,7 +37,8 @@ map<string, int>settingMap =
     { CLI_BLOAT, sBloat },
     { CLI_UUID, sUUID },
     { CLI_FS_SLOW, sFailsafeSlow },
-    { CLI_DEFAULT, sDefault }
+    { CLI_DEFAULT, sDefault },
+    { CLI_DATAONLY, sDataOnly }
 };
 // CLI_PATHS is excluded because it's only accessed as a commandline option
 // and never as a Setting. And because its a vector<> that's one less special-

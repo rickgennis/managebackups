@@ -185,21 +185,25 @@ void FaubEntry::removeEntry() {
 
 void FaubEntry::updateDiffFiles(set<string> files) {
     ofstream cacheFile;
-
-    if (files.size()) {
-        cacheFile.open(cacheFilename(SUFFIX_FAUBDIFF));
-        if (cacheFile.is_open()) {
+    
+    cacheFile.open(cacheFilename(SUFFIX_FAUBDIFF));
+    if (cacheFile.is_open()) {
+        
+        if (files.size()) {
             for (auto &aFile: files)
                 cacheFile << aFile << endl;
+        }
+        else
+            cacheFile << "no changes." << endl;
 
-            cacheFile.close();
-        }
-        else {
-            string error = "error: unable to create " + cacheFilename(SUFFIX_FAUBDIFF) + " - " + strerror(errno);
-            log(error);
-            SCREENERR(error);
-        }
+        cacheFile.close();
     }
+    else {
+        string error = "error: unable to create " + cacheFilename(SUFFIX_FAUBDIFF) + " - " + strerror(errno);
+        log(error);
+        SCREENERR(error);
+    }
+    
 }
 
 
@@ -216,9 +220,10 @@ bool FaubEntry::displayDiffFiles() {
             if (cacheFile.eof())
                 break;
             
-            data = slashConcat(directory, data);
+            if (data != "no changes.")
+                data = slashConcat(directory, data);
             
-            // only print the header if we have valid output, in case
+            // only print the header if we have valid output.  otherwise
             // we have to try a second approach (compareDirs()), which will
             // print its own header
             if (!headerShown) {

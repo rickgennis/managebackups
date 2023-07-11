@@ -59,6 +59,7 @@ void showHelp(enum helpType kind) {
             + "   --years [x]         Keep x yearly backups\n"
             + "   --dow [x]           Day of week to save for weeklies (0=Sunday, 1=Monday, etc); defaults to Sunday.\n"
             + "   --consolidate [x]   Prune down to a single backups of the profilel per day after its x days old.\n"
+            + "   --dataonly          Only keep backups with changed data; identical copies w/no changes are removed immediately.\n"
             + "   --fs_backups [b]    FAILSAFE: Require b backups before pruning\n"
             + "   --fs_days [d]       FAILSAFE: within the last d days.\n"
             + "   --fs_limit [b]       FAILSAFE: limit prunes to b deletes per run\n"
@@ -95,7 +96,7 @@ void showHelp(enum helpType kind) {
             + "   -v[options]         Verbose debugging output. See 'man managebackups' for details\n"
             + "   --defaults          Display the default settings for all profiles\n"
             + "   -x, --lock          Lock the current profile for the duration of the run so only one copy can run at a time\n"
-            + "   -f, --force         Override any existing locks, recovery from relocate and Full Changes diffs\n"
+            + "   -f, --force         Override any existing locks, recover from relocate and Full Changes diffs\n"
             + "   --tripwire [string] Define tripwire files of the form 'filename: md5, filename: md5'\n"
             + "\n" + string(BOLDBLUE) + "SCHEDULING (via cron on Linux and launchctl on MacOS)\n" + RESET
             + "   --sched [h]         Schedule managebackups to run every h hours\n"

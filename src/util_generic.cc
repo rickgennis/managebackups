@@ -272,15 +272,15 @@ string onevarsprintf(string format, string data) {
 }
 
 
-string approximate(size_t size, int maxUnits, bool commas) {
+string approximate(size_t size, int maxUnits, bool commas, bool base10) {
     int index = 0;
     long double decimalSize = size;
     char unit[] = {'B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'};
 
-    while (decimalSize >= 1024 &&
+    while ((decimalSize >= (base10 ? 1000 : 1024)) &&
             (maxUnits < 0 || index < maxUnits) &&
             index++ <= sizeof(unit)) {
-        decimalSize /= 1024.0;
+        decimalSize /= (base10 ? 1000 : 1024.0);
     }
 
     char buffer[150];

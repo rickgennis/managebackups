@@ -300,7 +300,7 @@ myMapIT FaubCache::findBackup(string backupDir, myMapIT backupIT) {
         }
     }
     
-    return backups.end();
+    return backupIt;
 }
 
 

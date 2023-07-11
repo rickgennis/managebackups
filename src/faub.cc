@@ -143,8 +143,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
      */
     
     try {       
-        DEBUG(D_faub) DFMT("current: " << currentDir);
-        DEBUG(D_faub) DFMT("previous: " << prevDir);
+        DEBUG(D_any) DFMT("current: " << currentDir);
+        DEBUG(D_any) DFMT("previous: " << prevDir);
         
         // record number of filesystems the client is going to send (again, not really "filesystems")
         auto totalFS = client.ipcRead();

@@ -574,7 +574,7 @@ void pruneFaubBackups(BackupConfig &config) {
     
     size_t backupAge = 0, backupCountOnDay = 0, backupsPruned = 0;
     auto fsSlowLimit = config.settings[sFailsafeSlow].ivalue();
-    
+        
     auto cacheEntryIt = config.fcache.getFirstBackup();
     while (cacheEntryIt != config.fcache.getEnd()) {
         
@@ -583,6 +583,7 @@ void pruneFaubBackups(BackupConfig &config) {
             break;
         }
         
+        auto dataOnlyDelete = false;
         auto mtimeDayAge = cacheEntryIt->second.mtimeDayAge;
         auto filenameDOW = cacheEntryIt->second.dow;
         auto filenameDayAge = cacheEntryIt->second.filenameDayAge();
@@ -591,6 +592,12 @@ void pruneFaubBackups(BackupConfig &config) {
         pruneShouldKeep(config, cacheEntryIt->second.getDir(), mtimeDayAge, filenameDOW,
                         cacheEntryIt->second.startDay, cacheEntryIt->second.startMonth,
                         cacheEntryIt->second.startYear);
+
+        // if no files were changed in this backup and --dataonly is elected, delete this backup
+        if (!cacheEntryIt->second.modifiedFiles && !cacheEntryIt->second.ds.getSize() && str2bool(config.settings[sDataOnly].value)) {
+            dataOnlyDelete = true;
+            shouldKeep = "";
+        }
         
         if (backupAge != filenameDayAge) {
             backupAge = filenameDayAge;
@@ -612,10 +619,12 @@ void pruneFaubBackups(BackupConfig &config) {
             continue;
         }
         
+        string deleteReason = shouldConsolidate ? " (consolidation) " : dataOnlyDelete ? " (dataonly) " : " ";
+        
         if (GLOBALS.cli.count(CLI_TEST)) {
             cout << YELLOW << config.ifTitle() << " TESTMODE: would have deleted "
             << cacheEntryIt->second.getDir() << " (age=" + to_string(mtimeDayAge)
-            << ", dow=" + dw(filenameDOW) << ")" << (shouldConsolidate ? " consolidation" : "" ) << RESET << endl;
+            << ", dow=" + dw(filenameDOW) << ")" << deleteReason << RESET << endl;
             ++cacheEntryIt;
         }
         else {
@@ -625,17 +634,17 @@ void pruneFaubBackups(BackupConfig &config) {
             if (rmrf(cacheEntryIt->second.getDir())) {
                 NOTQUIET && ANIMATE && cout << noMessage << flush;
                 
-                NOTQUIET && cout << "\t• removed " << cacheEntryIt->second.getDir() << (shouldConsolidate ? " (consolidation)" : "" ) << endl;
+                NOTQUIET && cout << "\t• removed " << cacheEntryIt->second.getDir() << deleteReason << endl;
                 log(config.ifTitle() + " removed " + cacheEntryIt->second.getDir() +
-                    " (age=" + to_string(mtimeDayAge) + ", dow=" + dw(filenameDOW) + ")" + (shouldConsolidate ? " consolidation" : "" ));
-                DEBUG(D_prune) DFMT("completed removal of " << cacheEntryIt->second.getDir() << (shouldConsolidate ? " (consolidation)" : "" ));
+                    " (age=" + to_string(mtimeDayAge) + ", dow=" + dw(filenameDOW) + ")" + deleteReason);
+                DEBUG(D_prune) DFMT("completed removal of " << cacheEntryIt->second.getDir() << deleteReason);
                 ++backupsPruned;
             }
             else {
                 NOTQUIET && ANIMATE && cout << noMessage << flush;
                 
-                log(config.ifTitle() + " unable to remove " + (shouldConsolidate ? " (consolidation) " : "" ) + cacheEntryIt->second.getDir() + errtext());
-                SCREENERR(string("unable to remove ") + (shouldConsolidate ? " (consolidation) " : "" ) + cacheEntryIt->second.getDir() + errtext());
+                log(config.ifTitle() + " unable to remove" + deleteReason + cacheEntryIt->second.getDir() + errtext());
+                SCREENERR(string("unable to remove") + deleteReason + cacheEntryIt->second.getDir() + errtext());
             }
             
             auto deadBackupIt = cacheEntryIt++;
@@ -1994,6 +2003,7 @@ int main(int argc, char *argv[]) {
         CLI_RECALC, "Recalculate faub space", cxxopts::value<bool>()->default_value("false"))(
         CLI_BLOAT, "Bloat size warning", cxxopts::value<string>())(
         CLI_RELOCATE, "Relocate", cxxopts::value<std::string>())(
+        CLI_DATAONLY, "Data only", cxxopts::value<bool>()->default_value("false"))(
         CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
     
     try {
@@ -2038,6 +2048,8 @@ int main(int argc, char *argv[]) {
                 GLOBALS.debugSelector = D_default;
                 continue;
             }
+            
+            /* ----------------------------------- */
             
             SCREENERR("error: unrecognized parameter " << uarg
                       << "\nUse --help for a list of options.");

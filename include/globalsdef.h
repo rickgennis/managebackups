@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.6.0"
+#define VERSION "1.6.1a"
 
 #include "cxxopts.hpp"
 #include "colors.h"
@@ -134,6 +134,7 @@
 #define CLI_COMPAREFILTER "Diff"
 #define CLI_THRESHOLD "threshold"
 #define CLI_GO "go"
+#define CLI_DATAONLY "dataonly"
 #define CLI_UUID "uuid"      /* not really a valid CLI option just used as a setting */
 
 
@@ -178,6 +179,7 @@
 #define RE_BLOAT "(bloat)"
 #define RE_UUID "(uuid|id)"
 #define RE_DEFAULT "(default)"
+#define RE_DATAONLY "(dataonly)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"
