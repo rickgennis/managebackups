@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.6.1a
+% MANAGEBACKUPS(1) managebackups 1.6.2
 % Rick Ennis
 % March 2023
 
@@ -172,6 +172,9 @@ Options are categorized by the three functions of **managebackups** plus general
         * scan (default)
         * transfer
         * tripwire
+
+**--dow** [*num*]
+: Specify which day of week to take weekly backups. 0 = Sunday, 1 = Monday...  Default is 0.
 
 ## 1. Take Backups Options
 Backups options are noted as {1F} for single-file applicable, {FB} for faub-backup applicable, or {both}.

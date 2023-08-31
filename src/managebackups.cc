@@ -273,7 +273,7 @@ void scanConfigToCache(BackupConfig &config) {
     
     if (!exists(directory)) {
         if (mkdirp(directory)) {
-            SCREENERR("error: unable to create directory " << directory << errtext());
+            SCREENERR("error: unable to create directory '" << directory << "': " << errtext());
             exit(1);
         }
     }
@@ -1891,6 +1891,17 @@ bool getGlobalStats(unsigned long& stats, unsigned long& md5s, string& elapsedTi
     }
     
     return false;
+}
+
+void showMatches(Pcre& p, string foo) {
+    if (p.search(foo)) {
+        cout << "fish count: " << p.matches() << endl;
+        cout << "0: '" << p.get_match(0) << "'" << endl;;
+        cout << "1: '" << p.get_match(1) << "'" << endl;
+        cout << "2: '" << p.get_match(2) << "'" << endl;
+        cout << "3: '" << p.get_match(3) << "'" << endl;
+        cout << endl;
+    }
 }
 
 

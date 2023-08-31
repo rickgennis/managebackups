@@ -742,8 +742,12 @@ string locateBinary(string app) {
 
 
 bool str2bool(string text) {
-    Pcre regTrue("^\\s*(t|true|y|yes|1)\\s*$", "i");
-
+    Pcre regTrue("(^\\s*(t|true|y|yes|1)\\s*$)|(^\\s*$)", "i");
+    // a blank value (^\\s*$) is parsed as true to support someone writing just the directive name in the config file.
+    // e.g. these two lines would be interpreted identically:
+    //      default: true
+    //      default
+    
     return(regTrue.search(text));
 }
 

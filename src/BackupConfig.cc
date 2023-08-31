@@ -131,7 +131,11 @@ void BackupConfig::saveConfig() {
         
     }
 
+    string directive = "";
     string usersDelimiter = ": ";
+    string value = "";
+    string comment = "";
+    
     if (oldFile.is_open()) {
         Pcre reBlank(RE_BLANK);
 
@@ -150,14 +154,16 @@ void BackupConfig::saveConfig() {
                     
                     for (auto &setting: settings) {
                         
-                        if (setting.regex.search(dataLine) && setting.regex.matches() > 2) {
+                        if (setting.regex.search(dataLine) && setting.regex.matches()) {
+                           
+                            directive = setting.regex.get_match(0);
                             usersDelimiter = setting.regex.get_match(1);
-                                                        
+                            value = setting.regex.get_match(2);
+                            comment = setting.regex.matches() > 3 ? " " + setting.regex.get_match(3) : "";
+                            
                             // don't write fs_days, fs_backups or fs_slow if fp is set
                             if (!bFailsafeParanoid || (bFailsafeParanoid && (setting.display_name != CLI_FS_DAYS && setting.display_name != CLI_FS_BACKUPS && setting.display_name != CLI_FS_SLOW))) {
-                                newFile << setting.regex.get_match(0) << setting.regex.get_match(1) <<
-                                (setting.data_type == BOOL ? (str2bool(setting.value) ? "true" : "false") : setting.value) <<
-                                (setting.regex.matches() > 3 ? setting.regex.get_match(3) : "")  << endl;
+                                newFile << directive << usersDelimiter << setting.value << " " << comment << endl;
                                 setting.seen = identified = true;
                                 break;
                             }
@@ -203,7 +209,7 @@ void BackupConfig::saveConfig() {
                 else
                     // if fp is set then don't add fs_days or fs_backups
                     if (!str2bool(settings[sFP].value) || (setting.display_name != CLI_FS_DAYS && setting.display_name != CLI_FS_BACKUPS))
-                        newFile << setting.display_name << usersDelimiter << (setting.data_type == BOOL ? (str2bool(setting.value) ? "true" : "false") : setting.value) << endl;
+                        newFile << setting.display_name << usersDelimiter << setting.value << endl;
             }
     }
     else {
@@ -268,8 +274,14 @@ bool BackupConfig::loadConfig(string filename) {
                 // compare the line against each of the config settings until there's a match
                 bool identified = false;
                 for (auto &setting: settings) {
-                    if (setting.regex.search(dataLine) && setting.regex.matches() > 2) {
-                        setting.value = setting.regex.get_match(2);
+                    // if (setting.regex.search(dataLine) && setting.regex.matches() > 2) {
+                    if (setting.regex.search(dataLine) && setting.regex.matches()) {
+
+                        if (setting.regex.matches() > 2)
+                            setting.value = setting.regex.get_match(2);
+                        else
+                            setting.value = "";
+                        
                         // STRING is handled implicitly with no conversion
                         
                         // special-case for something that can look like a SIZE or be a percentage

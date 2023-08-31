@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.6.1a"
+#define VERSION "1.6.2"
 
 #include "cxxopts.hpp"
 #include "colors.h"
@@ -139,8 +139,8 @@
 
 
 // conf file regexes
-#define CAPTURE_VALUE string("((?:\\s|=|:)+)(.*?)\\s*?")
-#define RE_COMMENT "((?:\\s*#).*)*$"
+#define CAPTURE_VALUE string("((?:\\s|=|:|\\b)+)(.*?)\\s*?")
+#define RE_COMMENT "\\s*((?:#.*)*)$"
 #define RE_BLANK "^((?:\\s*#).*)*$"
 #define RE_PROFILE "(profile)"
 #define RE_DIR "(dir|directory)"
