@@ -138,7 +138,6 @@ class PipeExec : public IPC_Base {
     bool dontCleanup;
     string errorDir;
     
-    void pickupTheKids();
     
 public:
     /* structors */
@@ -155,6 +154,7 @@ public:
     int closeRead();
     int closeWrite();
     int closeAll();
+    void pickupTheKids();
 };
 
 #endif

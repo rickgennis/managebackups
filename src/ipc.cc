@@ -59,6 +59,9 @@ ssize_t IPC_Base::ipcRead(void *data, size_t count) {
         else {
             auto bytes = read(readFd, (char*)data + dataLen, count);
            
+            if (bytes == -1 && errno == ENOENT)
+                throw MBException(string("backup aborted due to premature closure of the network connection"));
+            
             if (bytes < 1) {
                 ++ioErrors;
                 
@@ -549,7 +552,8 @@ void PipeExec::pickupTheKids() {
             for (auto procIt = procs.begin(); procIt != procs.end(); ++procIt) {
                 if (procIt->childPID == pid) {
                     procIt->reaped = pidFound = true;
-                    DEBUG(D_exec) DFMT("successfully reaped child pid " + to_string(pid) + " (" + plural(procs.size(), "child proc") + " outstanding)");
+                    // minus 2 below:  1 for the dummy header proc, 1 for the one we're reaping now
+                    DEBUG(D_exec) DFMT("successfully reaped child pid " + to_string(pid) + " (" + plural(procs.size() - 2, "child proc") + " outstanding)");
                     
                     // bail early if we've hit both conditions (a pid found & a pid not found)
                     if (!done)
@@ -571,6 +575,8 @@ void PipeExec::pickupTheKids() {
             if (!pidFound)
                 GLOBALS.reapedPids.insert(GLOBALS.reapedPids.end(), pid);
         }
+        else
+            break;  // wait() returned -1, no kids left
     }
 }
 
@@ -594,8 +600,19 @@ void PipeExec::flushErrors() {
 }
 
 
+void pipedetail(int FDs[2], string text) {
+    cerr << "[" << getpid() << "] pipe " << text << " :" << FDs[0] << " <-> " << FDs[1] << endl;
+}
+
+void pipedetail(int x, int y, string text) {
+    cerr << "[" << getpid() << "] pipe " << text << " :" << x << " <=> " << y << endl;
+}
+
+
 int PipeExec::closeAll() {
     if (procs.size() > 0) {
+        //pipedetail(procs[0].writefd[READ_END], -2, "closed");
+        //pipedetail(procs[0].writefd[WRITE_END], procs[0].readfd[READ_END], "closed");
         close(procs[0].writefd[READ_END]);
         int a = close(procs[0].writefd[WRITE_END]);
         int b = close(procs[0].readfd[READ_END]);
@@ -612,7 +629,6 @@ int PipeExec::closeRead() {
 
     return 0;
 }
-
 
 int PipeExec::closeWrite() {
     if (procs.size() > 0)
@@ -679,13 +695,17 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
         string stderrFname = errorDir + commandID + ":" + to_string(distance(procs.begin(), procIt)) + "." + safeFilename(commandPrefix) + ".stderr";
         
         if (procIt != procs.end() - 1) {  // if not last proc
-            if (procIt == procs.begin())
+            if (procIt == procs.begin()) {
                 pipe(procIt->readfd);  // extra pipe for our dummy entry to communicate with the calling app
-
+                //pipedetail(procIt->readfd, "opened (dummy entry)");
+            }
+            
             // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
             // Pipe & Fork
             // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
             pipe(procIt->writefd);
+            //pipedetail(procIt->writefd, "opened");
+
             if (((procIt+1)->childPID = fork())) {
                 
                 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -702,12 +722,14 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
                     // close fds from two procs back
                     if (procs.size() > 2 && *procIt != procs[1]) {
                         auto back2_it = procIt - 2;
+                        //pipedetail(back2_it->writefd, "closed");
                         close(back2_it->writefd[0]);
                         close(back2_it->writefd[1]);
                     }
 
                     // dup and close current and x - 1 fds
                     auto backIt = procIt - 1;
+                    //pipedetail(procIt->writefd[READ_END], backIt->writefd[WRITE_END], "closed");
                     close(procIt->writefd[READ_END]);
                     close(backIt->writefd[WRITE_END]);
                     DUP2(backIt->writefd[READ_END], READ_END);
@@ -721,6 +743,7 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
                 // First Proc:  PARENT - the dummy proc that returns
                 // FDs to the calling app
                 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+                //pipedetail(procIt->writefd[READ_END], procIt->readfd[WRITE_END], "closed (primary parent)");
                 close(procIt->writefd[READ_END]);
                 close(procIt->readfd[WRITE_END]);
                 if (procName.length())
@@ -737,13 +760,15 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
             // Last Proc: PARENT - execute the last command
             // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
             DEBUG(D_exec) DFMT("child executing final command [" << procIt->command << "]");
+            auto backIt = procIt - 1;
+            //pipedetail(procs[0].writefd[WRITE_END], procs[0].readfd[READ_END], "closed");
+            //pipedetail(backIt->writefd[READ_END], READ_END, "duping");
 
             // redirect stderr to a file
             if (!noErrToDisk)
                 redirectStdError(stderrFname);
-        
+            
             // dup and close remaining fds
-            auto backIt = procIt - 1;
             DUP2(backIt->writefd[READ_END], READ_END);
             close(procs[0].writefd[WRITE_END]);
             close(procs[0].readfd[READ_END]);
@@ -766,6 +791,7 @@ int PipeExec::execute(string procName, bool leaveFinalOutput, bool noDestruct, b
         // generations where each child has the next child.
         // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
         if (*procIt != procs[0]) {
+            //pipedetail(procIt->writefd[WRITE_END], -1, "closed");
             close(procIt->writefd[WRITE_END]);
             DUP2(procIt->writefd[READ_END], READ_END);
         }

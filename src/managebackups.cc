@@ -857,6 +857,7 @@ void updateLinks(BackupConfig &config)
     unsigned int maxLinksAllowed = config.settings[sMaxLinks].ivalue();
     bool includeTime = str2bool(config.settings[sIncTime].value);
     bool rescanRequired;
+    unsigned long maxedOutLinkedFiles = 0;
     
     /* The indexByMD5 is a list of lists ("map" of "set"s).  Here we loop through the list of MD5s
      * (the map) once.  For each MD5, we loop through its list of associated files (the set) twice:
@@ -954,6 +955,7 @@ void updateLinks(BackupConfig &config)
                     // skip if this file already has the max links
                     if (raw_it->second.links >= maxLinksAllowed) {
                         DEBUG(D_link) DFMT("\t\tfile links already maxed out");
+                        ++maxedOutLinkedFiles;
                         continue;
                     }
                     
@@ -1502,19 +1504,22 @@ void sigTermHandler(int sig) {
     string reason = (sig > 0 ? "interrupt" : !sig ? "timeout" : "error");
     
     if (GLOBALS.interruptFilename.length()) {
+        log("operation aborted on " + reason + (sig ? ", signal " + to_string(sig) : "") + " (" +
+            GLOBALS.interruptFilename + ")");
+
         cerr << "\n" << reason << ": aborting backup, cleaning up " << GLOBALS.interruptFilename << "... ";
         
         struct stat statData;
         if (!mystat(GLOBALS.interruptFilename, &statData)) {
-            if (S_ISDIR(statData.st_mode))
-                rmrf(GLOBALS.interruptFilename);             // faub-style
+            if (S_ISDIR(statData.st_mode)) {
+                rename(GLOBALS.interruptFilename.c_str(), string(GLOBALS.interruptFilename + ".abandoned").c_str());
+                rmrf(GLOBALS.interruptFilename + ".abandoned");             // faub-style
+            }
             else
                 unlink(GLOBALS.interruptFilename.c_str());   // single-file
         }
         
         cerr << "done." << endl;
-        log("operation aborted on " + reason + (sig ? ", signal " + to_string(sig) : "") + " (" +
-            GLOBALS.interruptFilename + ")");
     }
     else
         log("operation aborted on " + reason + (sig > 0 ? " (signal " + to_string(sig) + ")" : ""));
@@ -2394,19 +2399,17 @@ int main(int argc, char *argv[]) {
             if (GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_CRONS)) {
                 timer allRunTimer;
                 allRunTimer.start();
-                log("[ALL] starting sequential processing of all profiles");
-                NOTQUIET &&cout << "starting sequential processing of all profiles" << endl;
-                
+                log("[ALL] starting sequential processing of " + plural(configManager.configs.size(), "profile"));
+                NOTQUIET && cout << "starting sequential processing of " << plural(configManager.configs.size(), "profile") << endl;
+                                
                 for (auto &config : configManager.configs) {
-                    if (!config.temp) {
+                   if (!config.temp) {
                         NOTQUIET &&cout << "\n"
                         << BOLDBLUE << "[" << config.settings[sTitle].value << "]"
                         << RESET << "\n";
                         PipeExec miniMe(string(argv[0]) + " -p " + config.settings[sTitle].value +
                                         commonSwitches);
-                        miniMe.execute("", true);
-                        miniMe.closeAll();
-                        wait(NULL);
+                        miniMe.execute("", true);   // fds closed and kids piped up via destructor
                     }
                 }
                 

@@ -1,6 +1,11 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
+/*
+ Borrowed from Philip Hazel's Exim Mail Transport Agent
+ */
+
+
 #include <sys/types.h>
 
 typedef unsigned char uschar;

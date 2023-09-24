@@ -1190,9 +1190,10 @@ char getFilesystemEntryType(string entry) {
    of the recursion is aborted.
  
    a regex pattern can be provided to filter filenames, along with whether the pattern
-   should be used as include or exclude criteria.  in either case the pattern is only
-   applied to filenames; by contrast *all* directories are considered and passed to
-   callback().
+   should be used as include or exclude criteria.  all subdirectories within are walked
+   looking for files, regardless of subdirectory names matching the pattern.  but
+   callback() is only passed entries (files or subdirectory names) that pass the pattern
+   filter, or if no pattern filter is given.
  
    maxDepth can be specified to only go x subdirectory levels deep.
  
