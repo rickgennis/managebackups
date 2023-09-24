@@ -1791,13 +1791,13 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
     // declare the crossFSDataType to hold the inode map.  we pass this to all the moveBackup() calls so it can use it
     // to tell which files need to be hardlinked to each other, even across separate backups
     crossFSDataType fsData;
-    progressPercentage(-1);
+    progressPercentageA(-1);
     
     // actually move the backup files
     if (config.isFaub()) {
         auto backupIt = config.fcache.getFirstBackup();
         while (backupIt != config.fcache.getEnd()) {
-            NOTQUIET && ANIMATE && cout << progressPercentage(numBackups, 1, (int)distance(config.fcache.getFirstBackup(), backupIt), 1, backupIt->second.getDir()) << flush;
+            NOTQUIET && ANIMATE && cout << progressPercentageA((int)numBackups, 1, (int)distance(config.fcache.getFirstBackup(), backupIt), 1, backupIt->second.getDir()) << flush;
             if (!moveBackup(backupIt->second.getDir(), oldBaseDir, newBaseDir, sameFS, numBackups, fsData)) {
                 log(config.ifTitle() + " " + backupIt->second.getDir() + " has vanished, updating cache");
                 config.fcache.removeBackup(backupIt);
@@ -1814,7 +1814,7 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
             // pointer.
             ++next_it;
             
-            NOTQUIET && ANIMATE && cout << progressPercentage(numBackups, 1, (int)distance(config.cache.indexByFilename.begin(), fIdx_it), 1, fIdx_it->first) << flush;
+            NOTQUIET && ANIMATE && cout << progressPercentageA((int)numBackups, 1, (int)distance(config.cache.indexByFilename.begin(), fIdx_it), 1, fIdx_it->first) << flush;
             
             if (!moveBackup(fIdx_it->first, oldBaseDir, newBaseDir, sameFS, numBackups, fsData)) {
                 auto rawIt = config.cache.rawData.find(fIdx_it->second);
@@ -1826,7 +1826,7 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
             }
         }
     
-    NOTQUIET && ANIMATE && cout << progressPercentage(0) << "\nupdating config..." << flush;
+    NOTQUIET && ANIMATE && cout << progressPercentageA(0) << "\nupdating config..." << flush;
     
     // clean up the directory name (resolve symlinks, and ".." references)
     // since mv succeeded above realpath() should succeed
@@ -2085,6 +2085,28 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     */
+    
+    /*string foo = "; transfered ";
+    auto b1 = string(foo.length(), '\b');
+    auto b2 = string(foo.length(), ' ');
+    
+    cout << progressPercentage((int)50, 100, 2, 3) << flush;
+    cout << foo;
+    sleep(1);
+    cout << progressPercentage((long)100, (long)25) << flush;
+    sleep(1);
+    cout << progressPercentage((long)100, (long)40) << flush;
+    sleep(1);
+    cout << progressPercentage((long)100, (long)50) << flush;
+    sleep(1);
+    cout << progressPercentage((long)0, (long)0) << flush;
+    sleep(1);
+    cout << b1 << b2 << b1 << flush;
+    sleep(1);
+    cout << progressPercentage((int)0) << flush;
+    sleep(1);
+    cout << "complete" << endl;
+    exit(1);*/
     
     if (GLOBALS.cli.count(CLI_DEFAULTS)) {
         showHelp(hDefaults);

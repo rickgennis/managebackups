@@ -138,7 +138,7 @@ string IPC_Base::ipcReadTo(string delimiter) {
 }
 
 
-tuple<string, int, time_t> IPC_Base::ipcReadToFile(string filename, bool preDelete) {
+tuple<string, int, time_t, long> IPC_Base::ipcReadToFile(string filename, bool preDelete) {
     long uid = ipcRead();
     long gid = ipcRead();
     long mode = ipcRead();
@@ -158,7 +158,7 @@ tuple<string, int, time_t> IPC_Base::ipcReadToFile(string filename, bool preDele
         if (utime(filename.c_str(), &timeBuf))
             errorMsg += "error: unable to set utime() on " + filename + errtext();
         
-        return {errorMsg, mode, mtime};
+        return {errorMsg, mode, mtime, 0};
     }
 
     // handle symlinks
@@ -172,23 +172,23 @@ tuple<string, int, time_t> IPC_Base::ipcReadToFile(string filename, bool preDele
             unlink(filename.c_str());
 
         if (symlink(target, filename.c_str()))
-            return {("error: unable to create symlink " + filename + errtext()), -1, 0};
+            return {("error: unable to create symlink " + filename + errtext()), -1, 0, 0};
 
         if (lchown(filename.c_str(), (int)uid, (int)gid))
-            return {("error: unable to chown symlink " + filename + errtext()), -1, 0};
+            return {("error: unable to chown symlink " + filename + errtext()), -1, 0, 0};
 
         struct timeval tv[2];
         tv[0].tv_sec  = tv[1].tv_sec  = mtime;
         tv[0].tv_usec = tv[1].tv_usec = 0;
         lutimes(filename.c_str(), tv);
 
-        return {"", mode, 0};
+        return {"", mode, 0, 0};
     }
 
     // handle directories that are inherent in the filename
     string dirName = filename.substr(0, filename.find_last_of("/"));
     if (mkdirp(dirName))
-        return {("error: unable to mkdir " + filename + ": " + strerror(errno)), 0, 0};
+        return {("error: unable to mkdir " + filename + ": " + strerror(errno)), 0, 0, 0};
 
     // handle files
     auto bytesRemaining = ipcRead();
@@ -232,11 +232,11 @@ tuple<string, int, time_t> IPC_Base::ipcReadToFile(string filename, bool preDele
         timeBuf.actime = timeBuf.modtime = mtime;
         utime(filename.c_str(), &timeBuf);
         DEBUG(D_netproto) cerr << " [" << totalBytes << " bytes]" << flush;
-        return {errorMsg, mode, mtime};
+        return {errorMsg, mode, mtime, totalBytes};
     }
 
     DEBUG(D_netproto) cerr << " [" << totalBytes << " bytes] can't write file" << flush;
-    return {errorMsg, mode, mtime};
+    return {errorMsg, mode, mtime, totalBytes};
 }
 
 

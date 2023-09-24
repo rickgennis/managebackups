@@ -1354,7 +1354,7 @@ string processDirectoryBackups(string directory, string pattern, bool exclude, b
 }
 
 
-string progressPercentage(int totalIterations, int totalSteps, int iterationsComplete, int stepsComplete, string detail) {
+string progressPercentageA(int totalIterations, int totalSteps, int iterationsComplete, int stepsComplete, string detail) {
     static int prevLength = 0;
     string result;
     
@@ -1365,7 +1365,6 @@ string progressPercentage(int totalIterations, int totalSteps, int iterationsCom
         if (prevLength)
             result = string(prevLength, '\b') + string(prevLength, ' ') + string(prevLength, '\b');
     
-    // numFS = 0 can be used to just backspace over the last status and blank it out
     if (totalIterations > 0) {
         int target = totalIterations * totalSteps;
         int current = iterationsComplete * totalSteps + stepsComplete;
@@ -1373,6 +1372,24 @@ string progressPercentage(int totalIterations, int totalSteps, int iterationsCom
         prevLength = (int)currentProgress.length();
         result += currentProgress;
     }
+
+    return result;
+}
+
+string progressPercentageB(long totalBytes, long completedBytes) {
+    static int prevLength = 0;
+    string result;
+    
+    if (prevLength)
+        result = string(prevLength, '\b') + string(prevLength, ' ') + string(prevLength, '\b');
+    
+    if (totalBytes > 0) {
+        string currentProgress = to_string(long((long double)completedBytes / (long double)totalBytes * 100)) + "%";
+        prevLength = (int)currentProgress.length();
+        result += currentProgress;
+    }
+    else
+        prevLength = 0;
 
     return result;
 }
