@@ -524,7 +524,8 @@ void PipeExec::pickupTheKids() {
             if (GLOBALS.reapedPids.find(procIt->childPID) != GLOBALS.reapedPids.end()) {
                 GLOBALS.reapedPids.erase(procIt->childPID);
                 procIt->reaped = true;
-                DEBUG(D_exec) DFMT("successfully reaped child pid " + to_string(procIt->childPID) + "* (" + plural(procs.size(), "child proc") + " outstanding)");
+                // minus 2 below:  1 for the dummy header proc, 1 for the one we're reaping now
+                DEBUG(D_exec) DFMT("successfully reaped child pid " + to_string(procIt->childPID) + "* (" + plural(procs.size() - 2, "child proc") + " outstanding)");
             }
             else
                 // if not then that's still a valid pid that's outstanding and we need to

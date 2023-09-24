@@ -2399,17 +2399,17 @@ int main(int argc, char *argv[]) {
             if (GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_CRONS)) {
                 timer allRunTimer;
                 allRunTimer.start();
-                log("[ALL] starting sequential processing of " + plural(configManager.configs.size(), "profile"));
-                NOTQUIET && cout << "starting sequential processing of " << plural(configManager.configs.size(), "profile") << endl;
+                log("[ALL] starting sequential processing of all profiles");
+                NOTQUIET && cout << "starting sequential processing of all profiles" << endl;
                                 
                 for (auto &config : configManager.configs) {
                    if (!config.temp) {
-                        NOTQUIET &&cout << "\n"
-                        << BOLDBLUE << "[" << config.settings[sTitle].value << "]"
-                        << RESET << "\n";
-                        PipeExec miniMe(string(argv[0]) + " -p " + config.settings[sTitle].value +
+                       NOTQUIET &&cout << "\n"
+                       << BOLDBLUE << "[" << config.settings[sTitle].value << "]"
+                       << RESET << "\n";
+                       PipeExec miniMe(string(argv[0]) + " -p " + config.settings[sTitle].value +
                                         commonSwitches);
-                        miniMe.execute("", true);   // fds closed and kids piped up via destructor
+                       miniMe.execute("", true, false, true);   // fds closed and kids piped up via destructor
                     }
                 }
                 
@@ -2439,6 +2439,8 @@ int main(int argc, char *argv[]) {
                         miniMe.closeAll();
                         
                         // save the child PID and pipe object in our map
+                        // emplace() into the map that's outside this loop keeps the destructor
+                        // from being called yet and blocking our execution with a wait().
                         childProcMap.emplace(pair<int, PipeExec>(childPID, miniMe));
                     }
                 
