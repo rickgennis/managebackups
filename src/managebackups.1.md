@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.6.4
+% MANAGEBACKUPS(1) managebackups 1.6.5
 % Rick Ennis
 % March 2023
 
@@ -241,6 +241,15 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 
 **--leaveoutput**
 : {both} Leave the output from any commands that are executed (create a backup, ssh, SFTP, etc) in a file under /tmp/managebackups_output. This can help facilitate diagnosing authentication or configuration errors.
+
+**--include** [*pattern*]
+: {FB} Only backup directory entries that match the specified regex pattern. By default this option only filters files and continues to include subdirectories themselves (files in the subdirectories are filtered). To have it apply to the subdirectories see **--filterdirs**.
+
+**--exclude** [*pattern*]
+: {FB} Only backup directory entries that do NOT match the specified regex pattern. By default this option only filters files and continues to include subdirectories themselves (files in the subdirectories are filtered). To have it apply to the subdirectories see **--filterdirs**.
+
+**--filterdirs**
+: {FB} Apply **--include** or **--exclude** filtering to subdirectory names.
 
 **-s**, **--path** [*path*]
 : {FB-remote} Specifies which directories to backup in a faub-style backup.  This option is only used on the REMOTE end, i.e. the server being backed up. See the FAUB-STYLE BACKUPS section below. Multiple paths can be specified via quoted parameters that are space delimited (--path "/usr /usr/local /root") or multiple directives (--path /usr --path /usr/local).

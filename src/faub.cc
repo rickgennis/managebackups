@@ -52,7 +52,7 @@ string mostRecentBackupDirSince(string backupDir, string sinceDir, string profil
     else
         data.sinceTime = time(NULL);
     
-    processDirectoryBackups(backupDir, "/" + profileName + "-", false, mostRecentBCallback, &data, FAUB_ONLY);
+    processDirectoryBackups(backupDir, "/" + profileName + "-", true, mostRecentBCallback, &data, FAUB_ONLY);
     
     return data.recentName;
 }
@@ -482,6 +482,12 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             rmrf(originalCurrentDir.c_str());
         
         if (rename(string(currentDir).c_str(), originalCurrentDir.c_str())) {
+            if (!filesModified && !filesHardLinked && !filesSymLinked) {
+                log(config.ifTitle() + " no files available to backup; backup aborted");
+                NOTQUIET && cout << "\t• " << config.ifTitle() << " no files to backup" << endl;
+                return;
+            }
+                
             string errorDetail = config.ifTitle() + " unable to rename " + currentDir + " to " + originalCurrentDir + ": " + strerror(errno);
             log(errorDetail);
             SCREENERR(errorDetail);
@@ -581,8 +587,10 @@ size_t fc_scanToServer(string entryName, IPC_Base& server) {
     data.server = &server;
     data.totalEntries = 0;
     
+    string clude = GLOBALS.cli.count(CLI_INCLUDE) ? GLOBALS.cli[CLI_INCLUDE].as<string>() : GLOBALS.cli.count(CLI_EXCLUDE) ? GLOBALS.cli[CLI_EXCLUDE].as<string>() : "";
+    
     entryName.erase(remove(entryName.begin(), entryName.end(), '\\'), entryName.end());
-    processDirectory(entryName, "", false, scanToServerCallback, &data);
+    processDirectory(entryName, clude, GLOBALS.cli.count(CLI_EXCLUDE), GLOBALS.cli.count(CLI_FILTERDIRS), scanToServerCallback, &data);
     
     return data.totalEntries;
 }

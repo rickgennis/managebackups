@@ -390,5 +390,5 @@ bool bcCleanupCallback(pdCallbackData &file) {
 // cleanup old cache files that may refer to no longer existing backups
 // cleanup works across all 1F cache files, regardless of profile or directory
 void BackupCache::cleanup() {
-    processDirectory(slashConcat(GLOBALS.cacheDir, uuid), ".1f$", false, bcCleanupCallback, this);
+    processDirectory(slashConcat(GLOBALS.cacheDir, uuid), ".1f$", false, false, bcCleanupCallback, this);
 }

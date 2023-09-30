@@ -67,7 +67,7 @@ bool configMgrCallback(pdCallbackData &file) {
 ConfigManager::ConfigManager() {
     activeConfig = -1;
     defaultConfig = "";
-    processDirectory(ue(GLOBALS.confDir), "\\.conf$", false, configMgrCallback, this);
+    processDirectory(ue(GLOBALS.confDir), "\\.conf$", false, false, configMgrCallback, this);
     sort(configs.begin(), configs.end());
     
     if (configs.size() == 1)
@@ -104,5 +104,5 @@ bool housekeepingCallback(pdCallbackData &file) {
 // scan cache sub-dirs and remove any that are no longer associated
 // with an active profile;  i.e. clean up the cache uuid sub-dirs
 void ConfigManager::housekeeping() {
-    processDirectory(GLOBALS.cacheDir, "/\\w{32}$", false, housekeepingCallback, &configs, 1);
+    processDirectory(GLOBALS.cacheDir, "/\\w{32}$", false, false, housekeepingCallback, &configs, 1);
 }

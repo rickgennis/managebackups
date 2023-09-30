@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.6.4"
+#define VERSION "1.6.5"
 
 #include "cxxopts.hpp"
 #include "colors.h"
@@ -22,11 +22,10 @@
  
  (B) To add a backup config setting:
     (1) add a defined constant for its regex #define RE_xxxx in globalsdef.h
-    (2) add an enum constant to reference it in Setting.h (order matters, at at end of list)
+    (2) add an enum constant to reference it in Setting.h (order matters, at end of list)
     (3) add a map entry between the defined const and the enum in Setting.cc
     (4) add it to the settings vector with its default in BackupConfig::BackupConfig(bool) in BackupConfig.cc
-    (5) do everything under the CLI option list above because you need a matching CLI option to
-      override the config setting
+    (5) do everything under the CLI option list above because you need a matching CLI option to override the config setting
  
  Settings are accessed as config.settings[ENUM].value or config.settings[ENUM].length()
  Because CLI options are already mapped to settings (via B3 above) config.settings[] will already
@@ -135,6 +134,9 @@
 #define CLI_THRESHOLD "threshold"
 #define CLI_GO "go"
 #define CLI_DATAONLY "dataonly"
+#define CLI_INCLUDE "include"
+#define CLI_EXCLUDE "exclude"
+#define CLI_FILTERDIRS "filterdirs"
 #define CLI_UUID "uuid"      /* not really a valid CLI option just used as a setting */
 
 
@@ -172,7 +174,7 @@
 #define RE_MAILFROM "(mailfrom|from)"
 #define RE_LEAVEOUTPUT "(leaveoutput)"
 #define RE_FAUB "(faub)"
-#define RE_PATHS "(path)"
+#define RE_PATHS "(path|paths)"
 #define RE_UID "(uid)"
 #define RE_GID "(gid)"
 #define RE_CONSOLIDATE "(consolidate)"
@@ -180,6 +182,9 @@
 #define RE_UUID "(uuid|id)"
 #define RE_DEFAULT "(default)"
 #define RE_DATAONLY "(dataonly)"
+#define RE_INCLUDE "(include)"
+#define RE_EXCLUDE "(exclude)"
+#define RE_FILTERDIRS "(filterdirs)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"

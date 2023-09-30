@@ -73,6 +73,10 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_FS_SLOW, RE_FSSLOW, INT, "0"));
     settings.insert(settings.end(), Setting(CLI_DEFAULT, RE_DEFAULT, BOOL, "false"));
     settings.insert(settings.end(), Setting(CLI_DATAONLY, RE_DATAONLY, BOOL, "false"));
+    settings.insert(settings.end(), Setting(CLI_INCLUDE, RE_INCLUDE, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_EXCLUDE, RE_EXCLUDE, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_FILTERDIRS, RE_FILTERDIRS, BOOL, "false"));
+    settings.insert(settings.end(), Setting(CLI_PATHS, RE_PATHS, STRING, ""));
 
     // CLI_PATHS is intentionally left out because its only accessed via CLI
     // and never as a Setting.  to implement it as a Setting would require a new

@@ -1662,7 +1662,7 @@ void moveBackupCrossFS(string oldBackupDir, string newBackupDir, crossFSDataType
     }
     
     fsData.newDir = newBackupDir;
-    processDirectory(oldBackupDir, "", false, crossFSCallback, &fsData);
+    processDirectory(oldBackupDir, "", false, false, crossFSCallback, &fsData);
 }
 
 
@@ -2020,6 +2020,9 @@ int main(int argc, char *argv[]) {
         CLI_BLOAT, "Bloat size warning", cxxopts::value<string>())(
         CLI_RELOCATE, "Relocate", cxxopts::value<std::string>())(
         CLI_DATAONLY, "Data only", cxxopts::value<bool>()->default_value("false"))(
+        CLI_INCLUDE, "Include", cxxopts::value<std::string>())(
+        CLI_EXCLUDE, "Exclude", cxxopts::value<std::string>())(
+        CLI_FILTERDIRS, "Filter directories", cxxopts::value<bool>()->default_value("false"))(
         CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
     
     try {
@@ -2362,13 +2365,10 @@ int main(int argc, char *argv[]) {
         string commonSwitches =
         string(NOTQUIET ? "" : " -q") + BoolParamIfSpecified(CLI_TEST) +
         BoolParamIfSpecified(CLI_NOBACKUP) + BoolParamIfSpecified(CLI_NOPRUNE) +
-        BoolParamIfSpecified(CLI_PRUNE) +
-        (GLOBALS.cli.count(CLI_CONFDIR) ? string("--") + CLI_CONFDIR + " '" + GLOBALS.confDir +"'"
-         : "") +
-        (GLOBALS.cli.count(CLI_CACHEDIR) ? string("--") + CLI_CACHEDIR + " '" + GLOBALS.cacheDir + "'"
-         : "") +
-        (GLOBALS.cli.count(CLI_LOGDIR) ? string("--") + CLI_LOGDIR + " '" + GLOBALS.logDir + "'"
-         : "") +
+        BoolParamIfSpecified(CLI_PRUNE) + BoolParamIfSpecified(CLI_FILTERDIRS) +
+        (GLOBALS.cli.count(CLI_CONFDIR) ? string("--") + CLI_CONFDIR + " '" + GLOBALS.confDir + "'" : "") +
+        (GLOBALS.cli.count(CLI_CACHEDIR) ? string("--") + CLI_CACHEDIR + " '" + GLOBALS.cacheDir + "'" : "") +
+        (GLOBALS.cli.count(CLI_LOGDIR) ? string("--") + CLI_LOGDIR + " '" + GLOBALS.logDir + "'" : "") +
         ValueParamIfSpecified(CLI_FAUB) + ValueParamIfSpecified(CLI_PATHS) +
         ValueParamIfSpecified(CLI_FS_FP) + ValueParamIfSpecified(CLI_FS_BACKUPS) +
         ValueParamIfSpecified(CLI_FS_SLOW) +
@@ -2380,6 +2380,7 @@ int main(int argc, char *argv[]) {
         ValueParamIfSpecified(CLI_WEEKS) + ValueParamIfSpecified(CLI_MONTHS) +
         ValueParamIfSpecified(CLI_TRIPWIRE) + ValueParamIfSpecified(CLI_NOTIFYEVERY) +
         ValueParamIfSpecified(CLI_YEARS) + ValueParamIfSpecified(CLI_NICE) +
+        ValueParamIfSpecified(CLI_INCLUDE) + ValueParamIfSpecified(CLI_EXCLUDE) +
         (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ? " -x" : "") +
         ValueParamIfSpecified(CLI_MAXLINKS);
         

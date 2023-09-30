@@ -841,7 +841,7 @@ bool catdirCallback(pdCallbackData &file) {
 string catdir(string dir) {
     string result;
     
-    processDirectory(dir, "", false, catdirCallback, &result);
+    processDirectory(dir, "", false, false, catdirCallback, &result);
     
     size_t p;
     while ((p = result.find("\r\n")) != string::npos)
@@ -976,7 +976,7 @@ DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes) {
     data.seenI = &seenInodes;
     data.newI = &newInodes;
 
-    processDirectory(path, "", false, dsCallback, &data);
+    processDirectory(path, "", false, false, dsCallback, &data);
     return ds;
 }
 
@@ -1205,7 +1205,7 @@ char getFilesystemEntryType(string entry) {
    shown on the screen (via SCREENERR) and returned to the calling function.
  */
 
-string processDirectory(string directory, string pattern, bool exclude, bool (*callback)(pdCallbackData&), void *passData, int maxDepth, string internalUseDir) {
+string processDirectory(string directory, string pattern, bool exclude, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, int maxDepth, string internalUseDir) {
     DIR *dir;
     struct dirent *dirEntry;
     vector<string> subDirs;
@@ -1231,23 +1231,25 @@ string processDirectory(string directory, string pattern, bool exclude, bool (*c
                         
                         // process directories
                         if (S_ISDIR(file.statData.st_mode)) {
-                            subDirs.insert(subDirs.end(), file.filename);
                             
                             // filter for patterns
-                            if (pattern.length()) {
-                                bool found = patternRE.search(file.filename);
-                                
-                                if (exclude && found)
-                                    continue;
-                                
-                                if (!exclude && !found)
-                                    continue;
-                            }
+                            if (filterDirs)
+                                if (pattern.length()) {
+                                    bool found = patternRE.search(file.filename);
+                                    
+                                    if (exclude && found)
+                                        continue;
+                                    
+                                    if (!exclude && !found)
+                                        continue;
+                                }
 
                             if (!callback(file)) {
                                 subDirs.clear();
                                 break;
                             }
+                            
+                            subDirs.insert(subDirs.end(), file.filename);
                         }
                         else {
                             // filter for patterns
@@ -1260,7 +1262,7 @@ string processDirectory(string directory, string pattern, bool exclude, bool (*c
                                 if (!exclude && !found)
                                     continue;
                             }
-                            
+                          
                             // process regular files
                             if (!callback(file)) {
                                 subDirs.clear();
@@ -1291,7 +1293,7 @@ string processDirectory(string directory, string pattern, bool exclude, bool (*c
     // recurse through subdirs
     if (maxDepth != 1)
         for (auto &dir: subDirs)
-            processDirectory(dir, pattern, exclude, callback, passData, maxDepth > -1 ? maxDepth - 1 : -1, file.origDir);
+            processDirectory(dir, pattern, exclude, filterDirs, callback, passData, maxDepth > -1 ? maxDepth - 1 : -1, file.origDir);
     
     return "";
 }
@@ -1343,14 +1345,14 @@ bool pdBackupsCallback(pdCallbackData &file) {
    for single-file backups the file is returned, for faub backups the containing directory
    is returned.  backupType specifies which types to return.
  */
-string processDirectoryBackups(string directory, string pattern, bool exclude, bool (*callback)(pdCallbackData&), void *passData, backupTypes backupType, int maxDepth) {
+string processDirectoryBackups(string directory, string pattern, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, backupTypes backupType, int maxDepth) {
     internalPDBDataType data;
     data.realCallback = callback;
     data.realDataPtr = passData;
     data.backupType = backupType;
     data.baseSlashes = (int)count(directory.begin(), directory.end(), '/');
 
-    return processDirectory(directory, pattern, exclude, pdBackupsCallback, &data, maxDepth == -1 ? 4 : maxDepth);
+    return processDirectory(directory, "(/\\d{2,4}$)|(" + pattern + ")", false, filterDirs, pdBackupsCallback, &data, maxDepth == -1 ? 4 : maxDepth);
 }
 
 

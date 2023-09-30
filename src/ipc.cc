@@ -864,7 +864,7 @@ bool firstAvailIDCallback(pdCallbackData &file) {
 string firstAvailIDForDir(string dir) {
     string lastID = "";
 
-    processDirectory(ue(dir), "", false, firstAvailIDCallback, &lastID, 1);
+    processDirectory(ue(dir), "", false, false, firstAvailIDCallback, &lastID, 1);
 
     if (!lastID.length())
         return "A";

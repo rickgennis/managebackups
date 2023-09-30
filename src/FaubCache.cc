@@ -130,7 +130,7 @@ void FaubCache::restoreCache(string profileName) {
     coreProfile = profileName;
     DEBUG(D_faub) DFMT(profileName);
     
-    processDirectoryBackups(ue(baseDir), "/" + coreProfile + "-", false, restoreCacheCallback, &data, FAUB_ONLY);
+    processDirectoryBackups(ue(baseDir), "/" + coreProfile + "-", true, restoreCacheCallback, &data, FAUB_ONLY);
     
     // all backups are loaded; now see which are missing stats and recache them
     recache("");
@@ -532,7 +532,7 @@ bool fcCleanupCallback(pdCallbackData &file) {
 void FaubCache::cleanup() {
     FaubCache *fc = this;
     
-    processDirectory(slashConcat(GLOBALS.cacheDir, uuid), string(SUFFIX_FAUBSTATS) + "$", false, fcCleanupCallback, fc);
+    processDirectory(slashConcat(GLOBALS.cacheDir, uuid), string(SUFFIX_FAUBSTATS) + "$", false, false, fcCleanupCallback, fc);
 }
 
 

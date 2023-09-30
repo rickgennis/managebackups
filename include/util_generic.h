@@ -246,7 +246,7 @@ struct pdCallbackData {
 };
 
 enum backupTypes { SINGLE_ONLY, FAUB_ONLY, ALL_BACKUPS };
-string processDirectory(string directory, string pattern, bool exclude, bool (*callback)(pdCallbackData&), void *passData, int maxDepth = -1, string internalUseDir = "");
+string processDirectory(string directory, string pattern, bool exclude, bool allDirs, bool (*callback)(pdCallbackData&), void *passData, int maxDepth = -1, string internalUseDir = "");
 string processDirectoryBackups(string directory, string pattern, bool exclude, bool (*callback)(pdCallbackData&), void *passData, backupTypes backupType, int maxDepth = -1);
 
 string progressPercentageA(int totalIterations, int totalSteps = 7, int iterationsComplete = 0, int stepsComplete = 0, string detail = "");
