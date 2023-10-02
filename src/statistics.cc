@@ -185,7 +185,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
     }
     else {
         for (auto &config: configManager.configs)
-            if (!config.temp) {
+            if (!config.temp && !config.settings[sPaths].value.length()) {
                 ++nonTempConfigs;
                 perStats = calculateSummaryStats(config, statDetail);
                 totalStats.lastBackupBytes += perStats.lastBackupBytes;
@@ -640,7 +640,7 @@ void displayDetailedStatsWrapper(ConfigManager& configManager, int statDetail) {
     else {
         bool previous = false;
         for (auto &config: configManager.configs) {
-            if (!config.temp) {
+            if (!config.temp && !config.settings[sPaths].value.length()) {
                 
                 if (previous)
                     cout << "\n\n";

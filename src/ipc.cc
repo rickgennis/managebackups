@@ -66,7 +66,7 @@ ssize_t IPC_Base::ipcRead(void *data, size_t count) {
                 ++ioErrors;
                 
                 if (ioErrors > 2)
-                    throw MBException(string("multiple errors on network read - ") + strerror(errno));
+                    throw MBException(string("unable to read from the client network connection"));
             }
             else
                 return bytes;

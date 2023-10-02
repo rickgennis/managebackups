@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.6.5
+% MANAGEBACKUPS(1) managebackups 1.6.6
 % Rick Ennis
 % March 2023
 
@@ -40,7 +40,16 @@ Faub-style backups, similar to the underlying approach of Apple's Time Machine, 
 In configurations using a single file backup where all backups are fulls, and therefore many are potentially identical, **managebackups** can save disk space by hard linking identical copies together.  This is done by default when identical copies are identified. In Faub-style backups hard linking is automatically implemented on a per-file basis.
 
 # PROFILES
-Backup profiles are a collection of settings describing a backup set -- its directory to save backups to, the command to take the backups, how many weekly copies to keep, etc.  Once a profile is associated with a collection of options, all of those options are invoked when the profile is specified, unless an overriding option is also given.
+Backup profiles are a collection of settings describing a backup set -- its directory to save backups to, the command to take the backups, how many weekly copies to keep, etc.  Once a profile is associated with a collection of options, all of those options are invoked when the profile is specified, unless an overriding option is also given on the commandline.  There are three types of profiles:
+
+## Single File Backup Profile
+These specify the settings to perform a single-file backup.  The distinct directives to make it single-file are 'command' and 'file'. 'faub' is not applicable.
+
+## Faub-style Backup Profile
+These specify the settings to perform a Faub backup.  The distinct directive to make it Faub is 'faub'.  'command' and 'file' are not applicable.
+
+## Faub client Profile
+Faub backups require an instance of **managebackups** running in a server capacity and a client capacity.  If you're backing up a remote server that remote server will run the client version.  The client side can be invoked with the **-s** or **--path** directive, a setup which doesn't require a profile (or config file) on the client side.  Alternatively if there are multiple directives (such as 'path', 'include', 'exclude') it may be simpler to create a client side profile that can be invoked with **-p**.  See FAUB-STYLE BACKUPS below. 
 
 # OPTIONS
 Options are categorized by the three functions of **managebackups** plus general options.
@@ -68,10 +77,10 @@ Options are categorized by the three functions of **managebackups** plus general
 : Delete any existing .conf file for this profile and recreate it in the standard format. Loses any comments or other existing formatting.
 
 **-a**, **--all**
-: Execute all profiles sequentially. Can be specified by itself to prune, link, and execute backups (whatever's configured) for all profiles.  Or can be combined with limiting options like **--nobackup**, **--noprune**.
+: Execute all profiles sequentially. Can be specified by itself to prune, link, and execute backups (whatever's configured) for all profiles.  Or can be combined with limiting options like **--nobackup**, **--noprune**. Note: Profiles containing the 'path' directive are excluded.
 
 **-A**, **--All**
-: Execute all profiles in parallel. Can be specified by itself to prune, link, and execute backups (whatever's configured) for all profiles.  Or can be combined with limiting options like **--nobackup**, **--noprune**.
+: Execute all profiles in parallel. Can be specified by itself to prune, link, and execute backups (whatever's configured) for all profiles.  Or can be combined with limiting options like **--nobackup**, **--noprune**. Note: Profiles containing the 'path' directive are excluded.
 
 **-k**, **--cron**
 : Sequential cron execution.  Equivalent to "-a -x -q".
@@ -83,10 +92,10 @@ Options are categorized by the three functions of **managebackups** plus general
 : Run (backup, prune, link) the default profile. Or can be combined with limiting options like **--nobackup**, **--noprune**. Normally running a profile is achieved by specifying the **--profile** name and **-g** is not required.  **-g** is simply a shortcut for the default profile, if defined.
 
 **-0**
-: Provide a summary of backups. **-0** can be specified up to 5 times for different formatting of sizes. It can also be combined with -p to limit output to a single profile.
+: Provide a summary of backups. **-0** can be specified up to 5 times for different formatting of sizes. It can also be combined with -p to limit output to a single profile. Note: Profiles containing the 'path' directive are excluded.
 
 **-1**
-: Provide detail of backups. **-1** can be specified up to 5 times for different formatting of sizes. It can also be combined with -p to limit output to a single profile.
+: Provide detail of backups. **-1** can be specified up to 5 times for different formatting of sizes. It can also be combined with -p to limit output to a single profile. Note: Profiles containing the 'path' directive are excluded.
 
 **--test**
 : Run in test mode. No changes are actually made to disk (no backups, pruning or linking).
@@ -252,7 +261,7 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 : {FB} Apply **--include** or **--exclude** filtering to subdirectory names.
 
 **-s**, **--path** [*path*]
-: {FB-remote} Specifies which directories to backup in a faub-style backup.  This option is only used on the REMOTE end, i.e. the server being backed up. See the FAUB-STYLE BACKUPS section below. Multiple paths can be specified via quoted parameters that are space delimited (--path "/usr /usr/local /root") or multiple directives (--path /usr --path /usr/local).
+: {FB-remote} Specifies which directories to backup in a faub-style backup.  This option is only used on the REMOTE end, i.e. the server being backed up. See the FAUB-STYLE BACKUPS section below. Multiple paths can be specified via quoted parameters that are space delimited (--path "/usr /usr/local /root") or multiple directives (--path /usr --path /usr/local). Note: If specified on the commandline and in a selected profile, the commandline paths replace *all* of the ones in the profile for that one.
 
 ## 2. Pruning Options
 
@@ -336,6 +345,10 @@ Without the authorized_keys2 file you would need the options in your faub config
 
     --faub "ssh dataserver sudo managebackups --path /usr/local/bin"
     
+Another simplification would be to create a profile (for example, "dataclient") on the dataserver that includes the 'path' directive and any others desired options (include, exclude, filterdirs, etc).  Then the --faub command on the server could become:
+
+    --faub "ssh dataserver sudo managebackups -p dataclient"
+
 Complications with configuration of faub, particularly if ssh is involved, are much easier to debug given the output of the various subcommands.  See **--leaveoutput**.
 
 # EXAMINING BACKUPS

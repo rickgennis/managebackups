@@ -244,6 +244,9 @@ void parseDirToCache(string directory, string fnamePattern, BackupCache &cache) 
  * Wrapper function for parseDirToCache().
  *******************************************************************************/
 void scanConfigToCache(BackupConfig &config) {
+    if (config.settings[sPaths].value.length())
+        return;
+    
     if (config.isFaub()) {
         config.fcache.restoreCache(config.settings[sDirectory].value, config.settings[sTitle].value, config.settings[sUUID].value);
         
@@ -406,14 +409,26 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
                                 break;
                             }
                     }
-                    
+
                     if (bSave && (setting.value != GLOBALS.cli[setting.display_name].as<string>()))
                         currentConf->modified = 1;
+                    
                     setting.value = GLOBALS.cli[setting.display_name].as<string>();
                     setting.execParam = "--" + setting.display_name + " '" + setting.value + "'";
                     
                     if (setting.display_name == CLI_TRIPWIRE)
                         verifyTripwireParams(setting.value);
+                    break;
+                    
+                case STRING_VECTOR:
+                    if (bSave)
+                        currentConf->modified = 1;
+                        
+                    setting.value = "";
+                    for (auto &item : GLOBALS.cli[setting.display_name].as<vector<string>>()) {
+                        for (auto &subitem : string2vector(item))
+                            setting.value += string(setting.value.length() ? " " : "") + subitem;
+                    }
                     break;
                     
                 case OCTAL:
@@ -472,7 +487,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
     // convert --fp (failsafe paranoid) to its separate settings
     if (GLOBALS.cli.count(CLI_FS_FP)) {
         if (GLOBALS.cli.count(CLI_FS_DAYS) || GLOBALS.cli.count(CLI_FS_BACKUPS) || GLOBALS.cli.count(CLI_FS_SLOW)) {
-            SCREENERR("error: --" << CLI_FS_FP << " is mutually exclusive with --" << CLI_FS_DAYS << ", --" << CLI_FS_BACKUPS << ", --" << CLI_FS_SLOW);
+            SCREENERR("error: --" << CLI_FS_FP << " is mutually-exclusive with --" << CLI_FS_DAYS << ", --" << CLI_FS_BACKUPS << ", --" << CLI_FS_SLOW);
             exit(1);
         }
         
@@ -497,7 +512,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
     }
     
     // user doesn't want to show stats & this isn't a faub client run via --path
-    if (!GLOBALS.stats && !GLOBALS.cli.count(CLI_PATHS) &&
+    if (!GLOBALS.stats && !currentConf->settings[sPaths].value.length() &&
         
         // & the current profile (either via -p or full config spelled out in CLI) doesn't have a
         // dir specified
@@ -1036,8 +1051,7 @@ string interpolate(string command, string subDir, string fullDirectory, string b
  *
  * SCP the backup to the specified location.
  *******************************************************************************/
-methodStatus sCpBackup(BackupConfig &config, string backupFilename, string subDir, string sCpParams)
-{
+methodStatus sCpBackup(BackupConfig &config, string backupFilename, string subDir, string sCpParams) {
     string sCpBinary = locateBinary("scp");
     timer sCpTime;
     
@@ -2189,7 +2203,7 @@ int main(int argc, char *argv[]) {
     DEBUG(D_any) DFMT("about to setup config...");
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager, GLOBALS.cli.count(CLI_GO) || GLOBALS.cli.count(CLI_COMPARE) || GLOBALS.cli.count(CLI_COMPAREFILTER)|| GLOBALS.cli.count(CLI_LAST) || GLOBALS.cli.count(CLI_RECALC) || GLOBALS.cli.count(CLI_RELOCATE));
-    
+        
     if (currentConfig->modified)
         currentConfig->saveConfig();
     
@@ -2305,12 +2319,18 @@ int main(int argc, char *argv[]) {
         if (!currentConfig->temp)
             scanConfigToCache(*currentConfig);
         else
-            for (auto &config : configManager.configs)
-                if (!config.temp) scanConfigToCache(config);
+            for (auto &config : configManager.configs) {
+                DEBUG(D_scan) DFMT("pre-uuid = " << config.settings[sUUID].value << "[" << config.temp << "]");
+                if (!config.temp)
+                    scanConfigToCache(config);
+                DEBUG(D_scan) DFMT("post-uuid = " << config.settings[sUUID].value);
+            }
         
         GLOBALS.cli.count(CLI_STATS1)
         ? displayDetailedStatsWrapper(configManager, (int)GLOBALS.cli.count(CLI_STATS1))
         : displaySummaryStatsWrapper(configManager, (int)GLOBALS.cli.count(CLI_STATS2));
+        //DEBUG(D_scan) DFMT("last-uuid = " << config.settings[sUUID].value);
+
     }
     else {  // "all" profiles locking is handled here; individual profile locking is handled further
         // down in the NORMAL RUN
@@ -2387,32 +2407,9 @@ int main(int argc, char *argv[]) {
         if (GLOBALS.debugSelector) commonSwitches += " -v=" + to_string(GLOBALS.debugSelector);
         
         try {
-            if (GLOBALS.cli.count(CLI_PATHS)) {
-                // get the list of --path "foo" --path "bar" parameters that are set
-                auto paths = GLOBALS.cli[CLI_PATHS].as<vector<string>>();
-                vector<string> newPaths;
-                
-                // loop through to see if any are space-delimited containing multiple paths in one
-                for (auto &p: paths) {
-                    Pcre pathRE("((?:([\'\"])(?:(?!\\g2).|(?:(?<=\\\\)[\'\"]))+(?<!\\\\)\\g2)|(?:\\S|(?:(?<=\\\\)\\s))+)", "g");
-                    size_t pos = 0;
-                    string match;
-                    
-                    while (pos <= p.length() && pathRE.search(p, (int)pos)) {
-                        pos = pathRE.get_match_end(0);
-                        ++pos;
-                        match = pathRE.get_match(0);
-                        
-                        if (match.length())
-                            newPaths.insert(newPaths.end(), trimQuotes(match));
-                    }
-                    
-                }
-                
-                paths = newPaths;
-                
-                // start faub client-side
-                fc_mainEngine(paths);
+            // start faub client-side
+            if (currentConfig->settings[sPaths].value.length()) {
+                fc_mainEngine(*currentConfig, string2vector(currentConfig->settings[sPaths].value, true, false));
                 exit(1);
             }
             
@@ -2426,7 +2423,7 @@ int main(int argc, char *argv[]) {
                 NOTQUIET && cout << "starting sequential processing of all profiles" << endl;
                                 
                 for (auto &config : configManager.configs) {
-                   if (!config.temp) {
+                   if (!config.temp && !config.settings[sPaths].value.length()) {
                        NOTQUIET &&cout << "\n"
                        << BOLDBLUE << "[" << config.settings[sTitle].value << "]"
                        << RESET << "\n";
@@ -2454,7 +2451,7 @@ int main(int argc, char *argv[]) {
                 
                 map<int, PipeExec> childProcMap;
                 for (auto &config : configManager.configs)
-                    if (!config.temp) {
+                    if (!config.temp && !config.settings[sPaths].value.length()) {
                         // launch each profile in a separate child
                         PipeExec miniMe(string(argv[0]) + " -p " + config.settings[sTitle].value +
                                         commonSwitches + " -z");

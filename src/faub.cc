@@ -547,11 +547,13 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     catch (MBException &e) {
         notify(config, "\t• " + config.ifTitle() + " Error (exception): " + e.detail(), false);
         log(config.ifTitle() + "  error (exception): " + e.detail());
+        SCREENERR("error (exception): " + e.detail());
         rmrf(currentDir);
     }
     catch (...) {
         notify(config, "\t• " + config.ifTitle() + " Error (exception): unknown", false);
         log(config.ifTitle() + "  error (exception), unknown");
+        SCREENERR("error (exception): unknown");
         rmrf(currentDir);
     }
 }
@@ -582,15 +584,15 @@ bool scanToServerCallback(pdCallbackData &file) {
  * Scan a filesystem, sending the filenames and their associated mtime's back
  * to the remote server. This is the client's side of phase 1.
  */
-size_t fc_scanToServer(string entryName, IPC_Base& server) {
+size_t fc_scanToServer(BackupConfig& config, string entryName, IPC_Base& server) {
     scanToServerDataType data;
     data.server = &server;
     data.totalEntries = 0;
     
-    string clude = GLOBALS.cli.count(CLI_INCLUDE) ? GLOBALS.cli[CLI_INCLUDE].as<string>() : GLOBALS.cli.count(CLI_EXCLUDE) ? GLOBALS.cli[CLI_EXCLUDE].as<string>() : "";
-    
+    string clude = config.settings[sInclude].value.length() ? config.settings[sInclude].value : config.settings[sExclude].value.length() ? config.settings[sExclude].value : "";
+
     entryName.erase(remove(entryName.begin(), entryName.end(), '\\'), entryName.end());
-    processDirectory(entryName, clude, GLOBALS.cli.count(CLI_EXCLUDE), GLOBALS.cli.count(CLI_FILTERDIRS), scanToServerCallback, &data);
+    processDirectory(entryName, clude, config.settings[sExclude].value.length(), config.settings[sFilterDirs].value.length(), scanToServerCallback, &data);
     
     return data.totalEntries;
 }
@@ -624,10 +626,24 @@ size_t fc_sendFilesToServer(IPC_Base& server) {
 }
 
 
-void fc_mainEngine(vector<string> paths) {
+void fc_mainEngine(BackupConfig& config, vector<string> origPaths) {
     try {
         IPC_Base server(0, 1, 60);  // use stdin and stdout
 
+        vector<string> paths;
+        
+        // the vector of paths that come into the function can be from the profile (conf file).
+        // each item could be a quoted list of multiple sub paths.  so we have to break it down
+        // a second time.
+        for (auto &p : origPaths) {
+            auto dirVec = string2vector(p, true, true);
+            
+            for (auto &d : dirVec) {
+                auto fileVec = expandWildcardFilespec(d);
+                paths.insert(paths.end(), fileVec.begin(), fileVec.end());
+            }
+        }
+        
         DEBUG(D_faub) DFMT("faub client starting with " << paths.size() << " request(s)");
 
         // tell server the number of filesystems we're going to process
@@ -638,7 +654,7 @@ void fc_mainEngine(vector<string> paths) {
             clientTime.start();
             
             server.ipcWrite(string(*it + NET_DELIM).c_str());
-            auto entries = fc_scanToServer(*it, server);
+            auto entries = fc_scanToServer(config, *it, server);
 
             server.ipcWrite(NET_OVER_DELIM);
             auto requests = fc_sendFilesToServer(server);

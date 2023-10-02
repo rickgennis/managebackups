@@ -56,6 +56,24 @@ bool configMgrCallback(pdCallbackData &file) {
             
             configManager->defaultConfig = backupConfig.settings[sTitle].value;
         }
+        
+        if (backupConfig.settings[sPaths].value.length() &&
+            (backupConfig.settings[sBackupCommand].value.length() || backupConfig.settings[sBackupFilename].value.length())) {
+            SCREENERR("error: 'paths' is mutually-exclusive with 'command' and 'file' in profile " << backupConfig.settings[sTitle].value);
+            exit(1);
+        }
+        
+        if (backupConfig.settings[sFaub].value.length() &&
+            (backupConfig.settings[sBackupCommand].value.length() || backupConfig.settings[sBackupFilename].value.length())) {
+            SCREENERR("error: 'faub' is mutually-exclusive with 'command' and 'file' in profile " << backupConfig.settings[sTitle].value);
+            exit(1);
+        }
+        
+        if (backupConfig.settings[sPaths].value.length() &&
+            backupConfig.settings[sFaub].value.length()) {
+            SCREENERR("error: 'paths' and 'faub' are mutually-exclusive in profile " << backupConfig.settings[sTitle].value);
+            exit(1);
+        }
    
         configManager->configs.emplace(configManager->configs.begin(), backupConfig);
     }

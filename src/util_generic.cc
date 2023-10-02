@@ -519,28 +519,50 @@ string trimQuotes(string s) {
 }
 
 
+// split a string into a vector on spaces, except where quoted or escaped
+vector<string> string2vector(string data, bool trimQ, bool unEscape) {
+    Pcre regex("((?:([\'\"])(?:(?!\\g2).|(?:(?<=\\\\)[\'\"]))+(?<!\\\\)\\g2)|(?:\\S|(?:(?<=\\\\)\\s))+)", "g");
+    vector<string> result;
+    string temp;
+    int pos = 0;
+    
+    while (pos <= data.length() && regex.search(data, pos)) {
+        pos = regex.get_match_end(0);
+        ++pos;
+        temp = regex.get_match(0);
+        
+        if (unEscape) {
+            size_t altpos;  // remove any remaining backslashes
+            while ((altpos = temp.find("\\")) != string::npos)
+                temp.erase(altpos, 1);
+        }
+        
+        result.push_back(trimQ ? trimQuotes(temp) : temp);
+    }
+
+    return result;
+}
+
+
 int varexec(string fullCommand) {
-    // split the command into a parameter list on spaces, except when quoted or escaped
-    Pcre cmdRE("((?:([\'\"])(?:(?!\\g2).|(?:(?<=\\\\)[\'\"]))+(?<!\\\\)\\g2)|(?:\\S|(?:(?<=\\\\)\\s))+)", "g");
     char *params[400];
     string match;
-
     int index = 0;
-    int pos = 0;
-    while (pos <= fullCommand.length() && cmdRE.search(fullCommand, pos)) {
-        pos = cmdRE.get_match_end(0);
-        ++pos;
-        match = cmdRE.get_match(0);
+    
+    // don't let string2vector remove quotes (i.e. cleanup) because we want
+    // to check for quoted wildcards first
+    auto tokens = string2vector(fullCommand, false, false);
 
-        // if its a valid string
-        if (match.length() &&
+    for (auto &token: tokens) {
+        /* token contains wildcard, add the matching files instead */
+        if (token.length() &&   // if its a valid string
                 // not quoted
-                !((match.front() == '\'' || match.front() == '\"') && match.front() == match.back()) &&
+                !((token.front() == '\'' || token.front() == '\"') && token.front() == token.back()) &&
                 // and has shell wildcards
-                (match.find("*") != string::npos || match.find("?") != string::npos)) {
-                
+                (token.find("*") != string::npos || token.find("?") != string::npos)) {
+
             // then replace the parameter with a wildcard expansion of the matching files
-            auto files = expandWildcardFilespec(trimQuotes(match));
+            auto files = expandWildcardFilespec(trimQuotes(token));
 
             for (auto entry: files) {
                 // no need to free() this because we're going to exec()
@@ -550,21 +572,23 @@ int varexec(string fullCommand) {
                 strcpy(params[index++], entry.c_str());
             }
         } 
+        
+        /* token doesn't contain a wildcard, just add the item */
         else {
             size_t altpos;
             // escaping is handled above by cmdRE and is complete by the time we get here
             // so now we remove any remaining backslashes in the string
-            if ((altpos = match.find("\\")) != string::npos)
-                match.erase(altpos, 1);
+            while ((altpos = token.find("\\")) != string::npos)
+                token.erase(altpos, 1);
 
-            params[index] = (char *)malloc(match.length() + 1);
+            params[index] = (char *)malloc(token.length() + 1);
 
             // and drop any quotes that are on the ends
-            strcpy(params[index++], trimQuotes(match).c_str());
+            strcpy(params[index++], trimQuotes(token).c_str());
         }
     }
     params[index] = NULL;
-
+    
     if (!index) {
         cerr << "********* EXEC NO CMD ************" << endl;
         exit(1);

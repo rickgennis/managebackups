@@ -76,7 +76,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_INCLUDE, RE_INCLUDE, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_EXCLUDE, RE_EXCLUDE, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_FILTERDIRS, RE_FILTERDIRS, BOOL, "false"));
-    settings.insert(settings.end(), Setting(CLI_PATHS, RE_PATHS, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_PATHS, RE_PATHS, STRING_VECTOR, ""));
 
     // CLI_PATHS is intentionally left out because its only accessed via CLI
     // and never as a Setting.  to implement it as a Setting would require a new
@@ -368,7 +368,7 @@ bool BackupConfig::loadConfig(string filename) {
             modified = true;
         }
         
-        DEBUG(D_config) DFMT("successfully parsed [" << settings[sTitle].value << "] config from " << filename);
+        DEBUG(D_config) DFMT("successfully parsed [" << settings[sTitle].value << "] config from " << filename << " (uuid " << settings[sUUID].value << ")");
 
         return 1;
     }

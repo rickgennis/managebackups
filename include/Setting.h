@@ -10,7 +10,7 @@
 using namespace std;
 using namespace pcrepp;
 
-enum SetType { INT, STRING, BOOL, OCTAL, SIZE };
+enum SetType { INT, STRING, BOOL, OCTAL, SIZE, STRING_VECTOR };
 enum SetSpecifier { sTitle, sDirectory, sBackupFilename, sBackupCommand, sDays, sWeeks, sMonths, sYears, sFailsafeBackups, sFailsafeDays,
     sSCPTo, sSFTPTo, sPruneLive, sNotify, sMaxLinks, sIncTime, sNos, sMinSize, sDOW, sFP, sMode, sMinSpace, sMinSFTPSpace, sNice, sTripwire, 
     sNotifyEvery, sMailFrom, sLeaveOutput, sFaub, sUID, sGID, sConsolidate, sBloat, sUUID, sFailsafeSlow, sDefault, sDataOnly, sInclude, sExclude, sFilterDirs,
