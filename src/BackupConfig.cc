@@ -209,7 +209,7 @@ void BackupConfig::saveConfig() {
                 
                 // for UUID add a comment
                 if (setting.display_name == CLI_UUID)
-                    newFile << setting.display_name << usersDelimiter << setting.value << "\t\t# links config to cache (do not change)"<< endl;
+                    newFile << setting.display_name << (usersDelimiter.length() ? usersDelimiter : ":\t") << setting.value << "\t\t# links config to cache (do not change)" << endl;
                 else
                     // if fp is set then don't add fs_days or fs_backups
                     if (!str2bool(settings[sFP].value) || (setting.display_name != CLI_FS_DAYS && setting.display_name != CLI_FS_BACKUPS))
