@@ -42,17 +42,15 @@ $(ODIR)/%.o: %.cc $(DEPS)
 clean:
 	rm -f $(ODIR)/*.o *~ core $(INCDIR)/*~ help.cc
 
+
+# personal home LAN setup
 fw:
 	/usr/local/bin/publish
 	tar --no-xattrs -C /Users/rennis --exclude "*.o" --exclude "help.cc" -czf /tmp/managebackups.tgz managebackups
 	scp /tmp/managebackups.tgz compile1@fw:/data
 	ssh compile2@fw 
 
+# to compile for two architectures
 both:
 	make && make fw
 
-skip:
-	/usr/local/bin/publish skip
-	tar --no-xattrs -C /Users/rennis --exclude "*.o" --exclude "help.cc" -czf /tmp/managebackups.tgz managebackups
-	scp /tmp/managebackups.tgz compile1@fw:/data
-	ssh compile2@fw 
