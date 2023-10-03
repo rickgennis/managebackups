@@ -117,9 +117,11 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     size_t unmodDirs = 0;
     size_t linkErrors = 0;
     string tempExtension = ".tmp." + to_string(GLOBALS.pid);
+    bool abortBackupAtEnd = false;
 
     // note start time
     timer backupTime;
+    timer fsTime;
     backupTime.start();
 
     /*
@@ -142,7 +144,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             - sets the mtime on all directories in the newly created backup
      */
     
-    try {       
+    try {
         DEBUG(D_any) DFMT("current: " << currentDir);
         DEBUG(D_any) DFMT("previous: " << prevDir);
         
@@ -168,6 +170,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         
         /* loop through filesystems */
         do {
+            fsTime.start();
+
             // needed (i.e. modified) files for this filesystem (pass of the protocol)
             set<string> neededFiles;
             
@@ -471,15 +475,34 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             filesSymLinked += symLinkList.size();
             ++completeFS;
             
+            fsTime.stop();
+            
+            // if it's been more than 5 minutes and no files are found (modified, unmodified, anything)
+            // then we have a timeout error - such as when the OS prompts for permission to read a
+            // protected directory but there's no user around to answer.  we have to finish the network
+            // conversation to let the client instance terminate, then we'll blow away the failed backup
+            // on the server side.
+            if (!filesModified && !filesHardLinked && !filesSymLinked && fsTime.seconds() > 600)
+                abortBackupAtEnd = true;
+            
         } while (client.ipcRead());
 
         // note finish time
         backupTime.stop();
         NOTQUIET && ANIMATE && cout << progressPercentageA((int)0, (int)0) << backspaces << blankspaces << backspaces << flush;
         
+        if (abortBackupAtEnd) {
+            string errorDetail = config.ifTitle() + " backup aborted due to timeout on the faub client end";
+            log(errorDetail);
+            SCREENERR(errorDetail);
+            notify(config, "\t• " + errorDetail, false);
+            rmrf(currentDir);
+            return;
+        }
+        
         // if time isn't included we may be about to overwrite a previous backup for this date
         if (!incTime)
-            rmrf(originalCurrentDir.c_str());
+            rmrf(originalCurrentDir);
         
         if (rename(string(currentDir).c_str(), originalCurrentDir.c_str())) {
             if (!filesModified && !filesHardLinked && !filesSymLinked) {
