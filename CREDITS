@@ -1,0 +1,9 @@
+Dependencies:
+
+      • OpenSSL (1.1.1s) for calculation of MD5s
+
+      • pcre (8.45) for support of regular expressions
+
+      • pcre++ (0.9.5) as a C++ interface to pcre
+
+      • CXXOPTS (https://github.com/jarro2783/cxxopts)
