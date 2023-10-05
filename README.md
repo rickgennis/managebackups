@@ -2,7 +2,7 @@ MANAGEBACKUPS
 
 managebackups provides three functions that can be run independently or in combination:
       
-   1. Take Backups
+   1. Take Backups: 
        Backups can be configured in one of two forms:
 
        • Single file: A single file backup is any of the standard Linux backup commands (tar, cpio, dump) that result in a single compressed file.  Given a backup command (tar, etc) managebackups will execute the
@@ -26,12 +26,12 @@ managebackups provides three functions that can be run independently or in combi
              -rw-r--r--   3 root  wheel  2245 Apr 02 07:02 /var/backups/2023/04/02/firewall_main-2023-04-02@15:07:56/etc/passwd
              -rw-r--r--   3 root  wheel  2245 Apr 02 07:02 /var/backups/2023/04/02/firewall_main-2023-04-02@21:10:22/etc/passwd
 
-   2. Prune Backups
+   2. Prune Backups: 
        managebackups deletes old backups that have aged out.  The retention critera is configured on a daily, weekly, monthly and yearly basis.  By default managebackups will keep 14 daily, 4 weekly, 6 monthly and 2
        yearly backups.  Additionally, managebackups can perform a second level of pruning called consolidation.  If elected, multiple backups taken on the same day can be consolidated down to a single per day backup
        after said backup has reached a specified age.  The default is no consolidation.
 
-   3. Hard Linking
+   3. Hard Linking: 
        In configurations using a single file backup where all backups are fulls, and therefore many are potentially identical, managebackups can save disk space by hard linking identical copies together.  This is done
        by default when identical copies are identified.  In Faub-style backups hard linking is automatically implemented on a per-file basis.
 
