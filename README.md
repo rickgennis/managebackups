@@ -1,7 +1,7 @@
 MANAGEBACKUPS
 
-      managebackups provides three functions that can be run independently or in combination:
-
+managebackups provides three functions that can be run independently or in combination:
+      
    1. Take Backups
        Backups can be configured in one of two forms:
 
