@@ -25,6 +25,7 @@ bit_table debug_options[]      = { /* must be in alphabetical order and use
   BIT_TABLE(D, netproto),
   BIT_TABLE(D, notify),
   BIT_TABLE(D, prune),
+  BIT_TABLE(D, recalc),
   BIT_TABLE(D, scan),
   BIT_TABLE(D, transfer),
   BIT_TABLE(D, tripwire),
@@ -68,7 +69,7 @@ void decode_bits(unsigned int *selector, size_t selsize, int *notall,
         if (!*end)
             return;
 
-        printf("unknown debugging selection: %s", parsestring); 
+        printf("unknown debugging selection: %s\n", parsestring);
         return;
     }
 
@@ -86,7 +87,7 @@ void decode_bits(unsigned int *selector, size_t selsize, int *notall,
             return;
 
         if (*parsestring != '+' && *parsestring != '-') {
-            printf("unknown debugging flag (should be + or -_: %s", parsestring);
+            printf("unknown debugging flag (should be + or -_: %s\n", parsestring);
             return;
         }
 
@@ -134,7 +135,7 @@ void decode_bits(unsigned int *selector, size_t selsize, int *notall,
         }  /* Loop to match selector name */
 
         if (start >= end) {
-            printf("unknown debugging selection: %c%s", adding ? '+' : '-', s);
+            printf("unknown debugging selection: %c%s\n", adding ? '+' : '-', s);
             return;
         }
     }    /* Loop for selector names */

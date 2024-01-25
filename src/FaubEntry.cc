@@ -84,6 +84,7 @@ bool FaubEntry::loadStats() {
         string2stats(data);
         cacheFile.close();
 
+        DEBUG(D_cache) DFMT("loaded " + cacheFilename(SUFFIX_FAUBSTATS));
         return true;
     }
 
@@ -177,9 +178,22 @@ void FaubEntry::loadInodes() {
 
 
 void FaubEntry::removeEntry() {
-    unlink(cacheFilename(SUFFIX_FAUBSTATS).c_str());
-    unlink(cacheFilename(SUFFIX_FAUBINODES).c_str());
-    unlink(cacheFilename(SUFFIX_FAUBDIFF).c_str());
+    int result = 0;
+    if ((result = unlink(cacheFilename(SUFFIX_FAUBSTATS).c_str()))) {
+        log("note: " + cacheFilename(SUFFIX_FAUBSTATS) + " didn't exist for deletion");
+        DEBUG(D_prune) DFMT("no cache to delete - " << cacheFilename(SUFFIX_FAUBSTATS));
+    }
+    else
+        log(cacheFilename(SUFFIX_FAUBSTATS) + " deleted");  // REMOVE
+    
+    if (unlink(cacheFilename(SUFFIX_FAUBINODES).c_str()))
+        DEBUG(D_prune) DFMT("no cache to delete - " << cacheFilename(SUFFIX_FAUBINODES));
+    
+    if (unlink(cacheFilename(SUFFIX_FAUBDIFF).c_str()))
+        DEBUG(D_prune) DFMT("no cache to delete - " << cacheFilename(SUFFIX_FAUBDIFF));
+
+    log("removed " + cacheFilename(SUFFIX_FAUBSTATS) + " cache file for " + directory + " (" + to_string(result) + " )");
+    DEBUG(D_prune) DFMT("cache files deleted - " << cacheFilename(SUFFIX_FAUBSTATS));
 }
 
 

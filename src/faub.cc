@@ -329,10 +329,11 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
              * in the order we've requested in the format of 8 bytes each for uid, gid,
              * mode, mtime, size and then the data ('size' number of bytes).
              */
+            bool showDetail = NOTQUIET && ANIMATE && fsTotalBytesNeeded > 1000000;
             string label = ": transferred ";
             auto backs = string(label.length(), '\b');
             auto blanks = string(label.length(), ' ');
-            cout << label;
+            showDetail && cout << label;
             
             for (auto &file: neededFiles) {
                 DEBUG(D_netproto) DFMT("server waiting for " << file);
@@ -354,14 +355,12 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                     if (S_ISLNK(mode))
                         ++receivedSymLinks;
             
-                if (fsTotalBytesNeeded > 1000000)
-                    NOTQUIET && ANIMATE && cout << progressPercentageB(fsTotalBytesNeeded, fsBytesReceived) << flush;
+                    showDetail && cout << progressPercentageB(fsTotalBytesNeeded, fsBytesReceived) << flush;
             }
             
-            if (fsTotalBytesNeeded > 1000000)
-                NOTQUIET && ANIMATE && cout << progressPercentageB((long)0, (long)0) << flush;
+            showDetail && cout << progressPercentageB((long)0, (long)0) << backs << blanks << backs << flush;
             
-            NOTQUIET && ANIMATE && cout << backs << blanks << backs << progressPercentageA((int)totalFS, 7, completeFS, 3) << flush;
+            NOTQUIET && ANIMATE && cout << progressPercentageA((int)totalFS, 7, completeFS, 3) << flush;
             DEBUG(D_netproto) DFMT(fs << " server phase 3 complete; received " << plural((int)neededFiles.size(), "file") + " from client");
             
             

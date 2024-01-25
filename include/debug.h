@@ -67,6 +67,7 @@ enum {
   DEBUG_BIT(netproto),
   DEBUG_BIT(notify),
   DEBUG_BIT(prune),
+  DEBUG_BIT(recalc),
   DEBUG_BIT(scan),
   DEBUG_BIT(transfer),
   DEBUG_BIT(tripwire),
@@ -87,7 +88,8 @@ enum {
                                          D_faub             | \
                                          D_netproto         | \
                                          D_notify           | \
-                                         D_tripwire))
+                                         D_tripwire         | \
+                                         D_recalc))
 
 
 #define DEBUG(x)      if (GLOBALS.debugSelector & (x))

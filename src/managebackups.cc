@@ -316,14 +316,14 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
     
     // if --profile is specified on the command line set the active config
     if (bProfile) {
-        int configNumber;
-        if ((configNumber = configManager.findConfig(GLOBALS.cli[CLI_PROFILE].as<string>())) > 0) {
+        auto [configNumber, msg] = configManager.findConfig(GLOBALS.cli[CLI_PROFILE].as<string>());
+        if (configNumber > 0) {
             configManager.activeConfig = configNumber - 1;
             currentConf = &configManager.configs[configManager.activeConfig];
         }
         else
             if (configNumber == -1) {
-                SCREENERR("error: more than one profile matches selection.");
+                SCREENERR("error: more than one profile matches selection (" + msg + ").");
                 exit(1);
             }
             else
@@ -347,7 +347,8 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
                 saveErrorAndExit();
             
             if (configManager.defaultConfig.length()) {
-                configManager.activeConfig = configManager.findConfig(configManager.defaultConfig) - 1;
+                auto [activeC, msg] = configManager.findConfig(configManager.defaultConfig);
+                configManager.activeConfig = activeC - 1;
                 currentConf = &configManager.configs[configManager.activeConfig];
                 
             }
@@ -2320,10 +2321,11 @@ int main(int argc, char *argv[]) {
             scanConfigToCache(*currentConfig);
         else
             for (auto &config : configManager.configs) {
-                DEBUG(D_scan) DFMT("pre-uuid = " << config.settings[sUUID].value << "[" << config.temp << "]");
-                if (!config.temp)
+                if (!config.temp) {
+                    DEBUG(D_scan) DFMT("pre-uuid = " << config.settings[sUUID].value << " [" << config.temp << "]");
                     scanConfigToCache(config);
-                DEBUG(D_scan) DFMT("post-uuid = " << config.settings[sUUID].value);
+                    DEBUG(D_scan) DFMT("post-uuid = " << config.settings[sUUID].value);
+                }
             }
         
         GLOBALS.cli.count(CLI_STATS1)

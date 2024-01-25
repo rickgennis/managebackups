@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.6.7
+% MANAGEBACKUPS(1) managebackups 1.6.7a
 % Rick Ennis
 % March 2023
 
@@ -92,10 +92,10 @@ Options are categorized by the three functions of **managebackups** plus general
 : Run (backup, prune, link) the default profile. Or can be combined with limiting options like **--nobackup**, **--noprune**. Normally running a profile is achieved by specifying the **--profile** name and **-g** is not required.  **-g** is simply a shortcut for the default profile, if defined.
 
 **-0**
-: Provide a summary of backups. **-0** can be specified up to 5 times for different formatting of sizes. It can also be combined with -p to limit output to a single profile. Note: Profiles containing the 'path' directive are excluded.
+: Provide a summary of backups. **-0** can be specified up to 5 times for different formatting of sizes. It can also be combined with **-p** to limit output to a single profile. Note: Profiles containing the 'path' directive are excluded.
 
 **-1**
-: Provide detail of backups. **-1** can be specified up to 5 times for different formatting of sizes. It can also be combined with -p to limit output to a single profile. Note: Profiles containing the 'path' directive are excluded.
+: Provide detail of backups. **-1** can be specified up to 5 times for different formatting of sizes. It can also be combined with **-p** to limit output to a single profile. Note: Profiles containing the 'path' directive are excluded.
 
 **--test**
 : Run in test mode. No changes are actually made to disk (no backups, pruning or linking).
@@ -287,7 +287,7 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 : Prune backups down to a single backups per day once they're *days* days old. If you take multiple backups of the same profile in the same day (with **--time**), this allows you to keep only a single one after they age to *days* days but haven't reached the full retention policy to be completely deleted.
 
 **--dataonly**
-: {FB} Only retain backups with changed data. Backups with no changes (identical copies of the previous backup) are removed immediately.
+: {FB} Only retain backups with changed data. Backups with no changes (identical copies of the previous backup) are removed on the next run.
 
 **--fs_days** [*days*]
 : Failsafe - Require *backups* backups (see **--fs_backups**) within the last *days* days before pruning will begin.  See FAILSAFE below.
@@ -498,7 +498,7 @@ Example output from **managebackups -1 -p faub** (faub-style backup example)
 
 **managebackups -p laptop --last**
 
-    (identical output to above as this is a synonym for diffing the most recent backup to its immediate predecessor)
+    Identical output to above as this is a synonym for diffing the most recent backup to its immediate predecessor.  Additionally, if "laptop" is made the default profile (such as via "**managebackups -p laptop --default --save**") the above command can be further simplified to "**managebackups --last**".
 
 **managebackups -p laptop --diff 17:2 --diff 55:53** 
 

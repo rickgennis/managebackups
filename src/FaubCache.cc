@@ -35,7 +35,7 @@ void FaubCache::restoreCache_internal(string backupDir) {
     Pcre regEx(DATE_REGEX);
     FaubEntry entry(backupDir, coreProfile, uuid);
     auto success = entry.loadStats();
-    DEBUG(D_faub|D_cache) DFMT("loading cache for " << backupDir << (success ? ": success" : ": failed"));
+    DEBUG(D_cache) DFMT("loading cache for " << backupDir << (success ? ": success" : ": failed"));
     
     if (!success || !entry.finishTime || !entry.startDay) {
         /* here we have a backup in a directory but no cache file to describe it. all the diskstats
@@ -159,6 +159,7 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
         restoreCache_internal(targetDir);
         
     for (auto aBackup = backups.begin(); aBackup != backups.end(); ++aBackup) {
+        DEBUG(D_recalc) DFMT("examining " << aBackup->first);
         bool deletedMatch = deletedTime && filename2Mtime(aBackup->first) > deletedTime;
 
         // we're doing all
@@ -182,11 +183,14 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
 
             if (!recached)
                 NOTQUIET && ANIMATE && cout << message << flush;
-            
+           
+            DEBUG(D_recalc) DFMT("\tcalling dus(); " << forceAll << "," << (targetDir == aBackup->first) << ","
+                                 << (!targetDir.length() && ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))
+                                 << "," << nextOneToo);
             ++recached;
             set<ino_t> emptySet;
             auto ds = dus(aBackup->first, gotPrev ? prevBackup->second.inodes : emptySet, aBackup->second.inodes);
-            DEBUG(D_any) DFMT("dus(" << aBackup->first << ") returned " << ds.sizeInBytes + ds.savedInBytes << " size bytes, " << ds.sizeInBytes << " used bytes");
+            DEBUG(D_any) DFMT("\tdus(" << aBackup->first << ") returned " << ds.sizeInBytes + ds.savedInBytes << " size bytes, " << ds.sizeInBytes << " used bytes");
             aBackup->second.ds = ds;
             aBackup->second.updated = true;
             aBackup->second.dirs = ds.dirs;
@@ -366,14 +370,21 @@ size_t compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
                         
                         if (percent >= threshold)
                             if (!filter || (filter && fileType != 'l' && fileType != 'd')) {
-                                cout << BOLDRED << blockp(to_string(p) + "%", 4) << " [" << fileType << "]  " << RESET << aFile << endl;
+                                cout << BOLDRED
+                                << blockp(to_string(p) + "%", 4) << RESET
+                                << " " << blockp(approximate(statDataA.st_size), 4)
+                                << " [" << fileType << "]  " << aFile << endl;
                                 ++fileChanges;
                             }
                     }
                     else
                         if (abs(sizeChange) >= threshold)
                             if (!filter || (filter && fileType != 'l' && fileType != 'd')) {
-                                cout << BOLDRED << blockp((sizeChange >= 0 ? "+" : "-") + approximate(abs(sizeChange)), 5) << RESET << " [" << fileType << "]  " << RESET << aFile << endl;
+                                cout << BOLDRED
+                                << blockp((sizeChange >= 0 ? "+" : "-") + approximate(abs(sizeChange)), 5)
+                                << RESET << " " << blockp(approximate(statDataA.st_size), 4)
+                                << " [" << fileType << "]  "
+                                << aFile << endl;
                                 ++fileChanges;
                             }
                 }
@@ -502,7 +513,7 @@ bool fcCleanupCallback(pdCallbackData &file) {
 
                 auto bdir = pathSplit(parentDir).dir;
                 if (profileName == fc->coreProfile && bdir == fc->baseDir) {
-                    log(backupDir + " has vanished, updating cache");
+                    log(backupDir + " has vanished, updating cache (" + file.filename + ")");
                     DEBUG(D_any) DFMT(backupDir << " no longer exists; will recalculate usage of subsequent backup");
                     unlink(file.filename.c_str());
                     file.filename.replace(file.filename.find(SUFFIX_FAUBSTATS), string(SUFFIX_FAUBSTATS).length(), SUFFIX_FAUBINODES);

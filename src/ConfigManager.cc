@@ -1,8 +1,9 @@
 
 #include <fstream>
 #include <dirent.h>
-#include "pcre++.h"
+#include <tuple>
 #include <algorithm>
+#include "pcre++.h"
 #include "ConfigManager.h"
 #include "globals.h"
 #include "util_generic.h"
@@ -10,7 +11,7 @@
 using namespace pcrepp;
 
 
-int ConfigManager::findConfig(string title) {
+tuple<int, string> ConfigManager::findConfig(string title) {
     int index = 0;
     int partialMatchIdx = 0;
 
@@ -18,20 +19,24 @@ int ConfigManager::findConfig(string title) {
         ++index;
 
         if (config.settings[sTitle].value == title)   
-            return index;
+            return {index, ""};
 
         if (config.settings[sTitle].value.find(title) != string::npos) {
-            if (partialMatchIdx)
-                return -1;
-            else
+            if (partialMatchIdx) {
+                DEBUG(D_cache) DFMT("\tconfig second partial match of [" << config.settings[sTitle].value << "]");
+                return {-1, config.settings[sTitle].value + ", " + configs[index].settings[sTitle].value};
+            }
+            else {
                 partialMatchIdx = index;
+                DEBUG(D_cache) DFMT("\tconfig partial match of [" << config.settings[sTitle].value << "]");
+            }
         }
     }
 
     if (partialMatchIdx)
-        return partialMatchIdx;
+        return {partialMatchIdx, ""};
 
-    return 0;
+    return {0, ""};
 }
 
 
@@ -53,6 +58,7 @@ bool configMgrCallback(pdCallbackData &file) {
                 SCREENERR("error: only one profile can be set as the default");
                 exit(1);
             }
+
             
             configManager->defaultConfig = backupConfig.settings[sTitle].value;
         }
