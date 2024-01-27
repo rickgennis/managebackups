@@ -17,12 +17,23 @@ extern void cleanupAndExitOnError();
 using namespace pcrepp;
 
 bool operator<(const BackupConfig& b1, const BackupConfig& b2) {
-    return (b1.settings[sTitle].value < b2.settings[sTitle].value);
+    auto b1Archive = str2bool(b1.settings[sArchive].value);
+    auto b2Archive = str2bool(b2.settings[sArchive].value);
+    
+    if (b1Archive == b2Archive)
+        return (b1.settings[sTitle].value < b2.settings[sTitle].value);
+    else
+        return (b1Archive > b2Archive);
 }
 
-
 bool operator>(const BackupConfig& b1, const BackupConfig& b2) {
-    return (b1.settings[sTitle].value > b2.settings[sTitle].value);
+    auto b1Archive = str2bool(b1.settings[sArchive].value);
+    auto b2Archive = str2bool(b2.settings[sArchive].value);
+    
+    if (b1Archive == b2Archive)
+        return (b1.settings[sTitle].value > b2.settings[sTitle].value);
+    else
+        return (b1Archive < b2Archive);
 }
 
 bool operator==(const BackupConfig& b1, const BackupConfig& b2) {
@@ -77,6 +88,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_EXCLUDE, RE_EXCLUDE, STRING, ""));
     settings.insert(settings.end(), Setting(CLI_FILTERDIRS, RE_FILTERDIRS, BOOL, "false"));
     settings.insert(settings.end(), Setting(CLI_PATHS, RE_PATHS, STRING_VECTOR, ""));
+    settings.insert(settings.end(), Setting(CLI_ARCHIVE, RE_ARCHIVE, BOOL, "false"));
 
     // CLI_PATHS is intentionally left out because its only accessed via CLI
     // and never as a Setting.  to implement it as a Setting would require a new

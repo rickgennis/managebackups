@@ -24,6 +24,7 @@ string oldMessage = ">24H old";
  */
 struct summaryStats {
     bool inProcess;
+    bool archived;
     size_t lastBackupBytes;
     time_t lastBackupTime;
     size_t totalUsed;
@@ -34,7 +35,7 @@ struct summaryStats {
     string stringOutput[NUMSTATDETAILS] = {"", "(no backups found)", "-", "00:00:00", "0", "0", "0%"};
     
     summaryStats() {
-        inProcess = false;
+        inProcess = archived = false;
         lastBackupBytes = totalUsed = totalSaved = numberOfBackups = uniqueBackups = duration = 0;
     }
 };
@@ -50,6 +51,8 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
     if (config.isFaub()) {
         if (config.fcache.size() < 1) {
             resultStats.stringOutput[0] = config.settings[sTitle].value;
+            resultStats.inProcess = config.fcache.getInProcessFilename().length() > 0;
+            resultStats.archived = str2bool(config.settings[sArchive].value);
             return resultStats;
         }
         
@@ -70,7 +73,8 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         resultStats.lastBackupTime = config.fcache.getLastBackup()->second.finishTime;
         resultStats.duration = config.fcache.getLastBackup()->second.duration;
         resultStats.inProcess = inProcessFilename.length() > 0;
-        
+        resultStats.archived = str2bool(config.settings[sArchive].value);
+                
         // set string stats
         auto t = localtime(&resultStats.lastBackupTime);
         char fileTime[20];
@@ -102,6 +106,8 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
     resultStats.numberOfBackups = config.cache.rawData.size();
     if (resultStats.numberOfBackups < 1) {
         resultStats.stringOutput[0] = config.settings[sTitle].value;
+        resultStats.inProcess = false;
+        resultStats.archived = str2bool(config.settings[sArchive].value);
         return resultStats;
     }
     
@@ -167,18 +173,24 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
 
 
 void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
+    struct boolStates {
+        bool inProcess;
+        bool archived;
+        boolStates(bool p, bool a) { inProcess = p; archived = a; }
+    };
+    
     int nonTempConfigs = 0;
     int precisionLevel = statDetail > 3 ? 0 : statDetail > 1 ? 1 : -1;
     struct summaryStats perStats;
     struct summaryStats totalStats;
     vector<string> statStrings;
-    vector<bool> profileInProcess;
+    vector<boolStates> profileStats;
     bool singleConfig = configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp;
     
     // calculate totals
     if (singleConfig) {
         perStats = calculateSummaryStats(configManager.configs[configManager.activeConfig], statDetail);
-        profileInProcess.insert(profileInProcess.end(), perStats.inProcess);
+        profileStats.insert(profileStats.end(), boolStates(perStats.inProcess, perStats.archived));
         
         for (int i = 0; i < NUMSTATDETAILS; ++i)
             statStrings.insert(statStrings.end(), perStats.stringOutput[i]);
@@ -195,7 +207,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
                 totalStats.uniqueBackups += perStats.uniqueBackups;
                 totalStats.duration += perStats.duration;
                 
-                profileInProcess.insert(profileInProcess.end(), perStats.inProcess);
+                profileStats.insert(profileStats.end(), boolStates(perStats.inProcess, perStats.archived));
                 
                 for (int i = 0; i < NUMSTATDETAILS; ++i)
                     statStrings.insert(statStrings.end(), perStats.stringOutput[i]);
@@ -262,23 +274,23 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
             if (max(headers[x].length(), colLen[x]))
                 lineFormat += (lineFormat.length() ? "  " : "") + string("%") + string(x == 6 ? "" : "-") +
                 to_string(max(headers[x].length(), colLen[x])) + "s";   // 6th column is right-justified
-        
+
         // print line by line results
         char result[1000];
         int line = 0;
         while (line * NUMSTATDETAILS < numberStatStrings - (singleConfig ? 0 : NUMSTATDETAILS)) {
-            string HIGHLIGHT = profileInProcess[line] ? BOLDGREEN : BOLDBLUE;
-            string BRACKETO = profileInProcess[line] ? "{" : "[";
-            string BRACKETC = profileInProcess[line] ? "}" : "]";
+            string HIGHLIGHT = profileStats[line].inProcess ? BOLDGREEN : profileStats[line].archived ? BLUE : BOLDBLUE;
+            string BRACKETO = profileStats[line].inProcess ? "{" : "[";
+            string BRACKETC = profileStats[line].inProcess ? "}" : "]";
             string msg = statStrings[line * NUMSTATDETAILS + 9];
             bool is_old = msg == oldMessage;
-            
             bool gotAge = statStrings[line * NUMSTATDETAILS + 7].length() || statStrings[line * NUMSTATDETAILS + 8].length();
+            
             snprintf(result, sizeof(result), lineFormat.c_str(),
                      statStrings[line * NUMSTATDETAILS].c_str(),
                      statStrings[line * NUMSTATDETAILS + 1].c_str(),
                      statStrings[line * NUMSTATDETAILS + 2].c_str(),
-                     statStrings[line * NUMSTATDETAILS + 3].c_str(),
+                     (profileStats[line].archived ? "ARCHIVED" : statStrings[line * NUMSTATDETAILS + 3]).c_str(),
                      statStrings[line * NUMSTATDETAILS + 4].c_str(),
                      statStrings[line * NUMSTATDETAILS + 5].c_str(),
                      statStrings[line * NUMSTATDETAILS + 6].c_str(),

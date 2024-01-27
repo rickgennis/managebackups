@@ -307,6 +307,39 @@ string approximate(size_t size, int maxUnits, bool commas, bool base10) {
 }
 
 
+// return the printable length of a string, ignoring ANSI escape codes (i.e. colors)
+unsigned int ansistrlength(string source) {
+    auto sourceLength = source.length();
+    unsigned int resultLength = 0;
+    bool shortEsc = false;
+    bool longEsc = false;
+    
+    for (unsigned int i = 0; i < sourceLength; ++i) {
+
+        // start of multi-character escape sequence
+        if (shortEsc && !longEsc && source[i] == '[')
+            longEsc = true;
+        
+        // start of single character escape sequence
+        if (source[i] == '\x1b')
+            shortEsc = true;
+        
+        if (!shortEsc && !longEsc)
+            ++resultLength;
+        
+        // end of single character escape sequence
+        if (shortEsc && !longEsc && source[i] != '\x1b')
+            shortEsc = false;
+       
+        // end of multi-character escape sequence
+        if (longEsc && source[i] != '[' && source[i] >= '@' && source[i] <= '~')
+            shortEsc = longEsc = false;
+    }
+    
+    return resultLength;
+}
+
+
 size_t approx2bytes(string approx) {
     vector<string> units = { "B", "K", "M", "G", "T", "P", "E", "Z", "Y" };
     Pcre reg("^((?:\\d|\\.)+)\\s*(?:(\\w)(?:[Bb]$|$)|$)");

@@ -42,7 +42,8 @@ map<string, int>settingMap =
     { CLI_INCLUDE, sInclude },
     { CLI_EXCLUDE, sExclude },
     { CLI_FILTERDIRS, sFilterDirs },
-    { CLI_PATHS, sPaths }
+    { CLI_PATHS, sPaths },
+    { CLI_ARCHIVE, sArchive }
 };
 // CLI_PATHS is excluded because it's only accessed as a commandline option
 // and never as a Setting. And because its a vector<> that's one less special-

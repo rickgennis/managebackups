@@ -261,5 +261,7 @@ string errtext(bool format = true);
 
 tuple<string, string> clearMessage(string message);
 
+unsigned int ansistrlength(string source);
+
 #endif
 

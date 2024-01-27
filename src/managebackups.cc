@@ -2038,6 +2038,7 @@ int main(int argc, char *argv[]) {
         CLI_INCLUDE, "Include", cxxopts::value<std::string>())(
         CLI_EXCLUDE, "Exclude", cxxopts::value<std::string>())(
         CLI_FILTERDIRS, "Filter directories", cxxopts::value<bool>()->default_value("false"))(
+        CLI_ARCHIVE, "Archive profile", cxxopts::value<bool>()->default_value("false"))(
         CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
     
     try {
@@ -2218,6 +2219,11 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     
+    if (haveProfile(&configManager) && GLOBALS.cli.count(CLI_ARCHIVE)) {
+        cout << "profile " << currentConfig->settings[sTitle].value << " has been archived." << endl;
+        exit(0);
+    }
+    
     auto compareArgs = GLOBALS.cli.count(CLI_COMPARE) + GLOBALS.cli.count(CLI_COMPAREFILTER);
     if (compareArgs || GLOBALS.cli.count(CLI_LAST)) {
         
@@ -2309,7 +2315,7 @@ int main(int argc, char *argv[]) {
         currentConfig->fcache.recache("", 0, true);
         exit(0);
     }
-    
+        
     // if displaying stats and --profile hasn't been specified (or matched successfully)
     // then rescan all configs;  otherwise just scan the --profile config
     DEBUG(D_any) DFMT("about to scan directories...");
@@ -2425,7 +2431,8 @@ int main(int argc, char *argv[]) {
                 NOTQUIET && cout << "starting sequential processing of all profiles" << endl;
                                 
                 for (auto &config : configManager.configs) {
-                   if (!config.temp && !config.settings[sPaths].value.length()) {
+                   if (!config.temp && !config.settings[sPaths].value.length()
+                       && !str2bool(config.settings[sArchive].value)) {
                        NOTQUIET &&cout << "\n"
                        << BOLDBLUE << "[" << config.settings[sTitle].value << "]"
                        << RESET << "\n";
@@ -2453,7 +2460,8 @@ int main(int argc, char *argv[]) {
                 
                 map<int, PipeExec> childProcMap;
                 for (auto &config : configManager.configs)
-                    if (!config.temp && !config.settings[sPaths].value.length()) {
+                    if (!config.temp && !config.settings[sPaths].value.length()
+                        && !str2bool(config.settings[sArchive].value)) {
                         // launch each profile in a separate child
                         PipeExec miniMe(string(argv[0]) + " -p " + config.settings[sTitle].value +
                                         commonSwitches + " -z");

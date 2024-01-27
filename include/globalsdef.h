@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.6.7a"
+#define VERSION "1.6.8"
 
 #include "cxxopts.hpp"
 #include "colors.h"
@@ -27,7 +27,7 @@
     (4) add it to the settings vector with its default in BackupConfig::BackupConfig(bool) in BackupConfig.cc
     (5) do everything under the CLI option list above because you need a matching CLI option to override the config setting
  
- Settings are accessed as config.settings[ENUM].value or config.settings[ENUM].length()
+ Settings are accessed as config.settings[ENUM].value or config.settings[ENUM].value.length()
  Because CLI options are already mapped to settings (via B3 above) config.settings[] will already
  have handled reading the settings from the config and overriding it if the CLI option was specified.
  i.e. no need to check the CLI option for a setting.
@@ -138,6 +138,7 @@
 #define CLI_EXCLUDE "exclude"
 #define CLI_FILTERDIRS "filterdirs"
 #define CLI_UUID "uuid"      /* not really a valid CLI option just used as a setting */
+#define CLI_ARCHIVE "archive"
 
 
 // conf file regexes
@@ -185,6 +186,7 @@
 #define RE_INCLUDE "(include)"
 #define RE_EXCLUDE "(exclude)"
 #define RE_FILTERDIRS "(filterdirs)"
+#define RE_ARCHIVE "(archive|archived)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"
