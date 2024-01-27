@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.6.8
+% MANAGEBACKUPS(1) managebackups 1.6.8a
 % Rick Ennis
 % March 2023
 
@@ -186,7 +186,7 @@ Options are categorized by the three functions of **managebackups** plus general
 : Specify which day of week to take weekly backups. 0 = Sunday, 1 = Monday...  Default is 0.
 
 **--archive**
-: Set the profile to Archive mode so no pruning takes place and its excluded from -a and -A runs.  Use with --save.
+: Set the profile to Archive mode; use with **--save**. In Archive mode the profile is skipped from "all" runs (**-a** & **-A**). It can still be run manually via **--profile**.  Even on a manual run, pruning is disabled for Archive profiles, unless specifically overridden with **--prune**.
 
 ## 1. Take Backups Options
 Backups options are noted as {1F} for single-file applicable, {FB} for faub-backup applicable, or {both}.

@@ -689,6 +689,10 @@ bool shouldPrune(BackupConfig &config) {
         return false;
     }
     
+    // skip any profile that's in archive mode unless --prune is explicity specified
+    if (str2bool(config.settings[sArchive].value) && !GLOBALS.cli.count(CLI_PRUNE))
+        return false;
+    
     // failsafe checks
     int fb = config.settings[sFailsafeBackups].ivalue();
     int fd = config.settings[sFailsafeDays].ivalue();
