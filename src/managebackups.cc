@@ -650,7 +650,7 @@ void pruneFaubBackups(BackupConfig &config) {
             if (rmrf(cacheEntryIt->second.getDir())) {
                 NOTQUIET && ANIMATE && cout << noMessage << flush;
                 
-                NOTQUIET && cout << "\t• removed " << cacheEntryIt->second.getDir() << deleteReason << endl;
+                NOTQUIET && cout << "\t• " << config.ifTitle() << " removed " << cacheEntryIt->second.getDir() << deleteReason << endl;
                 log(config.ifTitle() + " removed " + cacheEntryIt->second.getDir() +
                     " (age=" + to_string(mtimeDayAge) + ", dow=" + dw(filenameDOW) + ")" + deleteReason);
                 DEBUG(D_prune) DFMT("completed removal of " << cacheEntryIt->second.getDir() << deleteReason);

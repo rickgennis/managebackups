@@ -146,7 +146,7 @@ void FaubCache::restoreCache(string profileName) {
  the time of that deleted backup can be passed in as deletedTime.  recache() will dus()
  the backup with the next sequential time after the deleted one.
  
- (3) as required - the general of catch all case is to loop through all backups of
+ (3) as required - the general catch all case is to loop through all backups of
  the profile and run dus() on any that we don't already have cached stats on.
  */
 void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
@@ -219,12 +219,8 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             // what remains are that we're doing all of them (forceAll) or walking through all of them
             // and just doing the ones that are missing stats.  if it's the latter and we're just updating
             // missing stats, we need to do one more after each missing stats one.
-            if (!forceAll) {
-                if (!nextOneToo)
-                    nextOneToo = true;
-                else
-                    nextOneToo = false;
-            }
+            if (!forceAll)
+                nextOneToo = !nextOneToo;
         }
 
         prevBackup = aBackup;
