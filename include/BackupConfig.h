@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <string>
+#include <tuple>
 #include <pcre++.h>
 #include "Setting.h"
 #include "BackupCache.h"
@@ -34,7 +35,7 @@ public:
     void fullDump();
     
     size_t getRecentAvgSize(int maxBackups = 10);
-    size_t getBloatTarget();
+    tuple<size_t, size_t, string> getBloatTarget();
     
     void saveConfig();
     bool loadConfig(string filename);

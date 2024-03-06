@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.6.8a
+% MANAGEBACKUPS(1) managebackups 1.6.9
 % Rick Ennis
 % March 2023
 
@@ -164,7 +164,7 @@ Options are categorized by the three functions of **managebackups** plus general
 : Specify the path to **managebackups** if it isn't installed in /usr/local/bin.  See **--sched**.
 
 **--recalc**
-: Recalcuate all disk usage for a profile. Use with -p.  This should never be necessary.
+: Recalcuate all disk usage for a profile. Use with -p. This should never be necessary unless you manually modify a backup.
 
 **-v**[*options*]
 : Provide verbose debugging output. Brilliant (albeit overkill in this situation) debugging logic borrowed from Philip Hazel's Exim Mail Transport Agent. **-v** by itself enables the default list of debugging contexts.  Contexts can be added or subtracted by name. For example, **-v+cache** provides the default set plus caching whereas **-v-all+cache** provides only caching. **-v+all** gives everything (**--vv**, two dashes, two v's, is a synonym for all). Longer combinations can be strung together as well (**-v-all+cache+prune+scan**). Note spaces are not supported in the -v string. Valid contexts are:
@@ -501,7 +501,7 @@ Example output from **managebackups -1 -p faub** (faub-style backup example)
 
 **managebackups -p laptop --last**
 
-    Identical output to above as this is a synonym for diffing the most recent backup to its immediate predecessor.  Additionally, if "laptop" is made the default profile (such as via "**managebackups -p laptop --default --save**") the above command can be further simplified to "**managebackups --last**".
+    Identical output to above as this is a synonym for diffing the most recent backup to its immediate predecessor.  Additionally, if "laptop" is made the default profile (such as via **managebackups -p laptop --default --save**) the above command can be further simplified to **managebackups --last**.
 
 **managebackups -p laptop --diff 17:2 --diff 55:53** 
 

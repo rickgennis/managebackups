@@ -1432,9 +1432,9 @@ void performBackup(BackupConfig &config) {
                 
                 if (config.settings[sBloat].value.length()) {
                     string bloat = config.settings[sBloat].value;
-                    auto target = config.getBloatTarget();
+                    auto [target, average, detail] = config.getBloatTarget();
                     if (cacheEntry.size > target) {
-                        notify(config, errorcom(config.ifTitle(), "warning: backup is larger than the bloat warning threshold (backup: " + to_string(cacheEntry.size) + ", threshold: " + bloat + ")"), false);
+                        notify(config, errorcom(config.ifTitle(), "warning: backup is larger than the bloat warning threshold -\n" + detail + "\tbackup: " + to_string(cacheEntry.size)), false);
                         
                         backup.flushErrors();
                         return;
@@ -1937,7 +1937,7 @@ void showMatches(Pcre& p, string foo) {
 int main(int argc, char *argv[]) {
     timer AppTimer;
     AppTimer.start();
-    
+        
     signal(SIGTERM, sigTermHandler);
     signal(SIGINT, sigTermHandler);
     

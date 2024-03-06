@@ -549,7 +549,7 @@ void BackupConfig::setPreviousFailures(unsigned int count) {
     }
 }
 
-/* calculate the average size of the most rercent 'maxBackups'
+/* calculate the average size of the most recent 'maxBackups'
    backups. because backups can be large & the last several of
    them added together may be huge, we check for variable
    overflow. if it overflows we may end up using fewer than
@@ -601,7 +601,7 @@ size_t BackupConfig::getRecentAvgSize(int maxBackups) {
 }
 
 
-size_t BackupConfig::getBloatTarget() {
+tuple<size_t, size_t, string> BackupConfig::getBloatTarget() {
     string bloat = settings[sBloat].value;
     size_t target = getRecentAvgSize();
     size_t origTarget = target;
@@ -618,7 +618,7 @@ size_t BackupConfig::getBloatTarget() {
         DEBUG(D_backup) DFMT("avg " << origTarget << " * " << settings[sBloat].value << " = " << target);
     }
     
-    return target;
+    return {target, origTarget, "\taverage backup: " + approximate(origTarget) + "\n\tbloat: " + bloat + " (effective: " + approximate(target) + ")\n"};
 }
 
 void BackupConfig::renameBaseDirTo(string newBaseDir) {

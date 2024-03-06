@@ -1069,7 +1069,7 @@ int simpleSelect(int rFd, int wFd, int timeoutSecs) {
     tv.tv_sec = timeoutSecs;
     tv.tv_usec = 0;
 
-    return select(max(rFd, wFd) + 1, rFd ? &dataSet : NULL, wFd ? &dataSet : NULL, &dataSet, &tv);
+    return select(max(rFd, wFd) + 1, rFd ? &dataSet : NULL, wFd ? &dataSet : NULL, &errorSet, &tv);
 }
 
 

@@ -348,6 +348,8 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
         cout << plural((int)bkups, "backup") << "\n";
         cout << approximate(stats.getSize() + stats.getSaved(), precisionLevel, statDetail == 3 || statDetail == 5) << " using "
         << approximate(stats.getSize(), precisionLevel, statDetail == 3 || statDetail == 5) << " on disk (saved " << saved << "%)\n";
+        auto [target, average, detail] = config.getBloatTarget();
+        cout << approximate(average) << " per backup average used\n";
         
         if (config.fcache.getInProcessFilename().length())
             cout << YELLOW << config.fcache.getInProcessFilename() << RESET << " (in process)" << endl;
