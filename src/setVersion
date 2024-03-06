@@ -12,11 +12,60 @@ my %hChanges = (
 );
 
 
-if (!defined $ARGV[0]) {
-    die "version number required";
-}
-my $sTargetVersion = $ARGV[0];
+sub getCurrentVersion() {
+    my $result = '';
 
+    foreach my $sFile (keys %hChanges) {
+        if (open(ORIG, $sFile)) {
+            while (<ORIG>) {
+                if (/$hChanges{$sFile}/) {
+                    $result = $1;
+                    last;
+                }
+            }
+
+            close(ORIG);
+
+            return $result if ($result);
+        }
+    }
+
+    return "";
+}
+
+
+
+#-#-#  MAIN
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#
+
+my $sOrigVersion = getCurrentVersion();
+my $sTargetVersion = $sOrigVersion;
+
+if (!defined $ARGV[0] ) {
+    print "[currently $sOrigVersion]\n\n";
+    print "$0 [version]\n";
+    print "\t or\n";
+    print "\t + for a trivial increase (bump the letter at the end)\n";
+    print "\t ++ for a minor increase (bump the last group of digits)\n";
+    exit;
+}
+
+$sTargetVersion = $ARGV[0];
+
+if ($ARGV[0] eq "+") {
+    if ($sOrigVersion =~ /(.+)\.(\d+)(\w*)$/) {
+        my $sLetter = $3;
+        $sTargetVersion = "$1.$2" . ($sLetter ? (++$sLetter) : 'a');
+    }
+}
+elsif ($ARGV[0] eq "++") {
+    if ($sOrigVersion =~ /(.+)\.(\d+)(\w*)$/) {
+        $sTargetVersion = "$1." . ($2+1);
+    }
+}
+
+
+print "$sOrigVersion -> $sTargetVersion\n";
 
 foreach my $sFile (keys %hChanges) {
 
