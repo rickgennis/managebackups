@@ -13,6 +13,7 @@
 #include <utime.h>
 #include <pwd.h>
 #include <vector>
+#include <list>
 #include <set>
 
 #include "pcre++.h"
@@ -56,7 +57,7 @@ string plurali(size_t number, string text) {
 
 string cppgetenv(string variable) {
     char* c;
-
+    
     c = getenv(variable.c_str());
     if (c == NULL)
         return "";
@@ -68,20 +69,20 @@ string cppgetenv(string variable) {
 vector<string> perlSplit(string regex, string haystack) {
     Pcre theRE("(" + regex + ")", "g");
     vector<string> result;
-
+    
     size_t pos = 0;
     size_t dataStart = 0;
     size_t dataEnd = 0;
-
+    
     while (pos <= haystack.length() && theRE.search(haystack, (int)pos)) {
         pos = theRE.get_match_end(0);
         string delimiter = theRE.get_match(0);
-
+        
         dataEnd = ++pos - delimiter.length() + 1;
         result.insert(result.end(), string(haystack, dataStart, dataEnd - dataStart - 1));
-        dataStart = pos; 
+        dataStart = pos;
     }
-
+    
     result.insert(result.end(), string(haystack, dataStart, string::npos));
     return result;
 }
@@ -89,9 +90,9 @@ vector<string> perlSplit(string regex, string haystack) {
 
 string log(string message) {
 #ifdef __APPLE__
-    if (!GLOBALS.logDir.length()) {  
+    if (!GLOBALS.logDir.length()) {
         string defaultDir = "/var/log";
-
+        
         ofstream logFile;
         logFile.open(defaultDir + "/managebackups.log", ios::app);
         if (logFile.is_open()) {
@@ -112,16 +113,16 @@ string log(string message) {
             }
         }
     }
-
+    
     time_t now;
     char timeStamp[100];
-
+    
     now = time(NULL);
     strftime(timeStamp, sizeof(timeStamp), "%b %d %Y %H:%M:%S ", localtime(&now));
-
+    
     ofstream logFile;
     logFile.open(GLOBALS.logDir + "/managebackups.log", ios::app);
-
+    
     if (logFile.is_open()) {
         logFile << string(timeStamp) << "[" << to_string(GLOBALS.pid) << "] " << commafy(message) << endl;
         logFile.close();
@@ -140,10 +141,10 @@ struct timeval mktimeval(time_t secs) { struct timeval t; t.tv_sec = secs; t.tv_
 string slashConcat(string str1, string str2, string str3) {
     if (str1.length() && str1[str1.length() - 1] == '/')
         str1.pop_back();
-
+    
     if (str2.length() && str2[0] == '/')
         str2.erase(0, 1);
-
+    
     return (str3.length() ? slashConcat(str1 + "/" + str2, str3) : str1 + "/" + str2);
 }
 
@@ -200,68 +201,68 @@ s_pathSplit pathSplit(string path) {
 
 string MD5file(string filename, bool quiet, string reason) {
     FILE *inputFile;
-
+    
     if ((inputFile = fopen(filename.c_str(), "rb")) != NULL) {
         string message = "MD5 " + filename + (reason.length() ? " " + reason : "...");
-
+        
         if (!quiet)
             cout << message << flush;
-
+        
         unsigned char data[65536];
         unsigned long bytesRead;
         EVP_MD_CTX *md5Context;
         unsigned char *md5Digest;
         unsigned int md5DigestLen = EVP_MD_size(EVP_md5());
-
+        
         md5Context = EVP_MD_CTX_new();
         EVP_DigestInit_ex(md5Context, EVP_md5(), NULL);
-
+        
         while ((bytesRead = fread(data, 1, 65536, inputFile)) != 0)
             EVP_DigestUpdate(md5Context, data, bytesRead);
-
+        
         fclose(inputFile);
         md5Digest = (unsigned char*)OPENSSL_malloc(md5DigestLen);
         EVP_DigestFinal_ex(md5Context, md5Digest, &md5DigestLen);
         EVP_MD_CTX_free(md5Context);
-
+        
         char tempStr[md5DigestLen * 2 + 1];
         for (int i = 0; i < md5DigestLen; i++)
             snprintf(tempStr+(2*i), 3, "%02x", md5Digest[i]);
         tempStr[md5DigestLen * 2] = 0;
-
+        
         if (!quiet) {
             string back = string(message.length(), '\b');
             string blank = string(message.length() , ' ');
             cout << back << blank << back << flush;
         }
-
+        
         return(tempStr);
     }
-
+    
     return "";
 }
 
 
 string MD5string(string origString) {
-        EVP_MD_CTX *md5Context;
-        unsigned char *md5Digest;
-        unsigned int md5DigestLen = EVP_MD_size(EVP_md5());
-        char* c_origString = const_cast<char*>(origString.c_str());
-
-        md5Context = EVP_MD_CTX_new();
-        EVP_DigestInit_ex(md5Context, EVP_md5(), NULL);
-
-        EVP_DigestUpdate(md5Context, c_origString, origString.length());
-
-        md5Digest = (unsigned char*)OPENSSL_malloc(md5DigestLen);
-        EVP_DigestFinal_ex(md5Context, md5Digest, &md5DigestLen);
-        EVP_MD_CTX_free(md5Context);
-
-        char tempStr[md5DigestLen * 2];
-        for (int i = 0; i < md5DigestLen ; i++)
-            snprintf(tempStr+(2*i), 3, "%02x", md5Digest[i]);
-
-        return(tempStr);
+    EVP_MD_CTX *md5Context;
+    unsigned char *md5Digest;
+    unsigned int md5DigestLen = EVP_MD_size(EVP_md5());
+    char* c_origString = const_cast<char*>(origString.c_str());
+    
+    md5Context = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(md5Context, EVP_md5(), NULL);
+    
+    EVP_DigestUpdate(md5Context, c_origString, origString.length());
+    
+    md5Digest = (unsigned char*)OPENSSL_malloc(md5DigestLen);
+    EVP_DigestFinal_ex(md5Context, md5Digest, &md5DigestLen);
+    EVP_MD_CTX_free(md5Context);
+    
+    char tempStr[md5DigestLen * 2];
+    for (int i = 0; i < md5DigestLen ; i++)
+        snprintf(tempStr+(2*i), 3, "%02x", md5Digest[i]);
+    
+    return(tempStr);
 }
 
 
@@ -276,33 +277,33 @@ string approximate(size_t size, int maxUnits, bool commas, bool base10) {
     int index = 0;
     long double decimalSize = size;
     char unit[] = {'B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'};
-
+    
     while ((decimalSize >= (base10 ? 1000 : 1024)) &&
-            (maxUnits < 0 || index < maxUnits) &&
-            index++ <= sizeof(unit)) {
+           (maxUnits < 0 || index < maxUnits) &&
+           index++ <= sizeof(unit)) {
         decimalSize /= (base10 ? 1000 : 1024.0);
     }
-
+    
     char buffer[150];
     snprintf(buffer, sizeof(buffer), index > 1 ? "%.01Lf" : "%.0Lf", index > 1 ? decimalSize : floor(decimalSize));
     string unitSuffix(1, unit[index]);
     string result = string(buffer);
-
+    
     if (commas) {
         string finalResult;
         auto numLen = result.length();
         auto commaOffset = numLen % 3;
-
+        
         for (auto i = 0; i < numLen; ++i) {
             if (i % 3 == commaOffset && i)
                 finalResult += ',';
-
+            
             finalResult += result[i];
         }
-
+        
         result = finalResult;
     }
-
+    
     return(result + (index ? unitSuffix : ""));
 }
 
@@ -315,7 +316,7 @@ unsigned int ansistrlength(string source) {
     bool longEsc = false;
     
     for (unsigned int i = 0; i < sourceLength; ++i) {
-
+        
         // start of multi-character escape sequence
         if (shortEsc && !longEsc && source[i] == '[')
             longEsc = true;
@@ -330,7 +331,7 @@ unsigned int ansistrlength(string source) {
         // end of single character escape sequence
         if (shortEsc && !longEsc && source[i] != '\x1b')
             shortEsc = false;
-       
+        
         // end of multi-character escape sequence
         if (longEsc && source[i] != '[' && source[i] >= '@' && source[i] <= '~')
             shortEsc = longEsc = false;
@@ -343,22 +344,22 @@ unsigned int ansistrlength(string source) {
 size_t approx2bytes(string approx) {
     vector<string> units = { "B", "K", "M", "G", "T", "P", "E", "Z", "Y" };
     Pcre reg("^((?:\\d|\\.)+)\\s*(?:(\\w)(?:[Bb]$|$)|$)");
-
+    
     if (reg.search(approx)) {
-
+        
         // was a numeric value and a unit specified?
         if (reg.matches() > 1) {
-
+            
             // save the two pieces
             auto numericVal = stof(reg.get_match(0));
             string unit = reg.get_match(1);
-
+            
             // capitalize the units to match the lookup in the vector
             for (auto &c: unit) c = toupper(c);
-
+            
             // lookup the supplied unit in the vector
             auto it = find(units.begin(), units.end(), unit);
-
+            
             if (it != units.end()) {
                 // determine its index and calculate the result
                 auto index = it - units.begin();
@@ -370,7 +371,7 @@ size_t approx2bytes(string approx) {
             return floor(stof(reg.get_match(0)));
         }
     }
-
+    
     throw std::runtime_error("error parsing size from " + approx);
 }
 
@@ -379,16 +380,16 @@ string seconds2hms(time_t seconds) {
     string result;
     int unit[] = {3600, 60, 1};
     bool dataAdded = false;
-
+    
     if (seconds >= 60*60*100)
         return(string("> ") + to_string(int(seconds / (60 * 60 * 24))) + " days");
-
+    
     for (int index = 0; index < sizeof(unit) / sizeof(unit[0]); ++index) {
         if (seconds >= unit[index]) {
             double value = floor(seconds / unit[index]);
             double leftover = seconds % unit[index];
             seconds = leftover;
-
+            
             char buffer[50];
             snprintf(buffer, sizeof(buffer), "%02.0f", value);
             result += string(dataAdded ? ":" : "") + buffer;
@@ -397,7 +398,7 @@ string seconds2hms(time_t seconds) {
         else
             result += dataAdded ? ":00" : index == (sizeof(unit) / sizeof(unit[0])) - 1 ? "00" : "00:";
     }
-
+    
     return(result.length() ? result : "        ");
 }
 
@@ -416,42 +417,42 @@ string timeDiffSingle(struct timeval duration, int maxUnits, int precision) {
         { 3600, "hour" },
         { 60, "minute" },
         { 1, "second" } };
-
+    
     for (auto unit_it = units.rbegin(); unit_it != units.rend(); ++unit_it) {
         if (offset >= unit_it->first) {
             unsigned long value = floor(offset / unit_it->first);
             unsigned long leftover = offset % unit_it->first;
-
+            
             result += (result.length() ? ", " : "") + to_string(value) + " " + unit_it->second + (value == 1 ? "" : "s");
             offset = leftover;
-
+            
             if (++unitsUsed == maxUnits)
                 break;
         }
     }
-
+    
     // if the duration is less than a minute and microseconds
     // are also provided, include them
     if (secs < 60 && us) {
         char ms[10];
         snprintf(ms, sizeof(ms), string(string("%.") + to_string(precision) + "f").c_str(), 1.0 * us / MILLION);
-
+        
         string sms = ms;
         if (sms.back() == '0')
             sms.pop_back();
-
+        
         auto pos = result.find(" ");
         if (pos != string::npos) {
             sms.erase(0, 1);
             result.replace(pos, 0, sms);
-
+            
             if (result.back() != 's')
                 result += "s";
         }
         else
             result = sms + " seconds";
     }
-
+    
     return(result.length() ? result : "0 seconds");
 }
 
@@ -459,7 +460,7 @@ string timeDiffSingle(struct timeval duration, int maxUnits, int precision) {
 string timeDiff(struct timeval start, struct timeval end, int maxUnits, int precision) {
     struct timeval diffTime;
     mytimersub(&end, &start, &diffTime);
-
+    
     return timeDiffSingle(diffTime, maxUnits, precision);
 }
 
@@ -498,26 +499,26 @@ void setFilePerms(string filename, struct stat &statData, bool exitOnError) {
 int mkdirp(string dir, mode_t mode) {
     struct stat statBuf;
     int result = 0;
-
+    
     if (mystat(dir, &statBuf) == -1) {
         char data[PATH_MAX];
         strcpy(data, dir.c_str());
         char *p = strtok(data, "/");
         string path;
-
+        
         while (p) {
-            path += string("/") + p;   
-
+            path += string("/") + p;
+            
             if (mystat(path, &statBuf) == -1)
-               result = mkdir(path.c_str(), mode);
-
+                result = mkdir(path.c_str(), mode);
+            
             if (result)
                 return(result);
-
+            
             p = strtok(NULL, "/");
         }
     }
-
+    
     return 0;
 }
 
@@ -532,22 +533,22 @@ string trimSpace(const string &s) {
     auto start = s.begin();
     while (start != s.end() && isspace(*start))
         start++;
-
+    
     auto end = s.end();
     do {
         end--;
     } while (distance(start, end) > 0 && isspace(*end));
-
+    
     return string(start, end + 1);
 }
 
 
 string trimQuotes(string s) {
     Pcre reg("([\'\"]+)(.+?)\\g1");
-
+    
     if (reg.search(s) && reg.matches())
         return reg.get_match(1);
-
+    
     return s;
 }
 
@@ -572,7 +573,7 @@ vector<string> string2vector(string data, bool trimQ, bool unEscape) {
         
         result.push_back(trimQ ? trimQuotes(temp) : temp);
     }
-
+    
     return result;
 }
 
@@ -585,26 +586,26 @@ int varexec(string fullCommand) {
     // don't let string2vector remove quotes (i.e. cleanup) because we want
     // to check for quoted wildcards first
     auto tokens = string2vector(fullCommand, false, false);
-
+    
     for (auto &token: tokens) {
         /* token contains wildcard, add the matching files instead */
         if (token.length() &&   // if its a valid string
-                // not quoted
-                !((token.front() == '\'' || token.front() == '\"') && token.front() == token.back()) &&
-                // and has shell wildcards
-                (token.find("*") != string::npos || token.find("?") != string::npos)) {
-
+            // not quoted
+            !((token.front() == '\'' || token.front() == '\"') && token.front() == token.back()) &&
+            // and has shell wildcards
+            (token.find("*") != string::npos || token.find("?") != string::npos)) {
+            
             // then replace the parameter with a wildcard expansion of the matching files
             auto files = expandWildcardFilespec(trimQuotes(token));
-
+            
             for (auto entry: files) {
                 // no need to free() this because we're going to exec()
                 params[index] = (char *)malloc(entry.length() + 1);
-
+                
                 // add each matching file as a parameter for exec()
                 strcpy(params[index++], entry.c_str());
             }
-        } 
+        }
         
         /* token doesn't contain a wildcard, just add the item */
         else {
@@ -613,9 +614,9 @@ int varexec(string fullCommand) {
             // so now we remove any remaining backslashes in the string
             while ((altpos = token.find("\\")) != string::npos)
                 token.erase(altpos, 1);
-
+            
             params[index] = (char *)malloc(token.length() + 1);
-
+            
             // and drop any quotes that are on the ends
             strcpy(params[index++], trimQuotes(token).c_str());
         }
@@ -626,12 +627,12 @@ int varexec(string fullCommand) {
         cerr << "********* EXEC NO CMD ************" << endl;
         exit(1);
     }
-
+    
     if (index == 1)
         execlp(params[0], "");
-
+    
     execvp(params[0], params);
-
+    
     cerr << "********* EXEC FAILED ************" << endl;
     exit(1);
 }
@@ -640,7 +641,7 @@ int varexec(string fullCommand) {
 string safeFilename(string filename) {
     Pcre search1("[\\s#;\\/\\\\]+", "g");   // these characters get converted to underscores
     Pcre search2("[\\?\\!\\*]+", "g");      // these characters get removed
-
+    
     string tempStr = search1.replace(filename, "_");
     return search2.replace(tempStr, "");
 }
@@ -653,20 +654,20 @@ vector<string> expandWildcardSub(string fileSpec, string baseDir, int index) {
     stringstream tokenizer(fileSpec);
     string tempStr;
     string resultBaseDir = baseDir;
-
+    
     // break the fileSpec into sections delimited by slashes
     while (getline(tokenizer, tempStr, '/'))
         parts.push_back(tempStr);
-
+    
     // if no wildcards are present in the entire string we need to return the original filespec
     if (index == parts.size()) {
         result.insert(result.end(), fileSpec);
         return(result);
     }
-
+    
     // get the current fileSpec section we're working on
     string currentSpec = parts[index];
-
+    
     // if there are no wildcards (asterisk or question marks) in the current section
     // of the fileSpec we can recurse directly to the next section.
     auto asterisk = currentSpec.find("*");
@@ -679,27 +680,27 @@ vector<string> expandWildcardSub(string fileSpec, string baseDir, int index) {
         // the currentSpec
         DIR *c_dir;
         struct dirent *c_dirEntry;
-
+        
         if ((c_dir = opendir(baseDir.c_str())) != NULL) {
-
+            
             // change the currentSpec into a PCRE
             strReplaceAll(currentSpec, ".", "\\.");
             strReplaceAll(currentSpec, "?", ".");
             strReplaceAll(currentSpec, "*", ".*");
             currentSpec = "^" + currentSpec + "$";
-
+            
             Pcre matchSpec(currentSpec);
             struct stat statData;
-
+            
             // loop through files in this directory
             while ((c_dirEntry = readdir(c_dir)) != NULL) {
                 if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
                     continue;
-
+                
                 // does the current file match the current fileSpec's regex?
                 if (matchSpec.search(c_dirEntry->d_name)) {
                     if (!mylstat(baseDir + "/" + c_dirEntry->d_name, &statData)) {
-
+                        
                         // if this matching dir entry is a subdirectory, add it to the list to call recursively
                         if (S_ISDIR(statData.st_mode))
                             subDirs.insert(subDirs.end(), c_dirEntry->d_name);
@@ -713,31 +714,31 @@ vector<string> expandWildcardSub(string fileSpec, string baseDir, int index) {
                 }
             }
             closedir(c_dir);
-
+            
             for (auto &dir: subDirs) {
                 auto subResult = expandWildcardSub(fileSpec, baseDir + (baseDir.back() == '/' ? "" : "/") + dir, index+1);
                 result.insert(result.end(), subResult.begin(), subResult.end());
             }
-        } 
+        }
     }
-
+    
     return(result);
 }
 
 
 vector<string> expandWildcardFilespec(string fileSpec) {
     string baseDir;
-
+    
     if (fileSpec.front() == '/')
         baseDir = "/";
     else
         baseDir = ".";
-
+    
     auto fileList = expandWildcardSub(fileSpec, baseDir, 0);
     for (auto &file: fileList)
         if (file.length() > 2 && file.substr(0, 2) == "./")
             file.erase(0, 2);
-
+    
     return fileList;
 }
 
@@ -746,7 +747,7 @@ void strReplaceAll(string& s, string const& toReplace, string const& replaceWith
     ostringstream oss;
     size_t pos = 0;
     size_t prevPos = pos;
-
+    
     while (1) {
         prevPos = pos;
         pos = s.find(toReplace, pos);
@@ -756,7 +757,7 @@ void strReplaceAll(string& s, string const& toReplace, string const& replaceWith
         oss << replaceWith;
         pos += toReplace.size();
     }
-
+    
     oss << s.substr(prevPos);
     s = oss.str();
 }
@@ -766,32 +767,32 @@ string locateBinary(string app) {
     string tempStr;
     string path = cppgetenv("PATH");
     vector<string> parts;
-
+    
     // if a path is specified try it
     if (app.find("/") != string::npos) {
         if (!access(app.c_str(), X_OK))
             return(app);
     }
-
+    
     // grab the binary name as the last delimited element given
     vector<string> appParts;
     stringstream appTokenizer(app);
     while (getline(appTokenizer, tempStr, '/'))
         appParts.push_back(tempStr);
     auto appBinary = appParts.back();
-
+    
     // parse the PATH
     stringstream pathTokenizer(path);
     while (getline(pathTokenizer, tempStr, ':'))
         parts.push_back(tempStr);
-        
+    
     // try to find the binary in each component of the path
     for (auto piece: parts) {
         string binary = string(piece) + "/" + appBinary;
         if (!access(binary.c_str(), X_OK))
-        return binary;
+            return binary;
     }
-
+    
     // give up
     log("unable to locate/execute '" + app + "' command");
     return "";
@@ -811,7 +812,7 @@ bool str2bool(string text) {
 
 string vars2MY(int month, int year) {
     char monthName[12][15] = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
-
+    
     return(string(monthName[month - 1]) + " " + to_string(year));
 }
 
@@ -820,9 +821,9 @@ bool mtimesAreSameDay(time_t m1, time_t m2) {
     struct tm *temp = localtime(&m1);  // localtime always returns the same internal pointer
     struct tm tM1 = *temp;             // so two calls to it require a temp to hold the first's data
     struct tm *tM2 = localtime(&m2);
-
-    return (tM1.tm_year == tM2->tm_year && 
-            tM1.tm_mon  == tM2->tm_mon && 
+    
+    return (tM1.tm_year == tM2->tm_year &&
+            tM1.tm_mon  == tM2->tm_mon &&
             tM1.tm_mday == tM2->tm_mday);
 }
 
@@ -831,10 +832,10 @@ string horizontalLine(int length) {
     char dash[5];
     snprintf(dash, sizeof(dash), "\u2501");
     string line;
-
+    
     for (int x = 0; x < length; ++x)
         line += dash;
-
+    
     return line;
 }
 
@@ -842,20 +843,20 @@ string horizontalLine(int length) {
 void sendEmail(string from, string recipients, string subject, string message) {
     string headers = "X-Mailer: Apple Sendmail\nContent-Type: text/plain\nReturn-Path: " + from + "\nSubject: " + subject + "\n\n";
     string bin = locateBinary("/usr/sbin/sendmail");
-
+    
     if (bin.length())
         bin += " -f " + from + " " + recipients;
     else {
         bin = locateBinary("mail") + " -s \"" + subject + "\" " + recipients;
         headers = "";
     }
-
+    
     PipeExec mail(bin);
     mail.execute();
-
+    
     if (headers.length())
         mail.ipcWrite(headers.c_str(), headers.length());
-
+    
     mail.ipcWrite(message.c_str(), message.length());
     mail.closeWrite();
 }
@@ -865,7 +866,7 @@ string todayString() {
     char text[100];
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
-
+    
     strftime(text, sizeof(text)-1, "%c", t);
     return(text);
 }
@@ -884,10 +885,10 @@ bool catdirCallback(pdCallbackData &file) {
     aFile.open(file.filename);
     if (aFile.is_open()) {
         string data;
-
+        
         while (getline(aFile, data))
-           *(string*)(file.dataPtr) += data + "\n";
-
+            *(string*)(file.dataPtr) += data + "\n";
+        
         aFile.close();
     }
     
@@ -903,13 +904,13 @@ string catdir(string dir) {
     size_t p;
     while ((p = result.find("\r\n")) != string::npos)
         result.erase(p, 1);
-
+    
     while ((p = result.find("\n\n")) != string::npos)
         result.erase(p, 1);
-
+    
     if (result.back() == '\n')
         result.pop_back();
-
+    
     return result;
 }
 
@@ -921,7 +922,7 @@ bool rmrf(string item) {
     struct dirent *c_dirEntry;
     struct stat statData;
     vector<string> subDirs;
-
+    
     if (!mylstat(item, &statData)) {
         if (S_ISDIR(statData.st_mode)) {
             
@@ -950,7 +951,7 @@ bool rmrf(string item) {
                 for (auto &dir: subDirs)
                     if (!rmrf(dir))
                         return false;
-
+                
                 // remove this directory itself
                 if (rmdir(item.c_str())) {
                     SCREENERR(log("error: unable to remove " + item + errtext()));
@@ -972,7 +973,7 @@ bool rmrf(string item) {
 int mkbasedirs(string path) {
     if (path.length())
         return mkdirp(path.substr(0, path.find_last_of("/")));
-
+    
     return -1;
 }
 
@@ -1014,17 +1015,17 @@ bool dsCallback(pdCallbackData &file) {
         else
             if (S_ISLNK(file.statData.st_mode))
                 ++data->ds->symLinks;
-
+    
     return true;
 }
 
 
 /*
-   du -s
-   stat'ing a directory entry itself (not the contents) or a symlink returns a definitive
-   size specific to that entry.  For reasons I don't understand the CLI 'du' command ignores
-   those numbers and doesn't add them to a given subdirectory's total.  Maybe they know
-   something I don't.  So this function is specifically excluding them as well in the callback.
+ du -s
+ stat'ing a directory entry itself (not the contents) or a symlink returns a definitive
+ size specific to that entry.  For reasons I don't understand the CLI 'du' command ignores
+ those numbers and doesn't add them to a given subdirectory's total.  Maybe they know
+ something I don't.  So this function is specifically excluding them as well in the callback.
  */
 DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes) {
     DiskStats ds;
@@ -1032,7 +1033,7 @@ DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes) {
     data.ds = &ds;
     data.seenI = &seenInodes;
     data.newI = &newInodes;
-
+    
     processDirectory(path, "", false, false, dsCallback, &data);
     return ds;
 }
@@ -1051,24 +1052,24 @@ string errorcom(string profile, string message) {
 int simpleSelect(int rFd, int wFd, int timeoutSecs) {
     fd_set dataSet;
     FD_ZERO(&dataSet);
-
+    
     fd_set errorSet;
     FD_ZERO(&errorSet);
-
+    
     if (rFd) {
         FD_SET(rFd, &dataSet);
         FD_SET(rFd, &errorSet);
     }
-
+    
     if (wFd) {
         FD_SET(wFd, &dataSet);
         FD_SET(wFd, &errorSet);
     }
-
+    
     struct timeval tv;
     tv.tv_sec = timeoutSecs;
     tv.tv_usec = 0;
-
+    
     return select(max(rFd, wFd) + 1, rFd ? &dataSet : NULL, wFd ? &dataSet : NULL, &errorSet, &tv);
 }
 
@@ -1082,19 +1083,19 @@ void showError(string message) {
 int copyFile(string srcFile, string destFile) {
     std::ifstream inF(srcFile, ios_base::in | ios_base::binary);
     if (!inF) return 0;
-
+    
     std::ofstream outF(destFile, ios_base::out | ios_base::binary | ios_base::trunc);
     if (!outF) return 0;
-
+    
     char buffer[32 * 1024];
     do {
         inF.read(buffer, sizeof(buffer));
         outF.write(buffer, inF.gcount());
     } while (inF.gcount() > 0);
-
+    
     inF.close();
     outF.close();
-        
+    
     return 1;
 }
 
@@ -1120,7 +1121,7 @@ string getUserHomeDir(int uid) {
     auto h = getpwuid(uid == -1 ? getuid() : uid);
     if (h != NULL)
         return h->pw_dir;
-
+    
     return "";
 }
 
@@ -1141,7 +1142,7 @@ int getUidFromName(string userName) {
 time_t filename2Mtime(string filename) {
     Pcre dateRE = Pcre(DATE_REGEX);
     int date_year, date_month, date_day, time_hour = 0, time_min = 0, time_sec = 0;
-
+    
     if (dateRE.search(filename) && dateRE.matches() > 2) {
         date_year  = stoi(dateRE.get_match(0));
         date_month = stoi(dateRE.get_match(1));
@@ -1155,7 +1156,7 @@ time_t filename2Mtime(string filename) {
     }
     else
         return 0;
-
+    
     struct tm fileTime;
     fileTime.tm_sec  = time_sec;
     fileTime.tm_min  = time_min;
@@ -1164,7 +1165,7 @@ time_t filename2Mtime(string filename) {
     fileTime.tm_mon  = date_month - 1;
     fileTime.tm_year = date_year - 1900;
     fileTime.tm_isdst = -1;
-
+    
     return mktime(&fileTime);
 }
 
@@ -1188,7 +1189,7 @@ int forkMvCmd(string oldDir, string newDir) {
         
         return -1;
     }
-
+    
     execl(mv.c_str(), mv.c_str(), oldDir.c_str(), newDir.c_str(), 0);
     exit(0);
 }
@@ -1208,21 +1209,21 @@ char getFilesystemEntryType(mode_t mode) {
     else
         if (S_ISDIR(mode))
             c = 'd';
-    else
-        if (S_ISLNK(mode))
-            c = 'l';
-    else
-        if (S_ISSOCK(mode))
-            c = 's';
-    else
-        if (S_ISCHR(mode))
-            c = 'c';
-    else
-        if (S_ISBLK(mode))
-            c = 'b';
-    else
-        if (S_ISFIFO(mode))
-            c = 'p';
+        else
+            if (S_ISLNK(mode))
+                c = 'l';
+            else
+                if (S_ISSOCK(mode))
+                    c = 's';
+                else
+                    if (S_ISCHR(mode))
+                        c = 'c';
+                    else
+                        if (S_ISBLK(mode))
+                            c = 'b';
+                        else
+                            if (S_ISFIFO(mode))
+                                c = 'p';
     
     return c;
 }
@@ -1241,123 +1242,137 @@ char getFilesystemEntryType(string entry) {
 
 
 /*
-   processDirectory() recurses down the specified directory calling the provided
-   callback() function on each filesystem entry (be it a directory, symlink or file).
-   the callback needs to return true for processing to continue otherwise the rest
-   of the recursion is aborted.
+ processDirectory() walks down the specified directory tree calling the provided
+ callback() function on each filesystem entry (be it a directory, symlink or file).
+ the callback needs to return true for processing to continue otherwise the rest
+ of the traversal is aborted.
  
-   a regex pattern can be provided to filter filenames, along with whether the pattern
-   should be used as include or exclude criteria.  all subdirectories within are walked
-   looking for files, regardless of subdirectory names matching the pattern.  but
-   callback() is only passed entries (files or subdirectory names) that pass the pattern
-   filter, or if no pattern filter is given.
+    'directory' to traverse (starting point)
  
-   maxDepth can be specified to only go x subdirectory levels deep.
+    'pattern'
+    'exclude'
+    'filterDirs'
+ a regex pattern can be provided to filter filenames, along with whether the pattern
+ should be used as include or exclude criteria. pattern filtering can optionally be
+ applied to directory names as well.
+
+    'callback' pointer to a callback function that gets passed a pdCallbackData reference
+
+    'passData' additional data pointer for the callback function
  
-   callback() is passed a structure that contains the full path of the filename to
-   process, its stat() information, and a void pointer that can be setup before processing
-   begins to pass any additional data into or out of the callback() functions.
+    'maxDepth' can be specified to only go x subdirectory levels deep
  
-   processDirectory() returns a blank string on success.  on error, the error is logged,
-   shown on the screen (via SCREENERR) and returned to the calling function.
+    'includeTopDir' whether to call the callback function for the original directory
+ name that as passed in as 'directory'
+ 
+ callback() is passed a structure that contains the full path of the filename to
+ process, its stat() information, and a void pointer that can be setup before processing
+ begins to pass any additional data into or out of the callback() functions.
+ 
+ processDirectory() returns a blank string on success.  on error, the error is logged,
+ shown on the screen (via SCREENERR) and returned to the calling function.
  */
 
-string processDirectory(string directory, string pattern, bool exclude, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, int maxDepth, string internalUseDir) {
+string processDirectory(string directory, string pattern, bool exclude, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, int maxDepth, bool includeTopDir) {
     DIR *dir;
     struct dirent *dirEntry;
-    vector<string> subDirs;
+    list<tuple<string, int>> dirsToRead;               // filename and depth in heirarchy
+    list<tuple<string, struct stat>> dirsToCallback;   // filename and stat struct
     Pcre patternRE(pattern);
     pdCallbackData file;
     file.dataPtr = passData;
-    file.origDir = internalUseDir.length() ? internalUseDir : directory;
+    file.origDir = directory;
+    
+    dirsToRead.push_back({ue(directory), 0});
+    
+    // to process the directory non-recursively dirsToRead is used as a master list.
+    // any subdirectory identified is added to the end of the list and processed breadth-first.
+    // it's important that the directory/subdirectory itself is "processed" (i.e. the callback is
+    // invoked for it) *after* its contents are processed.  dirsToCallback is used to track the
+    // ones that need to still have the callback invoked at the end - order is important.
+    
+    while (!dirsToRead.empty()) {
+        auto [baseDir, depth] = dirsToRead.front();
+        dirsToRead.pop_front();
         
-    if (!mylstat(directory, &file.statData)) {
-        file.filename = ue(directory);
-                
-        if (S_ISDIR(file.statData.st_mode)) {
+        if (!mylstat(baseDir, &file.statData)) {
             
-            if ((dir = opendir(directory.c_str())) != NULL) {
-                while ((dirEntry = readdir(dir)) != NULL) {
-                    
-                    if (!strcmp(dirEntry->d_name, ".") || !strcmp(dirEntry->d_name, ".."))
-                        continue;
-                    
-                    file.filename = slashConcat(directory, dirEntry->d_name);
-                    
-                    if (!mylstat(file.filename, &file.statData)) {
+            if (S_ISDIR(file.statData.st_mode)) {
+                
+                if (includeTopDir || baseDir != directory)
+                    dirsToCallback.push_front({baseDir, file.statData});
+                
+                if ((dir = opendir(baseDir.c_str())) != NULL) {
+                    while ((dirEntry = readdir(dir)) != NULL) {
                         
-                        // process directories
-                        if (S_ISDIR(file.statData.st_mode)) {
+                        if (!strcmp(dirEntry->d_name, ".") || !strcmp(dirEntry->d_name, ".."))
+                            continue;
+                        
+                        file.filename = slashConcat(baseDir, dirEntry->d_name);
+                        
+                        if (!mylstat(file.filename, &file.statData)) {
                             
-                            // filter for patterns
-                            if (filterDirs)
+                            // process directories
+                            if (S_ISDIR(file.statData.st_mode)) {
+                                
+                                // filter for patterns
+                                if (filterDirs)
+                                    if (pattern.length()) {
+                                        bool found = patternRE.search(file.filename);
+                                        
+                                        if ((exclude && found) || (!exclude && !found))
+                                            continue;
+                                    }
+                                
+                                if (maxDepth < 1 || depth < maxDepth)
+                                    dirsToRead.push_back({file.filename, depth+1});
+                            }
+                            else {
+                                // filter for patterns
                                 if (pattern.length()) {
                                     bool found = patternRE.search(file.filename);
                                     
-                                    if (exclude && found)
-                                        continue;
-                                    
-                                    if (!exclude && !found)
+                                    if ((exclude && found) || (!exclude && !found))
                                         continue;
                                 }
-
-                            if (!callback(file)) {
-                                subDirs.clear();
-                                break;
-                            }
-                            
-                            subDirs.insert(subDirs.end(), file.filename);
-                        }
-                        else {
-                            // filter for patterns
-                            if (pattern.length()) {
-                                bool found = patternRE.search(file.filename);
                                 
-                                if (exclude && found)
-                                    continue;
-                                
-                                if (!exclude && !found)
-                                    continue;
-                            }
-                          
-                            // process regular files
-                            if (!callback(file)) {
-                                subDirs.clear();
-                                break;
+                                // process regular files
+                                if (!callback(file)) {
+                                    dirsToRead.clear();
+                                    break;
+                                }
                             }
                         }
                     }
+                    
+                    closedir(dir);
                 }
-                
-                closedir(dir);
+                else {
+                    string err = "error: unable to open " + ue(directory) + errtext();;
+                    SCREENERR(log(err));
+                    return err;
+                }
             }
             else {
-                string err = "error: unable to open " + ue(directory) + errtext();;
-                SCREENERR(log(err));
-                return err;
+                // in case we're given an initial file instead of directory
+                file.filename = baseDir;
+                callback(file);
             }
         }
-        else
-            // in case we're given an initial file instead of directory
-            callback(file);
-    }
-    else {
-        string err = "error: stat failed for " + directory + errtext();
-        // SCREENERR(log(err));
-        return err;
-    }
-
-    // recurse through subdirs
-    if (maxDepth != 1) {
-        string result;
-        
-        for (auto &dir: subDirs) {
-            result = processDirectory(dir, pattern, exclude, filterDirs, callback, passData, maxDepth > -1 ? maxDepth - 1 : -1, file.origDir);
-            
-            // bomb out on error
-            if (result.length())
-                return result;
+        else {
+            string err = "error: stat failed for " + baseDir + errtext();
+            // SCREENERR(log(err));
+            return err;
         }
+    }
+    
+    // call callbacks on directories themselves now that their contents have been processed
+    for (auto [dirName, statData]: dirsToCallback) {
+        file.filename = dirName;
+        file.statData = statData;
+        
+        if (!callback(file))
+            break;
     }
     
     return "";
@@ -1369,7 +1384,7 @@ struct internalPDBDataType {
     void *realDataPtr;
     int baseSlashes;
     backupTypes backupType;
-
+    
 };
 
 
@@ -1379,16 +1394,16 @@ bool pdBackupsCallback(pdCallbackData &file) {
     passedFile.filename = file.filename;
     passedFile.statData = file.statData;
     passedFile.dataPtr = data->realDataPtr;
-
+    
     auto depth = count(file.filename.begin(), file.filename.end(), '/') - data->baseSlashes;
     auto dirPs = pathSplit(pathSplit(file.filename).dir);
     auto filePs = pathSplit(file.filename);
     bool dirIsDay = (dirPs.file.length() == 2 && isdigit(dirPs.file[0]) && isdigit(dirPs.file[1]));
     bool entIsDay = (filePs.file.length() == 2 && isdigit(filePs.file[0]) && isdigit(filePs.file[1]));
-
+    
     // make sure we're in the year/month or year/month/day subdirs
     if ((depth == 3 && !entIsDay) || (depth == 4 && dirIsDay)) {
-
+        
         // handle directories
         if (S_ISDIR(file.statData.st_mode)) {
             if (data->backupType != SINGLE_ONLY)
@@ -1406,9 +1421,9 @@ bool pdBackupsCallback(pdCallbackData &file) {
 
 
 /*
-   processDirectoryBackups() is a version of processDirectory that only returns backups.
-   for single-file backups the file is returned, for faub backups the containing directory
-   is returned.  backupType specifies which types to return.
+ processDirectoryBackups() is a version of processDirectory that only returns backups.
+ for single-file backups the file is returned, for faub backups the containing directory
+ is returned.  backupType specifies which types to return.
  */
 string processDirectoryBackups(string directory, string pattern, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, backupTypes backupType, int maxDepth) {
     internalPDBDataType data;
@@ -1416,7 +1431,7 @@ string processDirectoryBackups(string directory, string pattern, bool filterDirs
     data.realDataPtr = passData;
     data.backupType = backupType;
     data.baseSlashes = (int)count(directory.begin(), directory.end(), '/');
-
+    
     return processDirectory(directory, "(/\\d{2,4}$)|(" + pattern + ")", false, filterDirs, pdBackupsCallback, &data, maxDepth == -1 ? 4 : maxDepth);
 }
 
@@ -1439,7 +1454,7 @@ string progressPercentageA(int totalIterations, int totalSteps, int iterationsCo
         prevLength = (int)currentProgress.length();
         result += currentProgress;
     }
-
+    
     return result;
 }
 
@@ -1457,7 +1472,7 @@ string progressPercentageB(long totalBytes, long completedBytes) {
     }
     else
         prevLength = 0;
-
+    
     return result;
 }
 

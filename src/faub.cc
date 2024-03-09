@@ -597,7 +597,7 @@ bool scanToServerCallback(pdCallbackData &file) {
     data->server->ipcWrite(file.statData.st_mtime);
     data->server->ipcWrite(file.statData.st_mode);
     data->server->ipcWrite(file.statData.st_size);
-    DEBUG(D_netproto) DFMT("client provided stats on " << file.filename);
+    DEBUG(D_netproto) DFMT("  client provided stats on " << file.filename);
     
     return true;
 }
@@ -616,7 +616,7 @@ size_t fc_scanToServer(BackupConfig& config, string entryName, IPC_Base& server)
     string clude = config.settings[sInclude].value.length() ? config.settings[sInclude].value : config.settings[sExclude].value.length() ? config.settings[sExclude].value : "";
 
     entryName.erase(remove(entryName.begin(), entryName.end(), '\\'), entryName.end());
-    auto error = processDirectory(entryName, clude, str2bool(config.settings[sExclude].value), config.settings[sFilterDirs].value.length(), scanToServerCallback, &data);
+    auto error = processDirectory(entryName, clude, str2bool(config.settings[sExclude].value), config.settings[sFilterDirs].value.length(), scanToServerCallback, &data, -1, true);
     if (error.find("system call") != string::npos)
         throw MBException(ABORTED_SYSTEM_CALL, error);  // this is most often MacOS timing out on a UI permission dialog box (e.g. access to desktop, etc)
     
@@ -637,14 +637,14 @@ size_t fc_sendFilesToServer(IPC_Base& server) {
         if (filename == NET_OVER)
             break;
         
-        DEBUG(D_netproto) DFMT("client received request for " << filename);
+        DEBUG(D_netproto) DFMT("  client received request for " << filename);
         neededFiles.insert(neededFiles.end(), filename);
     }
     
     DEBUG(D_netproto) DFMT("client received requests for " << to_string(neededFiles.size()) << " file(s)");
     
     for (auto &file: neededFiles) {
-        DEBUG(D_netproto) DFMT("client sending " << file << " to server");
+        DEBUG(D_netproto) DFMT("  client sending " << file << " to server");
         server.ipcSendDirEntry(file);
     }
 
@@ -678,6 +678,8 @@ void fc_mainEngine(BackupConfig& config, vector<string> origPaths) {
         for (auto it = paths.begin(); it != paths.end(); ++it) {
             timer clientTime;
             clientTime.start();
+            
+            DEBUG(D_faub) DFMT("faub client looping on path " << *it);
             
             server.ipcWrite(string(*it + NET_DELIM).c_str());
             auto entries = fc_scanToServer(config, *it, server);

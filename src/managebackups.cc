@@ -211,6 +211,7 @@ bool parseDirCallback(pdCallbackData &file) {
 }
 
 
+
 /*******************************************************************************
  * parseDirToCache(directory, fnamePattern, cache)
  *
@@ -1918,6 +1919,7 @@ bool getGlobalStats(unsigned long& stats, unsigned long& md5s, string& elapsedTi
     return false;
 }
 
+/*
 void showMatches(Pcre& p, string foo) {
     if (p.search(foo)) {
         cout << "fish count: " << p.matches() << endl;
@@ -1927,6 +1929,11 @@ void showMatches(Pcre& p, string foo) {
         cout << "3: '" << p.get_match(3) << "'" << endl;
         cout << endl;
     }
+}
+*/
+bool testCallback(pdCallbackData &file) {
+    cout << "\t=> " << file.filename << (S_ISDIR(file.statData.st_mode) ? " [DIR]" : "") << endl;
+    return true;
 }
 
 
@@ -1938,7 +1945,7 @@ void showMatches(Pcre& p, string foo) {
 int main(int argc, char *argv[]) {
     timer AppTimer;
     AppTimer.start();
-            
+    
     signal(SIGTERM, sigTermHandler);
     signal(SIGINT, sigTermHandler);
     
@@ -2103,35 +2110,6 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     
-    /*
-    if (argc == 1) {
-        showHelp(hSyntax);
-        exit(0);
-    }
-    */
-    
-    /*string foo = "; transfered ";
-    auto b1 = string(foo.length(), '\b');
-    auto b2 = string(foo.length(), ' ');
-    
-    cout << progressPercentage((int)50, 100, 2, 3) << flush;
-    cout << foo;
-    sleep(1);
-    cout << progressPercentage((long)100, (long)25) << flush;
-    sleep(1);
-    cout << progressPercentage((long)100, (long)40) << flush;
-    sleep(1);
-    cout << progressPercentage((long)100, (long)50) << flush;
-    sleep(1);
-    cout << progressPercentage((long)0, (long)0) << flush;
-    sleep(1);
-    cout << b1 << b2 << b1 << flush;
-    sleep(1);
-    cout << progressPercentage((int)0) << flush;
-    sleep(1);
-    cout << "complete" << endl;
-    exit(1);*/
-    
     if (GLOBALS.cli.count(CLI_DEFAULTS)) {
         showHelp(hDefaults);
         exit(0);
@@ -2169,7 +2147,7 @@ int main(int argc, char *argv[]) {
     
     if (GLOBALS.cli.count(CLI_VERSION)) {
         cout << "managebackups " << VERSION << "\n";
-        cout << "(c) 2023 released under GPLv3." << endl;
+        cout << "(c) 2022-2024 released under GPLv3." << endl;
         exit(0);
     }
     
@@ -2186,7 +2164,7 @@ int main(int argc, char *argv[]) {
          GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ||
          GLOBALS.cli.count(CLI_PROFILE) || GLOBALS.cli.count(CLI_FILE) || GLOBALS.cli.count(CLI_COMMAND) ||
          GLOBALS.cli.count(CLI_SAVE) || GLOBALS.cli.count(CLI_SCPTO) || GLOBALS.cli.count(CLI_SFTPTO))) {
-        SCREENERR("error: --path (or -s) is mutually-exclusive with all other options");
+        SCREENERR("error: --" << CLI_PATHS << " (or -s) is mutually-exclusive with all other options");
         exit(1);
     }
     

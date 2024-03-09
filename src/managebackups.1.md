@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.6.9b
+% MANAGEBACKUPS(1) managebackups 1.6.10
 % Rick Ennis
 % March 2023
 

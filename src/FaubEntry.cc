@@ -32,8 +32,13 @@ FaubEntry::FaubEntry(string dir, string aProfile, string aUuid) {
 
 
 FaubEntry::~FaubEntry() {
-    if (updated)
+    if (updated) {
+        DEBUG(D_cache) DFMT("writing cache changes");
         saveStats();
+    }
+    else {
+        DEBUG(D_cache) DFMT("no cache changes to persist");
+    }
 
     if (inodes.size())
         saveInodes();
@@ -225,6 +230,7 @@ bool FaubEntry::displayDiffFiles() {
     ifstream cacheFile;
     string data;
     bool headerShown = false;
+    unsigned int fileCount = 0;
     
     cacheFile.open(cacheFilename(SUFFIX_FAUBDIFF));
     if (cacheFile.is_open()) {
@@ -246,8 +252,11 @@ bool FaubEntry::displayDiffFiles() {
             }
             
             cout << data << endl;
+            ++fileCount;
         }
         
+        cout << BOLDBLUE << plural(fileCount, "change") << RESET << endl;
+
         cacheFile.close();
         return true;
     }
