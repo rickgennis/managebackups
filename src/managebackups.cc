@@ -1524,7 +1524,7 @@ void sigTermHandler(int sig) {
     string reason = (sig > 0 ? "interrupt" : !sig ? "timeout" : "error");
     
     if (GLOBALS.interruptFilename.length()) {
-        log("operation aborted on " + reason + (sig ? ", signal " + to_string(sig) : "") + " (" +
+        log("operation aborted on " + reason + (sig > 0 ? ", signal " + to_string(sig) : "") + " (" +
             GLOBALS.interruptFilename + ")");
 
         cerr << "\n" << reason << ": aborting backup, cleaning up " << GLOBALS.interruptFilename << "... ";
