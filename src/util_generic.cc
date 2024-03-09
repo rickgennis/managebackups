@@ -123,11 +123,11 @@ string log(string message) {
     logFile.open(GLOBALS.logDir + "/managebackups.log", ios::app);
 
     if (logFile.is_open()) {
-        logFile << string(timeStamp) << "[" << to_string(GLOBALS.pid) << "] " << message << endl;
+        logFile << string(timeStamp) << "[" << to_string(GLOBALS.pid) << "] " << commafy(message) << endl;
         logFile.close();
     }
 #else
-    syslog(LOG_CRIT, "%s", message.c_str());
+    syslog(LOG_CRIT, "%s", commafy(message).c_str());
 #endif
     
     return message;
@@ -1348,9 +1348,17 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
     }
 
     // recurse through subdirs
-    if (maxDepth != 1)
-        for (auto &dir: subDirs)
-            processDirectory(dir, pattern, exclude, filterDirs, callback, passData, maxDepth > -1 ? maxDepth - 1 : -1, file.origDir);
+    if (maxDepth != 1) {
+        string result;
+        
+        for (auto &dir: subDirs) {
+            result = processDirectory(dir, pattern, exclude, filterDirs, callback, passData, maxDepth > -1 ? maxDepth - 1 : -1, file.origDir);
+            
+            // bomb out on error
+            if (result.length())
+                return result;
+        }
+    }
     
     return "";
 }
@@ -1477,4 +1485,18 @@ tuple<string, string> clearMessage(string message) {
     string sp = string(len, ' ');
     
     return {message, bs + sp + bs};
+}
+
+
+// replace carriage-returns with commas
+string commafy(string data) {
+    if (data.back() == '\n')
+        data.pop_back();
+    
+    size_t pos = 0;
+    while((pos = data.find("\n", pos)) != std::string::npos) {
+        data.replace(pos, 1, ", ");
+        pos += 2;
+    }
+    return data;
 }

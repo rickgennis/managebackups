@@ -263,5 +263,7 @@ tuple<string, string> clearMessage(string message);
 
 unsigned int ansistrlength(string source);
 
+string commafy(string data);
+
 #endif
 

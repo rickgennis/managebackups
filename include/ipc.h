@@ -10,6 +10,7 @@
 #define NET_DELIM       ";\n"
 #define NET_OVER        "///;/"
 #define NET_OVER_DELIM  string(string(NET_OVER) + string(NET_DELIM)).c_str()
+#define NET_ABORT       "=-_/ABORT;=-0,"
 
 
 using namespace std;

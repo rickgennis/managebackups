@@ -192,7 +192,7 @@ void FaubEntry::removeEntry() {
     if (unlink(cacheFilename(SUFFIX_FAUBDIFF).c_str()))
         DEBUG(D_prune) DFMT("no cache to delete - " << cacheFilename(SUFFIX_FAUBDIFF));
 
-    log("removed " + cacheFilename(SUFFIX_FAUBSTATS) + " cache file for " + directory + " (" + to_string(result) + " )");
+    log("removed " + cacheFilename(SUFFIX_FAUBSTATS) + " cache file for " + directory + " (" + to_string(result) + ")");
     DEBUG(D_prune) DFMT("cache files deleted - " << cacheFilename(SUFFIX_FAUBSTATS));
 }
 

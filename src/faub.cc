@@ -13,6 +13,8 @@
 #include "globals.h"
 #include "exception.h"
 
+#define ABORTED_SYSTEM_CALL "abortedSysCall"
+
 
 extern void cleanupAndExitOnError();
 
@@ -202,19 +204,17 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             unsigned int maxLinksAllowed = config.settings[sMaxLinks].ivalue();
             size_t checkpointTotal = fileTotal;
             
-            /* loop through files in this filesystem */
+            /* loop through files in this "filesystem" */
             while (1) {
                 remoteFilename = client.ipcReadTo(NET_DELIM);
-                if (remoteFilename == NET_OVER) {
-                    break;
-                }
-                
-                // log errors sent by the client
-                if (remoteFilename.substr(0, 4) == "##* ") {
-                    remoteFilename.erase(0, 4);
-                    log(config.ifTitle() + " " + fs + " " + remoteFilename);
+        
+                if (remoteFilename == NET_ABORT) {
+                    log(config.ifTitle() + " backup aborted by client");
                     cleanupAndExitOnError();
                 }
+                
+                if (remoteFilename == NET_OVER)
+                    break;
                 
                 ++fileTotal;
                 long mtime = client.ipcRead();
@@ -481,7 +481,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             // protected directory but there's no user around to answer.  we have to finish the network
             // conversation to let the client instance terminate, then we'll blow away the failed backup
             // on the server side.
-            if (!filesModified && !filesHardLinked && !filesSymLinked && fsTime.seconds() > 600)
+            if (!neededFiles.size() && !hardLinkList.size() && !symLinkList.size() && fsTime.seconds() > 600)
                 abortBackupAtEnd = true;
             
         } while (client.ipcRead());
@@ -502,23 +502,23 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         // if time isn't included we may be about to overwrite a previous backup for this date
         if (!incTime)
             rmrf(originalCurrentDir);
+       
+        if (!filesModified && !filesHardLinked && !filesSymLinked) {
+            log(config.ifTitle() + " no files available to backup; backup aborted");
+            NOTQUIET && cout << "\t• " << config.ifTitle() << " no files to backup" << endl;
+            return;
+        }
         
         if (rename(string(currentDir).c_str(), originalCurrentDir.c_str())) {
-            if (!filesModified && !filesHardLinked && !filesSymLinked) {
-                log(config.ifTitle() + " no files available to backup; backup aborted");
-                NOTQUIET && cout << "\t• " << config.ifTitle() << " no files to backup" << endl;
-                return;
-            }
-                
             string errorDetail = config.ifTitle() + " unable to rename " + currentDir + " to " + originalCurrentDir + ": " + strerror(errno);
             log(errorDetail);
             SCREENERR(errorDetail);
             notify(config, "\t• " + errorDetail, false);
-            return;
+            cleanupAndExitOnError();
         }
         
-        GLOBALS.interruptFilename = "";
         currentDir = originalCurrentDir;
+        GLOBALS.interruptFilename = currentDir;
         
         // add the backup to the cache, including running a dus()
         config.fcache.recache(currentDir);
@@ -538,6 +538,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         fcacheCurrent->second.unchangedFiles = filesHardLinked;
         fcacheCurrent->second.dirs = unmodDirs;
         fcacheCurrent->second.slinks = filesSymLinked + receivedSymLinks;
+
+        GLOBALS.interruptFilename = "";  // here we consider the backup complete; only notification & screen UI remain
 
         string maxLinkMsg = maxLinksReached ? " [" + plural(maxLinksReached, "max link") + " reached]" : "";
         string message1 = "backup completed to " + currentDir + " in " + backupTime.elapsed();
@@ -568,15 +570,15 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
     }
     catch (MBException &e) {
         notify(config, "\t• " + config.ifTitle() + " Error (exception): " + e.detail(), false);
-        log(config.ifTitle() + "  error (exception): " + e.detail());
+        log(config.ifTitle() + " error (exception): " + e.detail());
         SCREENERR("error (exception): " + e.detail());
-        rmrf(currentDir);
+        cleanupAndExitOnError();
     }
     catch (...) {
         notify(config, "\t• " + config.ifTitle() + " Error (exception): unknown", false);
         log(config.ifTitle() + "  error (exception), unknown");
         SCREENERR("error (exception): unknown");
-        rmrf(currentDir);
+        cleanupAndExitOnError();
     }
 }
 
@@ -614,7 +616,9 @@ size_t fc_scanToServer(BackupConfig& config, string entryName, IPC_Base& server)
     string clude = config.settings[sInclude].value.length() ? config.settings[sInclude].value : config.settings[sExclude].value.length() ? config.settings[sExclude].value : "";
 
     entryName.erase(remove(entryName.begin(), entryName.end(), '\\'), entryName.end());
-    processDirectory(entryName, clude, config.settings[sExclude].value.length(), config.settings[sFilterDirs].value.length(), scanToServerCallback, &data);
+    auto error = processDirectory(entryName, clude, str2bool(config.settings[sExclude].value), config.settings[sFilterDirs].value.length(), scanToServerCallback, &data);
+    if (error.find("system call") != string::npos)
+        throw MBException(ABORTED_SYSTEM_CALL, error);  // this is most often MacOS timing out on a UI permission dialog box (e.g. access to desktop, etc)
     
     return data.totalEntries;
 }
@@ -649,9 +653,9 @@ size_t fc_sendFilesToServer(IPC_Base& server) {
 
 
 void fc_mainEngine(BackupConfig& config, vector<string> origPaths) {
-    try {
-        IPC_Base server(0, 1, 60);  // use stdin and stdout
+    IPC_Base server(0, 1, 60);  // use stdin and stdout
 
+    try {
         vector<string> paths;
         
         // the vector of paths that come into the function can be from the profile (conf file).
@@ -677,7 +681,7 @@ void fc_mainEngine(BackupConfig& config, vector<string> origPaths) {
             
             server.ipcWrite(string(*it + NET_DELIM).c_str());
             auto entries = fc_scanToServer(config, *it, server);
-
+                
             server.ipcWrite(NET_OVER_DELIM);
             auto requests = fc_sendFilesToServer(server);
 
@@ -696,6 +700,11 @@ void fc_mainEngine(BackupConfig& config, vector<string> origPaths) {
         log("error: faub client caught internal exception: " + s);
     }
     catch (MBException &e) {
+        if (e.detail() == ABORTED_SYSTEM_CALL) {
+            server.ipcWrite(NET_ABORT);
+            log("client aborting on " + e.getData());
+        }
+        
         cerr << "faub client caught MB excetion: " << e.detail() << endl;
         log("error: faub client caught exception: " + e.detail());
     }

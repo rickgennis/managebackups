@@ -117,8 +117,8 @@ bool restoreCacheCallback(pdCallbackData &file) {
 
 
 /*
-   load or reload all profile name-matching entries from disk.
-   don't reload anything that's already in the cache.
+ load or reload all profile name-matching entries from disk.
+ don't reload anything that's already in the cache.
  */
 
 void FaubCache::restoreCache(string profileName) {
@@ -126,7 +126,7 @@ void FaubCache::restoreCache(string profileName) {
     Pcre tempRE("\\.tmp\\.\\d+$");
     data.tempRE = &tempRE;
     data.fc = this;
-
+    
     coreProfile = profileName;
     DEBUG(D_faub) DFMT(profileName);
     
@@ -154,22 +154,22 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
     unsigned int recached = 0;
     bool nextOneToo = false;
     auto [message, noMessage] = clearMessage("recalculating disk usage... ");
-
+    
     if (targetDir.length() && backups.find(targetDir) == backups.end())
         restoreCache_internal(targetDir);
-        
+    
     for (auto aBackup = backups.begin(); aBackup != backups.end(); ++aBackup) {
         DEBUG(D_recalc) DFMT("examining " << aBackup->first);
         bool deletedMatch = deletedTime && filename2Mtime(aBackup->first) > deletedTime;
-
+        
         // we're doing all
         if (forceAll ||
             
             // this is a backup we've specifically been asked to recache
             (targetDir.length() && targetDir == aBackup->first) ||
             
-             // if we have no cached data for this backup or its the next sequential backup
-             // after the time of a deleted one
+            // if we have no cached data for this backup or its the next sequential backup
+            // after the time of a deleted one
             (!targetDir.length() && ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch)) ||
             
             // in the case of walking through all the backups and doing just the ones that are missing stats
@@ -180,10 +180,10 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             bool gotPrev = prevBackup != backups.end();
             if (gotPrev)
                 prevBackup->second.loadInodes();
-
+            
             if (!recached)
                 NOTQUIET && ANIMATE && cout << message << flush;
-           
+            
             DEBUG(D_recalc) DFMT("\tcalling dus(); " << forceAll << "," << (targetDir == aBackup->first) << ","
                                  << (!targetDir.length() && ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))
                                  << "," << nextOneToo);
@@ -198,12 +198,13 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             aBackup->second.modifiedFiles = ds.mods;
             aBackup->second.saveStats();
             aBackup->second.saveInodes();
-                        
+            
             if (forceAll && NOTQUIET) {
                 if (ANIMATE)
                     cout << noMessage;
                 
-                cout << BOLDBLUE << aBackup->first << "  " << RESET << "size: " << approximate(ds.getSize() + ds.getSaved()) << ", used: " << approximate(ds.getSize()) << endl;
+                cout << BOLDBLUE << aBackup->first << "  " << RESET << "size: " << approximate(ds.getSize() + ds.getSaved()) << ", used: " << approximate(ds.getSize()) <<
+                ", dirs: " << approximate(ds.dirs) << ", links: " << approximate(ds.symLinks) << ", mods: " << approximate(ds.mods) << endl;
             }
             
             // the inode list can be long and suck memory.  so let's not let multiple cache entries
@@ -222,7 +223,7 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             if (!forceAll)
                 nextOneToo = !nextOneToo;
         }
-
+        
         prevBackup = aBackup;
     }
     
@@ -238,10 +239,10 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
 
 DiskStats FaubCache::getTotalStats() {
     DiskStats ds;
-
+    
     for (auto &aBackup: backups)
         ds += aBackup.second.ds;
-
+    
     return ds;
 }
 
@@ -273,18 +274,18 @@ myMapIT FaubCache::findBackup(string backupDir, myMapIT backupIT) {
         }
     
     auto backupIt = backups.find(backupDir);
-
+    
     if (backupIt == backups.end()) {
         Pcre regex(backupDir);
         myMapIT match;
-
+        
         for (auto it = backups.begin(); it != backups.end(); ++it) {
             if (regex.search(it->first)) {
                 contenders.insert(contenders.end(), it->first);
                 match = it;
             }
         }
-
+        
         if (contenders.size() == 1)
             return match;
         else {
@@ -309,7 +310,7 @@ bool FaubCache::displayDiffFiles(string backupDir) {
     
     if (backup != backups.end())
         return backup->second.displayDiffFiles();
-
+    
     return false;
 }
 
@@ -479,7 +480,7 @@ bool fcCleanupCallback(pdCallbackData &file) {
     FaubCache *fc = (FaubCache*)file.dataPtr;
     
     cacheFile.open(file.filename);
-
+    
     if (cacheFile.is_open()) {
         cacheFile >> fullId;
         cacheFile.close();
@@ -496,17 +497,17 @@ bool fcCleanupCallback(pdCallbackData &file) {
         // delete the cache file
         if (!exists(backupDir)) {
             auto targetMtime = filename2Mtime(backupDir);
-
+            
             if (profileName.length()) {
                 Pcre yearRE("^20\\d{2}$");
                 auto parentDir = backupDir;
                 auto ps = pathSplit(parentDir);
-
+                
                 while (parentDir.length() > 1 && parentDir.find("/") != string::npos && !yearRE.search(ps.file)) {
                     parentDir = ps.dir;
                     ps = pathSplit(parentDir);
                 }
-
+                
                 auto bdir = pathSplit(parentDir).dir;
                 if (profileName == fc->coreProfile && bdir == fc->baseDir) {
                     log(backupDir + " has vanished, updating cache (" + file.filename + ")");
@@ -516,7 +517,7 @@ bool fcCleanupCallback(pdCallbackData &file) {
                     unlink(file.filename.c_str());
                     file.filename.replace(file.filename.find(SUFFIX_FAUBINODES), string(SUFFIX_FAUBINODES).length(), SUFFIX_FAUBDIFF);
                     unlink(file.filename.c_str());
-  
+                    
                     // re-dus the next backup
                     fc->recache("", targetMtime);
                 }

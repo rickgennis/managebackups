@@ -1543,7 +1543,8 @@ void sigTermHandler(int sig) {
     else
         log("operation aborted on " + reason + (sig > 0 ? " (signal " + to_string(sig) + ")" : ""));
     
-    if (GLOBALS.interruptLock.length()) unlink(GLOBALS.interruptLock.c_str());
+    if (GLOBALS.interruptLock.length())
+        unlink(GLOBALS.interruptLock.c_str());
     
     exit(1);
 }
@@ -1937,7 +1938,7 @@ void showMatches(Pcre& p, string foo) {
 int main(int argc, char *argv[]) {
     timer AppTimer;
     AppTimer.start();
-        
+            
     signal(SIGTERM, sigTermHandler);
     signal(SIGINT, sigTermHandler);
     
