@@ -2,6 +2,7 @@
 #include <fstream>
 #include <algorithm>
 #include <queue>
+#include <unordered_set>
 #include <dirent.h>
 #include <unistd.h>
 #include "globals.h"
@@ -315,123 +316,119 @@ bool FaubCache::displayDiffFiles(string backupDir) {
 }
 
 
-size_t compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
-    map<string, string> subDirs;
-    map<string, bool> seenFiles;
-    DIR *c_dir;
-    struct dirent *c_dirEntry;
-    struct stat statDataA;
+struct compareDirsDataType {
+    size_t filesChanged;
+    size_t filesA;
+    size_t filesB;
+    unordered_set<string> seenFiles;
+    string baseDirA;
+    string baseDirB;
+    size_t threshold;
+    bool percent;
+    bool filter;
+};
+
+
+bool compareDirsCallbackA(pdCallbackData &file) {
+    compareDirsDataType *data = (compareDirsDataType*)file.dataPtr;
     struct stat statDataB;
-    size_t fileChanges = 0;
-    bool filter = !GLOBALS.cli.count(CLI_COMPAREFILTER);
     
-    /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
-     walk directory aFile
-     *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
+    // file.filename is fileA
+    // fileB is the same filename but with the dirB baseDir instead of the dirA one
+    string fileB = file.filename;
+    fileB.replace(0, data->baseDirA.length(), data->baseDirB);
     
-    if ((c_dir = opendir(dirA.c_str())) != NULL) {
-        while ((c_dirEntry = readdir(c_dir)) != NULL) {
-            
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
-                continue;
-            
-            auto aFile = slashConcat(dirA, c_dirEntry->d_name);
-            auto bFile = slashConcat(dirB, c_dirEntry->d_name);
-            
-            if (mylstat(aFile, &statDataA)) {
-                SCREENERR("error: unable to stat " << aFile << " - " << strerror(errno));
-                exit(1);
-            }
-            
-            if (mylstat(bFile, &statDataB))
-                statDataB.st_ino = statDataB.st_size = 0;  // file doesn't exist in the other backup
-            
-            seenFiles.insert(seenFiles.end(), pair<string, bool>(aFile, false));  // bool value is unused
-            
-            if (statDataA.st_ino != statDataB.st_ino) {
-                auto fileType = getFilesystemEntryType(statDataA.st_mode);
-                
-                if (S_ISDIR(statDataA.st_mode))
-                    subDirs.insert(subDirs.end(), pair<string, string>(aFile, bFile));
-                else {
-                    auto sizeChange = statDataA.st_size - statDataB.st_size;
-                    
-                    if (percent) {
-                        long p = 0;
-                        
-                        if (statDataA.st_size)
-                            p = floor((double)abs(sizeChange) / (double)statDataA.st_size * 100.0);
-                        else
-                            if (sizeChange)
-                                p = threshold;
-                        
-                        if (percent >= threshold)
-                            if (!filter || (filter && fileType != 'l' && fileType != 'd')) {
-                                cout << BOLDRED
-                                << blockp(to_string(p) + "%", 4) << RESET
-                                << " " << blockp(approximate(statDataA.st_size), 4)
-                                << " [" << fileType << "]  " << aFile << endl;
-                                ++fileChanges;
-                            }
-                    }
-                    else
-                        if (abs(sizeChange) >= threshold)
-                            if (!filter || (filter && fileType != 'l' && fileType != 'd')) {
-                                cout << BOLDRED
-                                << blockp((sizeChange >= 0 ? "+" : "-") + approximate(abs(sizeChange)), 5)
-                                << RESET << " " << blockp(approximate(statDataA.st_size), 4)
-                                << " [" << fileType << "]  "
-                                << aFile << endl;
-                                ++fileChanges;
-                            }
-                }
-            }
-        }
-        closedir(c_dir);
-    }
+    ++data->filesA;
     
+    if (mylstat(fileB, &statDataB)) // file doesn't exist in dirB
+        statDataB.st_ino = statDataB.st_size = 0;
+    else
+        ++data->filesB;
+
+    data->seenFiles.insert(file.filename);
     
-    /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
-     walk directory bFile
-     *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
-    
-    if ((c_dir = opendir(dirB.c_str())) != NULL) {
-        while ((c_dirEntry = readdir(c_dir)) != NULL) {
+    if (file.statData.st_ino != statDataB.st_ino) {
+        auto fileType = getFilesystemEntryType(file.statData.st_mode);
+        auto sizeChange = file.statData.st_size - statDataB.st_size;
+        
+        if (data->percent) {
+            long p = 0;
             
-            if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
-                continue;
+            if (file.statData.st_size)
+                p = floor((double)abs(sizeChange) / (double)file.statData.st_size * 100.0);
+            else
+                if (sizeChange)
+                    p = data->threshold;
             
-            auto aFile = slashConcat(dirA, c_dirEntry->d_name);
-            auto bFile = slashConcat(dirB, c_dirEntry->d_name);
-            
-            if (seenFiles.find(aFile) != seenFiles.end())
-                continue;
-            
-            if (mylstat(bFile, &statDataB)) {
-                SCREENERR("error: unable to stat " << bFile << " - " << strerror(errno));
-                exit(1);
-            }
-            
-            auto fileType = getFilesystemEntryType(statDataB.st_mode);
-            
-            if (percent || statDataB.st_size >= threshold)
-                if (!filter || (filter && fileType != 'l' && fileType != 'd')) {
-                    cout << BOLDRED << blockp("+" + approximate(statDataB.st_size), 5) << RESET << " [" << fileType << "]  " << RESET << bFile << endl;
-                    ++fileChanges;
+            if (data->percent >= data->threshold)
+                if (!data->filter || (data->filter && fileType != 'l' && fileType != 'd')) {
+                    cout << BOLDRED
+                    << blockp(to_string(p) + "%", 4) << RESET
+                    << " " << blockp(approximate(file.statData.st_size), 4)
+                    << " [" << fileType << "]  " << file.filename << endl;
+                    ++data->filesChanged;
                 }
         }
-        closedir(c_dir);
+        else
+            if (abs(sizeChange) >= data->threshold)
+                if (!data->filter || (data->filter && fileType != 'l' && fileType != 'd')) {
+                    cout << BOLDRED
+                    << blockp((sizeChange >= 0 ? "+" : "-") + approximate(abs(sizeChange)), 5)
+                    << RESET << " " << blockp(approximate(file.statData.st_size), 4)
+                    << " [" << fileType << "]  "
+                    << file.filename << endl;
+                    ++data->filesChanged;
+                }
     }
     
+    return true;
+}
+
+
+bool compareDirsCallbackB(pdCallbackData &file) {
+    compareDirsDataType *data = (compareDirsDataType*)file.dataPtr;
     
-    /*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
-     walk subdirs
-     *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*/
+    // file.filename is fileB
+    // fileA is the same filename but with the dirA baseDir instead of the dirB one
+    string fileA = file.filename;
+    fileA.replace(0, data->baseDirB.length(), data->baseDirA);
     
-    for (auto &dirs: subDirs)
-        fileChanges += compareDirs(dirs.first, dirs.second, threshold, percent);
+    if (data->seenFiles.find(fileA) == data->seenFiles.end()) {
+        auto fileType = getFilesystemEntryType(file.statData.st_mode);
+        ++data->filesB;
+
+        if (data->percent || file.statData.st_size >= data->threshold)
+            if (!data->filter || (data->filter && fileType != 'l' && fileType != 'd')) {
+                cout << BOLDRED << blockp("+" + approximate(file.statData.st_size), 5) << RESET << " [" << fileType << "]  " << RESET << file.filename << endl;
+                ++data->filesChanged;
+            }
+    }
     
-    return fileChanges;
+    return true;
+}
+
+
+tuple<size_t, size_t, size_t> compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
+    compareDirsDataType data;
+    data.filter = !GLOBALS.cli.count(CLI_COMPAREFILTER);
+    data.percent = percent;
+    data.threshold = threshold;
+    data.filesChanged = data.filesA = data.filesB = 0;
+    data.baseDirA = dirA;
+    data.baseDirB = dirB;
+    
+    // walk through the first of the backups to compare (dirA).
+    // note all discovered files.  if the same file doesn't exist in the other
+    // backups (dirB) with the same inode, then output its diff details.
+    processDirectory(dirA, "", false, false, compareDirsCallbackA, &data);
+
+    // walk through the second of the backups to compare (dirB).  if the
+    // filename is on the dirA list of discoverd files, skip it.  otherwise it's
+    // a file that only exists in the second backup (i.e. not discoverable in the
+    // dirA scan).  so output its diff details here.
+    processDirectory(dirB, "", false, false, compareDirsCallbackB, &data);
+    
+    return {data.filesChanged, data.filesA, data.filesB};
 }
 
 
@@ -469,8 +466,8 @@ void FaubCache::compare(string backupA, string backupB, string givenThreshold) {
     
     cout << BOLDYELLOW << "[" << BOLDBLUE << b1Base << BOLDYELLOW << "]\n";
     cout << "[" << BOLDBLUE << b2Base << BOLDYELLOW << "]" << endl;
-    auto changes = compareDirs(b1Base, b2Base, threshold, percent);
-    cout << BOLDBLUE << plural(changes, "change") << RESET << endl;
+    auto [changes, filesA, filesB] = compareDirs(b1Base, b2Base, threshold, percent);
+    cout << BOLDBLUE << plural(changes, "change") << RESET << " (A entries: " << approximate(filesA) << ", B entries: " << approximate(filesB) << ")" << endl;
 }
 
 
