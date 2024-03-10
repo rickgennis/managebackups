@@ -10,6 +10,8 @@
 
 #include "FaubEntry.h"
 
+#define NO_CHANGES  "no changes."
+
 
 FaubEntry& FaubEntry::operator=(const DiskStats& stats) {
     ds.sizeInBytes = stats.sizeInBytes;
@@ -188,8 +190,6 @@ void FaubEntry::removeEntry() {
         log("note: " + cacheFilename(SUFFIX_FAUBSTATS) + " didn't exist for deletion");
         DEBUG(D_prune) DFMT("no cache to delete - " << cacheFilename(SUFFIX_FAUBSTATS));
     }
-    else
-        log(cacheFilename(SUFFIX_FAUBSTATS) + " deleted");  // REMOVE
     
     if (unlink(cacheFilename(SUFFIX_FAUBINODES).c_str()))
         DEBUG(D_prune) DFMT("no cache to delete - " << cacheFilename(SUFFIX_FAUBINODES));
@@ -197,8 +197,7 @@ void FaubEntry::removeEntry() {
     if (unlink(cacheFilename(SUFFIX_FAUBDIFF).c_str()))
         DEBUG(D_prune) DFMT("no cache to delete - " << cacheFilename(SUFFIX_FAUBDIFF));
 
-    log("removed " + cacheFilename(SUFFIX_FAUBSTATS) + " cache file for " + directory + " (" + to_string(result) + ")");
-    DEBUG(D_prune) DFMT("cache files deleted - " << cacheFilename(SUFFIX_FAUBSTATS));
+    DEBUG(D_prune) DFMT("cache files deleted - " << cacheFilename(SUFFIX_FAUBSTATS) << " for " << directory << " (result " << result << ")");
 }
 
 
@@ -213,7 +212,7 @@ void FaubEntry::updateDiffFiles(set<string> files) {
                 cacheFile << aFile << endl;
         }
         else
-            cacheFile << "no changes." << endl;
+            cacheFile << NO_CHANGES << endl;
 
         cacheFile.close();
     }
@@ -240,7 +239,7 @@ bool FaubEntry::displayDiffFiles() {
             if (cacheFile.eof())
                 break;
             
-            if (data != "no changes.")
+            if (data != NO_CHANGES)
                 data = slashConcat(directory, data);
             
             // only print the header if we have valid output.  otherwise
