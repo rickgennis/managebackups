@@ -757,6 +757,11 @@ pattern.
 By default this option only filters files and continues to include
 subdirectories themselves (files in the subdirectories are filtered).
 To have it apply to the subdirectories see \f[B]\[en]filterdirs\f[R].
+Also note, this is applicable for the client invocation of
+\f[B]managebackups\f[R], the one run with \f[B]\[en]path\f[R].
+To minimize complexity the server side innovation understands
+\f[B]\[en]include\f[R] and will automatically append it to the
+client-side call (\f[B]\[en]faub\f[R]) if found.
 .TP
 \f[B]\[en]exclude\f[R] [\f[I]pattern\f[R]]
 {FB} Only backup directory entries that do NOT match the specified regex
@@ -764,6 +769,11 @@ pattern.
 By default this option only filters files and continues to include
 subdirectories themselves (files in the subdirectories are filtered).
 To have it apply to the subdirectories see \f[B]\[en]filterdirs\f[R].
+Also note, this is applicable for the client invocation of
+\f[B]managebackups\f[R], the one run with \f[B]\[en]path\f[R].
+To minimize complexity the server side innovation understands
+\f[B]\[en]exclude\f[R] and will automatically append it to the
+client-side call (\f[B]\[en]faub\f[R]) if found.
 .TP
 \f[B]\[en]filterdirs\f[R]
 {FB} Apply \f[B]\[en]include\f[R] or \f[B]\[en]exclude\f[R] filtering to

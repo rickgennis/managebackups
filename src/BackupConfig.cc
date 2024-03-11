@@ -89,10 +89,6 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_FILTERDIRS, RE_FILTERDIRS, BOOL, "false"));
     settings.insert(settings.end(), Setting(CLI_PATHS, RE_PATHS, STRING_VECTOR, ""));
     settings.insert(settings.end(), Setting(CLI_ARCHIVE, RE_ARCHIVE, BOOL, "false"));
-
-    // CLI_PATHS is intentionally left out because its only accessed via CLI
-    // and never as a Setting.  to implement it as a Setting would require a new
-    // type (vector<string>) to be setup and parse and there's really no benefit.
 }
 
 

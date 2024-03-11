@@ -479,6 +479,13 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
     
     if (GLOBALS.cli.count(CLI_RECREATE)) currentConf->modified = 1;
     
+    // check for conflicting profile settings and CLI options
+    if (currentConf->settings[sInclude].value.length() &&
+        currentConf->settings[sExclude].value.length()) {
+        SCREENERR("error: 'include' and 'exclude' are mutual-exclusive in a single profile");
+        exit(1);
+    }
+            
     // apply fp from the config file, if set
     if (str2bool(currentConf->settings[sFP].value)) {
         currentConf->settings[sFailsafeDays].value = "2";

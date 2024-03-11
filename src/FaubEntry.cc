@@ -34,13 +34,8 @@ FaubEntry::FaubEntry(string dir, string aProfile, string aUuid) {
 
 
 FaubEntry::~FaubEntry() {
-    if (updated) {
-        DEBUG(D_cache) DFMT("writing cache changes");
+    if (updated)
         saveStats();
-    }
-    else {
-        DEBUG(D_cache) DFMT("no cache changes to persist");
-    }
 
     if (inodes.size())
         saveInodes();

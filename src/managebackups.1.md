@@ -255,10 +255,10 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 : {both} Leave the output from any commands that are executed (create a backup, ssh, SFTP, etc) in a file under /tmp/managebackups_output. This can help facilitate diagnosing authentication or configuration errors.
 
 **--include** [*pattern*]
-: {FB} Only backup directory entries that match the specified regex pattern. By default this option only filters files and continues to include subdirectories themselves (files in the subdirectories are filtered). To have it apply to the subdirectories see **--filterdirs**.
+: {FB} Only backup directory entries that match the specified regex pattern. By default this option only filters files and continues to include subdirectories themselves (files in the subdirectories are filtered). To have it apply to the subdirectories see **--filterdirs**. Also note, this is applicable for the client invocation of **managebackups**, the one run with **--path**. To minimize complexity the server side innovation understands **--include** and will automatically append it to the client-side call (**--faub**) if found.
 
 **--exclude** [*pattern*]
-: {FB} Only backup directory entries that do NOT match the specified regex pattern. By default this option only filters files and continues to include subdirectories themselves (files in the subdirectories are filtered). To have it apply to the subdirectories see **--filterdirs**.
+: {FB} Only backup directory entries that do NOT match the specified regex pattern. By default this option only filters files and continues to include subdirectories themselves (files in the subdirectories are filtered). To have it apply to the subdirectories see **--filterdirs**. Also note, this is applicable for the client invocation of **managebackups**, the one run with **--path**. To minimize complexity the server side innovation understands **--exclude** and will automatically append it to the client-side call (**--faub**) if found.
 
 **--filterdirs**
 : {FB} Apply **--include** or **--exclude** filtering to subdirectory names.

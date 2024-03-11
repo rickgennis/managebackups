@@ -80,6 +80,12 @@ bool configMgrCallback(pdCallbackData &file) {
             SCREENERR("error: 'paths' and 'faub' are mutually-exclusive in profile " << backupConfig.settings[sTitle].value);
             exit(1);
         }
+        
+        if (backupConfig.settings[sExclude].value.length() &&
+            backupConfig.settings[sInclude].value.length()) {
+            SCREENERR("error: 'include' and 'exclude' are mutually-exclusive in profile " << backupConfig.settings[sTitle].value);
+            exit(1);
+        }
    
         configManager->configs.emplace(configManager->configs.begin(), backupConfig);
     }

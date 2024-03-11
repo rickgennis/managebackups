@@ -83,7 +83,10 @@ string newBackupDir(BackupConfig& config) {
 
 
 void fs_startServer(BackupConfig& config) {
-    PipeExec faub(config.settings[sFaub].value, 60);
+    string clude = config.settings[sInclude].value.length() ? " --include \"" + config.settings[sInclude].value + "\"" :
+        config.settings[sExclude].value.length() ? " --exclude \"" + config.settings[sExclude].value + "\"" : "";
+    
+    PipeExec faub(config.settings[sFaub].value + clude, 60);
 
     if (GLOBALS.cli.count(CLI_NOBACKUP))
         return;
@@ -92,7 +95,7 @@ void fs_startServer(BackupConfig& config) {
     string prevDir = mostRecentBackupDirSince(config.settings[sDirectory].value, newDir, config.settings[sTitle].value);
 
     if (GLOBALS.cli.count(CLI_TEST)) {
-        cout << YELLOW << config.ifTitle() << " TESTMODE: would have begun backup by executing \"" << config.settings[sFaub].value << "\"" << endl;
+        cout << YELLOW << config.ifTitle() << " TESTMODE: would have begun backup by executing \"" << config.settings[sFaub].value + clude << "\"" << endl;
         cout << "saving to " << newDir << endl;
         cout << "comparing to previous " << prevDir << RESET << endl;
         return;
@@ -616,7 +619,7 @@ size_t fc_scanToServer(BackupConfig& config, string entryName, IPC_Base& server)
     string clude = config.settings[sInclude].value.length() ? config.settings[sInclude].value : config.settings[sExclude].value.length() ? config.settings[sExclude].value : "";
 
     entryName.erase(remove(entryName.begin(), entryName.end(), '\\'), entryName.end());
-    auto error = processDirectory(entryName, clude, str2bool(config.settings[sExclude].value), config.settings[sFilterDirs].value.length(), scanToServerCallback, &data, -1, true);
+    auto error = processDirectory(entryName, clude, config.settings[sExclude].value.length(), config.settings[sFilterDirs].value.length(), scanToServerCallback, &data, -1, true);
     if (error.find("system call") != string::npos)
         throw MBException(ABORTED_SYSTEM_CALL, error);  // this is most often MacOS timing out on a UI permission dialog box (e.g. access to desktop, etc)
     
@@ -668,6 +671,21 @@ void fc_mainEngine(BackupConfig& config, vector<string> origPaths) {
                 auto fileVec = expandWildcardFilespec(d);
                 paths.insert(paths.end(), fileVec.begin(), fileVec.end());
             }
+        }
+        
+        if (GLOBALS.cli.count(CLI_TEST)) {
+            cout << YELLOW << config.ifTitle() << " TESTMODE: faub client would have scanned " << plural(paths.size(), "path") << ":";
+            for (auto it = paths.begin(); it != paths.end(); ++it)
+                cout << endl << "\t• " << *it;
+            
+            if (config.settings[sInclude].value.length())
+                cout << endl << "including only files that match [" << config.settings[sInclude].value << "]";
+            else
+                if (config.settings[sExclude].value.length())
+                    cout << endl << "excluding files that match [" << config.settings[sExclude].value << "]";
+            
+            cout << RESET << endl;
+            return;
         }
         
         DEBUG(D_faub) DFMT("faub client starting with " << paths.size() << " request(s)");
