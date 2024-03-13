@@ -139,7 +139,7 @@ struct parseDirDataType {
 
 bool parseDirCallback(pdCallbackData &file) {
     parseDirDataType *data = (parseDirDataType*)file.dataPtr;
-    
+        
     // first test for an in-process file.  if its in process, is it old and abandoned?
     // if so, delete it.  if not old, note the in process filename and skip the rest
     auto ps = pathSplit(file.filename);
@@ -1610,7 +1610,7 @@ bool crossFSCallback(pdCallbackData &file) {
     
     string oldFilename = file.filename;
     string newFilename = oldFilename;
-    newFilename.replace(0, file.origDir.length(), "");
+    newFilename.replace(0, file.topLevelDir.length(), "");
     newFilename = slashConcat(newDataPtr->newDir, newFilename);
     
     if (!mylstat(oldFilename, &file.statData)) {

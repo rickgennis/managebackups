@@ -199,6 +199,9 @@ s_pathSplit pathSplit(string path) {
 }
 
 
+string getParentDir(string path) { return pathSplit(path).dir; }
+
+
 string MD5file(string filename, bool quiet, string reason) {
     FILE *inputFile;
     
@@ -1241,6 +1244,7 @@ char getFilesystemEntryType(string entry) {
 }
 
 
+
 /*
  processDirectory() walks down the specified directory tree calling the provided
  callback() function on each filesystem entry (be it a directory, symlink or file).
@@ -1260,7 +1264,15 @@ char getFilesystemEntryType(string entry) {
 
     'passData' additional data pointer for the callback function
  
-    'maxDepth' can be specified to only go x subdirectory levels deep
+    'maxDepth' can be specified to only go x subdirectory levels deep. depth is defined as
+ an entries number of subdirs below the provided 'directory'.  for example, given a provided
+ directory of '/tmp/foo' and these entries:
+    /tmp/foo/cases
+    /tmp/foo/cases/case1
+    /tmp/foo/cases/case2
+ case1 and 2 are at a depth of 1 because they're one subdirectory ("cases") below the starting
+ directory (/tmp/foo).  but /tmp/foo/cases itself, even though it's a directory, is at a
+ depth of 0 because it's in the starting directory.
  
     'includeTopDir' whether to call the callback function for the original directory
  name that as passed in as 'directory'
@@ -1274,14 +1286,16 @@ char getFilesystemEntryType(string entry) {
  */
 
 string processDirectory(string directory, string pattern, bool exclude, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, int maxDepth, bool includeTopDir) {
-    DIR *dir;
+    DIR *dirPtr;
+    size_t dirEntries;
     struct dirent *dirEntry;
-    list<tuple<string, int>> dirsToRead;               // filename and depth in heirarchy
-    list<tuple<string, struct stat>> dirsToCallback;   // filename and stat struct
+    list<tuple<string, unsigned int>> dirsToRead; // filename and depth in heirarchy
+    list<pdCallbackData> dirsToCallback;          // dirs to calback
     Pcre patternRE(pattern);
+    struct stat dirStat;
     pdCallbackData file;
     file.dataPtr = passData;
-    file.origDir = directory;
+    file.topLevelDir = directory;
     
     dirsToRead.push_back({ue(directory), 0});
     
@@ -1294,22 +1308,21 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
     while (!dirsToRead.empty()) {
         auto [baseDir, depth] = dirsToRead.front();
         dirsToRead.pop_front();
-        
-        if (!mylstat(baseDir, &file.statData)) {
+        dirEntries = 0;
+             
+        if (!mylstat(baseDir, &dirStat)) {
             
-            if (S_ISDIR(file.statData.st_mode)) {
+            if (S_ISDIR(dirStat.st_mode)) {
                 
-                if (includeTopDir || baseDir != directory)
-                    dirsToCallback.push_front({baseDir, file.statData});
-                
-                if ((dir = opendir(baseDir.c_str())) != NULL) {
-                    while ((dirEntry = readdir(dir)) != NULL) {
+                if ((dirPtr = opendir(baseDir.c_str())) != NULL) {
+                    while ((dirEntry = readdir(dirPtr)) != NULL) {
                         
                         if (!strcmp(dirEntry->d_name, ".") || !strcmp(dirEntry->d_name, ".."))
                             continue;
                         
+                        ++dirEntries;
                         file.filename = slashConcat(baseDir, dirEntry->d_name);
-                        
+                        file.depth = depth;
                         if (!mylstat(file.filename, &file.statData)) {
                             
                             // process directories
@@ -1335,6 +1348,8 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
                                     if ((exclude && found) || (!exclude && !found))
                                         continue;
                                 }
+
+                                file.dirEntries = 0;
                                 
                                 // process regular files
                                 if (!callback(file)) {
@@ -1344,8 +1359,15 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
                             }
                         }
                     }
+                    closedir(dirPtr);
                     
-                    closedir(dir);
+                    if (includeTopDir || baseDir != directory) {
+                        file.filename = baseDir;
+                        file.statData = dirStat;
+                        file.dirEntries = dirEntries;
+                        file.depth = depth - 1;
+                        dirsToCallback.push_front(file);
+                    }
                 }
                 else {
                     string err = "error: unable to open " + ue(directory) + errtext();;
@@ -1367,9 +1389,9 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
     }
     
     // call callbacks on directories themselves now that their contents have been processed
-    for (auto [dirName, statData]: dirsToCallback) {
-        file.filename = dirName;
-        file.statData = statData;
+    while (!dirsToCallback.empty()) {
+        file = dirsToCallback.front();
+        dirsToCallback.pop_front();
         
         if (!callback(file))
             break;
@@ -1391,8 +1413,7 @@ struct internalPDBDataType {
 bool pdBackupsCallback(pdCallbackData &file) {
     internalPDBDataType *data = (internalPDBDataType*)file.dataPtr;
     pdCallbackData passedFile;
-    passedFile.filename = file.filename;
-    passedFile.statData = file.statData;
+    passedFile = file;
     passedFile.dataPtr = data->realDataPtr;
     
     auto depth = count(file.filename.begin(), file.filename.end(), '/') - data->baseSlashes;
@@ -1400,6 +1421,14 @@ bool pdBackupsCallback(pdCallbackData &file) {
     auto filePs = pathSplit(file.filename);
     bool dirIsDay = (dirPs.file.length() == 2 && isdigit(dirPs.file[0]) && isdigit(dirPs.file[1]));
     bool entIsDay = (filePs.file.length() == 2 && isdigit(filePs.file[0]) && isdigit(filePs.file[1]));
+    
+        
+   DEBUG(D_any) DFMT(file.filename << (S_ISDIR(file.statData.st_mode) ? " [DIR]" : " [file]") << ", depth:" << depth << ", f.depth:" << file.depth << ", dirents:" << file.dirEntries << ", p:" << getParentDir(file.filename));
+
+    
+        
+  //  removeemptydirs can be rewritten now
+        
     
     // make sure we're in the year/month or year/month/day subdirs
     if ((depth == 3 && !entIsDay) || (depth == 4 && dirIsDay)) {

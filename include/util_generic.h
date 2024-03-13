@@ -151,8 +151,13 @@ struct s_pathSplit {
     string file_ext;
 };
 
-
+// pathsplit assumes a full dir/file
 s_pathSplit pathSplit(string path);
+
+// getParentDir assumes just a dir path, no file on the end.  so
+// we can use pathSplit to chop off the last portion, which pathSplit
+// will think is the file but we know to be the last dir here.
+string getParentDir(string path);
 
 string slashConcat(string str1, string str2, string str3 = "");
 
@@ -242,12 +247,15 @@ char getFilesystemEntryType(string entry);
 
 struct pdCallbackData {
     string filename;
-    string origDir;
+    unsigned int depth;
+    size_t dirEntries;
+    string topLevelDir;
     struct stat statData;
     void *dataPtr;
 };
 
 enum backupTypes { SINGLE_ONLY, FAUB_ONLY, ALL_BACKUPS };
+
 string processDirectory(string directory, string pattern, bool exclude, bool allDirs, bool (*callback)(pdCallbackData&), void *passData, int maxDepth = -1, bool includeTopDir = false);
 string processDirectoryBackups(string directory, string pattern, bool exclude, bool (*callback)(pdCallbackData&), void *passData, backupTypes backupType, int maxDepth = -1);
 
