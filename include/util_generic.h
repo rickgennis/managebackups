@@ -154,10 +154,10 @@ struct s_pathSplit {
 // pathsplit assumes a full dir/file
 s_pathSplit pathSplit(string path);
 
-// getParentDir assumes just a dir path, no file on the end.  so
+// getDirUp assumes just a dir path, no file on the end.  so
 // we can use pathSplit to chop off the last portion, which pathSplit
 // will think is the file but we know to be the last dir here.
-string getParentDir(string path);
+string getDirUp(string path);
 
 string slashConcat(string str1, string str2, string str3 = "");
 

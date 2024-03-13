@@ -199,7 +199,7 @@ s_pathSplit pathSplit(string path) {
 }
 
 
-string getParentDir(string path) { return pathSplit(path).dir; }
+string getDirUp(string path) { return pathSplit(path).dir; }
 
 
 string MD5file(string filename, bool quiet, string reason) {
@@ -1404,9 +1404,8 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
 struct internalPDBDataType {
     bool (*realCallback)(pdCallbackData&);
     void *realDataPtr;
-    int baseSlashes;
     backupTypes backupType;
-    
+    Pcre *backupPattern;
 };
 
 
@@ -1416,22 +1415,8 @@ bool pdBackupsCallback(pdCallbackData &file) {
     passedFile = file;
     passedFile.dataPtr = data->realDataPtr;
     
-    auto depth = count(file.filename.begin(), file.filename.end(), '/') - data->baseSlashes;
-    auto dirPs = pathSplit(pathSplit(file.filename).dir);
-    auto filePs = pathSplit(file.filename);
-    bool dirIsDay = (dirPs.file.length() == 2 && isdigit(dirPs.file[0]) && isdigit(dirPs.file[1]));
-    bool entIsDay = (filePs.file.length() == 2 && isdigit(filePs.file[0]) && isdigit(filePs.file[1]));
-    
-        
-   DEBUG(D_any) DFMT(file.filename << (S_ISDIR(file.statData.st_mode) ? " [DIR]" : " [file]") << ", depth:" << depth << ", f.depth:" << file.depth << ", dirents:" << file.dirEntries << ", p:" << getParentDir(file.filename));
-
-    
-        
-  //  removeemptydirs can be rewritten now
-        
-    
     // make sure we're in the year/month or year/month/day subdirs
-    if ((depth == 3 && !entIsDay) || (depth == 4 && dirIsDay)) {
+    if (data->backupPattern->search(file.filename)) {
         
         // handle directories
         if (S_ISDIR(file.statData.st_mode)) {
@@ -1456,10 +1441,11 @@ bool pdBackupsCallback(pdCallbackData &file) {
  */
 string processDirectoryBackups(string directory, string pattern, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, backupTypes backupType, int maxDepth) {
     internalPDBDataType data;
+    Pcre backupPattern("./\\d{4}/\\d{2}(?:/\\d{2}){0,1}/(?!\\d{2}\\b)[^/]+$");  // identify backup directories
+    data.backupPattern = &backupPattern;
     data.realCallback = callback;
     data.realDataPtr = passData;
     data.backupType = backupType;
-    data.baseSlashes = (int)count(directory.begin(), directory.end(), '/');
     
     return processDirectory(directory, "(/\\d{2,4}$)|(" + pattern + ")", false, filterDirs, pdBackupsCallback, &data, maxDepth == -1 ? 4 : maxDepth);
 }
