@@ -408,58 +408,54 @@ void BackupConfig::fullDump() {
 }
 
 
-// this is fugly and should be refactored
-unsigned int BackupConfig::removeEmptyDirs(string directory, int baseSlashes) {
-    DIR *dir;
-    struct dirent *dirEntry;
-    vector<string> subDirs;
-    string startDir = directory.length() ? directory : settings[sDirectory].value;
+typedef map<string, size_t> DIRENTRYMAP;
 
-    int numBaseSlashes = baseSlashes ? baseSlashes : (int)count(startDir.begin(), startDir.end(), '/');
-
-    /* this is unique logic (needs depth-first) so processDirectory() won't work; let's traverse the directories here instead */
-    if ((dir = opendir(ue(startDir).c_str())) != NULL) {
-        unsigned int entryCount = 0;
-
-        while ((dirEntry = readdir(dir)) != NULL) {
-
-            if (!strcmp(dirEntry->d_name, ".") || !strcmp(dirEntry->d_name, ".."))
-               continue; 
-
-            ++entryCount;
-            struct stat statData;
-            string fullFilename = slashConcat(startDir, dirEntry->d_name);
-
-            auto depth = count(fullFilename.begin(), fullFilename.end(), '/') - numBaseSlashes;
-            bool entIsDay = (string(dirEntry->d_name).length() == 2 && isdigit(dirEntry->d_name[0]) && isdigit(dirEntry->d_name[1]));
-
-            if ((depth < 3 || (depth == 3 && entIsDay)) && !mystat(fullFilename, &statData)) {
-                if (S_ISDIR(statData.st_mode)) {
-                    subDirs.insert(subDirs.end(), fullFilename);
-                }
-            }
-        }
-        closedir(dir);
+bool removeEmptyDirsCallback(pdCallbackData &file) {
+    DIRENTRYMAP *deletionMap = (DIRENTRYMAP*)file.dataPtr;
+    
+    // processDirectory already accounts for regular files by providing the number of directory
+    // entries for a given directory (file.dirEntries).  so we can just focus on directories here.
+    if (S_ISDIR(file.statData.st_mode)) {
         
-        for (auto &dir: subDirs) {
-            if (!removeEmptyDirs(dir, numBaseSlashes)) {
+        // the deletionMap tracks how many items we've deleted from a given directory.
+        // see if the current directory is already in our deletion map
+        auto thisEntry = deletionMap->find(file.filename);
                 
-                if (!rmdir(dir.c_str())) {    // remove empty subdirectory
-                    NOTQUIET && cout << "\t• removed empty directory " << dir << endl;
-                    log(ifTitle() + " removed empty directory " + dir);
-                    --entryCount;
-                }
-                else {
-                    SCREENERR("error: unable to remove empty directory " << dir);
-                    log(ifTitle() + " error: unable to remove empty directory " + dir);
-                }
+        // next we check if the number entries that processDirectory is reporting in this
+        // directory (dirEntries) minus the number we've deleted (i.e. the map) brings the
+        // remaining items in this directory to zero.  if so, we can delete it.
+        if (!(file.dirEntries - (thisEntry != deletionMap->end() ? thisEntry->second : 0))) {
+            
+            if (!rmdir(file.filename.c_str())) {
+                NOTQUIET && cout << "\t• removed empty directory " << file.filename << endl;
+                log(" removed empty directory " + file.filename);
+                
+                // if the delete was successful we need to increment the deletion map entry
+                // for the parent directory of the one we just deleted to indicate we deleted
+                // something from it.
+                auto parentPs = pathSplit(file.filename);
+                auto parentEntry = deletionMap->find(parentPs.dir);
+                
+                if (parentEntry != deletionMap->end())
+                    ++parentEntry->second;
+                else
+                    deletionMap->insert(deletionMap->end(), make_pair(parentPs.dir, 1));
             }
+            else {
+                SCREENERR("error: unable to remove empty directory " << file.filename);
+                log(" error: unable to remove empty directory " + file.filename);
+            }
+            
         }
-        
-        return entryCount;
     }
+    
+    return true;
+}
 
-    return 1;
+
+void BackupConfig::removeEmptyDirs(string directory) {
+    DIRENTRYMAP deletionMap;
+    processDirectory(directory.length() ? directory : settings[sDirectory].value, "", false, false, removeEmptyDirsCallback, &deletionMap, 3);
 }
 
 

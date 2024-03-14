@@ -1297,23 +1297,33 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
     file.dataPtr = passData;
     file.topLevelDir = directory;
     
+    // dirsToRead tracks the directories that need to be scanned (opendir()/readdir())).  as new
+    // subdirectories are found, they're added to the dirsToRead list so that, once we finish
+    // reading the current directory, we can come back and read those subs.
+    
+    // dirsToCallback tracks the directories that need to have the callback function called on them.
+    // the callback function is called immediately on regular files.  but for directories, it needs
+    // to be called after everything else in that directory (including subdirectories) have had it
+    // called.  that order enables a number of other functions, such as updating copies of files
+    // before the directory they're in (so the mtime on the containing directory changes at a known
+    // time) and being able to remove empty directories because the contents are processed first.
+    // the result is the callback function gets called on directories in this order (depth-first):
+    // /backups/2024/01/02 -> /backups/2024/01 -> /backups/2024 -> /backups
+  
+    // seed our list with the provided starting directory, depth of 0
     dirsToRead.push_back({ue(directory), 0});
-    
-    // to process the directory non-recursively dirsToRead is used as a master list.
-    // any subdirectory identified is added to the end of the list and processed breadth-first.
-    // it's important that the directory/subdirectory itself is "processed" (i.e. the callback is
-    // invoked for it) *after* its contents are processed.  dirsToCallback is used to track the
-    // ones that need to still have the callback invoked at the end - order is important.
-    
+
+    // walk through the known list of directories to read
     while (!dirsToRead.empty()) {
         auto [baseDir, depth] = dirsToRead.front();
         dirsToRead.pop_front();
         dirEntries = 0;
-             
+          
+        // verify we have an accessible directory
         if (!mylstat(baseDir, &dirStat)) {
-            
             if (S_ISDIR(dirStat.st_mode)) {
                 
+                // read individual directory entries
                 if ((dirPtr = opendir(baseDir.c_str())) != NULL) {
                     while ((dirEntry = readdir(dirPtr)) != NULL) {
                         
@@ -1322,10 +1332,12 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
                         
                         ++dirEntries;
                         file.filename = slashConcat(baseDir, dirEntry->d_name);
-                        file.depth = depth;
+                        
                         if (!mylstat(file.filename, &file.statData)) {
                             
-                            // process directories
+                            /* process directories - first we filter (if requested) to make sure we're
+                               interested in this subdirectory.  if so, and its within our depth constraints,
+                               we add it to the list of directories to read. */
                             if (S_ISDIR(file.statData.st_mode)) {
                                 
                                 // filter for patterns
@@ -1341,7 +1353,8 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
                                     dirsToRead.push_back({file.filename, depth+1});
                             }
                             else {
-                                // filter for patterns
+                                /* process files - again, first filter (if requested) to make sure we're
+                                   interested in this file.  if so, immediately call the callback on it. */
                                 if (pattern.length()) {
                                     bool found = patternRE.search(file.filename);
                                     
@@ -1350,8 +1363,6 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
                                 }
 
                                 file.dirEntries = 0;
-                                
-                                // process regular files
                                 if (!callback(file)) {
                                     dirsToRead.clear();
                                     break;
@@ -1361,6 +1372,11 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
                     }
                     closedir(dirPtr);
                     
+                    /* here we've finished reading everything in the current directory.  we can't call the
+                       callback on the directory itself because we may have found subdirectories that need
+                       to be processed first.  those subs will get handled as we get back to the top of our
+                       while().  so we add the current directory to the dirsToCallback list that will get
+                       processed after all the directory walking is complete. */
                     if (includeTopDir || baseDir != directory) {
                         file.filename = baseDir;
                         file.statData = dirStat;
@@ -1378,6 +1394,8 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
             else {
                 // in case we're given an initial file instead of directory
                 file.filename = baseDir;
+                file.statData = dirStat;
+                file.depth = depth;
                 callback(file);
             }
         }
@@ -1388,7 +1406,8 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
         }
     }
     
-    // call callbacks on directories themselves now that their contents have been processed
+    /* all the directory walking is complete.  now we can call the callback on each directory we've found
+       in the proper depth-first order. */
     while (!dirsToCallback.empty()) {
         file = dirsToCallback.front();
         dirsToCallback.pop_front();

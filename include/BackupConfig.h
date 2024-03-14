@@ -48,7 +48,7 @@ public:
     tuple<int, time_t> getLockPID();
     
     string ifTitle();
-    unsigned int removeEmptyDirs(string dir = "", int baseSlashes = 0);
+    void removeEmptyDirs(string directory = "");
     void renameBaseDirTo(string newBaseDir);
     
     friend bool operator<(const BackupConfig &b1, const BackupConfig &b2);
