@@ -11,6 +11,7 @@
 #include "globals.h"
 #include "colors.h"
 #include "FaubCache.h"
+#include "FastCache.h"
 
 #define NUMSTATDETAILS        10 
 
@@ -27,6 +28,7 @@ struct summaryStats {
     bool archived;
     size_t lastBackupBytes;
     time_t lastBackupTime;
+    time_t firstBackupTime;
     size_t totalUsed;
     size_t totalSaved;
     long numberOfBackups;
@@ -36,7 +38,7 @@ struct summaryStats {
     
     summaryStats() {
         inProcess = archived = false;
-        lastBackupBytes = totalUsed = totalSaved = numberOfBackups = uniqueBackups = duration = 0;
+        lastBackupBytes = firstBackupTime = lastBackupTime = totalUsed = totalSaved = numberOfBackups = uniqueBackups = duration = 0;
     }
 };
 
@@ -71,10 +73,11 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         resultStats.numberOfBackups = resultStats.uniqueBackups = config.fcache.size();
         resultStats.lastBackupBytes = config.fcache.getLastBackup()->second.ds.getSize() + config.fcache.getLastBackup()->second.ds.getSaved();
         resultStats.lastBackupTime = config.fcache.getLastBackup()->second.finishTime;
+        resultStats.firstBackupTime = config.fcache.getFirstBackup()->second.finishTime;
         resultStats.duration = config.fcache.getLastBackup()->second.duration;
         resultStats.inProcess = inProcessFilename.length() > 0;
         resultStats.archived = str2bool(config.settings[sArchive].value);
-                
+                    
         // set string stats
         auto t = localtime(&resultStats.lastBackupTime);
         char fileTime[20];
@@ -90,12 +93,12 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
             (approximate(resultStats.lastBackupBytes, precisionLevel, statDetail == 3 || statDetail == 5) +
              " (" + approximate(resultStats.totalUsed, precisionLevel, statDetail == 3 || statDetail == 5) + ")"),
             to_string(resultStats.uniqueBackups),
-            to_string(saved) + "%",
-            config.fcache.getFirstBackup()->second.finishTime ? timeDiff(mktimeval(config.fcache.getFirstBackup()->second.finishTime)) : "?",
-            config.fcache.getLastBackup()->second.finishTime ? timeDiff(mktimeval(config.fcache.getLastBackup()->second.finishTime)) : "?",
+            to_string(saved) + "%",  // YOMAMA
+            config.fcache.getFirstBackup() != config.fcache.getEnd() ? timeDiff(mktimeval(config.fcache.getFirstBackup()->second.finishTime)) : "",
+            config.fcache.getLastBackup() != config.fcache.getEnd() ? timeDiff(mktimeval(config.fcache.getLastBackup()->second.finishTime)) : "",
             processAge.length() ? processAge : GLOBALS.startupTime - config.fcache.getLastBackup()->second.finishTime > 2*60*60*24 ? oldMessage : ""
         };
-        
+                
         for (int i = 0; i < NUMSTATDETAILS; ++i)
             resultStats.stringOutput[i] = soutput[i];
         
@@ -145,7 +148,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         auto t = localtime(&last_it->second.mtime);
         char fileTime[20];
         strftime(fileTime, sizeof(fileTime), "%X", t);
-        
+                
         string soutput[NUMSTATDETAILS] = {
             config.settings[sTitle].value,
             pathSplit(last_it->second.filename).file,
@@ -154,7 +157,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
             (approximate(last_it->second.size, precisionLevel, statDetail == 3 || statDetail == 5) + " (" + approximate(resultStats.totalUsed, precisionLevel, statDetail == 3 || statDetail == 5) + ")"),
             (to_string(resultStats.uniqueBackups) + " (" + to_string(resultStats.numberOfBackups) + ")"),
             to_string(saved) + "%",
-            first_it->second.name_mtime ? timeDiff(mktimeval(first_it->second.name_mtime)) : "?",
+            first_it->second.mtime ? timeDiff(mktimeval(first_it->second.mtime)) : first_it->second.name_mtime ? timeDiff(mktimeval(first_it->second.name_mtime)) : "?",
             last_it->second.mtime ? timeDiff(mktimeval(last_it->second.mtime)) : "?",
             processAge.length() ? processAge : GLOBALS.startupTime - last_it->second.name_mtime > 2*60*60*24 ? oldMessage : ""
         };
@@ -166,17 +169,21 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         resultStats.duration = last_it->second.duration;
         resultStats.lastBackupBytes = last_it->second.size;
         resultStats.lastBackupTime = last_it->second.mtime;
+        resultStats.firstBackupTime = first_it->second.mtime;
+        resultStats.archived = str2bool(config.settings[sArchive].value);
     }
     
     return resultStats;
 }
 
 
-void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
-    struct boolStates {
+void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bool cacheOnly) {
+    struct profileStatsType {
         bool inProcess;
         bool archived;
-        boolStates(bool p, bool a) { inProcess = p; archived = a; }
+        time_t firstBackupTime;
+        time_t lastBackupTime;
+        profileStatsType(bool p, bool a, time_t f, time_t l) { inProcess = p; archived = a; firstBackupTime = f; lastBackupTime = l; }
     };
     
     int nonTempConfigs = 0;
@@ -184,13 +191,13 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
     struct summaryStats perStats;
     struct summaryStats totalStats;
     vector<string> statStrings;
-    vector<boolStates> profileStats;
+    vector<profileStatsType> profileStats;
     bool singleConfig = configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp;
     
     // calculate totals
     if (singleConfig) {
         perStats = calculateSummaryStats(configManager.configs[configManager.activeConfig], statDetail);
-        profileStats.insert(profileStats.end(), boolStates(perStats.inProcess, perStats.archived));
+        profileStats.insert(profileStats.end(), profileStatsType(perStats.inProcess, perStats.archived, perStats.firstBackupTime, perStats.lastBackupTime));
         
         for (int i = 0; i < NUMSTATDETAILS; ++i)
             statStrings.insert(statStrings.end(), perStats.stringOutput[i]);
@@ -207,7 +214,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
                 totalStats.uniqueBackups += perStats.uniqueBackups;
                 totalStats.duration += perStats.duration;
                 
-                profileStats.insert(profileStats.end(), boolStates(perStats.inProcess, perStats.archived));
+                profileStats.insert(profileStats.end(), profileStatsType(perStats.inProcess, perStats.archived, perStats.firstBackupTime, perStats.lastBackupTime));
                 
                 for (int i = 0; i < NUMSTATDETAILS; ++i)
                     statStrings.insert(statStrings.end(), perStats.stringOutput[i]);
@@ -254,19 +261,19 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
         // print the header row
         // the blank at the end isn't just for termination; it's used for "in process" status
         string headers[] = { "Profile", "Most Recent Backup", "Finish@", "Duration", "Size (Total)", "Uniq (T)", "Saved", "Age Range", "" };
-        cout << BOLDBLUE;
+        !cacheOnly && cout << BOLDBLUE;
         
         int x = -1;
         while (headers[++x].length()) {
-            cout << (x == 0 ? "" : "  ") << headers[x];
+            !cacheOnly && cout << (x == 0 ? "" : "  ") << headers[x];
             
             // pad the headers to line up with the longest item in each column
             if (colLen[x] > headers[x].length()) {
                 string spaces(colLen[x] - headers[x].length(), ' ');
-                cout << spaces;
+                !cacheOnly && cout << spaces;
             }
         }
-        cout << RESET << "\n";
+        !cacheOnly && cout << RESET << "\n";
         
         // setup line formatting
         string lineFormat;
@@ -275,6 +282,8 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
                 lineFormat += (lineFormat.length() ? "  " : "") + string("%") + string(x == 6 ? "" : "-") +
                 to_string(max(headers[x].length(), colLen[x])) + "s";   // 6th column is right-justified
 
+        FastCache fastCache;
+        
         // print line by line results
         char result[1000];
         int line = 0;
@@ -299,9 +308,12 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
                              string(" -> ") + RESET + statStrings[line * NUMSTATDETAILS + 8] : "-") +
                             HIGHLIGHT + BRACKETC).c_str(),
                      string(is_old ? string(BOLDRED) + msg : msg).c_str());
-            cout << result << RESET << "\n";
+            
+            fastCache.append(FASTCACHETYPE (string(result, 0, 105), profileStats[line].firstBackupTime, profileStats[line].lastBackupTime));
+            !cacheOnly && cout << result << RESET << "\n";
             ++line;
         }
+        
         
         // print the totals line
         if (!singleConfig && nonTempConfigs > 1) {
@@ -319,12 +331,15 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail) {
                      statStrings[line * NUMSTATDETAILS + 8].c_str());
             
             string spaces(max(headers[0].length(), colLen[0]) + max(headers[1].length(), colLen[1]) + colLen[2], ' ');
-            cout << BOLDWHITE << "TOTALS" << spaces << result << RESET << "\n";
+            !cacheOnly && cout << BOLDWHITE << "TOTALS" << spaces << result << RESET << "\n";
+            fastCache.append(FASTCACHETYPE (string(BOLDWHITE) + "TOTALS" + spaces + result + RESET, 0, 1));
         }
+
+        fastCache.commit();
     }
     else
-        cout << "no backups found." << endl;
-    
+        !cacheOnly && cout << "no backups found." << endl;
+        
     return;
 }
 

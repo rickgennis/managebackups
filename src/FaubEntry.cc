@@ -225,6 +225,7 @@ bool FaubEntry::displayDiffFiles() {
     string data;
     bool headerShown = false;
     unsigned int fileCount = 0;
+    bool noChanges = false;
     
     cacheFile.open(cacheFilename(SUFFIX_FAUBDIFF));
     if (cacheFile.is_open()) {
@@ -236,6 +237,8 @@ bool FaubEntry::displayDiffFiles() {
             
             if (data != NO_CHANGES)
                 data = slashConcat(directory, data);
+            else
+                noChanges = true;
             
             // only print the header if we have valid output.  otherwise
             // we have to try a second approach (compareDirs()), which will
@@ -249,7 +252,8 @@ bool FaubEntry::displayDiffFiles() {
             ++fileCount;
         }
         
-        cout << BOLDBLUE << plural(fileCount, "change") << RESET << endl;
+        if (!noChanges)
+            cout << BOLDBLUE << plural(fileCount, "change") << RESET << endl;
 
         cacheFile.close();
         return true;

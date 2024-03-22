@@ -45,10 +45,6 @@ map<string, int>settingMap =
     { CLI_PATHS, sPaths },
     { CLI_ARCHIVE, sArchive }
 };
-// CLI_PATHS is excluded because it's only accessed as a commandline option
-// and never as a Setting. And because its a vector<> that's one less special-
-// case selectOrSetupConfig() needs to address.
-
 
 
 Setting::Setting(string name, string pattern, enum SetType setType, string defaultVal) {

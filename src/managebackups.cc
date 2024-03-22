@@ -73,6 +73,7 @@
 #include "BackupEntry.h"
 #include "ConfigManager.h"
 #include "FaubCache.h"
+#include "FastCache.h"
 #include "colors.h"
 #include "cxxopts.hpp"
 #include "debug.h"
@@ -2306,28 +2307,37 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
         
-    // if displaying stats and --profile hasn't been specified (or matched successfully)
-    // then rescan all configs;  otherwise just scan the --profile config
-    DEBUG(D_any) DFMT("about to scan directories...");
+    
     
     /* SHOW STATS
      * ****************************/
     if (GLOBALS.stats) {
-        if (!currentConfig->temp)
-            scanConfigToCache(*currentConfig);
-        else
-            for (auto &config : configManager.configs) {
-                if (!config.temp) {
-                    DEBUG(D_scan) DFMT("pre-uuid = " << config.settings[sUUID].value << " [" << config.temp << "]");
-                    scanConfigToCache(config);
-                    DEBUG(D_scan) DFMT("post-uuid = " << config.settings[sUUID].value);
+        FastCache fc;
+
+        // if we've been called with no arguments (or just -v) and are defaulting to showing stats,
+        // show the fast cached version instead of the live -0.
+        if ((argc == 1 || (argc == 2 && GLOBALS.debugSelector)) && fc.get().length())
+            cout << fc.get() << endl;
+        else {
+            
+            // if displaying stats and --profile hasn't been specified (or matched successfully)
+            // then rescan all configs;  otherwise just scan the --profile config
+            DEBUG(D_any) DFMT("about to scan directories...");
+            if (!currentConfig->temp)
+                scanConfigToCache(*currentConfig);
+            else
+                for (auto &config : configManager.configs) {
+                    if (!config.temp) {
+                        DEBUG(D_scan) DFMT("pre-uuid = " << config.settings[sUUID].value << " [" << config.temp << "]");
+                        scanConfigToCache(config);
+                        DEBUG(D_scan) DFMT("post-uuid = " << config.settings[sUUID].value);
+                    }
                 }
-            }
-        
-        GLOBALS.cli.count(CLI_STATS1)
-        ? displayDetailedStatsWrapper(configManager, (int)GLOBALS.cli.count(CLI_STATS1))
-        : displaySummaryStatsWrapper(configManager, (int)GLOBALS.cli.count(CLI_STATS2));
-        //DEBUG(D_scan) DFMT("last-uuid = " << config.settings[sUUID].value);
+            
+            GLOBALS.cli.count(CLI_STATS1)
+            ? displayDetailedStatsWrapper(configManager, (int)GLOBALS.cli.count(CLI_STATS1))
+            : displaySummaryStatsWrapper(configManager, (int)GLOBALS.cli.count(CLI_STATS2));
+        }
 
     }
     else {  // "all" profiles locking is handled here; individual profile locking is handled further
@@ -2567,6 +2577,9 @@ int main(int argc, char *argv[]) {
             log("aborting due to " + e.detail());
             cleanupAndExitOnError();
         }
+        
+        // update the fast cache
+        displaySummaryStatsWrapper(configManager, 0, true);
         
         DEBUG(D_any) DFMT("completed primary tasks");
         

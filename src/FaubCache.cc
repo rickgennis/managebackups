@@ -86,7 +86,6 @@ struct restoreCacheDataType {
     FaubCache *fc;
     queue<string> *q;
     string currentDir;
-    int baseSlashes;
     Pcre *tempRE;
 };
 
@@ -124,15 +123,22 @@ bool restoreCacheCallback(pdCallbackData &file) {
 
 void FaubCache::restoreCache(string profileName) {
     restoreCacheDataType data;
+    timer restoreTimer;
     Pcre tempRE("\\.tmp\\.\\d+$");
     data.tempRE = &tempRE;
     data.fc = this;
+
+    restoreTimer.start();
     
     coreProfile = profileName;
     DEBUG(D_faub) DFMT(profileName);
     
     processDirectoryBackups(ue(baseDir), "/" + coreProfile + "-", true, restoreCacheCallback, &data, FAUB_ONLY);
+
+    restoreTimer.stop();
     
+    DEBUG(D_faub) DFMT("complete - " << restoreTimer.elapsed(5));
+
     // all backups are loaded; now see which are missing stats and recache them
     recache("");
 }
@@ -155,6 +161,9 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
     unsigned int recached = 0;
     bool nextOneToo = false;
     auto [message, noMessage] = clearMessage("recalculating disk usage... ");
+    timer recacheTimer;
+    
+    recacheTimer.start();
     
     if (targetDir.length() && backups.find(targetDir) == backups.end())
         restoreCache_internal(targetDir);
@@ -234,7 +243,8 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
     if (forceAll && NOTQUIET)
         cout << "caches updated for " << plural(recached, "backup") << "." << endl;
     
-    DEBUG(D_faub) DFMT("complete");
+    recacheTimer.stop();
+    DEBUG(D_faub) DFMT("complete - " << recacheTimer.elapsed(5));
 }
 
 

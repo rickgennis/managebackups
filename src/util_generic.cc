@@ -455,7 +455,7 @@ string timeDiffSingle(struct timeval duration, int maxUnits, int precision) {
         else
             result = sms + " seconds";
     }
-    
+        
     return(result.length() ? result : "0 seconds");
 }
 
@@ -463,7 +463,7 @@ string timeDiffSingle(struct timeval duration, int maxUnits, int precision) {
 string timeDiff(struct timeval start, struct timeval end, int maxUnits, int precision) {
     struct timeval diffTime;
     mytimersub(&end, &start, &diffTime);
-    
+        
     return timeDiffSingle(diffTime, maxUnits, precision);
 }
 

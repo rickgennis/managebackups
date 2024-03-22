@@ -9,10 +9,10 @@ LDIR =../lib
 
 LIBS=-lm -L/opt/homebrew/Cellar/pcre++/0.9.5/lib -L/opt/homebrew/opt/openssl@3/lib -lpcre++ -lcrypto
 
-_DEPS = BackupEntry.h BackupCache.h Setting.h BackupConfig.h ConfigManager.h util_generic.h notify.h ipc.h globals.h globalsdef.h statistics.h colors.h help.h setup.h debug.h faub.h FaubCache.h FaubEntry.h
+_DEPS = BackupEntry.h BackupCache.h Setting.h BackupConfig.h ConfigManager.h util_generic.h notify.h ipc.h globals.h globalsdef.h statistics.h colors.h help.h setup.h debug.h faub.h FaubCache.h FastCache.h FaubEntry.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
-_OBJ = BackupEntry.o BackupCache.o Setting.o BackupConfig.o ConfigManager.o util_generic.o statistics.o notify.o help.o setup.o debug.o ipc.o faub.o FaubCache.o FaubEntry.o managebackups.o
+_OBJ = BackupEntry.o BackupCache.o Setting.o BackupConfig.o ConfigManager.o util_generic.o statistics.o notify.o help.o setup.o debug.o ipc.o faub.o FaubCache.o FastCache.o FaubEntry.o managebackups.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 UNAME_S := $(shell uname -s)
