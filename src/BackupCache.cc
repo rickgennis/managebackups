@@ -30,7 +30,6 @@ BackupCache::~BackupCache() {
         saveCache();
 }
 
-
 void BackupCache::updateAges(time_t refTime) {
     for (auto &raw: rawData)
         raw.second.updateAges(refTime);

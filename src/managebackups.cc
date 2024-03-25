@@ -2570,6 +2570,9 @@ int main(int argc, char *argv[]) {
                     }
                     
                     configManager.housekeeping();
+                    
+                    // update the fast cache
+                    displaySummaryStatsWrapper(configManager, 0, true);
                 }
             }
         }
@@ -2577,10 +2580,7 @@ int main(int argc, char *argv[]) {
             log("aborting due to " + e.detail());
             cleanupAndExitOnError();
         }
-        
-        // update the fast cache
-        displaySummaryStatsWrapper(configManager, 0, true);
-        
+                
         DEBUG(D_any) DFMT("completed primary tasks");
         
         // remove lock

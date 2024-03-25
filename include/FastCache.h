@@ -27,16 +27,22 @@ typedef  tuple<string, time_t, time_t> FASTCACHETYPE;
 
 class FastCache {
     vector<FASTCACHETYPE> cachedData;
+    vector<string> cachedFiles;
     string cachedOutput;
     
+    bool verifyFileMtimes();
+    
 public:
-    void append(FASTCACHETYPE);
+    // add a line of -0 status output
+    void appendStatus(FASTCACHETYPE);
+    
+    // add a directory to watch for mtime changes
+    void appendFile(string filename);
+
+    // write to disk
     void commit();
     
-    // set() skips the appends and just specifies the entire content in a
-    // single vector. it also does the commit.
-    void set(vector<FASTCACHETYPE> &data);
-    
+    // return cache from disk
     string get();
 };
 

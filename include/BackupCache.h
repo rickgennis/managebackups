@@ -12,6 +12,9 @@
 
 using namespace std;
 
+typedef map<unsigned int, BackupEntry>::iterator bcMapIT;
+
+
 class BackupCache {
     string uuid;
 
@@ -28,6 +31,9 @@ public:
     void updateAges(time_t refTime = 0);
     void reStatMD5(string md5);
     void remove(BackupEntry oldEntry);
+    
+    bcMapIT getLastBackup() { return (indexByFilename.size() ? rawData.find((--indexByFilename.end())->second) : rawData.end()); }
+    bcMapIT getEnd() { return rawData.end(); }
     
     string size();
     string size(string md5);

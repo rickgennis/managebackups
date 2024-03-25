@@ -93,7 +93,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
             (approximate(resultStats.lastBackupBytes, precisionLevel, statDetail == 3 || statDetail == 5) +
              " (" + approximate(resultStats.totalUsed, precisionLevel, statDetail == 3 || statDetail == 5) + ")"),
             to_string(resultStats.uniqueBackups),
-            to_string(saved) + "%",  // YOMAMA
+            to_string(saved) + "%",
             config.fcache.getFirstBackup() != config.fcache.getEnd() ? timeDiff(mktimeval(config.fcache.getFirstBackup()->second.finishTime)) : "",
             config.fcache.getLastBackup() != config.fcache.getEnd() ? timeDiff(mktimeval(config.fcache.getLastBackup()->second.finishTime)) : "",
             processAge.length() ? processAge : GLOBALS.startupTime - config.fcache.getLastBackup()->second.finishTime > 2*60*60*24 ? oldMessage : ""
@@ -186,6 +186,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
         profileStatsType(bool p, bool a, time_t f, time_t l) { inProcess = p; archived = a; firstBackupTime = f; lastBackupTime = l; }
     };
     
+    FastCache fastCache;
     int nonTempConfigs = 0;
     int precisionLevel = statDetail > 3 ? 0 : statDetail > 1 ? 1 : -1;
     struct summaryStats perStats;
@@ -215,6 +216,14 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
                 totalStats.duration += perStats.duration;
                 
                 profileStats.insert(profileStats.end(), profileStatsType(perStats.inProcess, perStats.archived, perStats.firstBackupTime, perStats.lastBackupTime));
+
+                if (config.fcache.size())
+                    fastCache.appendFile(pathSplit(config.fcache.getLastBackup()->first).dir);
+                else {
+                    auto bIt = config.cache.getLastBackup();
+                    if (bIt != config.cache.getEnd())
+                        fastCache.appendFile(pathSplit(bIt->second.filename).dir);
+                }
                 
                 for (int i = 0; i < NUMSTATDETAILS; ++i)
                     statStrings.insert(statStrings.end(), perStats.stringOutput[i]);
@@ -281,8 +290,6 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
             if (max(headers[x].length(), colLen[x]))
                 lineFormat += (lineFormat.length() ? "  " : "") + string("%") + string(x == 6 ? "" : "-") +
                 to_string(max(headers[x].length(), colLen[x])) + "s";   // 6th column is right-justified
-
-        FastCache fastCache;
         
         // print line by line results
         char result[1000];
@@ -309,7 +316,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
                             HIGHLIGHT + BRACKETC).c_str(),
                      string(is_old ? string(BOLDRED) + msg : msg).c_str());
             
-            fastCache.append(FASTCACHETYPE (string(result, 0, 105), profileStats[line].firstBackupTime, profileStats[line].lastBackupTime));
+            fastCache.appendStatus(FASTCACHETYPE (string(result, 0, 105), profileStats[line].firstBackupTime, profileStats[line].lastBackupTime));
             !cacheOnly && cout << result << RESET << "\n";
             ++line;
         }
@@ -332,7 +339,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
             
             string spaces(max(headers[0].length(), colLen[0]) + max(headers[1].length(), colLen[1]) + colLen[2], ' ');
             !cacheOnly && cout << BOLDWHITE << "TOTALS" << spaces << result << RESET << "\n";
-            fastCache.append(FASTCACHETYPE (string(BOLDWHITE) + "TOTALS" + spaces + result + RESET, 0, 1));
+            fastCache.appendStatus(FASTCACHETYPE (string(BOLDWHITE) + "TOTALS" + spaces + result + RESET, 0, 1));
         }
 
         fastCache.commit();
