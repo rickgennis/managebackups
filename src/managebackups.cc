@@ -2352,27 +2352,28 @@ int main(int argc, char *argv[]) {
             if (pid) {
                 if (!kill(pid, 0)) {
                     if (GLOBALS.cli.count(CLI_FORCE)) {
-                        kill(pid, 15);
                         NOTQUIET && cerr << "[ALL] previous profile lock (running as pid " << pid <<
                         ") released due to --force" << endl;
                         log("[ALL] previous lock (pid " + to_string(pid) + ") released due to --force");
                         GLOBALS.interruptLock = currentConfig->setLockPID(0);
                     }
-                    if (GLOBALS.startupTime - lockTime < 60 * 60 * 24) {
-                        NOTQUIET &&cerr << "[ALL] profile is locked while previous invocation is "
-                        "still running (pid "
-                        << pid << "); skipping this run." << endl;
-                        log("[ALL] skipped run due to profile lock while previous invocation is "
-                            "still running (pid " +
-                            to_string(pid) + ")");
-                        exit(1);
-                    }
                     else
-                        kill(pid, 15);
-                    notify(*currentConfig,
-                           errorcom("ALL",
-                                    "abandoning previous lock because its over 24 hours old"),
-                           false, true);
+                        if (GLOBALS.startupTime - lockTime < 60 * 60 * 24) {
+                            NOTQUIET &&cerr << "[ALL] profile is locked while previous invocation is "
+                            "still running (pid "
+                            << pid << "); skipping this run." << endl;
+                            log("[ALL] skipped run due to profile lock while previous invocation is "
+                                "still running (pid " +
+                                to_string(pid) + ")");
+                            exit(1);
+                        }
+                        else
+                            notify(*currentConfig,
+                                   errorcom("[ALL]",
+                                            "abandoning previous lock because its over 24 hours old"),
+                                   false, true);
+                    
+                    kill(pid, 15);
                 }
                 else {
                     log("[ALL] abandoning previous lock because pid " + to_string(pid) +
