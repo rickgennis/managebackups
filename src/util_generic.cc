@@ -437,13 +437,13 @@ string timeDiffSingle(struct timeval duration, int maxUnits, int precision) {
     // if the duration is less than a minute and microseconds
     // are also provided, include them
     if (secs < 60 && us) {
-        char ms[10];
-        snprintf(ms, sizeof(ms), string(string("%.") + to_string(precision) + "f").c_str(), 1.0 * us / MILLION);
-        
-        string sms = ms;
+        char decimalSecs[50];
+        snprintf(decimalSecs, sizeof(decimalSecs), string(string("%.") + to_string(precision) + "f").c_str(), 1.0 * us / MILLION);
+                
+        string sms = decimalSecs;
         if (sms.back() == '0')
             sms.pop_back();
-        
+
         auto pos = result.find(" ");
         if (pos != string::npos) {
             sms.erase(0, 1);
@@ -454,6 +454,9 @@ string timeDiffSingle(struct timeval duration, int maxUnits, int precision) {
         }
         else
             result = sms + " seconds";
+        
+        if (secs < 1)
+            result += string(" (" + to_string(us) + " μs)");
     }
         
     return(result.length() ? result : "0 seconds");

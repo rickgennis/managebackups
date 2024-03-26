@@ -2549,14 +2549,12 @@ int main(int argc, char *argv[]) {
                    FastCache, which we want to update on every prune/backup/linking run, we
                    need all the configs and caches populated.  This allows the status runs,
                    populated by FastCache, to be near instantaneous.
+                 
+                   We do this after the prune/backup/linking below.
                  */
 
-                //scanConfigToCache(*currentConfig);
+                scanConfigToCache(*currentConfig);
                 
-                configManager.loadAllConfigCaches();
-                for (auto &config : configManager.configs)
-                    if (!config.temp)
-                        scanConfigToCache(config);
 
                 /***********************************************************/
                 
@@ -2582,6 +2580,12 @@ int main(int argc, char *argv[]) {
                     
                     configManager.housekeeping();
                     
+                    // reload caches to include any newly created backups in the FastCache
+                    configManager.loadAllConfigCaches();
+                    for (auto &config : configManager.configs)
+                        if (!config.temp)
+                            scanConfigToCache(config);
+                    
                     // update the fast cache
                     displaySummaryStatsWrapper(configManager, 0, true);
                 }
@@ -2601,10 +2605,6 @@ int main(int argc, char *argv[]) {
     }
     
     AppTimer.stop();
-    DEBUG(D_any)
-    DFMT("stats: " << BOLDGREEN << GLOBALS.statsCount << RESET << GREEN << ", md5s: " << BOLDGREEN
-         << GLOBALS.md5Count << RESET << GREEN << ", total time: " << BOLDGREEN
-         << AppTimer.elapsed(3) << YELLOW << " (current run)");
     
     unsigned long oldStats;
     unsigned long oldMd5s;
@@ -2614,8 +2614,13 @@ int main(int argc, char *argv[]) {
         DEBUG(D_any)
         DFMT("stats: " << BOLDGREEN << oldStats << RESET << GREEN << ", md5s: " << BOLDGREEN
              << oldMd5s << RESET << GREEN << ", total time: " << BOLDGREEN
-             << oldElapsed << YELLOW << " (previous run)");
+             << oldElapsed << YELLOW << " [previous run]");
     }
+    
+    DEBUG(D_any)
+    DFMT("stats: " << BOLDGREEN << GLOBALS.statsCount << RESET << GREEN << ", md5s: " << BOLDGREEN
+         << GLOBALS.md5Count << RESET << GREEN << ", total time: " << BOLDGREEN
+         << AppTimer.elapsed(3) << YELLOW << " [current run]");
     
     saveGlobalStats(GLOBALS.statsCount, GLOBALS.md5Count, AppTimer.elapsed(3));
     
