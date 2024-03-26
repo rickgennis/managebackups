@@ -2326,13 +2326,9 @@ int main(int argc, char *argv[]) {
             if (!currentConfig->temp)
                 scanConfigToCache(*currentConfig);
             else
-                for (auto &config : configManager.configs) {
-                    if (!config.temp) {
-                        DEBUG(D_scan) DFMT("pre-uuid = " << config.settings[sUUID].value << " [" << config.temp << "]");
+                for (auto &config : configManager.configs)
+                    if (!config.temp)
                         scanConfigToCache(config);
-                        DEBUG(D_scan) DFMT("post-uuid = " << config.settings[sUUID].value);
-                    }
-                }
             
             GLOBALS.cli.count(CLI_STATS1)
             ? displayDetailedStatsWrapper(configManager, (int)GLOBALS.cli.count(CLI_STATS1))
@@ -2548,7 +2544,21 @@ int main(int argc, char *argv[]) {
                         log(currentConfig->ifTitle() + " unable to set nice value" + errtext());
                 }
                 
-                scanConfigToCache(*currentConfig);
+                /* We used to only load the config of the selected profile here to execute it
+                   (perform pruning, backup and linking).  But now with the advent of the
+                   FastCache, which we want to update on every prune/backup/linking run, we
+                   need all the configs and caches populated.  This allows the status runs,
+                   populated by FastCache, to be near instantaneous.
+                 */
+
+                //scanConfigToCache(*currentConfig);
+                
+                configManager.loadAllConfigCaches();
+                for (auto &config : configManager.configs)
+                    if (!config.temp)
+                        scanConfigToCache(config);
+
+                /***********************************************************/
                 
                 if (performTripwire(*currentConfig)) {
                     

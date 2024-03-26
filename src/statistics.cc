@@ -193,7 +193,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
     struct summaryStats totalStats;
     vector<string> statStrings;
     vector<profileStatsType> profileStats;
-    bool singleConfig = configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp;
+    bool singleConfig = configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp && !cacheOnly;
     
     // calculate totals
     if (singleConfig) {
@@ -204,7 +204,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
             statStrings.insert(statStrings.end(), perStats.stringOutput[i]);
     }
     else {
-        for (auto &config: configManager.configs)
+        for (auto &config: configManager.configs) {
             if (!config.temp && !config.settings[sPaths].value.length()) {
                 ++nonTempConfigs;
                 perStats = calculateSummaryStats(config, statDetail);
@@ -216,7 +216,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
                 totalStats.duration += perStats.duration;
                 
                 profileStats.insert(profileStats.end(), profileStatsType(perStats.inProcess, perStats.archived, perStats.firstBackupTime, perStats.lastBackupTime));
-
+                
                 if (config.fcache.size())
                     fastCache.appendFile(pathSplit(config.fcache.getLastBackup()->first).dir);
                 else {
@@ -228,6 +228,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
                 for (int i = 0; i < NUMSTATDETAILS; ++i)
                     statStrings.insert(statStrings.end(), perStats.stringOutput[i]);
             }
+        }
     }
     
     // add totals into totalStats
@@ -265,8 +266,8 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
             ++line;
         }
     }
-    
-    if (numberStatStrings > NUMSTATDETAILS) {
+        
+    if (numberStatStrings >= NUMSTATDETAILS) {
         // print the header row
         // the blank at the end isn't just for termination; it's used for "in process" status
         string headers[] = { "Profile", "Most Recent Backup", "Finish@", "Duration", "Size (Total)", "Uniq (T)", "Saved", "Age Range", "" };
