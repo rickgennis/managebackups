@@ -317,7 +317,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
                             HIGHLIGHT + BRACKETC).c_str(),
                      string(is_old ? string(BOLDRED) + msg : msg).c_str());
             
-            fastCache.appendStatus(FASTCACHETYPE (string(result, 0, 105), profileStats[line].firstBackupTime, profileStats[line].lastBackupTime));
+            fastCache.appendStatus(FASTCACHETYPE (string(result, 0, 103), profileStats[line].firstBackupTime, profileStats[line].lastBackupTime));
             !cacheOnly && cout << result << RESET << "\n";
             ++line;
         }

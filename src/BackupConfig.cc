@@ -428,7 +428,7 @@ bool removeEmptyDirsCallback(pdCallbackData &file) {
             
             if (!rmdir(file.filename.c_str())) {
                 NOTQUIET && cout << "\t• removed empty directory " << file.filename << endl;
-                log(" removed empty directory " + file.filename);
+                log("removed empty directory " + file.filename);
                 
                 // if the delete was successful we need to increment the deletion map entry
                 // for the parent directory of the one we just deleted to indicate we deleted
