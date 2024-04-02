@@ -348,34 +348,39 @@ size_t approx2bytes(string approx) {
     vector<string> units = { "B", "K", "M", "G", "T", "P", "E", "Z", "Y" };
     Pcre reg("^((?:\\d|\\.)+)\\s*(?:(\\w)(?:[Bb]$|$)|$)");
     
-    if (reg.search(approx)) {
-        
-        // was a numeric value and a unit specified?
-        if (reg.matches() > 1) {
+    if (approx.length()) {
+        if (reg.search(approx)) {
             
-            // save the two pieces
-            auto numericVal = stof(reg.get_match(0));
-            string unit = reg.get_match(1);
-            
-            // capitalize the units to match the lookup in the vector
-            for (auto &c: unit) c = toupper(c);
-            
-            // lookup the supplied unit in the vector
-            auto it = find(units.begin(), units.end(), unit);
-            
-            if (it != units.end()) {
-                // determine its index and calculate the result
-                auto index = it - units.begin();
-                return floor(pow(1024, index) * numericVal);
+            // was a numeric value and a unit specified?
+            if (reg.matches() > 1) {
+                
+                // save the two pieces
+                auto numericVal = stof(reg.get_match(0));
+                string unit = reg.get_match(1);
+                
+                // capitalize the units to match the lookup in the vector
+                for (auto &c: unit) c = toupper(c);
+                
+                // lookup the supplied unit in the vector
+                auto it = find(units.begin(), units.end(), unit);
+                
+                if (it != units.end()) {
+                    // determine its index and calculate the result
+                    auto index = it - units.begin();
+                    return floor(pow(1024, index) * numericVal);
+                }
+            }
+            // was just a numeric value specified?
+            else
+                if (reg.matches() > 0) {
+                    return floor(stof(reg.get_match(0)));
             }
         }
-        // was just a numeric value specified?
-        else if (reg.matches() > 0) {
-            return floor(stof(reg.get_match(0)));
-        }
     }
+    else
+        return 0;
     
-    throw std::runtime_error("error parsing size from " + approx);
+    throw std::runtime_error("approx2bytes - error parsing size from string '" + approx + "'");
 }
 
 

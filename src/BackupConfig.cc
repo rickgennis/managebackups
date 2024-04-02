@@ -598,19 +598,23 @@ tuple<size_t, size_t, string> BackupConfig::getBloatTarget() {
     size_t target = getRecentAvgSize();
     size_t origTarget = target;
     
-    if (bloat.find("%") == string::npos) {
-        auto bytes = approx2bytes(bloat);
-        target += bytes;
-        DEBUG(D_backup) DFMT("avg " << origTarget << " + " << bloat << " (" << bytes << ") = " << target);
-    }
-    else {
-        bloat.erase(bloat.find("%"), string::npos);  // remove % sign
-        int percent = stoi(bloat);
-        target = percent / 100.0 * target;
-        DEBUG(D_backup) DFMT("avg " << origTarget << " * " << settings[sBloat].value << " = " << target);
+    if (settings[sBloat].value.length()) {
+        if (bloat.find("%") == string::npos) {
+            auto bytes = approx2bytes(bloat);
+            target += bytes;
+            DEBUG(D_backup) DFMT("avg " << origTarget << " + " << bloat << " (" << bytes << ") = " << target);
+        }
+        else {
+            bloat.erase(bloat.find("%"), string::npos);  // remove % sign
+            int percent = stoi(bloat);
+            target = percent / 100.0 * target;
+            DEBUG(D_backup) DFMT("avg " << origTarget << " * " << settings[sBloat].value << " = " << target);
+        }
+        
+        return {target, origTarget, "\taverage backup: " + approximate(origTarget) + "\n\tbloat: " + bloat + " (effective: " + approximate(target) + ")\n"};
     }
     
-    return {target, origTarget, "\taverage backup: " + approximate(origTarget) + "\n\tbloat: " + bloat + " (effective: " + approximate(target) + ")\n"};
+    return {0, origTarget, ""};
 }
 
 void BackupConfig::renameBaseDirTo(string newBaseDir) {
