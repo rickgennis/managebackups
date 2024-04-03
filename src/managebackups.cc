@@ -2317,7 +2317,7 @@ int main(int argc, char *argv[]) {
         // if we've been called with no arguments (or just -v) and are defaulting to showing stats,
         // show the fast cached version instead of the live -0.
         if ((argc == 1 || (argc == 2 && GLOBALS.debugSelector)) && fc.get().length())
-            cout << fc.get() << endl;
+            cout << fc.get();
         else {
             
             // if displaying stats and --profile hasn't been specified (or matched successfully)

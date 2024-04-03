@@ -270,27 +270,28 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
     if (numberStatStrings >= NUMSTATDETAILS) {
         // print the header row
         // the blank at the end isn't just for termination; it's used for "in process" status
+        string headerText = BOLDBLUE;
         string headers[] = { "Profile", "Most Recent Backup", "Finish@", "Duration", "Size (Total)", "Uniq (T)", "Saved", "Age Range", "" };
-        !cacheOnly && cout << BOLDBLUE;
         
         int x = -1;
         while (headers[++x].length()) {
-            !cacheOnly && cout << (x == 0 ? "" : "  ") << headers[x];
+            headerText += (x == 0 ? "" : "  ") + headers[x];
             
             // pad the headers to line up with the longest item in each column
-            if (colLen[x] > headers[x].length()) {
-                string spaces(colLen[x] - headers[x].length(), ' ');
-                !cacheOnly && cout << spaces;
-            }
+            if (colLen[x] > headers[x].length())
+                headerText += string(colLen[x] - headers[x].length(), ' ');
         }
-        !cacheOnly && cout << RESET << "\n";
+        
+        !cacheOnly && cout << headerText << RESET << "\n";
+        fastCache.appendStatus(FASTCACHETYPE (headerText + RESET, 0, 1));
         
         // setup line formatting
         string lineFormat;
-        for (int x = 0; x < NUMSTATDETAILS - 1; ++x)
+        for (int x = 0; x < NUMSTATDETAILS - 3; ++x)
             if (max(headers[x].length(), colLen[x]))
                 lineFormat += (lineFormat.length() ? "  " : "") + string("%") + string(x == 6 ? "" : "-") +
                 to_string(max(headers[x].length(), colLen[x])) + "s";   // 6th column is right-justified
+        lineFormat += "  ";
         
         // print line by line results
         char result[1000];
@@ -310,15 +311,15 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
                      (profileStats[line].archived ? "ARCHIVED" : statStrings[line * NUMSTATDETAILS + 3]).c_str(),
                      statStrings[line * NUMSTATDETAILS + 4].c_str(),
                      statStrings[line * NUMSTATDETAILS + 5].c_str(),
-                     statStrings[line * NUMSTATDETAILS + 6].c_str(),
-                     string(HIGHLIGHT + BRACKETO + RESET +
-                            (gotAge ? statStrings[line * NUMSTATDETAILS + 7] + HIGHLIGHT +
-                             string(" -> ") + RESET + statStrings[line * NUMSTATDETAILS + 8] : "-") +
-                            HIGHLIGHT + BRACKETC).c_str(),
-                     string(is_old ? string(BOLDRED) + msg : msg).c_str());
+                     statStrings[line * NUMSTATDETAILS + 6].c_str());
             
-            fastCache.appendStatus(FASTCACHETYPE (string(result, 0, 103), profileStats[line].firstBackupTime, profileStats[line].lastBackupTime));
-            !cacheOnly && cout << result << RESET << "\n";
+            string ageDetail = string(HIGHLIGHT) + BRACKETO + RESET +
+                (gotAge ? statStrings[line * NUMSTATDETAILS + 7] + HIGHLIGHT +
+                 string(" -> ") + RESET + statStrings[line * NUMSTATDETAILS + 8] : "-") +
+                HIGHLIGHT + BRACKETC + (is_old ? string(BOLDRED) + msg : msg);
+            
+            fastCache.appendStatus(FASTCACHETYPE (result, profileStats[line].firstBackupTime, profileStats[line].lastBackupTime));
+            !cacheOnly && cout << result << ageDetail << RESET << "\n";
             ++line;
         }
         

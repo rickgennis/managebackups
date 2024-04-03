@@ -79,7 +79,7 @@ string FastCache::get() {
                     
                     
                     if (!firstTime && lastTime == 1)
-                        result += lineText;
+                        result += lineText + "\n";
                     else
                         result += lineText + BOLDBLUE + "[" + RESET +
                         (firstTime || lastTime ? timeDiff(mktimeval(firstTime)) +
@@ -91,10 +91,7 @@ string FastCache::get() {
             result = "";
         }
         cacheFile.close();
-        
-        if (result.length())
-            result = string(BOLDBLUE) + "Profile        Most Recent Backup                 Finish@   Duration  Size (Total)     Uniq (T)   Saved  Age Range" + RESET + "\n" + result;
-        
+                
         cachedOutput = result;
     }
     
