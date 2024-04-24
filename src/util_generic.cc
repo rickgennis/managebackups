@@ -20,6 +20,7 @@
 #include "util_generic.h"
 #include "globals.h"
 #include "ipc.h"
+#include "exception.h"
 
 using namespace pcrepp;
 
@@ -1252,6 +1253,28 @@ char getFilesystemEntryType(string entry) {
 }
 
 
+// follow a directory entry through all symlink resolutions to determine
+// if the final entry is a dir or a file; return it's mode
+mode_t resolveLinkMode(string dirEntryName, mode_t mode) {
+    struct stat statData;
+    statData.st_mode = mode;
+    
+    while (S_ISLNK(statData.st_mode)) {
+        char buf[1024];
+        auto len = readlink(dirEntryName.c_str(), buf, sizeof(buf));
+        
+        if (len > 0) {
+            buf[len] = 0;
+            string target = (buf[0] != '/') ? string("./") + buf : buf;
+            
+            if (mylstat(target, &statData))
+                throw MBException("can't read " + dirEntryName);
+        }
+    }
+    
+    return statData.st_mode;
+}
+
 
 /*
  processDirectory() walks down the specified directory tree calling the provided
@@ -1293,7 +1316,7 @@ char getFilesystemEntryType(string entry) {
  shown on the screen (via SCREENERR) and returned to the calling function.
  */
 
-string processDirectory(string directory, string pattern, bool exclude, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, int maxDepth, bool includeTopDir) {
+string processDirectory(string directory, string pattern, bool exclude, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, bool followSymLinks, int maxDepth, bool includeTopDir) {
     DIR *dirPtr;
     size_t dirEntries;
     struct dirent *dirEntry;
@@ -1317,111 +1340,124 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
     // time) and being able to remove empty directories because the contents are processed first.
     // the result is the callback function gets called on directories in this order (depth-first):
     // /backups/2024/01/02 -> /backups/2024/01 -> /backups/2024 -> /backups
-  
+    
     // seed our list with the provided starting directory, depth of 0
     dirsToRead.push_back({ue(directory), 0});
-
-    // walk through the known list of directories to read
-    while (!dirsToRead.empty()) {
-        auto [baseDir, depth] = dirsToRead.front();
-        dirsToRead.pop_front();
-        dirEntries = 0;
-          
-        // verify we have an accessible directory
-        if (!mylstat(baseDir, &dirStat)) {
-            if (S_ISDIR(dirStat.st_mode)) {
+    
+    try {
+        // walk through the known list of directories to read
+        while (!dirsToRead.empty()) {
+            auto [baseDir, depth] = dirsToRead.front();
+            dirsToRead.pop_front();
+            dirEntries = 0;
+            
+            // verify we have an accessible directory
+            if (!mylstat(baseDir, &dirStat)) {
                 
-                // read individual directory entries
-                if ((dirPtr = opendir(baseDir.c_str())) != NULL) {
-                    while ((dirEntry = readdir(dirPtr)) != NULL) {
-                        
-                        if (!strcmp(dirEntry->d_name, ".") || !strcmp(dirEntry->d_name, ".."))
-                            continue;
-                        
-                        ++dirEntries;
-                        file.filename = slashConcat(baseDir, dirEntry->d_name);
-                        
-                        if (!mylstat(file.filename, &file.statData)) {
+                if (followSymLinks)
+                    dirStat.st_mode = resolveLinkMode(baseDir, dirStat.st_mode);
+                
+                if (S_ISDIR(dirStat.st_mode)) {
+                    
+                    // read individual directory entries
+                    if ((dirPtr = opendir(baseDir.c_str())) != NULL) {
+                        while ((dirEntry = readdir(dirPtr)) != NULL) {
                             
-                            /* process directories - first we filter (if requested) to make sure we're
-                               interested in this subdirectory.  if so, and its within our depth constraints,
-                               we add it to the list of directories to read. */
-                            if (S_ISDIR(file.statData.st_mode)) {
+                            if (!strcmp(dirEntry->d_name, ".") || !strcmp(dirEntry->d_name, ".."))
+                                continue;
+                            
+                            ++dirEntries;
+                            file.filename = slashConcat(baseDir, dirEntry->d_name);
+                            
+                            if (!mylstat(file.filename, &file.statData)) {
                                 
-                                // filter for patterns
-                                if (filterDirs)
+                                if (followSymLinks)
+                                    file.statData.st_mode = resolveLinkMode(file.filename, file.statData.st_mode);
+                                
+                                /* process directories - first we filter (if requested) to make sure we're
+                                 interested in this subdirectory.  if so, and its within our depth constraints,
+                                 we add it to the list of directories to read. */
+                                if (S_ISDIR(file.statData.st_mode)) {
+                                    
+                                    // filter for patterns
+                                    if (filterDirs)
+                                        if (pattern.length()) {
+                                            bool found = patternRE.search(file.filename);
+                                            
+                                            if ((exclude && found) || (!exclude && !found))
+                                                continue;
+                                        }
+                                    
+                                    if (maxDepth < 1 || depth < maxDepth)
+                                        dirsToRead.push_back({file.filename, depth+1});
+                                }
+                                else {
+                                    /* process files - again, first filter (if requested) to make sure we're
+                                     interested in this file.  if so, immediately call the callback on it. */
                                     if (pattern.length()) {
                                         bool found = patternRE.search(file.filename);
                                         
                                         if ((exclude && found) || (!exclude && !found))
                                             continue;
                                     }
-                                
-                                if (maxDepth < 1 || depth < maxDepth)
-                                    dirsToRead.push_back({file.filename, depth+1});
-                            }
-                            else {
-                                /* process files - again, first filter (if requested) to make sure we're
-                                   interested in this file.  if so, immediately call the callback on it. */
-                                if (pattern.length()) {
-                                    bool found = patternRE.search(file.filename);
                                     
-                                    if ((exclude && found) || (!exclude && !found))
-                                        continue;
-                                }
-
-                                file.dirEntries = 0;
-                                if (!callback(file)) {
-                                    dirsToRead.clear();
-                                    break;
+                                    file.dirEntries = 0;
+                                    if (!callback(file)) {
+                                        dirsToRead.clear();
+                                        break;
+                                    }
                                 }
                             }
                         }
+                        closedir(dirPtr);
+                        
+                        /* here we've finished reading everything in the current directory.  we can't call the
+                         callback on the directory itself because we may have found subdirectories that need
+                         to be processed first.  those subs will get handled as we get back to the top of our
+                         while().  so we add the current directory to the dirsToCallback list that will get
+                         processed after all the directory walking is complete. */
+                        if (includeTopDir || baseDir != directory) {
+                            file.filename = baseDir;
+                            file.statData = dirStat;
+                            file.dirEntries = dirEntries;
+                            file.depth = depth - 1;
+                            dirsToCallback.push_front(file);
+                        }
                     }
-                    closedir(dirPtr);
-                    
-                    /* here we've finished reading everything in the current directory.  we can't call the
-                       callback on the directory itself because we may have found subdirectories that need
-                       to be processed first.  those subs will get handled as we get back to the top of our
-                       while().  so we add the current directory to the dirsToCallback list that will get
-                       processed after all the directory walking is complete. */
-                    if (includeTopDir || baseDir != directory) {
-                        file.filename = baseDir;
-                        file.statData = dirStat;
-                        file.dirEntries = dirEntries;
-                        file.depth = depth - 1;
-                        dirsToCallback.push_front(file);
+                    else {
+                        string err = "error: unable to open " + ue(directory) + errtext();;
+                        SCREENERR(log(err));
+                        return err;
                     }
                 }
                 else {
-                    string err = "error: unable to open " + ue(directory) + errtext();;
-                    SCREENERR(log(err));
-                    return err;
+                    // in case we're given an initial file instead of directory
+                    file.filename = baseDir;
+                    file.statData = dirStat;
+                    file.depth = depth;
+                    callback(file);
                 }
             }
             else {
-                // in case we're given an initial file instead of directory
-                file.filename = baseDir;
-                file.statData = dirStat;
-                file.depth = depth;
-                callback(file);
+                string err = "error: stat failed for " + baseDir + errtext();
+                // SCREENERR(log(err));
+                return err;
             }
         }
-        else {
-            string err = "error: stat failed for " + baseDir + errtext();
-            // SCREENERR(log(err));
-            return err;
+        
+        /* all the directory walking is complete.  now we can call the callback on each directory we've found
+         in the proper depth-first order. */
+        while (!dirsToCallback.empty()) {
+            file = dirsToCallback.front();
+            dirsToCallback.pop_front();
+            
+            if (!callback(file))
+                break;
         }
     }
-    
-    /* all the directory walking is complete.  now we can call the callback on each directory we've found
-       in the proper depth-first order. */
-    while (!dirsToCallback.empty()) {
-        file = dirsToCallback.front();
-        dirsToCallback.pop_front();
-        
-        if (!callback(file))
-            break;
+    catch (MBException &e) {
+        SCREENERR("error: " << e.detail());
+        log("error: " + e.detail());
     }
     
     return "";
@@ -1441,7 +1477,7 @@ bool pdBackupsCallback(pdCallbackData &file) {
     pdCallbackData passedFile;
     passedFile = file;
     passedFile.dataPtr = data->realDataPtr;
-    
+        
     // make sure we're in the year/month or year/month/day subdirs
     if (data->backupPattern->search(file.filename)) {
         
@@ -1466,15 +1502,15 @@ bool pdBackupsCallback(pdCallbackData &file) {
  for single-file backups the file is returned, for faub backups the containing directory
  is returned.  backupType specifies which types to return.
  */
-string processDirectoryBackups(string directory, string pattern, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, backupTypes backupType, int maxDepth) {
+string processDirectoryBackups(string directory, string pattern, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, backupTypes backupType, bool followSymLinks, int maxDepth) {
     internalPDBDataType data;
     Pcre backupPattern("./\\d{4}/\\d{2}(?:/\\d{2}){0,1}/(?!\\d{2}\\b)[^/]+$");  // identify backup directories
     data.backupPattern = &backupPattern;
     data.realCallback = callback;
     data.realDataPtr = passData;
     data.backupType = backupType;
-    
-    return processDirectory(directory, "(/\\d{2,4}$)|(" + pattern + ")", false, filterDirs, pdBackupsCallback, &data, maxDepth == -1 ? 4 : maxDepth);
+        
+    return processDirectory(directory, "(/\\d{2,4}$)|(" + pattern + ")", false, filterDirs, pdBackupsCallback, &data, followSymLinks, maxDepth == -1 ? 4 : maxDepth);
 }
 
 

@@ -348,7 +348,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
     }
     else
         !cacheOnly && cout << "no backups found." << endl;
-        
+     
     return;
 }
 

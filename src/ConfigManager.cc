@@ -97,7 +97,7 @@ bool configMgrCallback(pdCallbackData &file) {
 ConfigManager::ConfigManager() {
     activeConfig = -1;
     defaultConfig = "";
-    processDirectory(ue(GLOBALS.confDir), "\\.conf$", false, false, configMgrCallback, this);
+    processDirectory(ue(GLOBALS.confDir), "\\.conf$", false, false, configMgrCallback, this, true);
     sort(configs.begin(), configs.end());
     
     if (configs.size() == 1)

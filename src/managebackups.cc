@@ -2064,7 +2064,7 @@ int main(int argc, char *argv[]) {
     try {
         options.allow_unrecognised_options();  // to support -v...
         GLOBALS.cli = options.parse(argc, argv);
-        GLOBALS.color = !(GLOBALS.cli[CLI_QUIET].as<bool>() || GLOBALS.cli[CLI_NOCOLOR].as<bool>());
+        GLOBALS.color = !GLOBALS.cli[CLI_NOCOLOR].as<bool>();
         GLOBALS.useBlocks = GLOBALS.cli.count(CLI_USEBLOCKS);
         
         if (GLOBALS.cli.count(CLI_USER))
@@ -2426,7 +2426,7 @@ int main(int argc, char *argv[]) {
                 allRunTimer.start();
                 log("[ALL] starting sequential processing of all profiles");
                 NOTQUIET && cout << "starting sequential processing of all profiles" << endl;
-                                
+                
                 for (auto &config : configManager.configs) {
                    if (!config.temp && !config.settings[sPaths].value.length()
                        && !str2bool(config.settings[sArchive].value)) {
@@ -2450,8 +2450,8 @@ int main(int argc, char *argv[]) {
              * ****************************/
             else if (GLOBALS.cli.count(CLI_ALLPAR) || GLOBALS.cli.count(CLI_CRONP)) {
                 timer allRunTimer;
-                
                 allRunTimer.start();
+                
                 log("[ALL] starting parallel processing of all profiles");
                 NOTQUIET &&cout << "starting parallel processing of all profiles" << endl;
                 
