@@ -87,7 +87,7 @@ void decode_bits(unsigned int *selector, size_t selsize, int *notall,
             return;
 
         if (*parsestring != '+' && *parsestring != '-') {
-            printf("unknown debugging flag (should be + or -_: %s\n", parsestring);
+            printf("unknown debugging flag (should be + or -: %s\n", parsestring);
             return;
         }
 

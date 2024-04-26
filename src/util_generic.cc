@@ -1253,22 +1253,30 @@ char getFilesystemEntryType(string entry) {
 }
 
 
-// follow a directory entry through all symlink resolutions to determine
-// if the final entry is a dir or a file; return it's mode
-mode_t resolveLinkMode(string dirEntryName, mode_t mode) {
+/* opendir() automatically resolves symlinks and opens the resulting directory
+   when the final item in the symlink chain is a directory itself.  the original
+   (symlink) name should still be used wherever possible.  so there's no need to
+   recursively resolve a symlink down to its 'real name.'  all we really need is
+   to know if the real name is a dir or a file, i.e. it's mode.  resolveLinkMode()
+   returns the mode of the real name if it exists (is a dir, file, socket, etc)
+   and the mode of the original symlink if its a dangling symlink whose antecedent
+   can't be found. */
+mode_t resolveLinkMode(string dirEntryName, mode_t origMode) {
     struct stat statData;
-    statData.st_mode = mode;
-    
+    statData.st_mode = origMode;
+    char buf[PATH_MAX + 1];
+
     while (S_ISLNK(statData.st_mode)) {
-        char buf[1024];
-        auto len = readlink(dirEntryName.c_str(), buf, sizeof(buf));
+        auto len = readlink(dirEntryName.c_str(), buf, sizeof(buf) - 1);
         
         if (len > 0) {
             buf[len] = 0;
-            string target = (buf[0] != '/') ? string("./") + buf : buf;
+            string target = (buf[0] == '/') ? buf : string("./") + buf;
             
+            // if the final target doesn't exist (dangling link) then
+            // return the original mode, which will be a symlink
             if (mylstat(target, &statData))
-                throw MBException("can't read " + dirEntryName);
+                return origMode;
         }
     }
     
@@ -1316,7 +1324,7 @@ mode_t resolveLinkMode(string dirEntryName, mode_t mode) {
  shown on the screen (via SCREENERR) and returned to the calling function.
  */
 
-string processDirectory(string directory, string pattern, bool exclude, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, bool followSymLinks, int maxDepth, bool includeTopDir) {
+string processDirectory(string directory, string pattern, bool exclude, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, int maxDepth, bool includeTopDir, bool followSymLinks) {
     DIR *dirPtr;
     size_t dirEntries;
     struct dirent *dirEntry;
@@ -1353,11 +1361,8 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
             
             // verify we have an accessible directory
             if (!mylstat(baseDir, &dirStat)) {
-                
-                if (followSymLinks)
-                    dirStat.st_mode = resolveLinkMode(baseDir, dirStat.st_mode);
-                
-                if (S_ISDIR(dirStat.st_mode)) {
+                                
+                if (S_ISDIR(dirStat.st_mode) || (followSymLinks && S_ISDIR(resolveLinkMode(baseDir, dirStat.st_mode)))) {
                     
                     // read individual directory entries
                     if ((dirPtr = opendir(baseDir.c_str())) != NULL) {
@@ -1371,13 +1376,10 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
                             
                             if (!mylstat(file.filename, &file.statData)) {
                                 
-                                if (followSymLinks)
-                                    file.statData.st_mode = resolveLinkMode(file.filename, file.statData.st_mode);
-                                
                                 /* process directories - first we filter (if requested) to make sure we're
                                  interested in this subdirectory.  if so, and its within our depth constraints,
                                  we add it to the list of directories to read. */
-                                if (S_ISDIR(file.statData.st_mode)) {
+                                if (S_ISDIR(file.statData.st_mode) || (followSymLinks && S_ISDIR(resolveLinkMode(file.filename, file.statData.st_mode)))) {
                                     
                                     // filter for patterns
                                     if (filterDirs)
@@ -1502,7 +1504,7 @@ bool pdBackupsCallback(pdCallbackData &file) {
  for single-file backups the file is returned, for faub backups the containing directory
  is returned.  backupType specifies which types to return.
  */
-string processDirectoryBackups(string directory, string pattern, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, backupTypes backupType, bool followSymLinks, int maxDepth) {
+string processDirectoryBackups(string directory, string pattern, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, backupTypes backupType, int maxDepth, bool followSymLinks) {
     internalPDBDataType data;
     Pcre backupPattern("./\\d{4}/\\d{2}(?:/\\d{2}){0,1}/(?!\\d{2}\\b)[^/]+$");  // identify backup directories
     data.backupPattern = &backupPattern;
@@ -1510,7 +1512,7 @@ string processDirectoryBackups(string directory, string pattern, bool filterDirs
     data.realDataPtr = passData;
     data.backupType = backupType;
         
-    return processDirectory(directory, "(/\\d{2,4}$)|(" + pattern + ")", false, filterDirs, pdBackupsCallback, &data, followSymLinks, maxDepth == -1 ? 4 : maxDepth);
+    return processDirectory(directory, "(/\\d{2,4}$)|(" + pattern + ")", false, filterDirs, pdBackupsCallback, &data, maxDepth == -1 ? 4 : maxDepth, false, followSymLinks);
 }
 
 

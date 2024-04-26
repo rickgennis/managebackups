@@ -1927,23 +1927,6 @@ bool getGlobalStats(unsigned long& stats, unsigned long& md5s, string& elapsedTi
     return false;
 }
 
-/*
-void showMatches(Pcre& p, string foo) {
-    if (p.search(foo)) {
-        cout << "fish count: " << p.matches() << endl;
-        cout << "0: '" << p.get_match(0) << "'" << endl;;
-        cout << "1: '" << p.get_match(1) << "'" << endl;
-        cout << "2: '" << p.get_match(2) << "'" << endl;
-        cout << "3: '" << p.get_match(3) << "'" << endl;
-        cout << endl;
-    }
-}
-*/
-bool testCallback(pdCallbackData &file) {
-    cout << "\t=> " << file.filename << (S_ISDIR(file.statData.st_mode) ? " [DIR]" : "") << endl;
-    return true;
-}
-
 
 /*******************************************************************************
  * main(argc, argv)
@@ -1953,7 +1936,7 @@ bool testCallback(pdCallbackData &file) {
 int main(int argc, char *argv[]) {
     timer AppTimer;
     AppTimer.start();
-    
+        
     signal(SIGTERM, sigTermHandler);
     signal(SIGINT, sigTermHandler);
     
