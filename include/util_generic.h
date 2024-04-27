@@ -179,7 +179,7 @@ void mkdirp(string dir, struct stat &statData);
 
 string trimSpace(const string &s);
 
-string trimQuotes(string s);
+string trimQuotes(string s, bool unEscape = false);
 
 string safeFilename(string filename);
 

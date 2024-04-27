@@ -555,13 +555,20 @@ string trimSpace(const string &s) {
 }
 
 
-string trimQuotes(string s) {
-    Pcre reg("([\'\"]+)(.+?)\\g1");
+string trimQuotes(string s, bool unEscape) {
+    Pcre reg("^([\'\"]+)(.+?)\\g1$");
+    string result = s;
     
     if (reg.search(s) && reg.matches())
-        return reg.get_match(1);
+        result = reg.get_match(1);
     
-    return s;
+    if (unEscape) {
+        size_t altpos;  // remove any remaining backslashes
+        while ((altpos = result.find("\\")) != string::npos)
+            result.erase(altpos, 1);
+    }
+    
+    return result;
 }
 
 

@@ -297,6 +297,10 @@ bool BackupConfig::loadConfig(string filename) {
                         
                         // STRING is handled implicitly with no conversion
                         
+                        if (setting.display_name == CLI_DIR ||
+                            setting.display_name == CLI_REPLICATETO)
+                            setting.value = trimQuotes(setting.value, true);
+                        
                         // special-case for something that can look like a SIZE or be a percentage
                         if (setting.display_name == CLI_BLOAT) {
                             for (int i=0; i < setting.value.length(); ++i)

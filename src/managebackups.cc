@@ -418,7 +418,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
                     
                     setting.value = GLOBALS.cli[setting.display_name].as<string>();
                     setting.execParam = "--" + setting.display_name + " '" + setting.value + "'";
-                    
+
                     if (setting.display_name == CLI_TRIPWIRE)
                         verifyTripwireParams(setting.value);
                     break;
@@ -1887,22 +1887,19 @@ void replicateBackup(BackupConfig &config, string newBaseDir) {
     }
     
     if (!config.fcache.size()) {
-        NOTQUIET && cout << GREEN << "no backups to replicate. " << RESET << endl;
+        NOTQUIET && cout << GREEN << "no backups to replicate." << RESET << endl;
         exit(0);
     }
     
     newBaseDir = resolveGivenDirectory(newBaseDir, false);
     auto origBaseDir = config.fcache.getBaseDir();
     auto lastBackupDir = config.fcache.getLastBackup()->second.getDir();
-    
+            
     if (newBaseDir == origBaseDir) {
         NOTQUIET && cout << GREEN << "backups for " << config.settings[sTitle].value << " are already in " << origBaseDir << RESET << endl;
         exit(0);
     }
-    
-    cout << "REPLICATE:\nFrom: " << lastBackupDir << "\n  To: " << newBaseDir << endl;
-    exit(1);
-    
+        
     if (mkdirp(newBaseDir)) {
         log("error: replication aborted; unable to create directory " + newBaseDir);
         SCREENERR("error: unable to create directory " << newBaseDir << errtext());
@@ -1996,7 +1993,7 @@ bool getGlobalStats(unsigned long& stats, unsigned long& md5s, string& elapsedTi
 int main(int argc, char *argv[]) {
     timer AppTimer;
     AppTimer.start();
-            
+              
     signal(SIGTERM, sigTermHandler);
     signal(SIGINT, sigTermHandler);
     
