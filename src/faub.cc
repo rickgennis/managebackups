@@ -316,7 +316,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
              * this includes every directory regardless of it changed.
              */
             for (auto &file: neededFiles) {
-                DEBUG(D_netproto) DFMT("server requesting " << file);
+                //DEBUG(D_netproto) DFMT("server requesting " << file);
                 client.ipcWrite(string(file + NET_DELIM).c_str());
             }
             
@@ -339,7 +339,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             showDetail && cout << label;
             
             for (auto &file: neededFiles) {
-                DEBUG(D_netproto) DFMT("server waiting for " << file);
+                //DEBUG(D_netproto) DFMT("server waiting for " << file);
                 auto currentFilename = slashConcat(currentDir, file);
                 auto [errorMsg, mode, mtime, size] = client.ipcReadToFile(currentFilename, !incTime);
                 fsBytesReceived += size;

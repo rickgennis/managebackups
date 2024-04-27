@@ -211,7 +211,7 @@ string blockp(string data, int width);
 
 string catdir(string dir);
 
-bool rmrf(string dir);
+bool rmrf(string directory, bool includeTopDir = true);
 
 int mkbasedirs(string path);
 
@@ -256,7 +256,7 @@ struct pdCallbackData {
 
 enum backupTypes { SINGLE_ONLY, FAUB_ONLY, ALL_BACKUPS };
 
-string processDirectory(string directory, string pattern, bool exclude, bool allDirs, bool (*callback)(pdCallbackData&), void *passData, int maxDepth = -1, bool includeTopDir = false, bool followSymLinks = false);
+string processDirectory(string directory, string pattern, bool exclude, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, int maxDepth = -1, bool includeTopDir = false, bool followSymLinks = false);
 string processDirectoryBackups(string directory, string pattern, bool exclude, bool (*callback)(pdCallbackData&), void *passData, backupTypes backupType, int maxDepth = -1, bool followSymLinks = true);
 
 string progressPercentageA(int totalIterations, int totalSteps = 7, int iterationsComplete = 0, int stepsComplete = 0, string detail = "");
@@ -272,6 +272,16 @@ tuple<string, string> clearMessage(string message);
 unsigned int ansistrlength(string source);
 
 string commafy(string data);
+
+string readlink(string dirEntry);
+
+mode_t resolveLinkMode(string dirEntryName, mode_t origMode);
+
+string resolveGivenDirectory(string inputDir, bool allowWildcards = true);
+
+bool isSameFileSystem(string dirEntry1, string dirEntry2);
+
+bool isSameDirectory(string dirEntry1, string dirEntry2);
 
 #endif
 

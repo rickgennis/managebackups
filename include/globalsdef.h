@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.6.11j"
+#define VERSION "1.7.0"
 
 #include "cxxopts.hpp"
 #include "colors.h"
@@ -139,6 +139,7 @@
 #define CLI_FILTERDIRS "filterdirs"
 #define CLI_UUID "uuid"      /* not really a valid CLI option just used as a setting */
 #define CLI_ARCHIVE "archive"
+#define CLI_REPLICATETO "replicateto"
 
 
 // conf file regexes
@@ -187,6 +188,7 @@
 #define RE_EXCLUDE "(exclude)"
 #define RE_FILTERDIRS "(filterdirs)"
 #define RE_ARCHIVE "(archive|archived)"
+#define RE_REPLICATETO "(rep|replicate|replicateto)"
 
 #define INTERP_FULLDIR "{fulldir}"
 #define INTERP_SUBDIR "{subdir}"

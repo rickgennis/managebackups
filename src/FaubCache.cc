@@ -201,6 +201,13 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             set<ino_t> emptySet;
             auto ds = dus(aBackup->first, gotPrev ? prevBackup->second.inodes : emptySet, aBackup->second.inodes);
             DEBUG(D_any) DFMT("\tdus(" << aBackup->first << ") returned " << ds.sizeInBytes + ds.savedInBytes << " size bytes, " << ds.sizeInBytes << " used bytes");
+            
+            // TEMP
+            log("debug: DUS()" + to_string(forceAll) + string(",") + to_string(targetDir == aBackup->first) + ","
+            + to_string(!targetDir.length() && ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))
+                + "," + to_string(nextOneToo) + "; " + to_string(ds.sizeInBytes + ds.savedInBytes) + ", " + to_string(ds.savedInBytes));
+            // TEMP
+            
             aBackup->second.ds = ds;
             aBackup->second.updated = true;
             aBackup->second.dirs = ds.dirs;

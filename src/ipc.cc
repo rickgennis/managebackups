@@ -163,7 +163,7 @@ tuple<string, int, time_t, long> IPC_Base::ipcReadToFile(string filename, bool p
 
     // handle symlinks
     if (S_ISLNK(mode)) {
-        char target[1025];
+        char target[PATH_MAX + 1];
         __int64_t bytes = ipcRead();
         ipcRead(target, bytes);
         target[bytes] = 0;
@@ -235,7 +235,7 @@ tuple<string, int, time_t, long> IPC_Base::ipcReadToFile(string filename, bool p
         return {errorMsg, mode, mtime, totalBytes};
     }
 
-    DEBUG(D_netproto) cerr << " [" << totalBytes << " bytes] can't write file" << flush;
+    DEBUG(D_netproto) cerr << " [" << totalBytes << " bytes] can't write file " << filename << endl;
     return {errorMsg, mode, mtime, totalBytes};
 }
 

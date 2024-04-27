@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.6.11j
+% MANAGEBACKUPS(1) managebackups 1.7.0
 % Rick Ennis
 % March 2023
 
@@ -150,6 +150,9 @@ Options are categorized by the three functions of **managebackups** plus general
 
 **--relocate** [*newDir*]
 : Relocating backups for a profile entails updating the internal caches, updating the profile's configuration and moving all the backups' files in a hardlink-aware way. The **--relocate** option handles all three of these. Use it in conjunction with **-p**.
+
+**--replicateto** [*targetDir*]
+: {FB} The replicate option makes a hardlink-aware copy (i.e. no appreciable additional storage) of the most recent backup of the specified (**-p**) profile to the targetDir.  The copy is placed directly in targetDir with no year, month or day or subdirectories.  The entire contents of targetDir are deleted before the copy begins.  This is useful for when you want to store a copy of your faub-style backup in a cloud syncing service (Apple's iCloud Drive, Microsoft's OneDrive, etc) which intentionally do not follow symlinks and don't respect hardlinks.  By replicating to a directory in one of your cloud synced services, you can gain off-site replication of a single backup. Because the cloud providers ignore hardlinks, storing your entire backup collection there would negate all the storage benefits of hardlinks.
 
 **--sched** [*hours*]
 : Schedule (via LaunchCtl on MacOS or cron on Linux) **managebackups** to run every *hours* hours with the "-K" option.  If *hours* is 0 or 24 it's interpreted as once a day and will default to 00:15 in the morning.  If set to run once a day **--schedhour** can be specified to use a different single hour. **--schedminute** can be used to specify a different minute offset. **--schedpath** can be used to specify an alternative location if **managebackups** isn't installed in /usr/local/bin.

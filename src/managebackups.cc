@@ -1611,68 +1611,60 @@ bool crossFSCallback(pdCallbackData &file) {
     
     string oldFilename = file.filename;
     string newFilename = oldFilename;
-    newFilename.replace(0, file.topLevelDir.length(), "");
-    newFilename = slashConcat(newDataPtr->newDir, newFilename);
     
-    if (!mylstat(oldFilename, &file.statData)) {
-        if (S_ISDIR(file.statData.st_mode))
-            mkdirp(newFilename, file.statData);
+    if (S_ISDIR(file.statData.st_mode))
+        mkdirp(newFilename, file.statData);
+    else {
+        auto inodeEntry = newDataPtr->iMap.find(file.statData.st_ino);
+        
+        // duplicate hard links
+        if (inodeEntry != newDataPtr->iMap.end()) {
+            if (link(inodeEntry->second.c_str(), newFilename.c_str())) {
+                SCREENERR("error: unable to create hard link " + newFilename + errtext());
+                exit(1);
+            }
+        }
         else {
-            auto inodeEntry = newDataPtr->iMap.find(file.statData.st_ino);
-            
-            // duplicate hard links
-            if (inodeEntry != newDataPtr->iMap.end()) {
-                if (link(inodeEntry->second.c_str(), newFilename.c_str())) {
-                    SCREENERR("error: unable to create hard link " + newFilename + errtext());
+            // translate symlinks
+            if (S_ISLNK(file.statData.st_mode)) {
+                char linkPath[PATH_MAX + 1];
+                int len = (int)readlink(oldFilename.c_str(), linkPath, sizeof(linkPath));
+                linkPath[len] = 0;
+                if (len > -1) {
+                    if (symlink(linkPath, newFilename.c_str())) {
+                        
+                        if (errno == EEXIST && GLOBALS.cli.count(CLI_FORCE)) {
+                            if (!unlink(newFilename.c_str()) && !symlink(linkPath, newFilename.c_str()))
+                                setFilePerms(newFilename, file.statData);
+                            else {
+                                SCREENERR("error: unable to recreate existing symlink " + newFilename + " to " + linkPath + errtext());
+                                exit(1);
+                            }
+                        }
+                        else {
+                            SCREENERR("error: unable to create symlink " + newFilename + " to " + linkPath + errtext());
+                            exit(1);
+                        }
+                    }
+                    else
+                        setFilePerms(newFilename, file.statData);
+                }
+                else {
+                    SCREENERR("error: unable to read symlink " + oldFilename + errtext());
                     exit(1);
                 }
             }
             else {
-                // translate symlinks
-                if (S_ISLNK(file.statData.st_mode)) {
-                    char linkPath[PATH_MAX];
-                    int len = (int)readlink(oldFilename.c_str(), linkPath, sizeof(linkPath));
-                    linkPath[len] = 0;
-                    if (len > -1) {
-                        if (symlink(linkPath, newFilename.c_str())) {
-                            
-                            if (errno == EEXIST && GLOBALS.cli.count(CLI_FORCE)) {
-                                if (!unlink(newFilename.c_str()) && !symlink(linkPath, newFilename.c_str()))
-                                    setFilePerms(newFilename, file.statData);
-                                else {
-                                    SCREENERR("error: unable to recreate existing symlink " + newFilename + " to " + linkPath + errtext());
-                                    exit(1);
-                                }
-                            }
-                            else {
-                                SCREENERR("error: unable to create symlink " + newFilename + " to " + linkPath + errtext());
-                                exit(1);
-                            }
-                        }
-                        else
-                            setFilePerms(newFilename, file.statData);
-                    }
-                    else {
-                        SCREENERR("error: unable to read symlink " + oldFilename + errtext());
-                        exit(1);
-                    }
+                // copy regular files
+                if (!copyFile(oldFilename, newFilename)) {
+                    SCREENERR("error: unable to copy " + oldFilename + " to " + newFilename + errtext());
+                    exit(1);
                 }
-                else {
-                    // copy regular files
-                    if (!copyFile(oldFilename, newFilename)) {
-                        SCREENERR("error: unable to copy " + oldFilename + " to " + newFilename + errtext());
-                        exit(1);
-                    }
-                    
-                    newDataPtr->iMap.insert(newDataPtr->iMap.end(), make_pair(file.statData.st_ino, newFilename));
-                    setFilePerms(newFilename, file.statData);
-                }
+                
+                newDataPtr->iMap.insert(newDataPtr->iMap.end(), make_pair(file.statData.st_ino, newFilename));
+                setFilePerms(newFilename, file.statData);
             }
         }
-    }
-    else {
-        SCREENERR("error: cross-filesystem move interrupted, unable to stat " + oldFilename + errtext());
-        exit(1);
     }
     
     return true;
@@ -1743,49 +1735,7 @@ bool moveBackup(string fullBackupOldPath, string oldBaseDir, string newBaseDir, 
 
 
 void relocateBackups(BackupConfig &config, string newBaseDir) {
-    char dirBuf[PATH_MAX+1];
-    
-    if (newBaseDir.find("*") != string::npos || newBaseDir.find("?") != string::npos) {
-        SCREENERR("error: specific directory required (no wildcards)");
-        exit(1);
-    }
-    
-    // prepend pwd
-    if (newBaseDir[0] != '/' && newBaseDir[0] != '~') {
-        if (getcwd(dirBuf, sizeof(dirBuf)) == NULL) {
-            SCREENERR("error: unable to determine the current directory");
-            exit(1);
-        }
-        
-        newBaseDir = slashConcat(dirBuf, newBaseDir);
-    }
-    
-    // handle tilde substitution
-    // most of the time this isn't necessary because the shell does the
-    // substitution before our app is invoked
-    if (newBaseDir[0] == '~') {
-        string user;
-        auto slash = newBaseDir.find("/");
-        
-        if (slash != string::npos)
-            user = newBaseDir.substr(1, slash - 1);
-        else
-            user = newBaseDir.length() ? newBaseDir.substr(1, newBaseDir.length() - 1) : "";
-        
-        auto uid = getUidFromName(user);
-        if (uid < 0) {
-            SCREENERR("error: invalid user reference in ~" << user);
-            exit(1);
-        }
-        
-        auto homeDir = getUserHomeDir(uid);
-        if (!homeDir.length()) {
-            SCREENERR("error: unable to determine home directory for ~" + user);
-            exit(1);
-        }
-        
-        newBaseDir.replace(0, slash, homeDir);
-    }
+    newBaseDir = resolveGivenDirectory(newBaseDir, false);
     
     auto oldBaseDir = config.isFaub() ? config.fcache.getBaseDir() : config.settings[sDirectory].value;
     
@@ -1799,20 +1749,7 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
         exit(1);
     }
     
-    struct stat statData1;
-    struct stat statData2;
-    
-    if (mystat(oldBaseDir, &statData1)) {
-        SCREENERR("error: unable to access (stat) " << oldBaseDir << errtext());
-        exit(1);
-    }
-    
-    if (mystat(newBaseDir, &statData2)) {
-        SCREENERR("error: unable to access (stat) " << newBaseDir << errtext());
-        exit(1);
-    }
-    
-    bool sameFS = (statData1.st_dev == statData2.st_dev);
+    bool sameFS = isSameFileSystem(oldBaseDir, newBaseDir);
     
     auto numBackups = config.isFaub() ? config.fcache.getNumberOfBackups() : config.cache.rawData.size();
     NOTQUIET && ANIMATE && cout << "moving backups " << (sameFS ? "[local filesystem]... " : "[cross-filesystem]... ");
@@ -1881,6 +1818,129 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
 }
 
 
+struct replicateDataType {
+    string newBaseDir;
+    long symlinkCount;
+    long dirCount;
+    long fileCount;
+};
+
+
+bool replicateCallback(pdCallbackData &file) {
+    replicateDataType *data = (replicateDataType*)file.dataPtr;
+    string newFilename = file.filename;
+    newFilename.replace(0, file.topLevelDir.length(), "");
+    newFilename = slashConcat(data->newBaseDir, newFilename);
+    
+    if (S_ISDIR(file.statData.st_mode)) {
+        ++data->dirCount;
+        if (mkdirp(newFilename, file.statData.st_mode)) {
+            log("error: creating directory " + newFilename + errtext());
+            SCREENERR("error: unable to create directory " + newFilename + errtext());
+            exit(1);
+        }
+        setFilePerms(newFilename, file.statData);
+
+    }
+    else {
+        // make the containing directory
+        auto ps = pathSplit(newFilename);
+        if (mkdirp(ps.dir)) {
+            log("error: creating directory " + ps.dir + errtext());
+            SCREENERR("error: unable to create directory " + ps.dir + errtext());
+            exit(1);
+        }
+        
+        if (S_ISLNK(file.statData.st_mode)) {
+            ++data->symlinkCount;
+            auto linkTarget = readlink(file.filename);
+            if (symlink(linkTarget.c_str(), newFilename.c_str())) {
+                log("error: creating symlink " + newFilename + " -> " + linkTarget + errtext());
+                SCREENERR("error: unable to create symlink " + newFilename + " -> " + linkTarget + errtext());
+                exit(1);
+            }
+            setFilePerms(newFilename, file.statData);
+
+        }
+        else {
+            ++data->fileCount;
+            if (link(file.filename.c_str(), newFilename.c_str())) {
+                log("error: creating link " + newFilename + " to " + file.filename + errtext());
+                SCREENERR("error: unable to create link " + newFilename + " to " + file.filename + errtext());
+                exit(1);
+            }
+            // owner/mode/time don't need to be set on hardlinks because they share them with the original file
+        }
+        
+    }
+    
+
+    return true;
+}
+
+
+void replicateBackup(BackupConfig &config, string newBaseDir) {
+    if (!config.isFaub()) {
+        log("error: replication aborted due to backup not being faub-style");
+        SCREENERR("error: replication is only applicable to faub-style backups; use 'ln ...' for single-file backups.");
+        exit(1);
+    }
+    
+    if (!config.fcache.size()) {
+        NOTQUIET && cout << GREEN << "no backups to replicate. " << RESET << endl;
+        exit(0);
+    }
+    
+    newBaseDir = resolveGivenDirectory(newBaseDir, false);
+    auto origBaseDir = config.fcache.getBaseDir();
+    auto lastBackupDir = config.fcache.getLastBackup()->second.getDir();
+    
+    if (newBaseDir == origBaseDir) {
+        NOTQUIET && cout << GREEN << "backups for " << config.settings[sTitle].value << " are already in " << origBaseDir << RESET << endl;
+        exit(0);
+    }
+    
+    cout << "REPLICATE:\nFrom: " << lastBackupDir << "\n  To: " << newBaseDir << endl;
+    exit(1);
+    
+    if (mkdirp(newBaseDir)) {
+        log("error: replication aborted; unable to create directory " + newBaseDir);
+        SCREENERR("error: unable to create directory " << newBaseDir << errtext());
+        exit(1);
+    }
+    
+    if (!isSameFileSystem(origBaseDir, newBaseDir)) {
+        log("error: replication aborted due to target directory being on a different filesystem");
+        SCREENERR("error: replication is only applicable when the target is on the same filesystem; use 'cp -R ...' to cross filesystems.");
+        exit(1);
+    }
+    
+    // paranoia check to make sure the user isn't confused by symlinks and
+    // we're about to wipe out the source copy of their backups.
+    if (isSameDirectory(origBaseDir, newBaseDir)) {
+        log("error: replication aborted due to source and target directories being the same");
+        SCREENERR("error: replication source and target directories are the same");
+        exit(1);
+    }
+    
+    rmrf(newBaseDir, false);
+
+    timer replicateTimer;
+    replicateTimer.start();
+    
+    replicateDataType data;
+    data.newBaseDir = newBaseDir;
+    data.dirCount = data.fileCount = data.symlinkCount = 0;
+    processDirectory(lastBackupDir, "", false, false, replicateCallback, &data);
+    replicateTimer.stop();
+    
+    string message = "replication completed to " + newBaseDir + " in " + replicateTimer.elapsed();
+    
+    NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message << endl;
+    log(message);
+}
+
+
 void saveGlobalStats(unsigned long stats, unsigned long md5s, string elapsedTime) {
     ofstream ofile;
     
@@ -1936,7 +1996,7 @@ bool getGlobalStats(unsigned long& stats, unsigned long& md5s, string& elapsedTi
 int main(int argc, char *argv[]) {
     timer AppTimer;
     AppTimer.start();
-        
+            
     signal(SIGTERM, sigTermHandler);
     signal(SIGINT, sigTermHandler);
     
@@ -2042,6 +2102,7 @@ int main(int argc, char *argv[]) {
         CLI_EXCLUDE, "Exclude", cxxopts::value<std::string>())(
         CLI_FILTERDIRS, "Filter directories", cxxopts::value<bool>()->default_value("false"))(
         CLI_ARCHIVE, "Archive profile", cxxopts::value<bool>()->default_value("false"))(
+        CLI_REPLICATETO, "Replicate To", cxxopts::value<std::string>())(
         CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
     
     try {
@@ -2538,29 +2599,27 @@ int main(int argc, char *argv[]) {
 
                 scanConfigToCache(*currentConfig);
                 
-
                 /***********************************************************/
                 
                 if (performTripwire(*currentConfig)) {
                     
+                    if (shouldPrune(*currentConfig))
+                        pruneBackups(*currentConfig);
+                    
                     /* faub configurations */
-                    if (currentConfig->isFaub()) {
-                        if (shouldPrune(*currentConfig))
-                            pruneBackups(*currentConfig);
-                        
+                    if (currentConfig->isFaub())
                         fs_startServer(*currentConfig);
-                    }
-                    else {  /* single file configurations */
-                        if (shouldPrune(*currentConfig))
-                            pruneBackups(*currentConfig);
-                        
+                    
+                    /* single file configurations */
+                    else {
                         updateLinks(*currentConfig);
-                        
-                        if (enoughLocalSpace(*currentConfig)) {
+                        if (enoughLocalSpace(*currentConfig))
                             performBackup(*currentConfig);
-                        }
                     }
                     
+                    if (currentConfig->settings[sReplicateTo].value.length())
+                        replicateBackup(*currentConfig, currentConfig->settings[sReplicateTo].value);
+                
                     configManager.housekeeping();
                     
                     // reload caches to include any newly created backups in the FastCache

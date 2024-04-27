@@ -158,7 +158,7 @@ s_pathSplit pathSplit(string path) {
         auto pos = path.rfind("/");
         s.file = path.substr(pos + 1);
         s.dir = path.substr(0, pos);
-        
+
         if (!pos)
             s.dir = "/";
         
@@ -513,7 +513,7 @@ int mkdirp(string dir, mode_t mode) {
     int result = 0;
     
     if (mystat(dir, &statBuf) == -1) {
-        char data[PATH_MAX];
+        char data[PATH_MAX + 1];
         strcpy(data, dir.c_str());
         char *p = strtok(data, "/");
         string path;
@@ -927,58 +927,15 @@ string catdir(string dir) {
 }
 
 
+bool rmrfCallback(pdCallbackData &file) {
+    return (S_ISDIR(file.statData.st_mode) ? !rmdir(file.filename.c_str()) : !unlink(file.filename.c_str()));
+}
+
+
 // delete an absolute directory (rm -rf).
 // wildcards are not interpreted in the directory name (use expandWildcardFilespec()).
-bool rmrf(string item) {
-    DIR *c_dir;
-    struct dirent *c_dirEntry;
-    struct stat statData;
-    vector<string> subDirs;
-    
-    if (!mylstat(item, &statData)) {
-        if (S_ISDIR(statData.st_mode)) {
-            
-            if ((c_dir = opendir(item.c_str())) != NULL) {
-                while ((c_dirEntry = readdir(c_dir)) != NULL) {
-                    if (!strcmp(c_dirEntry->d_name, ".") || !strcmp(c_dirEntry->d_name, ".."))
-                        continue;
-                    
-                    string filename = slashConcat(item, c_dirEntry->d_name);
-                    if (!mylstat(filename, &statData)) {
-                        
-                        // save directories in a list to do after we close this fd
-                        if (S_ISDIR(statData.st_mode))
-                            subDirs.insert(subDirs.end(), filename);
-                        else
-                            if (unlink(filename.c_str())) {
-                                closedir(c_dir);
-                                SCREENERR(log("error: unable to remove " + filename + errtext()));
-                                return false;
-                            }
-                    }
-                }
-                closedir(c_dir);
-                
-                // recurse into subdirectories
-                for (auto &dir: subDirs)
-                    if (!rmrf(dir))
-                        return false;
-                
-                // remove this directory itself
-                if (rmdir(item.c_str())) {
-                    SCREENERR(log("error: unable to remove " + item + errtext()));
-                    return false;
-                }
-            }
-        }
-        else
-            if (unlink(item.c_str())) {
-                SCREENERR(log("error: unable to remove " + item + errtext()));
-                return false;
-            }
-    }
-    
-    return true;
+bool rmrf(string directory, bool includeTopDir) {
+    return (processDirectory(directory, "", false, false, rmrfCallback, NULL, -1, includeTopDir, false) == "");
 }
 
 
@@ -1007,26 +964,25 @@ struct dsDataType {
 bool dsCallback(pdCallbackData &file) {
     dsDataType *data = (dsDataType*)file.dataPtr;
     
-    if (!S_ISDIR(file.statData.st_mode) && !S_ISLNK(file.statData.st_mode)) {
-        if (data->seenI->find(file.statData.st_ino) != data->seenI->end() ||
-            data->newI->find(file.statData.st_ino) != data->newI->end()) {
-            data->ds->savedInBytes += file.statData.st_size;
-            data->ds->savedInBlocks += 512 * file.statData.st_blocks;
-        }
-        else {
-            data->ds->sizeInBytes += file.statData.st_size;
-            data->ds->sizeInBlocks += 512 * file.statData.st_blocks;
-            ++data->ds->mods;
-        }
-        
-        data->newI->insert(file.statData.st_ino);
-    }
+    if (S_ISDIR(file.statData.st_mode))
+        ++data->ds->dirs;
     else
-        if (S_ISDIR(file.statData.st_mode))
-            ++data->ds->dirs;
-        else
-            if (S_ISLNK(file.statData.st_mode))
-                ++data->ds->symLinks;
+        if (S_ISLNK(file.statData.st_mode))
+            ++data->ds->symLinks;
+        else {
+            if (data->seenI->find(file.statData.st_ino) == data->seenI->end() &&
+                data->newI->find(file.statData.st_ino) == data->newI->end()) {
+                data->ds->sizeInBytes += file.statData.st_size;
+                data->ds->sizeInBlocks += 512 * file.statData.st_blocks;
+                ++data->ds->mods;
+            }
+            else {
+                data->ds->savedInBytes += file.statData.st_size;
+                data->ds->savedInBlocks += 512 * file.statData.st_blocks;
+            }
+            
+            data->newI->insert(file.statData.st_ino);
+        }
     
     return true;
 }
@@ -1253,34 +1209,39 @@ char getFilesystemEntryType(string entry) {
 }
 
 
+string readlink(string dirEntry) {
+    char buf[PATH_MAX + 1];
+    auto len = readlink(dirEntry.c_str(), buf, sizeof(buf) - 1);
+    return ((len > 0) ? string(buf, 0, len) : "");
+}
+
+
+string resolveLink(string dirEntry) {
+    struct stat statData;
+    string prevEntry;
+    
+    while (!mylstat(dirEntry, &statData) && S_ISLNK(statData.st_mode)) {
+        prevEntry = dirEntry;
+        dirEntry = readlink(dirEntry);
+        
+        if (dirEntry[0] != '/')
+            dirEntry = slashConcat(pathSplit(prevEntry).dir, dirEntry);
+    }
+    
+    return dirEntry;
+}
+
+
 /* opendir() automatically resolves symlinks and opens the resulting directory
    when the final item in the symlink chain is a directory itself.  the original
-   (symlink) name should still be used wherever possible.  so there's no need to
-   recursively resolve a symlink down to its 'real name.'  all we really need is
+   (symlink) name should still be used wherever possible.   all we really need is
    to know if the real name is a dir or a file, i.e. it's mode.  resolveLinkMode()
    returns the mode of the real name if it exists (is a dir, file, socket, etc)
    and the mode of the original symlink if its a dangling symlink whose antecedent
    can't be found. */
 mode_t resolveLinkMode(string dirEntryName, mode_t origMode) {
     struct stat statData;
-    statData.st_mode = origMode;
-    char buf[PATH_MAX + 1];
-
-    while (S_ISLNK(statData.st_mode)) {
-        auto len = readlink(dirEntryName.c_str(), buf, sizeof(buf) - 1);
-        
-        if (len > 0) {
-            buf[len] = 0;
-            string target = (buf[0] == '/') ? buf : string("./") + buf;
-            
-            // if the final target doesn't exist (dangling link) then
-            // return the original mode, which will be a symlink
-            if (mylstat(target, &statData))
-                return origMode;
-        }
-    }
-    
-    return statData.st_mode;
+    return (mylstat(resolveLink(dirEntryName), &statData) ? origMode : statData.st_mode);
 }
 
 
@@ -1460,6 +1421,7 @@ string processDirectory(string directory, string pattern, bool exclude, bool fil
     catch (MBException &e) {
         SCREENERR("error: " << e.detail());
         log("error: " + e.detail());
+        return e.detail();
     }
     
     return "";
@@ -1594,4 +1556,90 @@ string commafy(string data) {
         pos += 2;
     }
     return data;
+}
+
+
+string resolveGivenDirectory(string inputDir, bool allowWildcards) {
+    char dirBuf[PATH_MAX+1];
+
+    if (!allowWildcards && (inputDir.find("*") != string::npos || inputDir.find("?") != string::npos)) {
+        SCREENERR("error: specific directory required (no wildcards): '" << inputDir << "'");
+        exit(1);
+    }
+    
+    // prepend pwd
+    if (inputDir[0] != '/' && inputDir[0] != '~') {
+        if (getcwd(dirBuf, sizeof(dirBuf)) == NULL) {
+            SCREENERR("error: unable to determine the current directory");
+            exit(1);
+        }
+        
+        inputDir = slashConcat(dirBuf, inputDir);
+    }
+    
+    // handle tilde substitution
+    if (inputDir[0] == '~') {
+        string user;
+        auto slash = inputDir.find("/");
+        
+        if (slash != string::npos)
+            user = inputDir.substr(1, slash - 1);
+        else
+            user = inputDir.length() ? inputDir.substr(1, inputDir.length() - 1) : "";
+        
+        auto uid = getUidFromName(user);
+        if (uid < 0) {
+            SCREENERR("error: invalid user reference in ~" << user);
+            exit(1);
+        }
+        
+        auto homeDir = getUserHomeDir(uid);
+        if (!homeDir.length()) {
+            SCREENERR("error: unable to determine home directory for ~" + user);
+            exit(1);
+        }
+        
+        inputDir.replace(0, slash, homeDir);
+    }
+    
+    return inputDir;
+}
+
+
+bool isSameFileSystem(string dirEntry1, string dirEntry2) {
+    struct stat statData1;
+    struct stat statData2;
+    
+    if (mystat(dirEntry1, &statData1)) {
+        SCREENERR("error: unable to access (stat) " << dirEntry1 << errtext());
+        exit(1);
+    }
+    
+    if (mystat(dirEntry2, &statData2)) {
+        SCREENERR("error: unable to access (stat) " << dirEntry2 << errtext());
+        exit(1);
+    }
+    
+    return (statData1.st_dev == statData2.st_dev);
+}
+
+
+// realpath() wouldn't tell us if two absolute paths referred to the
+// same file via hard links.  so let's use a manual approach to be certain.
+bool isSameDirectory(string dirEntry1, string dirEntry2) {
+    string testFilename = ".linktest." + to_string(getpid());
+    string test1 = slashConcat(dirEntry1, testFilename);
+    string test2 = slashConcat(dirEntry2, testFilename);
+    bool result = false;
+    
+    ofstream ofile;
+    ofile.open(test1);
+    if (ofile.is_open()) {
+        ofile.close();
+        
+        result = exists(test2);
+        unlink(test1.c_str());
+    }
+    
+    return result;
 }
