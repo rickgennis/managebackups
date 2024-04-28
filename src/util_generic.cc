@@ -498,11 +498,18 @@ void setFilePerms(string filename, struct stat &statData, bool exitOnError) {
     }
     
     struct timespec tv[2];
+#ifdef __APPLE__
     tv[0].tv_sec  = statData.st_atimespec.tv_sec;
     tv[0].tv_nsec  = statData.st_atimespec.tv_nsec;
     tv[1].tv_sec  = statData.st_mtimespec.tv_sec;
     tv[1].tv_nsec  = statData.st_mtimespec.tv_nsec;
-
+#else
+    tv[0].tv_sec  = statData.st_atim.tv_sec;
+    tv[0].tv_nsec  = statData.st_atim.tv_nsec;
+    tv[1].tv_sec  = statData.st_mtim.tv_sec;
+    tv[1].tv_nsec  = statData.st_mtim.tv_nsec;
+#endif
+    
     if (utimensat(0, filename.c_str(), tv, 0)) {
         SCREENERR(log("error: unable to set time on " + filename + " - " + strerror(errno)));
         if (exitOnError)
@@ -1685,9 +1692,14 @@ bool statusMessage::remove() {
 
 
 bool statModeOwnerTimeEqual(struct stat a, struct stat b) {
-    return (a.st_mode == b.st_mode &&
-            a.st_uid == b.st_uid &&
+    return (a.st_uid == b.st_uid &&
             a.st_gid == b.st_gid &&
+#ifdef __APPLE__
             a.st_mtimespec.tv_sec == b.st_mtimespec.tv_sec &&
-            a.st_mtimespec.tv_nsec == b.st_mtimespec.tv_nsec);
+            a.st_mtimespec.tv_nsec == b.st_mtimespec.tv_nsec &&
+#else
+            a.st_mtim.tv_sec == b.st_mtim.tv_sec &&
+            a.st_mtim.tv_nsec == b.st_mtim.tv_nsec &&
+#endif
+            a.st_mode == b.st_mode);
 }
