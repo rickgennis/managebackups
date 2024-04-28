@@ -497,11 +497,14 @@ void setFilePerms(string filename, struct stat &statData, bool exitOnError) {
             exit(1);
     }
     
-    struct timeval tv[2];
-    tv[0].tv_sec  = tv[1].tv_sec  = statData.st_mtime;
-    tv[0].tv_usec = tv[1].tv_usec = 0;
-    if (lutimes(filename.c_str(), tv)) {
-        SCREENERR(log("error: unable to set utime on " + filename + " - " + strerror(errno)));
+    struct timespec tv[2];
+    tv[0].tv_sec  = statData.st_atimespec.tv_sec;
+    tv[0].tv_nsec  = statData.st_atimespec.tv_nsec;
+    tv[1].tv_sec  = statData.st_mtimespec.tv_sec;
+    tv[1].tv_nsec  = statData.st_mtimespec.tv_nsec;
+
+    if (utimensat(0, filename.c_str(), tv, 0)) {
+        SCREENERR(log("error: unable to set time on " + filename + " - " + strerror(errno)));
         if (exitOnError)
             exit(1);
     }
@@ -1083,7 +1086,7 @@ string ue(string file) {
 
 bool exists(const std::string& name) {
     struct stat statBuffer;
-    return (mystat(name, &statBuffer) == 0);
+    return (mylstat(name, &statBuffer) == 0);
 }
 
 
@@ -1678,4 +1681,13 @@ bool statusMessage::remove() {
     }
     
     return shown;
+}
+
+
+bool statModeOwnerTimeEqual(struct stat a, struct stat b) {
+    return (a.st_mode == b.st_mode &&
+            a.st_uid == b.st_uid &&
+            a.st_gid == b.st_gid &&
+            a.st_mtimespec.tv_sec == b.st_mtimespec.tv_sec &&
+            a.st_mtimespec.tv_nsec == b.st_mtimespec.tv_nsec);
 }

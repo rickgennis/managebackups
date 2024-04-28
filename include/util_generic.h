@@ -293,5 +293,7 @@ public:
     bool remove();
 };
 
+bool statModeOwnerTimeEqual(struct stat a, struct stat b);
+
 #endif
 

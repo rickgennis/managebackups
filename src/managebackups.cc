@@ -1812,67 +1812,120 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
 }
 
 
-struct replicateDataType {
-    string newBaseDir;
-    long symlinkCount;
-    long dirCount;
-    long fileCount;
-};
-
-
-bool replicateCallback(pdCallbackData &file) {
-    replicateDataType *data = (replicateDataType*)file.dataPtr;
+bool replicateCallback1(pdCallbackData &file) {
+    string *dataDir = (string*)file.dataPtr;
     string newFilename = file.filename;
     newFilename.replace(0, file.topLevelDir.length(), "");
-    newFilename = slashConcat(data->newBaseDir, newFilename);
+    newFilename = slashConcat(*dataDir, newFilename);
+    struct stat targetStat;
     
-    if (S_ISDIR(file.statData.st_mode)) {
-        ++data->dirCount;
-        if (mkdirp(newFilename, file.statData.st_mode)) {
-            log("error: creating directory " + newFilename + errtext());
-            SCREENERR("error: unable to create directory " + newFilename + errtext());
-            exit(1);
-        }
-        setFilePerms(newFilename, file.statData);
+    auto targetExists = !mylstat(newFilename.c_str(), &targetStat);
 
-    }
-    else {
-        // make the containing directory
-        auto ps = pathSplit(newFilename);
-        if (mkdirp(ps.dir)) {
-            log("error: creating directory " + ps.dir + errtext());
-            SCREENERR("error: unable to create directory " + ps.dir + errtext());
-            exit(1);
-        }
-        
-        if (S_ISLNK(file.statData.st_mode)) {
-            ++data->symlinkCount;
-            auto linkTarget = readlink(file.filename);
-            if (symlink(linkTarget.c_str(), newFilename.c_str())) {
-                log("error: creating symlink " + newFilename + " -> " + linkTarget + errtext());
-                SCREENERR("error: unable to create symlink " + newFilename + " -> " + linkTarget + errtext());
+    if (S_ISDIR(file.statData.st_mode)) {
+        if (!targetExists || !statModeOwnerTimeEqual(targetStat, file.statData)) {
+            if (mkdirp(newFilename, file.statData.st_mode)) {
+                log("error: creating directory " + newFilename + errtext());
+                SCREENERR("error: unable to create directory " + newFilename + errtext());
                 exit(1);
             }
             setFilePerms(newFilename, file.statData);
-
         }
-        else {
-            ++data->fileCount;
-            if (link(file.filename.c_str(), newFilename.c_str())) {
-                log("error: creating link " + newFilename + " to " + file.filename + errtext());
-                SCREENERR("error: unable to create link " + newFilename + " to " + file.filename + errtext());
-                exit(1);
-            }
-            // owner/mode/time don't need to be set on hardlinks because they share them with the original file
-        }
+    }
+    else {
+        auto ps = pathSplit(newFilename);
         
+        if (S_ISLNK(file.statData.st_mode)) {
+            auto sourceTarget = readlink(file.filename);
+            auto targetTarget = readlink(newFilename);
+            
+            if (!targetExists || sourceTarget != targetTarget || file.statData.st_uid != targetStat.st_uid || file.statData.st_gid != targetStat.st_gid) {
+                if (targetExists) {
+                    if (unlink(newFilename.c_str())) {
+                        log("error: unable to delete " + newFilename + " in prep to recreate it" + errtext());
+                        SCREENERR("error: unable to delete " + newFilename + " in prep to recreate it" + errtext());
+                        exit(1);
+                    }
+                }
+                else {
+                    if (!exists(ps.dir))
+                        if (mkdirp(ps.dir)) {  // make the containing directory
+                            log("error: creating directory " + ps.dir + errtext());
+                            SCREENERR("error: unable to create directory " + ps.dir + errtext());
+                            exit(1);
+                        }
+                }
+                
+                if (symlink(sourceTarget.c_str(), newFilename.c_str())) {
+                    log("error: creating symlink " + newFilename + " -> " + sourceTarget + errtext());
+                    SCREENERR("error: unable to create symlink " + newFilename + " -> " + sourceTarget + errtext());
+                    exit(1);
+                }
+                setFilePerms(newFilename, file.statData);
+            }
+            
+        }
+        else
+            if (!targetExists || file.statData.st_ino != targetStat.st_ino) {
+                if (targetExists)
+                    if (unlink(newFilename.c_str())) {
+                        log("error: unable to delete " + newFilename + " in prep to recreate it" + errtext());
+                        SCREENERR("error: unable to delete " + newFilename + " in prep to recreate it" + errtext());
+                        exit(1);
+                    }
+                                
+                if (link(file.filename.c_str(), newFilename.c_str())) {
+                    log("error: creating link " + newFilename + " to " + file.filename + errtext());
+                    SCREENERR("error: unable to create link " + newFilename + " to " + file.filename + errtext());
+                    exit(1);
+                }
+                // owner/mode/time don't need to be set on hardlinks because they share them with the original file
+            }
     }
     
-
     return true;
 }
 
 
+bool replicateCallback2(pdCallbackData &file) {
+    string *dataDir = (string*)file.dataPtr;
+    string sourceFilename = file.filename;
+    sourceFilename.replace(0, file.topLevelDir.length(), "");
+    sourceFilename = slashConcat(*dataDir, sourceFilename);
+
+    if (!exists(sourceFilename)) {
+        if (S_ISDIR(file.statData.st_mode)) {
+            if (rmdir(file.filename.c_str())) {
+                log("error: unable to remove directory for replication " + file.filename + errtext());
+                SCREENERR("error: unable to remove directory " + file.filename + errtext());
+                exit(1);
+            }
+        }
+        else
+            if (unlink(file.filename.c_str())) {
+                log("error: unable to remove for replication " + file.filename + errtext());
+                SCREENERR("error: unable to remove " + file.filename + errtext());
+                exit(1);
+            }
+    }
+    
+    return true;
+}
+
+
+/*
+ Replication is straight-forward by walking through a file tree and making hardlinks to
+ it under the traget directory. The goal here is to do so with minimal disk changes, as
+ we're assuming the target directory is monitored by a cloud-syncing daemon.  So deleting
+ a file or directory there just to recreate could trigger a re-sync.  To do that at scale
+ could lead to constant updates for the cloud process.  Instead we take as much care as
+ possible to compare the target to determine if it already has the current entry, which
+ wouldn't need to be updated.  This requires two passes:
+
+ (1) Walking through the source directory tree and making adds/changes to the target.
+ 
+ (2) Walking through the target directory tree and removing things that aren't in the source.
+
+ */
 void replicateBackup(BackupConfig &config, string newBaseDir) {
     if (!config.isFaub()) {
         log("error: replication aborted due to backup not being faub-style");
@@ -1907,26 +1960,25 @@ void replicateBackup(BackupConfig &config, string newBaseDir) {
     }
     
     // paranoia check to make sure the user isn't confused by symlinks and
-    // we're about to wipe out the source copy of their backups.
+    // we're about to corrupt the source copy of their backups.
     if (isSameDirectory(origBaseDir, newBaseDir)) {
         log("error: replication aborted due to source and target directories being the same");
         SCREENERR("error: replication source and target directories are the same");
         exit(1);
     }
     
-    statusMessage screenMessage(config.ifTitle() + " cleaning out " + newBaseDir);
+    statusMessage screenMessage(config.ifTitle() + " replicating " + lastBackupDir + " to " + newBaseDir);
     NOTQUIET && ANIMATE && screenMessage.show();
     
     timer replicateTimer;
     replicateTimer.start();
-
-    rmrf(newBaseDir, false);
-    NOTQUIET && ANIMATE && screenMessage.show(config.ifTitle() + " replicating " + lastBackupDir + " to " + newBaseDir);
     
-    replicateDataType data;
-    data.newBaseDir = newBaseDir;
-    data.dirCount = data.fileCount = data.symlinkCount = 0;
-    processDirectory(lastBackupDir, "", false, false, replicateCallback, &data);
+    /* Pass 1 - walk source to add/update to target */
+    processDirectory(lastBackupDir, "", false, false, replicateCallback1, &newBaseDir);
+
+    /* Pass 2 - walk target to delete what's no longer in source */
+    processDirectory(newBaseDir, "", false, false, replicateCallback2, &lastBackupDir);
+
     replicateTimer.stop();
     
     NOTQUIET && ANIMATE && screenMessage.remove();
