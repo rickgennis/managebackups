@@ -1083,17 +1083,15 @@ methodStatus sCpBackup(BackupConfig &config, string backupFilename, string subDi
         return methodStatus(false, "\t• SCP: unable to locate 'scp' binary in the PATH");
     }
     
-    string screenMessage = config.ifTitle() + " SCPing to " + sCpParams + "... ";
-    string backspaces = string(screenMessage.length(), '\b');
-    string blankspaces = string(screenMessage.length(), ' ');
-    NOTQUIET &&ANIMATE &&cout << screenMessage << flush;
+    statusMessage screenMessage(config.ifTitle() + " SCPing to " + sCpParams + "... ");
+    NOTQUIET && ANIMATE && screenMessage.show();
     
     // execute the scp
     sCpTime.start();
     int result = system(string(sCpBinary + " " + backupFilename + " " + sCpParams).c_str());
     
     sCpTime.stop();
-    NOTQUIET &&ANIMATE &&cout << backspaces << blankspaces << backspaces << flush;
+    NOTQUIET && ANIMATE && screenMessage.remove();
     
     if (result == -1 || result == 127)
         return methodStatus(
@@ -1139,10 +1137,9 @@ methodStatus sFtpBackup(BackupConfig &config, string backupFilename, string subD
                             errorcom(config.ifTitle(),
                                      "SFTP skipped (unable to locate 'sftp' binary in the PATH)"));
     
-    string screenMessage = config.ifTitle() + " SFTPing via " + sFtpParams + "... ";
-    string backspaces = string(screenMessage.length(), '\b');
-    string blankspaces = string(screenMessage.length(), ' ');
-    NOTQUIET &&ANIMATE &&cout << screenMessage << flush;
+    statusMessage screenMessage(config.ifTitle() + " SFTPing via " + sFtpParams + "... ");
+    NOTQUIET && ANIMATE && screenMessage.show();
+
     DEBUG(D_transfer)
     {
         cout << "\n";
@@ -1189,7 +1186,7 @@ methodStatus sFtpBackup(BackupConfig &config, string backupFilename, string subD
             auto availSpace = approx2bytes(freeSpace + "K");
             
             if (availSpace < requiredSpace) {
-                NOTQUIET &&ANIMATE &&cout << backspaces << blankspaces << backspaces << flush;
+                NOTQUIET && ANIMATE && screenMessage.remove();
                 return methodStatus(
                                     false, errorcom(config.ifTitle(),
                                                     " SFTP aborted due to insufficient disk space (" +
@@ -1202,7 +1199,7 @@ methodStatus sFtpBackup(BackupConfig &config, string backupFilename, string subD
                      << approximate(requiredSpace) << ")");
         }
         else {
-            NOTQUIET &&ANIMATE &&cout << backspaces << blankspaces << backspaces << flush;
+            NOTQUIET && ANIMATE && screenMessage.remove();
             return methodStatus(
                                 false,
                                 errorcom(config.ifTitle(),
@@ -1224,7 +1221,7 @@ methodStatus sFtpBackup(BackupConfig &config, string backupFilename, string subD
     DEBUG(D_transfer) DFMT("SFTP readAndMatch returned " << success);
     sFtp.closeAll();
     sFtpTime.stop();
-    NOTQUIET &&ANIMATE &&cout << backspaces << blankspaces << backspaces << flush;
+    NOTQUIET && ANIMATE && screenMessage.remove();
     
     if (success) {
         string message = "SFTP completed for " + backupFilename + " in " + sFtpTime.elapsed();
@@ -1334,11 +1331,8 @@ void performBackup(BackupConfig &config) {
     mkdirp(fullDirectory);
     
     log(config.ifTitle() + " starting backup to " + backupFilename);
-    string screenMessage =
-    config.ifTitle() + " backing up to temp file " + backupFilename + tempExtension + "... ";
-    string backspaces = string(screenMessage.length(), '\b');
-    string blankspaces = string(screenMessage.length(), ' ');
-    NOTQUIET &&ANIMATE &&cout << screenMessage << flush;
+    statusMessage screenMessage(config.ifTitle() + " backing up to temp file " + backupFilename + tempExtension + "... ");
+    NOTQUIET && ANIMATE && screenMessage.show();
     
     // note start time
     timer backupTime;
@@ -1353,7 +1347,7 @@ void performBackup(BackupConfig &config) {
     
     // note finish time
     backupTime.stop();
-    NOTQUIET &&ANIMATE &&cout << backspaces << blankspaces << backspaces << flush;
+    NOTQUIET && ANIMATE && screenMessage.remove();
     
     // determine results
     struct stat statData;
@@ -1920,10 +1914,14 @@ void replicateBackup(BackupConfig &config, string newBaseDir) {
         exit(1);
     }
     
-    rmrf(newBaseDir, false);
-
+    statusMessage screenMessage(config.ifTitle() + " cleaning out " + newBaseDir);
+    NOTQUIET && ANIMATE && screenMessage.show();
+    
     timer replicateTimer;
     replicateTimer.start();
+
+    rmrf(newBaseDir, false);
+    NOTQUIET && ANIMATE && screenMessage.show(config.ifTitle() + " replicating " + lastBackupDir + " to " + newBaseDir);
     
     replicateDataType data;
     data.newBaseDir = newBaseDir;
@@ -1931,8 +1929,8 @@ void replicateBackup(BackupConfig &config, string newBaseDir) {
     processDirectory(lastBackupDir, "", false, false, replicateCallback, &data);
     replicateTimer.stop();
     
+    NOTQUIET && ANIMATE && screenMessage.remove();
     string message = "replication completed to " + newBaseDir + " in " + replicateTimer.elapsed();
-    
     NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message << endl;
     log(message);
 }
@@ -1993,7 +1991,7 @@ bool getGlobalStats(unsigned long& stats, unsigned long& md5s, string& elapsedTi
 int main(int argc, char *argv[]) {
     timer AppTimer;
     AppTimer.start();
-              
+    
     signal(SIGTERM, sigTermHandler);
     signal(SIGINT, sigTermHandler);
     

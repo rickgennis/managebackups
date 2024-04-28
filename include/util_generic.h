@@ -283,5 +283,15 @@ bool isSameFileSystem(string dirEntry1, string dirEntry2);
 
 bool isSameDirectory(string dirEntry1, string dirEntry2);
 
+class statusMessage {
+    string lastMessage;
+    bool shown;
+public:
+    statusMessage(string text) { lastMessage = text; shown = false; }
+    ~statusMessage() { remove(); }
+    bool show(string text = "");
+    bool remove();
+};
+
 #endif
 

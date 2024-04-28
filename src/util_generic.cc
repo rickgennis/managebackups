@@ -1650,3 +1650,32 @@ bool isSameDirectory(string dirEntry1, string dirEntry2) {
     
     return result;
 }
+
+
+
+bool statusMessage::show(string newMessage) {
+    auto ll = lastMessage.length();
+    auto nl = newMessage.length();
+    
+    cout << (shown ? string(lastMessage.length(), '\b') : "") << (newMessage.length() ? newMessage : lastMessage);
+    
+    if (shown && nl && ll && nl < ll)
+        cout << string(ll - nl, ' ') << string(ll - nl, '\b');
+    
+    cout << flush;
+    
+    if (nl)
+        lastMessage = newMessage;
+    
+    shown = true;
+    return true;
+}
+
+bool statusMessage::remove() {
+    if (shown) {
+        string bs = string(lastMessage.length(), '\b');
+        cout << bs << string(lastMessage.length(), ' ') << bs << flush;
+    }
+    
+    return shown;
+}
