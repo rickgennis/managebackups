@@ -562,7 +562,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             if (fcacheCurrent->second.ds.sizeInBytes > target) {
                 string message = config.ifTitle() + " warning: backup is larger than the bloat threshold -\n" + detail + "\tbackup: " + approximate(fcacheCurrent->second.ds.sizeInBytes);
                 log(message);
-                SCREENERR(message)
+                SCREENERR(message);
                 message += maxLinkMsg;
                 notify(config, "\t• " + message, false);
                 return;

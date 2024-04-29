@@ -160,7 +160,7 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
     myMapIT prevBackup = backups.end();
     unsigned int recached = 0;
     bool nextOneToo = false;
-    auto [message, noMessage] = clearMessage("recalculating disk usage... ");
+    statusMessage message("recalculating disk usage... ");
     timer recacheTimer;
     
     recacheTimer.start();
@@ -192,7 +192,7 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
                 prevBackup->second.loadInodes();
             
             if (!recached)
-                NOTQUIET && ANIMATE && cout << message << flush;
+                NOTQUIET && ANIMATE && message.show();
             
             DEBUG(D_recalc) DFMT("\tcalling dus(); " << forceAll << "," << (targetDir == aBackup->first) << ","
                                  << (!targetDir.length() && ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))
@@ -217,8 +217,7 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             aBackup->second.saveInodes();
             
             if (forceAll && NOTQUIET) {
-                if (ANIMATE)
-                    cout << noMessage;
+                ANIMATE && message.remove();
                 
                 cout << BOLDBLUE << aBackup->first << "  " << RESET << "size: " << approximate(ds.getSize() + ds.getSaved()) << ", used: " << approximate(ds.getSize()) <<
                 ", dirs: " << approximate(ds.dirs) << ", links: " << approximate(ds.symLinks) << ", mods: " << approximate(ds.mods) << endl;
@@ -245,7 +244,7 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
     }
     
     if (recached)
-        NOTQUIET && ANIMATE && !forceAll && cout << noMessage << flush;
+        NOTQUIET && ANIMATE && !forceAll && message.remove();
     
     if (forceAll && NOTQUIET)
         cout << "caches updated for " << plural(recached, "backup") << "." << endl;

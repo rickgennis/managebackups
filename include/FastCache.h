@@ -44,6 +44,9 @@ public:
     
     // return cache from disk
     string get();
+    
+    // remove the cache so the next run regenerates it from scratch
+    void invalidate();
 };
 
 

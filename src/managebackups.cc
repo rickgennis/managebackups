@@ -653,11 +653,11 @@ void pruneFaubBackups(BackupConfig &config) {
             ++cacheEntryIt;
         }
         else {
-            auto [message, noMessage] = clearMessage("removing " + cacheEntryIt->first + "...");
-            NOTQUIET && ANIMATE && cout << message << flush;
+            statusMessage message("removing " + cacheEntryIt->first + "...");
+            NOTQUIET && ANIMATE && message.show();
             
             if (rmrf(cacheEntryIt->second.getDir())) {
-                NOTQUIET && ANIMATE && cout << noMessage << flush;
+                NOTQUIET && ANIMATE && message.remove();
                 
                 NOTQUIET && cout << "\t• " << config.ifTitle() << " removed " << cacheEntryIt->second.getDir() << deleteReason << endl;
                 log(config.ifTitle() + " removed " + cacheEntryIt->second.getDir() +
@@ -666,7 +666,7 @@ void pruneFaubBackups(BackupConfig &config) {
                 ++backupsPruned;
             }
             else {
-                NOTQUIET && ANIMATE && cout << noMessage << flush;
+                NOTQUIET && ANIMATE && message.remove();
                 
                 log(config.ifTitle() + " unable to remove" + deleteReason + cacheEntryIt->second.getDir() + errtext());
                 SCREENERR(string("unable to remove") + deleteReason + cacheEntryIt->second.getDir() + errtext());
@@ -2150,6 +2150,8 @@ int main(int argc, char *argv[]) {
         CLI_FILTERDIRS, "Filter directories", cxxopts::value<bool>()->default_value("false"))(
         CLI_ARCHIVE, "Archive profile", cxxopts::value<bool>()->default_value("false"))(
         CLI_REPLICATETO, "Replicate To", cxxopts::value<std::string>())(
+        CLI_RMN, "Remove newest backups", cxxopts::value<int>())(
+        CLI_RMO, "Remove oldest backups", cxxopts::value<int>())(
         CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
     
     try {
@@ -2240,7 +2242,7 @@ int main(int argc, char *argv[]) {
     }
     
     if ((GLOBALS.cli.count(CLI_SCHEDHOUR) || GLOBALS.cli.count(CLI_SCHEDMIN) || GLOBALS.cli.count(CLI_SCHEDPATH)) && !GLOBALS.cli.count(CLI_SCHED)) {
-        SCREENERR("error: --schedhour, --schedmin and --schedpath all require --sched")
+        SCREENERR("error: --schedhour, --schedmin and --schedpath all require --sched");
         exit(1);
     }
     
@@ -2287,7 +2289,7 @@ int main(int argc, char *argv[]) {
     DEBUG(D_any) DFMT("about to setup config...");
     ConfigManager configManager;
     auto currentConfig = selectOrSetupConfig(configManager, GLOBALS.cli.count(CLI_GO) || GLOBALS.cli.count(CLI_COMPARE) || GLOBALS.cli.count(CLI_COMPAREFILTER)|| GLOBALS.cli.count(CLI_LAST) || GLOBALS.cli.count(CLI_RECALC) || GLOBALS.cli.count(CLI_RELOCATE));
-        
+         
     if (currentConfig->modified)
         currentConfig->saveConfig();
     
@@ -2302,7 +2304,74 @@ int main(int argc, char *argv[]) {
     }
     
     if (haveProfile(&configManager) && GLOBALS.cli.count(CLI_ARCHIVE)) {
+        currentConfig->settings[sArchive].value = "1";
+        currentConfig->saveConfig();
         cout << "profile " << currentConfig->settings[sTitle].value << " has been archived." << endl;
+
+        FastCache fc;
+        fc.invalidate();
+        exit(0);
+    }
+
+    if (GLOBALS.cli.count(CLI_RMN) || GLOBALS.cli.count(CLI_RMO)) {
+        if (GLOBALS.cli.count(CLI_RMN) && GLOBALS.cli.count(CLI_RMO)) {
+            SCREENERR("error: --" << CLI_RMN << " and --" << CLI_RMO << " are mutuall-exclusive");
+            exit(1);
+        }
+        
+        string option = GLOBALS.cli.count(CLI_RMN) ? CLI_RMN : CLI_RMO;
+        
+        if (!haveProfile(&configManager))
+            SCREENERR("error: --" << option << " requires a profile (use -p)");
+        else
+            if (!GLOBALS.cli.count(CLI_FORCE))
+                SCREENERR("error: --" << option << " requires --" << CLI_FORCE << " to remove backups");
+            else {
+                try {
+                    int target = GLOBALS.cli[option].as<int>();
+                    
+                    if (currentConfig->isFaub()) {
+                        scanConfigToCache(*currentConfig);
+                        int removed = 0;
+                        
+                        if (currentConfig->fcache.size()) {
+                            auto it = option == CLI_RMN ? currentConfig->fcache.getLastBackup() : currentConfig->fcache.getFirstBackup();
+                            auto finalBackup = option == CLI_RMN ? currentConfig->fcache.getFirstBackup() : currentConfig->fcache.getEnd();
+                            
+                            while (it != finalBackup && removed < target) {
+                                statusMessage message("removing " + it->first);
+                                NOTQUIET && ANIMATE && message.show();
+                                
+                               if (rmrf(it->second.getDir())) {
+                                    NOTQUIET && ANIMATE && message.remove();
+                                    NOTQUIET && cout << "\t• " << currentConfig->ifTitle() << " removed " << it->first << endl;
+                                    log(currentConfig->ifTitle() + " removed " + it->second.getDir() + " via --" + option);
+                                }
+                                else {
+                                    NOTQUIET && ANIMATE && message.remove();
+                                    log(currentConfig->ifTitle() + " unable to remove (via --" + option + ") " + it->second.getDir() + errtext());
+                                    SCREENERR(string("unable to remove ") + it->second.getDir() + errtext());
+                                }
+                                
+                                auto deadBackupIt = option == CLI_RMN ? it-- : it++;
+                                currentConfig->fcache.removeBackup(deadBackupIt);
+                                ++removed;
+                            }
+                        }
+
+                        cout << plural(removed, "backup") << " removed" << endl;
+                        
+                        FastCache fc;
+                        fc.invalidate();
+                    }
+                    else
+                        SCREENERR("error: --" << option << " is currently only supported for faub-style backups");
+                    
+                }
+                catch (...) {
+                    SCREENERR("error: --" << option << " needs to be a number (how many backups to delete)");
+                }
+            }
         exit(0);
     }
     

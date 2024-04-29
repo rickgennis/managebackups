@@ -154,3 +154,8 @@ void FastCache::commit() {
             log("error: unable to write to " + fastCacheFilename(FC_TEXT));
     }
 }
+
+
+void FastCache::invalidate() {
+    unlink(fastCacheFilename(FC_TEXT).c_str());
+}

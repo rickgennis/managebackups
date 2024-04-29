@@ -1553,15 +1553,6 @@ string errtext(bool format) {
 }
 
 
-tuple<string, string> clearMessage(string message) {
-    auto len = message.length();
-    string bs = string(len, '\b');
-    string sp = string(len, ' ');
-    
-    return {message, bs + sp + bs};
-}
-
-
 // replace carriage-returns with commas
 string commafy(string data) {
     if (data.back() == '\n')
@@ -1678,7 +1669,7 @@ bool statusMessage::show(string newMessage) {
         lastMessage = newMessage;
     
     shown = true;
-    return true;
+    return shown;
 }
 
 bool statusMessage::remove() {
@@ -1687,6 +1678,7 @@ bool statusMessage::remove() {
         cout << bs << string(lastMessage.length(), ' ') << bs << flush;
     }
     
+    shown = false;
     return shown;
 }
 

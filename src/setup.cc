@@ -336,7 +336,7 @@ void scheduleLaunchCtl(string& appPath) {
                 cout << "use \"launchctl disable gui/" << uid << "/com.local.managebackups\" to disable." << endl;
             }
             else {
-                SCREENERR("error enabling service. Try \"" << command << "\"")
+                SCREENERR("error enabling service. Try \"" << command << "\"");
                 exit(1);
             }
         }
@@ -346,7 +346,7 @@ void scheduleLaunchCtl(string& appPath) {
         }
     }
     else {
-        SCREENERR("error: unable to write to " << plistPath)
+        SCREENERR("error: unable to write to " << plistPath);
         exit(1);
     }
 }

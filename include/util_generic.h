@@ -267,8 +267,6 @@ int mystat(string filename, struct stat *buf);
 
 string errtext(bool format = true);
 
-tuple<string, string> clearMessage(string message);
-
 unsigned int ansistrlength(string source);
 
 string commafy(string data);
@@ -287,8 +285,7 @@ class statusMessage {
     string lastMessage;
     bool shown;
 public:
-    statusMessage(string text) { lastMessage = text; shown = false; }
-    ~statusMessage() { remove(); }
+    statusMessage(string text = "") { lastMessage = text; shown = false; }
     bool show(string text = "");
     bool remove();
 };

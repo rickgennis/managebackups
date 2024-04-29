@@ -122,7 +122,7 @@ void BackupConfig::saveConfig() {
         }
     }
 
-    NOTQUIET && cout << "\t• saving profile " << settings[sTitle].value << " (" << config_filename << ")" << endl;
+    GLOBALS.cli.count(CLI_SAVE) && NOTQUIET && cout << "\t• saving profile " << settings[sTitle].value << " (" << config_filename << ")" << endl;
     
     if (GLOBALS.cli.count(CLI_RECREATE))
         unlink(config_filename.c_str());
@@ -171,6 +171,7 @@ void BackupConfig::saveConfig() {
                            
                             directive = setting.regex.get_match(0);
                             usersDelimiter = setting.regex.get_match(1);
+                            if (!usersDelimiter.length()) usersDelimiter = "\t";
                             value = setting.regex.get_match(2);
                             comment = setting.regex.matches() > 3 ? " " + setting.regex.get_match(3) : "";
                             

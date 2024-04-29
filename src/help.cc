@@ -514,8 +514,6 @@ appreciable additional storage) of the most recent backup of the
 specified (\f[B]-p\f[R]) profile to the \f[I]targetDir\f[R].
 The copy is placed directly in \f[I]targetDir\f[R] with no year, month
 or day subdirectories.
-The entire contents of \f[I]targetDir\f[R] are deleted before the copy
-begins.
 This is useful for when you want to store a copy of your faub-style
 backup in a cloud syncing service (Apple\[cq]s iCloud Drive,
 Microsoft\[cq]s OneDrive, etc).
@@ -530,6 +528,20 @@ directory, resulting in a larger cloud bill because the provider would
 ignore the hardlinks and see each copy as additional storage.
 The copy of the backup in \f[I]targetDir\f[R] is not tracked and
 doesn\[cq]t not appear in \f[B]-1\f[R] output.
+.TP
+\f[B]\[en]rmo\f[R] [\f[I]num\f[R]]
+{FB} Remove the \f[I]num\f[R] oldest backups from the specified profile
+(\f[B]-p\f[R]).
+This can also be done manually from the commandline via \[lq]rm -rf\[rq]
+and caches would be updated automatically on the next run.
+This is purely a convenience function.
+.TP
+\f[B]\[en]rmn\f[R] [\f[I]num\f[R]]
+{FB} Remove the \f[I]num\f[R] newest (most recent) backups from the
+specified profile (\f[B]-p\f[R]).
+This can also be done manually from the commandline via \[lq]rm -rf\[rq]
+and caches would be updated automatically on the next run.
+This is purely a convenience function.
 .TP
 \f[B]\[en]sched\f[R] [\f[I]hours\f[R]]
 Schedule (via LaunchCtl on MacOS or cron on Linux)
