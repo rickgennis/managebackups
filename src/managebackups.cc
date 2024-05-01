@@ -656,6 +656,7 @@ void pruneFaubBackups(BackupConfig &config) {
             statusMessage message("removing " + cacheEntryIt->first + "...");
             NOTQUIET && ANIMATE && message.show();
             
+            // remove the backup itself
             if (rmrf(cacheEntryIt->second.getDir())) {
                 NOTQUIET && ANIMATE && message.remove();
                 
@@ -673,7 +674,13 @@ void pruneFaubBackups(BackupConfig &config) {
             }
             
             auto deadBackupIt = cacheEntryIt++;
+            auto savedMtime = filename2Mtime(deadBackupIt->first);
+            
+            // remove the backup's cache files
             config.fcache.removeBackup(deadBackupIt);
+            
+            // recalculate the disk usage (dus) for the subsequent backup
+            config.fcache.recache("", savedMtime, false);
         }
     }
     

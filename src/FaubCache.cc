@@ -201,15 +201,11 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             set<ino_t> emptySet;
             aBackup->second.unloadInodes();
             auto ds = dus(aBackup->first, gotPrev ? prevBackup->second.inodes : emptySet, aBackup->second.inodes);
-            DEBUG(D_any) DFMT("\tdus(" << aBackup->first << ") returned " << ds.sizeInBytes + ds.savedInBytes << " size bytes, " << ds.sizeInBytes << " used bytes");
-            
-            // TEMP
-            log("debug: DUS(" + aBackup->first + ") " + to_string(forceAll) + string(",") + to_string(targetDir == aBackup->first) + ","
-            + to_string(!targetDir.length() && ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))
-                + "," + to_string(nextOneToo) + "; T:" + to_string(ds.sizeInBytes + ds.savedInBytes) + ", Svd:" + to_string(ds.savedInBytes) + ", " +
-                (gotPrev ? prevBackup->first + " inodes loaded" : "none"));
-            // TEMP
-            
+            DEBUG(D_any) DFMT("\tdus(" << aBackup->first << ") returned " << ds.sizeInBytes + ds.savedInBytes << " size bytes, " << ds.sizeInBytes << " used bytes (" <<
+                              to_string(forceAll) + string(",") + to_string(targetDir == aBackup->first) + ","
+                              + to_string(!targetDir.length() && ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))
+                                  + "," + to_string(nextOneToo));
+                        
             aBackup->second.ds = ds;
             aBackup->second.updated = true;
             aBackup->second.dirs = ds.dirs;
@@ -533,14 +529,10 @@ bool fcCleanupCallback(pdCallbackData &file) {
                 
                 auto bdir = pathSplit(parentDir).dir;
                 if (profileName == fc->coreProfile && bdir == fc->baseDir) {
-                    log(backupDir + " has vanished, updating cache (" + file.filename + ")");
-                    DEBUG(D_any) DFMT(backupDir << " no longer exists; will recalculate usage of subsequent backup");
-                    unlink(file.filename.c_str());
-                    file.filename.replace(file.filename.find(SUFFIX_FAUBSTATS), string(SUFFIX_FAUBSTATS).length(), SUFFIX_FAUBINODES);
-                    unlink(file.filename.c_str());
-                    file.filename.replace(file.filename.find(SUFFIX_FAUBINODES), string(SUFFIX_FAUBINODES).length(), SUFFIX_FAUBDIFF);
-                    unlink(file.filename.c_str());
-                    
+                    FaubEntry entry(backupDir, fc->coreProfile, fc->uuid);
+                    entry.removeEntry();
+                    log(backupDir + " has vanished, updating cache");
+
                     // re-dus the next backup
                     fc->recache("", targetMtime);
                 }

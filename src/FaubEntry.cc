@@ -181,18 +181,17 @@ void FaubEntry::loadInodes() {
 
 void FaubEntry::removeEntry() {
     int result = 0;
-    if ((result = unlink(cacheFilename(SUFFIX_FAUBSTATS).c_str()))) {
-        log("note: " + cacheFilename(SUFFIX_FAUBSTATS) + " didn't exist for deletion");
+    if ((result = unlink(cacheFilename(SUFFIX_FAUBSTATS).c_str())))
         DEBUG(D_prune) DFMT("no cache to delete - " << cacheFilename(SUFFIX_FAUBSTATS));
-    }
     
     if (unlink(cacheFilename(SUFFIX_FAUBINODES).c_str()))
         DEBUG(D_prune) DFMT("no cache to delete - " << cacheFilename(SUFFIX_FAUBINODES));
     
     if (unlink(cacheFilename(SUFFIX_FAUBDIFF).c_str()))
         DEBUG(D_prune) DFMT("no cache to delete - " << cacheFilename(SUFFIX_FAUBDIFF));
-
+    
     DEBUG(D_prune) DFMT("cache files deleted - " << cacheFilename(SUFFIX_FAUBSTATS) << " for " << directory << " (result " << result << ")");
+    updated = false;  // otherwise the destructor recreates these files
 }
 
 
