@@ -180,7 +180,7 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             
             // if we have no cached data for this backup or its the next sequential backup
             // after the time of a deleted one
-            (!targetDir.length() && ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch)) ||
+            (!targetDir.length() && ((!aBackup->second.ds.usedInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch)) ||
             
             // in the case of walking through all the backups and doing just the ones that are missing stats
             // (the immediately above condition of this "if") then we also have to re-do the next backup too
@@ -195,15 +195,15 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
                 NOTQUIET && ANIMATE && message.show();
             
             DEBUG(D_recalc) DFMT("\tcalling dus(); " << forceAll << "," << (targetDir == aBackup->first) << ","
-                                 << (!targetDir.length() && ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))
+                                 << (!targetDir.length() && ((!aBackup->second.ds.usedInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))
                                  << "," << nextOneToo);
             ++recached;
             set<ino_t> emptySet;
             aBackup->second.unloadInodes();
             auto ds = dus(aBackup->first, gotPrev ? prevBackup->second.inodes : emptySet, aBackup->second.inodes);
-            DEBUG(D_any) DFMT("\tdus(" << aBackup->first << ") returned " << ds.sizeInBytes + ds.savedInBytes << " size bytes, " << ds.sizeInBytes << " used bytes (" <<
+            DEBUG(D_any) DFMT("\tdus(" << aBackup->first << ") returned " << ds.usedInBytes + ds.savedInBytes << " size bytes, " << ds.usedInBytes << " used bytes (" <<
                               to_string(forceAll) + string(",") + to_string(targetDir == aBackup->first) + ","
-                              + to_string(!targetDir.length() && ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))
+                              + to_string(!targetDir.length() && ((!aBackup->second.ds.usedInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))
                                   + "," + to_string(nextOneToo));
                         
             aBackup->second.ds = ds;

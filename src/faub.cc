@@ -559,8 +559,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         if (config.settings[sBloat].value.length()) {
             string bloat = config.settings[sBloat].value;
             auto [target, average, detail] = config.getBloatTarget();
-            if (fcacheCurrent->second.ds.sizeInBytes > target) {
-                string message = config.ifTitle() + " warning: backup is larger than the bloat threshold -\n" + detail + "\tbackup: " + approximate(fcacheCurrent->second.ds.sizeInBytes);
+            if (fcacheCurrent->second.ds.usedInBytes > target) {
+                string message = config.ifTitle() + " warning: backup is larger than the bloat threshold -\n" + detail + "\tbackup: " + approximate(fcacheCurrent->second.ds.usedInBytes);
                 log(message);
                 SCREENERR(message);
                 message += maxLinkMsg;

@@ -1004,8 +1004,8 @@ bool dsCallback(pdCallbackData &file) {
         else {
             if (data->seenI->find(file.statData.st_ino) == data->seenI->end() &&
                 data->newI->find(file.statData.st_ino) == data->newI->end()) {
-                data->ds->sizeInBytes += file.statData.st_size;
-                data->ds->sizeInBlocks += 512 * file.statData.st_blocks;
+                data->ds->usedInBytes += file.statData.st_size;
+                data->ds->usedInBlocks += 512 * file.statData.st_blocks;
                 ++data->ds->mods;
             }
             else {

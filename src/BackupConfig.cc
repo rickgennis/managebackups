@@ -583,11 +583,11 @@ size_t BackupConfig::getRecentAvgSize(int maxBackups) {
             while (--backupIt != fcache.getFirstBackup() && counted < maxBackups) {
                 
                 // check for overflow
-                if (runningTotal > SIZE_MAX - backupIt->second.ds.sizeInBytes)
+                if (runningTotal > SIZE_MAX - backupIt->second.ds.usedInBytes)
                     break;
                 
                 ++counted;
-                runningTotal += backupIt->second.ds.sizeInBytes;
+                runningTotal += backupIt->second.ds.usedInBytes;
             }
     }
 

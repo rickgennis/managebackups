@@ -17,8 +17,8 @@
 using namespace std;
 
 struct DiskStats {
-    size_t sizeInBytes;
-    size_t sizeInBlocks;
+    size_t usedInBytes;
+    size_t usedInBlocks;
     size_t savedInBytes;
     size_t savedInBlocks;
     
@@ -28,8 +28,8 @@ struct DiskStats {
     size_t mods;
     
     DiskStats(size_t szBy = 0, size_t szBk = 0, size_t svBy = 0, size_t svBk = 0, size_t sDirs = 0, size_t sSymLinks = 0, size_t sMods = 0) {
-        sizeInBytes = szBy;
-        sizeInBlocks = szBk;
+        usedInBytes = szBy;
+        usedInBlocks = szBk;
         savedInBytes = svBy;
         savedInBlocks = svBk;
         
@@ -39,8 +39,8 @@ struct DiskStats {
     }
 
     DiskStats& operator+=(const DiskStats& a) {
-        sizeInBytes += a.sizeInBytes;
-        sizeInBlocks += a.sizeInBlocks;
+        usedInBytes += a.usedInBytes;
+        usedInBlocks += a.usedInBlocks;
         savedInBytes += a.savedInBytes;
         savedInBlocks += a.savedInBlocks;
         dirs += a.dirs;
@@ -49,11 +49,11 @@ struct DiskStats {
         return *this;
     }
 
-    size_t getSize() { return (GLOBALS.useBlocks ? sizeInBlocks : sizeInBytes); }
+    size_t getSize() { return (GLOBALS.useBlocks ? usedInBlocks : usedInBytes); }
     size_t getSaved() { return (GLOBALS.useBlocks ? savedInBlocks : savedInBytes); }
     
     friend ostream& operator<<(ostream& s, const DiskStats& a) {
-        s << "usedBy:" << a.sizeInBytes << ", usedBk:" << a.sizeInBlocks << ", savBy:" << a.savedInBytes << ", savBk:" << a.savedInBlocks;
+        s << "usedBy:" << a.usedInBytes << ", usedBk:" << a.usedInBlocks << ", savBy:" << a.savedInBytes << ", savBk:" << a.savedInBlocks;
         return s;
     }
 };

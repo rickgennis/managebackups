@@ -14,8 +14,8 @@
 
 
 FaubEntry& FaubEntry::operator=(const DiskStats& stats) {
-    ds.sizeInBytes = stats.sizeInBytes;
-    ds.sizeInBlocks = stats.sizeInBlocks;
+    ds.usedInBytes = stats.usedInBytes;
+    ds.usedInBlocks = stats.usedInBlocks;
     ds.savedInBytes = stats.savedInBytes;
     ds.savedInBlocks = stats.savedInBlocks;
     return *this;
@@ -25,7 +25,7 @@ FaubEntry& FaubEntry::operator=(const DiskStats& stats) {
 FaubEntry::FaubEntry(string dir, string aProfile, string aUuid) {
     directory = dir;
     uuid = aUuid;
-    ds.sizeInBytes = ds.sizeInBlocks = ds.savedInBytes = ds.savedInBlocks = finishTime = duration = modifiedFiles = unchangedFiles = dirs = slinks = 0;
+    ds.usedInBytes = ds.usedInBlocks = ds.savedInBytes = ds.savedInBlocks = finishTime = duration = modifiedFiles = unchangedFiles = dirs = slinks = 0;
     startDay = startMonth = startYear = mtimeDayAge = dow = 0;
     profile = aProfile;
     updated = false;
@@ -43,7 +43,7 @@ FaubEntry::~FaubEntry() {
 
 
 string FaubEntry::stats2string() {
-    return(to_string(ds.sizeInBytes) + "," + to_string(ds.sizeInBlocks) + "," + to_string(ds.savedInBytes) + "," + to_string(ds.savedInBlocks) + "," + to_string(finishTime) + "," + to_string(duration) + "," + 
+    return(to_string(ds.usedInBytes) + "," + to_string(ds.usedInBlocks) + "," + to_string(ds.savedInBytes) + "," + to_string(ds.savedInBlocks) + "," + to_string(finishTime) + "," + to_string(duration) + "," + 
             to_string(modifiedFiles) + "," + to_string(unchangedFiles) + "," + to_string(dirs) + "," + to_string(slinks) + ";");
 }
 
@@ -53,8 +53,8 @@ void FaubEntry::string2stats(string& data) {
 
     try {
         if (regEx.search(data) && regEx.matches() > 9) {
-            ds.sizeInBytes = stoll(regEx.get_match(0));
-            ds.sizeInBlocks = stoll(regEx.get_match(1));
+            ds.usedInBytes = stoll(regEx.get_match(0));
+            ds.usedInBlocks = stoll(regEx.get_match(1));
             ds.savedInBytes = stoll(regEx.get_match(2));
             ds.savedInBlocks = stoll(regEx.get_match(3));
             finishTime = stol(regEx.get_match(4));
