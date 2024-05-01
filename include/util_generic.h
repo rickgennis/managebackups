@@ -185,7 +185,8 @@ string safeFilename(string filename);
 
 int varexec(string fullCommand);
 
-vector<string> string2vector(string data, bool trimQ = false, bool unEscape = false);
+vector<string> string2vectorOnPipe(string data, bool trimQ = false, bool unEscape = false);
+vector<string> string2vectorOnSpace(string data, bool trimQ = false, bool unEscape = false);
 
 vector<string> expandWildcardFilespec(string filespec);
 

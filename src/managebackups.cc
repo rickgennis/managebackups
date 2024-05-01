@@ -429,7 +429,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
                         
                     setting.value = "";
                     for (auto &item : GLOBALS.cli[setting.display_name].as<vector<string>>()) {
-                        for (auto &subitem : string2vector(item))
+                        for (auto &subitem : string2vectorOnSpace(item))
                             setting.value += string(setting.value.length() ? " " : "") + subitem;
                     }
                     break;
@@ -2574,7 +2574,7 @@ int main(int argc, char *argv[]) {
         try {
             // start faub client-side
             if (currentConfig->settings[sPaths].value.length()) {
-                fc_mainEngine(*currentConfig, string2vector(currentConfig->settings[sPaths].value, true, false));
+                fc_mainEngine(*currentConfig, string2vectorOnSpace(currentConfig->settings[sPaths].value, true, false));
                 exit(1);
             }
             

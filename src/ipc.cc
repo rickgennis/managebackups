@@ -490,23 +490,17 @@ bool operator==(const struct ProcDetail& A, const struct ProcDetail& B) {
 }
 
 
+
 PipeExec::PipeExec(string command, unsigned int timeout) : IPC_Base(0, 0, timeout) {
     timeoutSecs = timeout;
     origCommand = command;
     bypassDestructor = false;
     errorDir = "";
-    char *data;
-
-    data = (char*)malloc(command.length() + 1);
-    strcpy(data, command.c_str());
-    char *p = strtok(data, "|");
-
-    while (p) {
-        procs.insert(procs.end(), procDetail(trimSpace(p)));
-        p = strtok(NULL, "|");
-    }
-
-    free(data);
+    
+    auto v = string2vectorOnPipe(command);
+    
+    for (auto vIt = v.begin(); vIt != v.end(); ++vIt)
+        procs.insert(procs.end(), procDetail(trimSpace(*vIt)));
 }
 
 

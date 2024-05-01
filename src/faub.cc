@@ -665,7 +665,7 @@ void fc_mainEngine(BackupConfig& config, vector<string> origPaths) {
         // each item could be a quoted list of multiple sub paths.  so we have to break it down
         // a second time.
         for (auto &p : origPaths) {
-            auto dirVec = string2vector(p, true, true);
+            auto dirVec = string2vectorOnSpace(p, true, true);
             
             for (auto &d : dirVec) {
                 auto fileVec = expandWildcardFilespec(d);

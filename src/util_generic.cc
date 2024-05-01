@@ -581,11 +581,8 @@ string trimQuotes(string s, bool unEscape) {
     return result;
 }
 
-
-// split a string into a vector on spaces, except where quoted or escaped
-vector<string> string2vector(string data, bool trimQ, bool unEscape) {
-    Pcre regex("((?:([\'\"])(?:(?!\\g2).|(?:(?<=\\\\)[\'\"]))+(?<!\\\\)\\g2)|(?:\\S|(?:(?<=\\\\)\\s))+)", "g");
-    vector<string> result;
+void splitOnRegex(vector<string>& result, string data, Pcre& re, bool trimQ, bool unEscape) {
+    Pcre regex(re);
     string temp;
     int pos = 0;
     
@@ -602,7 +599,25 @@ vector<string> string2vector(string data, bool trimQ, bool unEscape) {
         
         result.push_back(trimQ ? trimQuotes(temp) : temp);
     }
-    
+}
+
+
+// split a string into a vector on pipes, except where quoted or escaped
+vector<string> string2vectorOnPipe(string data, bool trimQ, bool unEscape) {
+//  Pcre regex("((?:([\'\"])(?:(?!\\g2).|(?:(?<=\\\\)[\'\"]))+(?<!\\\\)\\g2)|(?:\\||(?:(?<=\\\\)\\|))+)", "g");
+    Pcre regex("((?:[^\'\"|]*([\'\"]).+?(?<!\\\\)\\g2[^\'\"|]*)|(?:[^|]|(?:(?<=\\\\)\\|))+)", "g");
+    vector<string> result;
+    splitOnRegex(result, data, regex, trimQ, unEscape);
+    return result;
+}
+
+
+// split a string into a vector on spaces, except where quoted or escaped
+vector<string> string2vectorOnSpace(string data, bool trimQ, bool unEscape) {
+//  Pcre regex("((?:([\'\"])(?:(?!\\g2).|(?:(?<=\\\\)[\'\"]))+(?<!\\\\)\\g2)|(?:\\S|(?:(?<=\\\\)\\s))+)", "g");
+    Pcre regex("((?:([\'\"]).+?(?<!\\\\)\\g2)|(?:\\S|(?:(?<=\\\\)\\s))+)", "g");
+    vector<string> result;
+    splitOnRegex(result, data, regex, trimQ, unEscape);
     return result;
 }
 
@@ -614,7 +629,7 @@ int varexec(string fullCommand) {
     
     // don't let string2vector remove quotes (i.e. cleanup) because we want
     // to check for quoted wildcards first
-    auto tokens = string2vector(fullCommand, false, false);
+    auto tokens = string2vectorOnSpace(fullCommand, false, false);
     
     for (auto &token: tokens) {
         /* token contains wildcard, add the matching files instead */

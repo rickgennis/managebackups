@@ -334,6 +334,8 @@ bool FaubCache::displayDiffFiles(string backupDir) {
 
 struct compareDirsDataType {
     size_t filesChanged;
+    size_t bytesChanged;
+    size_t bytesUsed;
     size_t filesA;
     size_t filesB;
     unordered_set<string> seenFiles;
@@ -383,6 +385,8 @@ bool compareDirsCallbackA(pdCallbackData &file) {
                     << " " << blockp(approximate(file.statData.st_size), 4)
                     << " [" << fileType << "]  " << file.filename << endl;
                     ++data->filesChanged;
+                    data->bytesChanged += abs(sizeChange);
+                    data->bytesUsed += file.statData.st_size;
                 }
         }
         else
@@ -394,6 +398,8 @@ bool compareDirsCallbackA(pdCallbackData &file) {
                     << " [" << fileType << "]  "
                     << file.filename << endl;
                     ++data->filesChanged;
+                    data->bytesChanged += abs(sizeChange);
+                    data->bytesUsed += file.statData.st_size;
                 }
     }
     
@@ -417,6 +423,8 @@ bool compareDirsCallbackB(pdCallbackData &file) {
             if (!data->filter || (data->filter && fileType != 'l' && fileType != 'd')) {
                 cout << BOLDRED << blockp("+" + approximate(file.statData.st_size), 5) << RESET << " [" << fileType << "]  " << RESET << file.filename << endl;
                 ++data->filesChanged;
+                data->bytesChanged += file.statData.st_size;
+                data->bytesUsed += file.statData.st_size;
             }
     }
     
@@ -424,12 +432,12 @@ bool compareDirsCallbackB(pdCallbackData &file) {
 }
 
 
-tuple<size_t, size_t, size_t> compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
+tuple<size_t, size_t, size_t, size_t, size_t> compareDirs(string dirA, string dirB, size_t threshold, bool percent) {
     compareDirsDataType data;
     data.filter = !GLOBALS.cli.count(CLI_COMPAREFILTER);
     data.percent = percent;
     data.threshold = threshold;
-    data.filesChanged = data.filesA = data.filesB = 0;
+    data.filesChanged = data.bytesChanged = data.bytesUsed = data.filesA = data.filesB = 0;
     data.baseDirA = dirA;
     data.baseDirB = dirB;
     
@@ -444,7 +452,7 @@ tuple<size_t, size_t, size_t> compareDirs(string dirA, string dirB, size_t thres
     // dirA scan).  so output its diff details here.
     processDirectory(dirB, "", false, false, compareDirsCallbackB, &data);
     
-    return {data.filesChanged, data.filesA, data.filesB};
+    return {data.filesChanged, data.bytesChanged, data.bytesUsed, data.filesA, data.filesB};
 }
 
 
@@ -482,8 +490,8 @@ void FaubCache::compare(string backupA, string backupB, string givenThreshold) {
     
     cout << BOLDYELLOW << "[" << BOLDBLUE << b1Base << BOLDYELLOW << "]\n";
     cout << "[" << BOLDBLUE << b2Base << BOLDYELLOW << "]" << endl;
-    auto [changes, filesA, filesB] = compareDirs(b1Base, b2Base, threshold, percent);
-    cout << BOLDBLUE << plural(changes, "change") << RESET << " (A entries: " << approximate(filesA) << ", B entries: " << approximate(filesB) << ")" << endl;
+    auto [changes, changeSize, changeUsed, filesA, filesB] = compareDirs(b1Base, b2Base, threshold, percent);
+    cout << BOLDYELLOW << approximate(changeSize) << BOLDBLUE << " in changes using " << BOLDYELLOW << approximate(changeUsed) << BOLDBLUE << " on disk across " << BOLDYELLOW << plural(changes, string(BOLDBLUE) + "file") << " (A entries: " << approximate(filesA) << ", B entries: " << approximate(filesB) << ")" << RESET << endl;
 }
 
 
