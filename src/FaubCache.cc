@@ -199,13 +199,15 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
                                  << "," << nextOneToo);
             ++recached;
             set<ino_t> emptySet;
+            aBackup->second.unloadInodes();
             auto ds = dus(aBackup->first, gotPrev ? prevBackup->second.inodes : emptySet, aBackup->second.inodes);
             DEBUG(D_any) DFMT("\tdus(" << aBackup->first << ") returned " << ds.sizeInBytes + ds.savedInBytes << " size bytes, " << ds.sizeInBytes << " used bytes");
             
             // TEMP
             log("debug: DUS(" + aBackup->first + ") " + to_string(forceAll) + string(",") + to_string(targetDir == aBackup->first) + ","
             + to_string(!targetDir.length() && ((!aBackup->second.ds.sizeInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))
-                + "," + to_string(nextOneToo) + "; " + to_string(ds.sizeInBytes + ds.savedInBytes) + ", " + to_string(ds.savedInBytes));
+                + "," + to_string(nextOneToo) + "; T:" + to_string(ds.sizeInBytes + ds.savedInBytes) + ", Svd:" + to_string(ds.savedInBytes) + ", " +
+                (gotPrev ? prevBackup->first + " inodes loaded" : "none"));
             // TEMP
             
             aBackup->second.ds = ds;

@@ -1846,14 +1846,12 @@ bool replicateCallback1(pdCallbackData &file) {
                         exit(1);
                     }
                 }
-                else {
-                    if (!exists(ps.dir))
-                        if (mkdirp(ps.dir)) {  // make the containing directory
-                            log("error: creating directory " + ps.dir + errtext());
-                            SCREENERR("error: unable to create directory " + ps.dir + errtext());
-                            exit(1);
-                        }
-                }
+                else
+                    if (mkdirp(ps.dir)) {  // make the containing directory
+                        log("error: creating directory " + ps.dir + errtext());
+                        SCREENERR("error: unable to create directory " + ps.dir + errtext());
+                        exit(1);
+                    }
                 
                 if (symlink(sourceTarget.c_str(), newFilename.c_str())) {
                     log("error: creating symlink " + newFilename + " -> " + sourceTarget + errtext());
@@ -1866,10 +1864,17 @@ bool replicateCallback1(pdCallbackData &file) {
         }
         else
             if (!targetExists || file.statData.st_ino != targetStat.st_ino) {
-                if (targetExists)
+                if (targetExists) {
                     if (unlink(newFilename.c_str())) {
                         log("error: unable to delete " + newFilename + " in prep to recreate it" + errtext());
                         SCREENERR("error: unable to delete " + newFilename + " in prep to recreate it" + errtext());
+                        exit(1);
+                    }
+                }
+                else
+                    if (mkdirp(ps.dir)) {  // make the containing directory
+                        log("error: creating directory " + ps.dir + errtext());
+                        SCREENERR("error: unable to create directory " + ps.dir + errtext());
                         exit(1);
                     }
                                 
@@ -2323,26 +2328,33 @@ int main(int argc, char *argv[]) {
         
         if (!haveProfile(&configManager))
             SCREENERR("error: --" << option << " requires a profile (use -p)");
-        else
-            if (!GLOBALS.cli.count(CLI_FORCE))
-                SCREENERR("error: --" << option << " requires --" << CLI_FORCE << " to remove backups");
-            else {
-                try {
-                    int target = GLOBALS.cli[option].as<int>();
+        else {
+            bool test = GLOBALS.cli.count(CLI_TEST);
+            bool force = GLOBALS.cli.count(CLI_FORCE);
+            
+            if (test)
+                cout << YELLOW << "TESTMODE:" << RESET << endl;
+            
+            try {
+                int target = GLOBALS.cli[option].as<int>();
+                
+                if (currentConfig->isFaub()) {
+                    scanConfigToCache(*currentConfig);
+                    int removed = 0;
                     
-                    if (currentConfig->isFaub()) {
-                        scanConfigToCache(*currentConfig);
-                        int removed = 0;
+                    if (currentConfig->fcache.size()) {
+                        auto it = option == CLI_RMN ? currentConfig->fcache.getLastBackup() : currentConfig->fcache.getFirstBackup();
+                        auto finalBackup = option == CLI_RMN ? currentConfig->fcache.getFirstBackup() : currentConfig->fcache.getEnd();
                         
-                        if (currentConfig->fcache.size()) {
-                            auto it = option == CLI_RMN ? currentConfig->fcache.getLastBackup() : currentConfig->fcache.getFirstBackup();
-                            auto finalBackup = option == CLI_RMN ? currentConfig->fcache.getFirstBackup() : currentConfig->fcache.getEnd();
-                            
-                            while (it != finalBackup && removed < target) {
-                                statusMessage message("removing " + it->first);
+                        while (it != finalBackup && removed < target) {
+                            statusMessage message("removing " + it->first);
+                            if (force && !test)
                                 NOTQUIET && ANIMATE && message.show();
-                                
-                               if (rmrf(it->second.getDir())) {
+                            else
+                                cout << "\t• would have removed " << it->first << endl;
+                            
+                            if (force && !test) {
+                                if (rmrf(it->second.getDir())) {
                                     NOTQUIET && ANIMATE && message.remove();
                                     NOTQUIET && cout << "\t• " << currentConfig->ifTitle() << " removed " << it->first << endl;
                                     log(currentConfig->ifTitle() + " removed " + it->second.getDir() + " via --" + option);
@@ -2352,26 +2364,31 @@ int main(int argc, char *argv[]) {
                                     log(currentConfig->ifTitle() + " unable to remove (via --" + option + ") " + it->second.getDir() + errtext());
                                     SCREENERR(string("unable to remove ") + it->second.getDir() + errtext());
                                 }
-                                
-                                auto deadBackupIt = option == CLI_RMN ? it-- : it++;
-                                currentConfig->fcache.removeBackup(deadBackupIt);
-                                ++removed;
                             }
+                            
+                            auto deadBackupIt = option == CLI_RMN ? it-- : it++;
+                            if (force && !test)
+                                currentConfig->fcache.removeBackup(deadBackupIt);
+                            ++removed;
                         }
-
-                        cout << plural(removed, "backup") << " removed" << endl;
-                        
-                        FastCache fc;
-                        fc.invalidate();
                     }
-                    else
-                        SCREENERR("error: --" << option << " is currently only supported for faub-style backups");
                     
+                    cout << BOLDYELLOW << plural(removed, string(BOLDBLUE) + "backup") << (test || !force ? " would have been removed" : " removed") << RESET << endl;
+                    
+                    if (!test && !force)
+                        cout << "Use --" << CLI_FORCE << " to actually remove these backups." << endl;
+                    
+                    FastCache fc;
+                    fc.invalidate();
                 }
-                catch (...) {
-                    SCREENERR("error: --" << option << " needs to be a number (how many backups to delete)");
-                }
+                else
+                    SCREENERR("error: --" << option << " is currently only supported for faub-style backups");
+                
             }
+            catch (...) {
+                SCREENERR("error: --" << option << " needs to be a number (how many backups to delete)");
+            }
+        }
         exit(0);
     }
     
@@ -2385,7 +2402,7 @@ int main(int argc, char *argv[]) {
                     SCREENERR("error: --" << CLI_GO << " is mutually-exclusive with --" << CLI_COMPARE << ", --" << CLI_COMPAREFILTER << ", and --" << CLI_LAST);
                     exit(1);
                 }
-                    
+                
                 if (currentConfig->isFaub()) {
                     scanConfigToCache(*currentConfig);
                     
