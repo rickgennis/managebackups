@@ -566,11 +566,18 @@ string trimSpace(const string &s) {
 
 
 string trimQuotes(string s, bool unEscape) {
-    Pcre reg("^([\'\"]+)(.+?)\\g1$");
+    Pcre regA("^([\'\"]+)");
     string result = s;
     
-    if (reg.search(s) && reg.matches())
-        result = reg.get_match(1);
+    if (regA.search(s) && regA.matches()) {
+        string openQuotes = regA.get_match(0);
+        string closeQuotes = openQuotes;
+        reverse(closeQuotes.begin(), closeQuotes.end());
+        
+        Pcre regB("^" + openQuotes + "(.*)" + closeQuotes + "$");
+        if (regB.search(s) && regB.matches())
+            result = regB.get_match(0);
+    }
     
     if (unEscape) {
         size_t altpos;  // remove any remaining backslashes

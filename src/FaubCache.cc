@@ -188,24 +188,39 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
             nextOneToo) {
             
             bool gotPrev = prevBackup != backups.end();
-            if (gotPrev)
+            string prevDesc;
+            if (gotPrev) {
                 prevBackup->second.loadInodes();
+                prevDesc = pathSplit(prevBackup->first).file;
+            }
             
             if (!recached)
                 NOTQUIET && ANIMATE && message.show();
             
-            DEBUG(D_recalc) DFMT("\tcalling dus(); " << forceAll << "," << (targetDir == aBackup->first) << ","
-                                 << (!targetDir.length() && ((!aBackup->second.ds.usedInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))
-                                 << "," << nextOneToo);
             ++recached;
             set<ino_t> emptySet;
             aBackup->second.unloadInodes();
             auto ds = dus(aBackup->first, gotPrev ? prevBackup->second.inodes : emptySet, aBackup->second.inodes);
-            DEBUG(D_any) DFMT("\tdus(" << aBackup->first << ") returned " << ds.usedInBytes + ds.savedInBytes << " size bytes, " << ds.usedInBytes << " used bytes (" <<
-                              to_string(forceAll) + string(",") + to_string(targetDir == aBackup->first) + ","
-                              + to_string(!targetDir.length() && ((!aBackup->second.ds.usedInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch))
-                                  + "," + to_string(nextOneToo));
-                        
+            
+            DEBUG(D_any) DFMT("dus " << aBackup->first << ": " <<
+                              ds.usedInBytes + ds.savedInBytes << " total, " <<
+                              ds.usedInBytes << " used (" <<
+                              to_string(forceAll) + string(",") +
+                              to_string(targetDir.length() && targetDir == aBackup->first) + "," +
+                              to_string(!targetDir.length() && ((!aBackup->second.ds.usedInBytes && !aBackup->second.ds.savedInBytes) || deletedMatch)) + "," +
+                              to_string(nextOneToo) + ")" +
+                              (gotPrev ? "; " + prevDesc : "; -"));
+
+            string reason = targetDir.length() && targetDir == aBackup->first ? "specific" :
+                (!targetDir.length() && (!aBackup->second.ds.usedInBytes && !aBackup->second.ds.savedInBytes)) ? "missing" :
+                (!targetDir.length() && deletedMatch) ? "post-delete" :
+                nextOneToo ? "next" : "?";
+            
+            log("stat calc " + aBackup->first + " (" + reason + "): " +
+                              to_string(ds.usedInBytes + ds.savedInBytes) + " total, " +
+                              to_string(ds.usedInBytes) + " used" +
+                              (gotPrev ? "; vs " + prevDesc : "; -"));
+            
             aBackup->second.ds = ds;
             aBackup->second.updated = true;
             aBackup->second.dirs = ds.dirs;

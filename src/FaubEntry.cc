@@ -252,7 +252,7 @@ bool FaubEntry::displayDiffFiles() {
         }
         
         if (!noChanges)
-            cout << BOLDBLUE << plural(fileCount, "change") << RESET << endl;
+            cout << BOLDYELLOW << plural(fileCount, string(BOLDBLUE) + "change") << RESET << endl;
 
         cacheFile.close();
         return true;

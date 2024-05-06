@@ -616,7 +616,7 @@ size_t fc_scanToServer(BackupConfig& config, string entryName, IPC_Base& server)
     data.server = &server;
     data.totalEntries = 0;
     
-    string clude = config.settings[sInclude].value.length() ? config.settings[sInclude].value : config.settings[sExclude].value.length() ? config.settings[sExclude].value : "";
+    string clude = config.settings[sInclude].value.length() ? trimQuotes(config.settings[sInclude].value) : config.settings[sExclude].value.length() ? trimQuotes(config.settings[sExclude].value) : "";
 
     entryName.erase(remove(entryName.begin(), entryName.end(), '\\'), entryName.end());
     auto error = processDirectory(entryName, clude, config.settings[sExclude].value.length(), config.settings[sFilterDirs].value.length(), scanToServerCallback, &data, -1, true, false);
