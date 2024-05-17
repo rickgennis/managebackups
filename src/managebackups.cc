@@ -1878,12 +1878,17 @@ bool replicateCallback1(pdCallbackData &file) {
                         exit(1);
                     }
                 }
-                else
+                else {
                     if (mkdirp(ps.dir)) {  // make the containing directory
                         log("error: creating directory " + ps.dir + errtext());
                         SCREENERR("error: unable to create directory " + ps.dir + errtext());
                         exit(1);
                     }
+                    
+                    struct stat containingDirStat;
+                    if (!mystat(ps.dir, &containingDirStat))
+                        setFilePerms(ps.dir, containingDirStat);
+                }
                                 
                 if (link(file.filename.c_str(), newFilename.c_str())) {
                     log("error: creating link " + newFilename + " to " + file.filename + errtext());

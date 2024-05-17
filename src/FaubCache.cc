@@ -12,6 +12,7 @@
 #include "debug.h"
 
 #include "FaubCache.h"
+#include "FastCache.h"
 
 
 FaubCache::FaubCache(string path, string profileName, string aUuid) {
@@ -264,6 +265,11 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
     
     recacheTimer.stop();
     DEBUG(D_faub) DFMT("complete - " << recacheTimer.elapsed(5));
+    
+    if (recached) {
+        FastCache fc;
+        fc.invalidate();
+    }
 }
 
 
