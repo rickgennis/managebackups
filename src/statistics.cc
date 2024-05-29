@@ -292,7 +292,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
                 lineFormat += (lineFormat.length() ? "  " : "") + string("%") + string(x == 6 ? "" : "-") +
                 to_string(max(headers[x].length(), colLen[x])) + "s";   // 6th column is right-justified
         lineFormat += "  ";
-        
+                
         // print line by line results
         char result[1000];
         int line = 0;
@@ -316,7 +316,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
             string ageDetail = string(HIGHLIGHT) + BRACKETO + RESET +
                 (gotAge ? statStrings[line * NUMSTATDETAILS + 7] + HIGHLIGHT +
                  string(" -> ") + RESET + statStrings[line * NUMSTATDETAILS + 8] : "-") +
-                HIGHLIGHT + BRACKETC + (is_old ? string(BOLDRED) + msg : msg);
+                HIGHLIGHT + BRACKETC + " " + (is_old ? string(BOLDRED) + msg : msg);
             
             fastCache.appendStatus(FASTCACHETYPE (result, profileStats[line].firstBackupTime, profileStats[line].lastBackupTime));
             !cacheOnly && cout << result << ageDetail << RESET << "\n";
