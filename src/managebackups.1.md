@@ -263,6 +263,18 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 **--leaveoutput**
 : {both} Leave the output from any commands that are executed (create a backup, ssh, SFTP, etc) in a file under /tmp/managebackups_output. This can help facilitate diagnosing authentication or configuration errors.
 
+**-t,--tag** [*data*]
+: {FB} There are three uses of the tag directive:
+
+    * (1) tag a backup as it's taken (e.g. "mb -p main -t snapshot")
+    * (2) tag a previously taken backup (e.g. "mb -p main -t snapshot=/var/backup/main-2024-02-23")
+    * (3) display backups that match a tag (e.g. "mb -1 -t snapshot")
+
+When tagging a previous backup (2) the full backup name isn't required; only enough to uniquely identify it.  By contrast tag names always need to be precisely specified.
+
+**--tagrm** [*data*]
+: {FB} If a tag is specified it will be removed from all backups.  If a backup is specified, all tags will be removed from it.
+
 **--include** [*pattern*]
 : {FB} Only backup directory entries that match the specified regex pattern. By default this option only filters files and continues to include subdirectories themselves (files in the subdirectories are filtered). To have it apply to the subdirectories see **--filterdirs**. Also note, this is applicable for the client invocation of **managebackups**, the one run with **--path**. To minimize complexity the server side innovation understands **--include** and will automatically append it to the client-side call (**--faub**) if found.
 
@@ -374,6 +386,9 @@ Full changes provide all detail: files that were added, modified or deleted, how
 
 ## General
 The **--diff** [*backup*] command, if only specified once, will default to Cached Changes and show the changes between the specified *backup* and the immediately previous one (at the time it was taken).  Use **--force** to generate the Full Changes diff instead.  When **--diff** [*backup*] is specified twice (i.e. which two backups to compare), it always does a Full Changes diff.  Note: Because symlinks and directories can't be hardlinked they always show up as changes and are automatically filtered out of the **--diff** output.  To include them use **--Diff** instead.  **--threshold** can be used to further filter the output to only show files that have changed by a certain size or more.  **--last** can be used as a shortcut to run **--diff** on the most recent backup without having to specify the backup itself.
+
+# TAGGING
+Tags can be used to identify and track specific backups within or across profiles.  A tag can be applied when a backup is taken or after the fact.  Tags can be specified with **-1** to see only the backups that match a given tag.  Multiple backups can be given the same tag and multiple tags can be given to the same backup (many to many).
 
 # PERMISSIONS
 Aside from access to read the files being backed up (on a remote server or locally) **managebackups** requires local write access for multiple tasks:

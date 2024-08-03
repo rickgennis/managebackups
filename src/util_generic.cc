@@ -67,6 +67,17 @@ string cppgetenv(string variable) {
 }
 
 
+string perlJoin(string delimiter, vector<string> items) {
+    string result;
+    
+    for (auto &item: items)
+        result += (result.length() ? delimiter : "") + item;
+    
+    return result;
+}
+
+// splitOnRegex: the RE given matches on the tokens to be returned (the data)
+// perlSplit: the RE given matches the delimiter and tokens are found in between
 vector<string> perlSplit(string regex, string haystack) {
     Pcre theRE("(" + regex + ")", "g");
     vector<string> result;
@@ -78,13 +89,15 @@ vector<string> perlSplit(string regex, string haystack) {
     while (pos <= haystack.length() && theRE.search(haystack, (int)pos)) {
         pos = theRE.get_match_end(0);
         string delimiter = theRE.get_match(0);
+        dataEnd = pos++ - delimiter.length();
         
-        dataEnd = ++pos - delimiter.length() + 1;
-        result.insert(result.end(), string(haystack, dataStart, dataEnd - dataStart - 1));
+        result.insert(result.end(), string(haystack, dataStart, dataEnd - dataStart + 1));
+        
         dataStart = pos;
     }
     
     result.insert(result.end(), string(haystack, dataStart, string::npos));
+
     return result;
 }
 
@@ -588,6 +601,8 @@ string trimQuotes(string s, bool unEscape) {
     return result;
 }
 
+// splitOnRegex: the RE given matches on the tokens to be returned (the data)
+// perlSplit: the RE given matches the delimiter and tokens are found in between
 void splitOnRegex(vector<string>& result, string data, Pcre& re, bool trimQ, bool unEscape) {
     Pcre regex(re);
     string temp;
@@ -597,6 +612,7 @@ void splitOnRegex(vector<string>& result, string data, Pcre& re, bool trimQ, boo
         pos = regex.get_match_end(0);
         ++pos;
         temp = regex.get_match(0);
+        cout << "split: " << temp << endl;
         
         if (unEscape) {
             size_t altpos;  // remove any remaining backslashes
@@ -628,6 +644,8 @@ vector<string> string2vectorOnSpace(string data, bool trimQ, bool unEscape) {
     return result;
 }
 
+//"((?:[^\'\"|]*([\'\"]).+?(?<!\\\\)\\g2[^\'\"|]*)|(?:[^|]|(?:(?<=\\\\)\\|))+)"
+//         "((?:([\'\"]).+?(?<!\\\\)\\g2)|(?:\\S|(?:(?<=\\\\)\\s))+)"
 
 int varexec(string fullCommand) {
     char *params[400];

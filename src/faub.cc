@@ -12,6 +12,7 @@
 #include "debug.h"
 #include "globals.h"
 #include "exception.h"
+#include "tagging.h"
 
 #define ABORTED_SYSTEM_CALL "abortedSysCall"
 
@@ -89,7 +90,7 @@ void fs_startServer(BackupConfig& config) {
     PipeExec faub(config.settings[sFaub].value + clude, 60);
 
     if (GLOBALS.cli.count(CLI_NOBACKUP))
-        return;
+        return; 
 
     string newDir = newBackupDir(config);
     string prevDir = mostRecentBackupDirSince(config.settings[sDirectory].value, newDir, config.settings[sTitle].value);
@@ -551,6 +552,11 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             to_string(unmodDirs) + ", symlinks: " + to_string(filesSymLinked + receivedSymLinks) +
             (linkErrors ? ", linkErrors: " + to_string(linkErrors) : "") +
             ", size: " + approximate(backupSize + backupSaved) + ", usage: " + approximate(backupSize) + maxLinkMsg + ")";
+
+        if (GLOBALS.cli.count(CLI_TAG)) {
+            GLOBALS.tags.fastTagBackup(GLOBALS.cli[CLI_TAG].as<string>(), currentDir);
+            message1 += " [tagged " + GLOBALS.cli[CLI_TAG].as<string>() + "]";
+        }
                         
         log(config.ifTitle() + " " + message1);
         log(config.ifTitle() + " " + message2);

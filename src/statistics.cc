@@ -12,8 +12,9 @@
 #include "colors.h"
 #include "FaubCache.h"
 #include "FastCache.h"
+#include "tagging.h"
 
-#define NUMSTATDETAILS        10 
+#define NUMSTATDETAILS        10
 
 using namespace std;
 string oldMessage = ">24H old";
@@ -48,7 +49,7 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
     struct summaryStats resultStats;
     int precisionLevel = statDetail > 3 ? 0 : statDetail > 1 ? 1 : -1;
     string processAge;
-    
+        
     // handle faub configs first
     if (config.isFaub()) {
         if (config.fcache.size() < 1) {
@@ -84,10 +85,11 @@ summaryStats calculateSummaryStats(BackupConfig& config, int statDetail = 0) {
         strftime(fileTime, sizeof(fileTime), "%X", t);
         
         int saved = floor((1 - (long double)resultStats.totalUsed / ((long double)resultStats.totalUsed + (long double)resultStats.totalSaved)) * 100 + 0.5);
+        string lastBackupFilename = pathSplit(config.fcache.getLastBackup()->first).file;
         
         string soutput[NUMSTATDETAILS] = {
             config.settings[sTitle].value,
-            pathSplit(config.fcache.getLastBackup()->first).file,
+            lastBackupFilename,
             fileTime,
             seconds2hms(resultStats.duration),
             (approximate(resultStats.lastBackupBytes, precisionLevel, statDetail == 3 || statDetail == 5) +
@@ -353,7 +355,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
 }
 
 
-bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
+bool _displayDetailedFaubStats(BackupConfig& config, int statDetail, Tagging tags) {
     int precisionLevel = statDetail > 3 ? 0 : statDetail > 1 ? 1 : -1;
     
     if (config.isFaub() && config.fcache.size()) {
@@ -361,23 +363,24 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
         auto bkups = config.fcache.getNumberOfBackups();
         auto stats = config.fcache.getTotalStats();
         int saved = floor((1 - (long double)stats.getSize() / (stats.getSize() + stats.getSaved())) * 100 + 0.5);
-        const int NUMCOLUMNS = 9;
+        const int NUMCOLUMNS = 10;
         int maxColLen[NUMCOLUMNS] = { 0 };
-        string headers[] = { "x", "Size", "Used", "Dirs", "SymLks", "Mods", "Duration", "Type", "Age", "" };
+        string headers[] = { "x", "Size", "Used", "Dirs", "SymLks", "Mods", "Duration", "Type", "Age", "Tags", "" };
         
-        // print top summary of backups
-        cout << line << "\n";
-        if (config.settings[sTitle].value.length()) cout << "Profile: " << config.settings[sTitle].value << "\n";
-        cout << "Directory: " << config.settings[sDirectory].value << "\n";
-        cout << plural((int)bkups, "backup") << "\n";
-        cout << approximate(stats.getSize() + stats.getSaved(), precisionLevel, statDetail == 3 || statDetail == 5) << " using "
-        << approximate(stats.getSize(), precisionLevel, statDetail == 3 || statDetail == 5) << " on disk (saved " << saved << "%)\n";
+        bool summaryShown = false;
+        string introSummary = line + "\n";
+        if (config.settings[sTitle].value.length())
+            introSummary += "Profile: " + config.settings[sTitle].value + "\n";
+        introSummary += "Directory: " + config.settings[sDirectory].value + "\n";
+        introSummary += plural((int)bkups, "backup") + "\n";
+        introSummary += approximate(stats.getSize() + stats.getSaved(), precisionLevel, statDetail == 3 || statDetail == 5) + " using "
+        + approximate(stats.getSize(), precisionLevel, statDetail == 3 || statDetail == 5) + " on disk (saved " + to_string(saved) + "%)\n";
         
         auto [target, average, detail] = config.getBloatTarget();
-        cout << approximate(average) << " per backup average used\n";
+        introSummary += approximate(average) + " per backup average used\n";
         
         if (config.fcache.getInProcessFilename().length())
-            cout << YELLOW << config.fcache.getInProcessFilename() << RESET << " (in process)" << endl;
+            introSummary += YELLOW + config.fcache.getInProcessFilename() + RESET + " (in process)\n";
         
         // determine the backup max filename length and rention match counts
         set<string> dayUnique;
@@ -391,100 +394,120 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
         for (int x = 0; x < arrsize; ++x)
             if (!maxColLen[x]) maxColLen[x] = (int)headers[x].length();
         
+        vector<string> ages;
         auto backupIt = config.fcache.getFirstBackup();
         while (backupIt != config.fcache.getEnd()) {
-            maxColLen[0] = (int)max(maxColLen[0], backupIt->first.length());
-            maxColLen[1] = (int)max(maxColLen[1], approximate(backupIt->second.ds.getSize() + backupIt->second.ds.getSaved(), precisionLevel, statDetail == 3 || statDetail == 5).length());
-            maxColLen[2] = (int)max(maxColLen[2], approximate(backupIt->second.ds.getSize(), precisionLevel, statDetail == 3 || statDetail == 5).length());
-            maxColLen[3] = (int)max(maxColLen[3], approximate(backupIt->second.dirs, precisionLevel, statDetail == 3 || statDetail == 5).length());
-            maxColLen[4] = (int)max(maxColLen[4], approximate(backupIt->second.slinks, precisionLevel, statDetail == 3 || statDetail == 5).length());
-            maxColLen[5] = (int)max(maxColLen[5], approximate(backupIt->second.modifiedFiles, precisionLevel, statDetail == 3 || statDetail == 5).length());
-            
-            timeDetail = localtime(&backupIt->second.finishTime);
-            auto timeString = to_string(timeDetail->tm_year) + to_string(timeDetail->tm_mon) + to_string(timeDetail->tm_mday);
-            
-            if (dayUnique.find(timeString) == dayUnique.end()) {
-                dayUnique.insert(timeString);
-                if (timeDetail->tm_mon == 0 && timeDetail->tm_mday == 1)
-                    ++numYear;
-                else if (timeDetail->tm_mday == 1)
-                    ++numMonth;
-                else if (timeDetail->tm_wday == config.settings[sDOW].ivalue())
-                    ++numWeek;
-                else
-                    ++numDay;
+            if (!GLOBALS.cli.count(CLI_TAG) || tags.match(GLOBALS.cli[CLI_TAG].as<string>(), backupIt->first)) {
+                ages.insert(ages.end(), backupIt->second.finishTime ? timeDiff(mktimeval(backupIt->second.finishTime)).c_str() : "?");
+                
+                maxColLen[0] = (int)max(maxColLen[0], backupIt->first.length());
+                maxColLen[1] = (int)max(maxColLen[1], approximate(backupIt->second.ds.getSize() + backupIt->second.ds.getSaved(), precisionLevel, statDetail == 3 || statDetail == 5).length());
+                maxColLen[2] = (int)max(maxColLen[2], approximate(backupIt->second.ds.getSize(), precisionLevel, statDetail == 3 || statDetail == 5).length());
+                maxColLen[3] = (int)max(maxColLen[3], approximate(backupIt->second.dirs, precisionLevel, statDetail == 3 || statDetail == 5).length());
+                maxColLen[4] = (int)max(maxColLen[4], approximate(backupIt->second.slinks, precisionLevel, statDetail == 3 || statDetail == 5).length());
+                maxColLen[5] = (int)max(maxColLen[5], approximate(backupIt->second.modifiedFiles, precisionLevel, statDetail == 3 || statDetail == 5).length());
+                maxColLen[8] = (int)max(maxColLen[8], ages.back().length());
+                maxColLen[9] = (int)max(maxColLen[9], perlJoin(", ", tags.tagsOnBackup(backupIt->first)).length());
+                
+                timeDetail = localtime(&backupIt->second.finishTime);
+                auto timeString = to_string(timeDetail->tm_year) + to_string(timeDetail->tm_mon) + to_string(timeDetail->tm_mday);
+                
+                if (dayUnique.find(timeString) == dayUnique.end()) {
+                    dayUnique.insert(timeString);
+                    if (timeDetail->tm_mon == 0 && timeDetail->tm_mday == 1)
+                        ++numYear;
+                    else if (timeDetail->tm_mday == 1)
+                        ++numMonth;
+                    else if (timeDetail->tm_wday == config.settings[sDOW].ivalue())
+                        ++numWeek;
+                    else
+                        ++numDay;
+                }
             }
             ++backupIt;
         }
         
-        cout << "Retention stats:\n";
-        cout << "\t• " << numDay << " of " << config.settings[sDays].ivalue() << " daily\n";
-        cout << "\t• " << numWeek << " of " << config.settings[sWeeks].ivalue() << " weekly\n";
-        cout << "\t• " << numMonth << " of " << config.settings[sMonths].ivalue() << " monthly\n";
-        cout << "\t• " << numYear << " of " << config.settings[sYears].ivalue() << " yearly\n";
-        cout << line << endl;
+        introSummary +=  "Retention stats:\n";
+        introSummary += "\t• " + to_string(numDay) + " of " + to_string(config.settings[sDays].ivalue()) + " daily\n";
+        introSummary += "\t• " + to_string(numWeek) + " of " + to_string(config.settings[sWeeks].ivalue()) + " weekly\n";
+        introSummary += "\t• " +  to_string(numMonth) + " of " + to_string(config.settings[sMonths].ivalue()) + " monthly\n";
+        introSummary += "\t• " + to_string(numYear) + " of " + to_string(config.settings[sYears].ivalue()) + " yearly\n";
+        introSummary += line;
         
         string lastMonthYear;
-        char result[1000];
+        char result[3000];
+        auto ageIt = ages.begin();
         backupIt = config.fcache.getFirstBackup();
         while (backupIt != config.fcache.getEnd())  {
-            timeDetail = localtime(&backupIt->second.finishTime);
-            string monthYear = backupIt->second.finishTime ? vars2MY(timeDetail->tm_mon+1, timeDetail->tm_year+1900) : "Unknown";
-            
-            // print the month header
-            if (lastMonthYear != monthYear) {
-                cout << BOLDBLUE << "\n";
+            if (!GLOBALS.cli.count(CLI_TAG) || tags.match(GLOBALS.cli[CLI_TAG].as<string>(), backupIt->first)) {
                 
-                int x = -1;
-                while (headers[++x].length()) {
-                    string header = headers[x];
-                    
-                    if (header == "x")
-                        header = monthYear;
-                    
-                    cout << (x == 0 ? "" : "  ") << header;
-                    
-                    if (maxColLen[x] > header.length()) {
-                        string spaces(maxColLen[x] - header.length(), ' ');
-                        cout << spaces;
-                    }
+                if (!summaryShown) {
+                    summaryShown = true;
+                    cout << introSummary << endl;
                 }
                 
-                cout << RESET << "\n";
+                timeDetail = localtime(&backupIt->second.finishTime);
+                string monthYear = backupIt->second.finishTime ? vars2MY(timeDetail->tm_mon+1, timeDetail->tm_year+1900) : "Unknown";
+                
+                // print the month header
+                if (lastMonthYear != monthYear) {
+                    cout << BOLDBLUE << "\n";
+                    
+                    int x = -1;
+                    while (headers[++x].length()) {
+                        string header = headers[x];
+                        
+                        if (header == "x")
+                            header = monthYear;
+                        
+                        cout << (x == 0 ? "" : "  ") << header;
+                        
+                        if (maxColLen[x] > header.length()) {
+                            string spaces(maxColLen[x] - header.length(), ' ');
+                            cout << spaces;
+                        }
+                    }
+                    
+                    cout << RESET << "\n";
+                }
+                
+                snprintf(result, sizeof(result),
+                         // filename
+                         string(string("%-") + to_string(maxColLen[0]) + "s  " +
+                                // size
+                                "%" + to_string(maxColLen[1]) + "s  " +
+                                // used
+                                "%" + to_string(maxColLen[2]) + "s  " +
+                                // dirs
+                                "%" + to_string(maxColLen[3]) + "s  " +
+                                // symlinks
+                                "%" + to_string(maxColLen[4]) + "s  " +
+                                // modifies
+                                "%" + to_string(maxColLen[5]) + "s  " +
+                                // duration
+                                "%s  " +
+                                // type
+                                "%-4s  " +
+                                // content age
+                                "%-" + to_string(maxColLen[8]) + "s  " +
+                                // tags
+                                "%s").c_str(),
+                         backupIt->first.c_str(),
+                         approximate(backupIt->second.ds.getSize() + backupIt->second.ds.getSaved(), precisionLevel, statDetail == 3 || statDetail == 5).c_str(),
+                         approximate(backupIt->second.ds.getSize(), precisionLevel, statDetail == 3 || statDetail == 5).c_str(),
+                         approximate(backupIt->second.dirs, precisionLevel, statDetail == 3 || statDetail == 5).c_str(),
+                         approximate(backupIt->second.slinks, precisionLevel, statDetail == 3 || statDetail == 5).c_str(),
+                         approximate(backupIt->second.modifiedFiles, precisionLevel, statDetail == 3 || statDetail == 5).c_str(),
+                         seconds2hms(backupIt->second.duration).c_str(),
+                         timeDetail->tm_mon  == 0 && timeDetail->tm_mday == 1 ? "Year" : timeDetail->tm_mday == 1 ? "Mnth" : timeDetail->tm_wday == config.settings[sDOW].ivalue() ? "Week" : "Day",
+                         //backupIt->second.finishTime ? timeDiff(mktimeval(backupIt->second.finishTime)).c_str() : "?",
+                         ageIt++->c_str(),
+                         perlJoin(", ", tags.tagsOnBackup(backupIt->first)).c_str());
+                
+                cout << result << endl;
+                lastMonthYear = monthYear;
             }
-            
-            snprintf(result, sizeof(result),
-                     // filename
-                     string(string("%-") + to_string(maxColLen[0]) + "s  " +
-                            // size
-                            "%" + to_string(maxColLen[1]) + "s  " +
-                            // used
-                            "%" + to_string(maxColLen[2]) + "s  " +
-                            // dirs
-                            "%" + to_string(maxColLen[3]) + "s  " +
-                            // symlinks
-                            "%" + to_string(maxColLen[4]) + "s  " +
-                            // modifies
-                            "%" + to_string(maxColLen[5]) + "s  " +
-                            // duration
-                            "%s  " +
-                            // type
-                            "%-4s  " +
-                            // content age
-                            "%s").c_str(),
-                     backupIt->first.c_str(),
-                     approximate(backupIt->second.ds.getSize() + backupIt->second.ds.getSaved(), precisionLevel, statDetail == 3 || statDetail == 5).c_str(),
-                     approximate(backupIt->second.ds.getSize(), precisionLevel, statDetail == 3 || statDetail == 5).c_str(),
-                     approximate(backupIt->second.dirs, precisionLevel, statDetail == 3 || statDetail == 5).c_str(),
-                     approximate(backupIt->second.slinks, precisionLevel, statDetail == 3 || statDetail == 5).c_str(),
-                     approximate(backupIt->second.modifiedFiles, precisionLevel, statDetail == 3 || statDetail == 5).c_str(),
-                     seconds2hms(backupIt->second.duration).c_str(),
-                     timeDetail->tm_mon  == 0 && timeDetail->tm_mday == 1 ? "Year" : timeDetail->tm_mday == 1 ? "Mnth" : timeDetail->tm_wday == config.settings[sDOW].ivalue() ? "Week" : "Day",
-                     backupIt->second.finishTime ? timeDiff(mktimeval(backupIt->second.finishTime)).c_str() : "?");
-            
-            cout << result << endl;
             ++backupIt;
-            lastMonthYear = monthYear;
         }
         
         return true;
@@ -494,7 +517,7 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail) {
 }
 
 
-void _displayDetailedStats(BackupConfig& config, int statDetail) {
+void _displayDetailedStats(BackupConfig& config, int statDetail, Tagging &tags) {
     const int NUMCOLUMNS = 6;
     int maxColLen[NUMCOLUMNS] = { 0 };
     int numDay = 0, numWeek = 0, numMonth = 0, numYear = 0;
@@ -505,7 +528,7 @@ void _displayDetailedStats(BackupConfig& config, int statDetail) {
     int precisionLevel = statDetail > 3 ? 0 : statDetail > 1 ? 1 : -1;
     string headers[] = { "x", "Size", "Duration", "Type", "Lnks", "Age", "" };
     
-    if (_displayDetailedFaubStats(config, statDetail))
+    if (_displayDetailedFaubStats(config, statDetail, tags) || GLOBALS.cli.count(CLI_TAG))
         return;
     
     maxColLen[2] = 8;
@@ -674,17 +697,19 @@ void _displayDetailedStats(BackupConfig& config, int statDetail) {
 
 
 void displayDetailedStatsWrapper(ConfigManager& configManager, int statDetail) {
+    Tagging tags;
+    
     if (configManager.activeConfig > -1 && !configManager.configs[configManager.activeConfig].temp)
-        _displayDetailedStats(configManager.configs[configManager.activeConfig], statDetail);
+        _displayDetailedStats(configManager.configs[configManager.activeConfig], statDetail, tags);
     else {
         bool previous = false;
         for (auto &config: configManager.configs) {
             if (!config.temp && !config.settings[sPaths].value.length()) {
                 
-                if (previous)
+                if (previous && !GLOBALS.cli.count(CLI_TAG))
                     cout << "\n\n";
                 
-                _displayDetailedStats(config, statDetail);
+                _displayDetailedStats(config, statDetail, tags);
                 previous = true;
             }
         }

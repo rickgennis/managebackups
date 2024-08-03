@@ -7,6 +7,7 @@
 #include "cxxopts.hpp"
 #include "colors.h"
 #include "debug.h"
+#include "tagging.h"
 
 #include <unistd.h>
 #include <set>
@@ -142,6 +143,8 @@
 #define CLI_REPLICATETO "replicateto"
 #define CLI_RMN "rmn"
 #define CLI_RMO "rmo"
+#define CLI_TAG "tag"
+#define CLI_TAGRM "tagrm"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:|\\b)+)(.*?)\\s*?")
@@ -220,6 +223,7 @@ struct global_vars {
     bool useBlocks;
     int pipes[2][2];
     set<int> reapedPids;
+    Tagging tags;
 };
 
 #endif

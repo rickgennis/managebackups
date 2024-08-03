@@ -85,6 +85,8 @@
 #include "setup.h"
 #include "statistics.h"
 #include "util_generic.h"
+#include "tagging.h"
+
 
 using namespace pcrepp;
 struct global_vars GLOBALS;
@@ -535,6 +537,9 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
         !GLOBALS.cli.count(CLI_COMPARE) && !GLOBALS.cli.count(CLI_COMPAREFILTER) &&
         !GLOBALS.cli.count(CLI_LAST) &&
         
+        // or removing a tag
+        !GLOBALS.cli.count(CLI_TAGRM) &&
+
         // & user hasn't selected --all/--All where there's a dir configured in at least one (first)
         // profile
         !((GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_ALLPAR) ||
@@ -1047,8 +1052,7 @@ void updateLinks(BackupConfig &config)
  *
  * Substitute variable values into SCP/SFP commands.
  *******************************************************************************/
-string interpolate(string command, string subDir, string fullDirectory, string basicFilename)
-{
+string interpolate(string command, string subDir, string fullDirectory, string basicFilename) {
     string origCmd = command;
     size_t pos;
     
@@ -2103,7 +2107,7 @@ int main(int argc, char *argv[]) {
         string("a,") + CLI_ALLSEQ, "All sequential", cxxopts::value<bool>()->default_value("false"))(
         string("A,") + CLI_ALLPAR, "All parallel", cxxopts::value<bool>()->default_value("false"))(
         string("z,") + CLI_ZERO, "No animation (internal)", cxxopts::value<bool>()->default_value("false"))(
-        string("t,") + CLI_TEST, "Test only mode", cxxopts::value<bool>()->default_value("false"))(
+        CLI_TEST, "Test only mode", cxxopts::value<bool>()->default_value("false"))(
         string("x,") + CLI_LOCK, "Lock profile", cxxopts::value<bool>()->default_value("false"))(
         string("k,") + CLI_CRONS, "Cron", cxxopts::value<bool>()->default_value("false"))(
         string("K,") + CLI_CRONP, "Cron", cxxopts::value<bool>()->default_value("false"))(
@@ -2166,6 +2170,8 @@ int main(int argc, char *argv[]) {
         CLI_EXCLUDE, "Exclude", cxxopts::value<std::string>())(
         CLI_FILTERDIRS, "Filter directories", cxxopts::value<bool>()->default_value("false"))(
         CLI_ARCHIVE, "Archive profile", cxxopts::value<bool>()->default_value("false"))(
+        string("t,") + CLI_TAG, "Tag a backup", cxxopts::value<string>())(
+        CLI_TAGRM, "Remove a tag", cxxopts::value<string>())(
         CLI_REPLICATETO, "Replicate To", cxxopts::value<std::string>())(
         CLI_RMN, "Remove newest backups", cxxopts::value<int>())(
         CLI_RMO, "Remove oldest backups", cxxopts::value<int>())(
@@ -2328,6 +2334,35 @@ int main(int argc, char *argv[]) {
         FastCache fc;
         fc.invalidate();
         exit(0);
+    }
+    
+    if (GLOBALS.cli.count(CLI_TAGRM)) {
+        string tag = GLOBALS.cli[CLI_TAGRM].as<string>();
+        
+        if (GLOBALS.tags.removeTag(tag))
+            cout << "\t• removed all occurrences of tag " << tag << endl;
+        else
+            if (GLOBALS.tags.removeTagsOn(tag))
+                cout << "\t• removed all tags from backup " << tag << endl;
+            else
+                SCREENERR("error: no tags or backups found matching " << tag);
+        exit(1);
+    }
+    
+    // --tag snapshot=/var/backups/foo-2024-09-12
+    if (GLOBALS.cli.count(CLI_TAG)) {
+        auto elements = perlSplit("(?<!\\\\)=", GLOBALS.cli[CLI_TAG].as<string>());
+        if (elements[0].length() && elements[1].length()) {
+            
+            if (currentConfig->isFaub()) {
+                scanConfigToCache(*currentConfig);
+                currentConfig->fcache.tagBackup(elements[0], elements[1]);
+            }
+            else
+                SCREENERR("error: --" << CLI_TAG << " is only compatible with faub-based backups");
+            
+            exit(0);
+        }
     }
 
     if (GLOBALS.cli.count(CLI_RMN) || GLOBALS.cli.count(CLI_RMO)) {
@@ -2593,6 +2628,7 @@ int main(int argc, char *argv[]) {
         ValueParamIfSpecified(CLI_NOS) + ValueParamIfSpecified(CLI_DAYS) +
         ValueParamIfSpecified(CLI_WEEKS) + ValueParamIfSpecified(CLI_MONTHS) +
         ValueParamIfSpecified(CLI_TRIPWIRE) + ValueParamIfSpecified(CLI_NOTIFYEVERY) +
+        ValueParamIfSpecified(CLI_TAG) +
         ValueParamIfSpecified(CLI_YEARS) + ValueParamIfSpecified(CLI_NICE) +
         ValueParamIfSpecified(CLI_INCLUDE) + ValueParamIfSpecified(CLI_EXCLUDE) +
         (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ? " -x" : "") +

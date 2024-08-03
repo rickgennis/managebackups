@@ -6,6 +6,7 @@
 #include <map>
 #include <sys/stat.h>
 #include "FaubEntry.h"
+#include "tagging.h"
 
 
 using namespace std;
@@ -54,6 +55,9 @@ public:
     myMapIT getLastBackup() { return (backups.size() ? --backups.end() : backups.end()); }
     myMapIT getEnd() { return backups.end(); }
     void removeBackup(map<string, FaubEntry>::iterator which) {
+        Tagging tags;
+        tags.removeTagsOn(which->first);
+
         which->second.removeEntry();
         backups.erase(which);
     }
@@ -61,7 +65,9 @@ public:
     void updateDiffFiles(string backupDir, set<string> files);
     bool displayDiffFiles(string backupDir);
     void compare(string backupA, string backupB, string threshold);
-    
+
+    void tagBackup(string tagname, string backup);
+
     void cleanup();
     void recache(string targetDir, time_t deletedtime = 0, bool forceAll = false);
     string getInProcessFilename() { return inProcessFilename; }

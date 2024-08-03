@@ -106,6 +106,8 @@ struct timeval mktimeval(time_t secs);
 string timeDiff(struct timeval start, struct timeval end = mktimeval(GLOBALS.startupTime), int maxUnits = 2, int precision = 2);
 string timeDiffSingle(struct timeval, int maxUnits = 2, int precision = 2);
 
+string perlJoin(string delimiter, vector<string> items);
+
 vector<string> perlSplit(string regex, string haystack);
 
 

@@ -10,9 +10,8 @@
 #include "BackupConfig.h"
 #include "util_generic.h"
 #include "debug.h"
-
-#include "FaubCache.h"
 #include "FastCache.h"
+#include "tagging.h"
 
 
 FaubCache::FaubCache(string path, string profileName, string aUuid) {
@@ -348,6 +347,15 @@ bool FaubCache::displayDiffFiles(string backupDir) {
         return backup->second.displayDiffFiles();
     
     return false;
+}
+
+
+void FaubCache::tagBackup(string tagname, string backup) {
+    auto b = findBackup(backup, backups.end());
+    auto backupname = b->second.getDir();
+    
+    GLOBALS.tags.fastTagBackup(tagname, backupname);
+    cout << "\t• tagged " << backupname << " as " << tagname << endl;
 }
 
 
