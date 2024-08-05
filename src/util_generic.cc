@@ -612,7 +612,6 @@ void splitOnRegex(vector<string>& result, string data, Pcre& re, bool trimQ, boo
         pos = regex.get_match_end(0);
         ++pos;
         temp = regex.get_match(0);
-        cout << "split: " << temp << endl;
         
         if (unEscape) {
             size_t altpos;  // remove any remaining backslashes

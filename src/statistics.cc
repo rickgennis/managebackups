@@ -363,10 +363,8 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail, Tagging tag
         auto bkups = config.fcache.getNumberOfBackups();
         auto stats = config.fcache.getTotalStats();
         int saved = floor((1 - (long double)stats.getSize() / (stats.getSize() + stats.getSaved())) * 100 + 0.5);
-        const int NUMCOLUMNS = 10;
-        int maxColLen[NUMCOLUMNS] = { 0 };
-        string headers[] = { "x", "Size", "Used", "Dirs", "SymLks", "Mods", "Duration", "Type", "Age", "Tags", "" };
         
+        vector<headerType> headers{ {"Date"}, {"Size"}, {"Used"}, {"Dirs"}, {"SymLks"}, {"Mods"}, {"Duration", 8}, {"Type", 4}, {"Age"}, {"Tags"}};
         bool summaryShown = false;
         string introSummary = line + "\n";
         if (config.settings[sTitle].value.length())
@@ -386,13 +384,6 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail, Tagging tag
         set<string> dayUnique;
         struct tm *timeDetail;
         int numDay = 0, numWeek = 0, numMonth = 0, numYear = 0;
-        maxColLen[6] = 8;
-        maxColLen[7] = 4;
-        maxColLen[8] = 0;
-        
-        auto arrsize = sizeof(maxColLen) / sizeof(maxColLen[0]);
-        for (int x = 0; x < arrsize; ++x)
-            if (!maxColLen[x]) maxColLen[x] = (int)headers[x].length();
         
         vector<string> ages;
         auto backupIt = config.fcache.getFirstBackup();
@@ -400,15 +391,19 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail, Tagging tag
             if (!GLOBALS.cli.count(CLI_TAG) || tags.match(GLOBALS.cli[CLI_TAG].as<string>(), backupIt->first)) {
                 ages.insert(ages.end(), backupIt->second.finishTime ? timeDiff(mktimeval(backupIt->second.finishTime)).c_str() : "?");
                 
-                maxColLen[0] = (int)max(maxColLen[0], backupIt->first.length());
-                maxColLen[1] = (int)max(maxColLen[1], approximate(backupIt->second.ds.getSize() + backupIt->second.ds.getSaved(), precisionLevel, statDetail == 3 || statDetail == 5).length());
-                maxColLen[2] = (int)max(maxColLen[2], approximate(backupIt->second.ds.getSize(), precisionLevel, statDetail == 3 || statDetail == 5).length());
-                maxColLen[3] = (int)max(maxColLen[3], approximate(backupIt->second.dirs, precisionLevel, statDetail == 3 || statDetail == 5).length());
-                maxColLen[4] = (int)max(maxColLen[4], approximate(backupIt->second.slinks, precisionLevel, statDetail == 3 || statDetail == 5).length());
-                maxColLen[5] = (int)max(maxColLen[5], approximate(backupIt->second.modifiedFiles, precisionLevel, statDetail == 3 || statDetail == 5).length());
-                maxColLen[8] = (int)max(maxColLen[8], ages.back().length());
-                maxColLen[9] = (int)max(maxColLen[9], perlJoin(", ", tags.tagsOnBackup(backupIt->first)).length());
+                headers[0].setMaxLength(backupIt->first.length());
+                headers[1].setMaxLength(approximate(backupIt->second.ds.getSize() + backupIt->second.ds.getSaved(), precisionLevel, statDetail == 3 || statDetail == 5).length());
+                headers[2].setMaxLength(approximate(backupIt->second.ds.getSize(), precisionLevel, statDetail == 3 || statDetail == 5).length());
+                headers[3].setMaxLength(approximate(backupIt->second.dirs, precisionLevel, statDetail == 3 || statDetail == 5).length());
+                headers[4].setMaxLength(approximate(backupIt->second.slinks, precisionLevel, statDetail == 3 || statDetail == 5).length());
+                headers[5].setMaxLength(approximate(backupIt->second.modifiedFiles, precisionLevel, statDetail == 3 || statDetail == 5).length());
+                headers[8].setMaxLength(ages.back().length());
                 
+                string itemTags = perlJoin(", ", tags.tagsOnBackup(backupIt->first));
+                headers[9].setMaxLength(itemTags.length());
+                if (itemTags.length())
+                    headers[9].override = true;
+
                 timeDetail = localtime(&backupIt->second.finishTime);
                 auto timeString = to_string(timeDetail->tm_year) + to_string(timeDetail->tm_mon) + to_string(timeDetail->tm_mday);
                 
@@ -453,18 +448,22 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail, Tagging tag
                 if (lastMonthYear != monthYear) {
                     cout << BOLDBLUE << "\n";
                     
-                    int x = -1;
-                    while (headers[++x].length()) {
-                        string header = headers[x];
+                    for (auto &header: headers) {
+                        string shownHeader = header.name == "Date" ? monthYear : header.name;
                         
-                        if (header == "x")
-                            header = monthYear;
-                        
-                        cout << (x == 0 ? "" : "  ") << header;
-                        
-                        if (maxColLen[x] > header.length()) {
-                            string spaces(maxColLen[x] - header.length(), ' ');
-                            cout << spaces;
+                        if (header.name != "Tags" || header.override) {
+                            
+                            // first column, no leading space
+                            if (header.name != "Date")
+                                cout << "  ";
+                            
+                            cout << shownHeader;
+                            
+                            // padding spaces to handle field lengths
+                            if (header.maxLength > shownHeader.length()) {
+                                string spaces(header.maxLength - shownHeader.length(), ' ');
+                                cout << spaces;
+                            }
                         }
                     }
                     
@@ -473,23 +472,23 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail, Tagging tag
                 
                 snprintf(result, sizeof(result),
                          // filename
-                         string(string("%-") + to_string(maxColLen[0]) + "s  " +
+                         string(string("%-") + to_string(headers[0].maxLength) + "s  " +
                                 // size
-                                "%" + to_string(maxColLen[1]) + "s  " +
+                                "%" + to_string(headers[1].maxLength) + "s  " +
                                 // used
-                                "%" + to_string(maxColLen[2]) + "s  " +
+                                "%" + to_string(headers[2].maxLength) + "s  " +
                                 // dirs
-                                "%" + to_string(maxColLen[3]) + "s  " +
+                                "%" + to_string(headers[3].maxLength) + "s  " +
                                 // symlinks
-                                "%" + to_string(maxColLen[4]) + "s  " +
+                                "%" + to_string(headers[4].maxLength) + "s  " +
                                 // modifies
-                                "%" + to_string(maxColLen[5]) + "s  " +
+                                "%" + to_string(headers[5].maxLength) + "s  " +
                                 // duration
                                 "%s  " +
                                 // type
                                 "%-4s  " +
                                 // content age
-                                "%-" + to_string(maxColLen[8]) + "s  " +
+                                "%-" + to_string(headers[8].maxLength) + "s  " +
                                 // tags
                                 "%s").c_str(),
                          backupIt->first.c_str(),
@@ -518,26 +517,18 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail, Tagging tag
 
 
 void _displayDetailedStats(BackupConfig& config, int statDetail, Tagging &tags) {
-    const int NUMCOLUMNS = 6;
-    int maxColLen[NUMCOLUMNS] = { 0 };
     int numDay = 0, numWeek = 0, numMonth = 0, numYear = 0;
     size_t bytesUsed = 0;
     size_t bytesSaved = 0;
     set<ino_t> countedInode;
     set<string> dayUnique;
     int precisionLevel = statDetail > 3 ? 0 : statDetail > 1 ? 1 : -1;
-    string headers[] = { "x", "Size", "Duration", "Type", "Lnks", "Age", "" };
+    //string headers[] = { "x", "Size", "Duration", "Type", "Lnks", "Age", "" };
+    vector<headerType> headers { {"Date"}, {"Size"}, {"Duration", 8}, {"Type", 4}, {"Lnks"}, {"Age"} };
     
     if (_displayDetailedFaubStats(config, statDetail, tags) || GLOBALS.cli.count(CLI_TAG))
         return;
-    
-    maxColLen[2] = 8;
-    maxColLen[3] = 4;
-    maxColLen[5] = 0;
-    auto arrsize = sizeof(maxColLen) / sizeof(maxColLen[0]);
-    for (int x = 0; x < arrsize; ++x)
-        if (!maxColLen[x]) maxColLen[x] = (int)headers[x].length();
-    
+        
     // calcuclate stats from the entire list of backups
     for (auto &raw: config.cache.rawData) {
         
@@ -563,9 +554,9 @@ void _displayDetailedStats(BackupConfig& config, int statDetail, Tagging &tags) 
                 ++numDay;
         }
         
-        maxColLen[0] = (int)max(maxColLen[0], raw.second.filename.length());
-        maxColLen[1] = (int)max(maxColLen[1], approximate(raw.second.size, precisionLevel, statDetail == 3 || statDetail == 5).length());
-        maxColLen[4] = (int)max(maxColLen[4], approximate(raw.second.links, precisionLevel, statDetail == 3 || statDetail == 5).length());
+        headers[0].setMaxLength(raw.second.filename.length());
+        headers[1].setMaxLength(approximate(raw.second.size, precisionLevel, statDetail == 3 || statDetail == 5).length());
+        headers[4].setMaxLength(approximate(raw.second.links, precisionLevel, statDetail == 3 || statDetail == 5).length());
     }
     
     // calcuclate percentage saved
@@ -614,18 +605,22 @@ void _displayDetailedStats(BackupConfig& config, int statDetail, Tagging &tags) 
             if (lastMonthYear != monthYear) {
                 cout << BOLDBLUE << "\n";
                 
-                int x = -1;
-                while (headers[++x].length()) {
-                    string header = headers[x];
+                for (auto &header: headers) {
+                    string shownHeader = header.name == "Date" ? monthYear : header.name;
                     
-                    if (header == "x")
-                        header = monthYear;
-                    
-                    cout << (x == 0 ? "" : "  ") << header;
-                    
-                    if (maxColLen[x] > header.length()) {
-                        string spaces(maxColLen[x] - header.length(), ' ');
-                        cout << spaces;
+                    if (header.name != "Tags" || header.override) {
+                        
+                        // first column, no leading space
+                        if (header.name != "Date")
+                            cout << "  ";
+                        
+                        cout << shownHeader;
+                        
+                        // padding spaces to handle field lengths
+                        if (header.maxLength > shownHeader.length()) {
+                            string spaces(header.maxLength - shownHeader.length(), ' ');
+                            cout << spaces;
+                        }
                     }
                 }
                 
@@ -653,15 +648,15 @@ void _displayDetailedStats(BackupConfig& config, int statDetail, Tagging &tags) 
             char result[1000];
             snprintf(result, sizeof(result),
                      // filename
-                     string(string("%-") + to_string(maxColLen[0]) + "s  " +
+                     string(string("%-") + to_string(headers[0].maxLength) + "s  " +
                             // size
-                            "%" + to_string(maxColLen[1]) + "s  " +
+                            "%" + to_string(headers[1].maxLength) + "s  " +
                             // duration
                             "%s  " +
                             // type
-                            "%-" + to_string(maxColLen[3]) + "s  " +
+                            "%-" + to_string(headers[3].maxLength) + "s  " +
                             // links
-                            "%" + to_string(maxColLen[4]) + "u  " +
+                            "%" + to_string(headers[4].maxLength) + "u  " +
                             // content age
                             "%s").c_str(),
                      raw_it->second.filename.c_str(), approximate(raw_it->second.size, precisionLevel, statDetail == 3 || statDetail == 5).c_str(),

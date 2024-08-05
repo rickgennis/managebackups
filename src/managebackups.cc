@@ -2355,6 +2355,9 @@ int main(int argc, char *argv[]) {
         if (elements[0].length() && elements[1].length()) {
             
             if (currentConfig->isFaub()) {
+                cout << "param: [" << GLOBALS.cli[CLI_TAG].as<string>() << "]\n";
+                cout << "0: [" << elements[0] << "]; [" << elements[1] << "]" << endl;
+                
                 scanConfigToCache(*currentConfig);
                 currentConfig->fcache.tagBackup(elements[0], elements[1]);
             }
