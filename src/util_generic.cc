@@ -16,13 +16,10 @@
 #include <list>
 #include <set>
 
-#include "pcre++.h"
 #include "util_generic.h"
 #include "globals.h"
 #include "ipc.h"
 #include "exception.h"
-
-using namespace pcrepp;
 
 #if defined(__linux__)
 #  include <endian.h>
@@ -601,6 +598,7 @@ string trimQuotes(string s, bool unEscape) {
     return result;
 }
 
+
 // splitOnRegex: the RE given matches on the tokens to be returned (the data)
 // perlSplit: the RE given matches the delimiter and tokens are found in between
 void splitOnRegex(vector<string>& result, string data, Pcre& re, bool trimQ, bool unEscape) {
@@ -621,6 +619,19 @@ void splitOnRegex(vector<string>& result, string data, Pcre& re, bool trimQ, boo
         
         result.push_back(trimQ ? trimQuotes(temp) : temp);
     }
+}
+
+
+vector<string> fullRegexMatch(string re, string data) {
+    Pcre regex(re);
+    vector<string> results;
+    
+    if (regex.search(data)) {
+        for (int x = 0; x < regex.matches(); x++)
+            results.insert(results.end(), regex.get_match(x));
+    }
+    
+    return results;
 }
 
 

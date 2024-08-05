@@ -30,8 +30,8 @@ public:
     void tagBackup(string tag, string backup);
     void fastTagBackup(string tag, string backup);
     
-    bool removeTagsOn(string backup);
-    bool removeTag(string tag);
+    unsigned long removeTagsOn(string backup);
+    unsigned long removeTag(string tag);
 };
 
 #endif

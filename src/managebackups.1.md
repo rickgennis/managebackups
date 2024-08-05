@@ -263,11 +263,12 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 **--leaveoutput**
 : {both} Leave the output from any commands that are executed (create a backup, ssh, SFTP, etc) in a file under /tmp/managebackups_output. This can help facilitate diagnosing authentication or configuration errors.
 
-**-t,--tag** [*data*]
+**-t,--tag** [*tagname*]
+**-t,--tag** [*tagname*:*backup*]
 : {FB} There are three uses of the tag directive:
 
     * (1) tag a backup as it's taken (e.g. "mb -p main -t snapshot")
-    * (2) tag a previously taken backup (e.g. "mb -p main -t snapshot=/var/backup/main-2024-02-23")
+    * (2) tag a previously taken backup; syntax is tag:backup (e.g. "mb -p main -t snapshot:/var/backup/main-2024-02-23")
     * (3) display backups that match a tag (e.g. "mb -1 -t snapshot")
 
 When tagging a previous backup (2) the full backup name isn't required; only enough to uniquely identify it.  By contrast tag names always need to be precisely specified.

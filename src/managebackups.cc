@@ -2339,11 +2339,11 @@ int main(int argc, char *argv[]) {
     if (GLOBALS.cli.count(CLI_TAGRM)) {
         string tag = GLOBALS.cli[CLI_TAGRM].as<string>();
         
-        if (GLOBALS.tags.removeTag(tag))
-            cout << "\t• removed all occurrences of tag " << tag << endl;
+        if (auto count = GLOBALS.tags.removeTag(tag))
+            cout << "\t• removed all " << plural(count, "occurrence") << " of tag " << tag << endl;
         else
-            if (GLOBALS.tags.removeTagsOn(tag))
-                cout << "\t• removed all tags from backup " << tag << endl;
+            if (auto count = GLOBALS.tags.removeTagsOn(tag))
+                cout << "\t• removed all " << plural(count, "tag") << " from backup " << tag << endl;
             else
                 SCREENERR("error: no tags or backups found matching " << tag);
         exit(1);
@@ -2351,12 +2351,19 @@ int main(int argc, char *argv[]) {
     
     // --tag snapshot=/var/backups/foo-2024-09-12
     if (GLOBALS.cli.count(CLI_TAG)) {
-        auto elements = perlSplit("(?<!\\\\)=", GLOBALS.cli[CLI_TAG].as<string>());
+        
+        auto elements = fullRegexMatch("^([^:\\\\]+):(.+)$", GLOBALS.cli[CLI_TAG].as<string>());
+        
+        //splitOnRegex(elements, GLOBALS.cli[CLI_TAG].as<string>(), regex, false, false);
+   //     auto elements = perlSplit("(?<![:\\\\]):", GLOBALS.cli[CLI_TAG].as<string>());
+//        void splitOnRegex(vector<string>& result, string data, Pcre& re, bool trimQ, bool unEscape) {
+
+        
         if (elements[0].length() && elements[1].length()) {
             
             if (currentConfig->isFaub()) {
                 cout << "param: [" << GLOBALS.cli[CLI_TAG].as<string>() << "]\n";
-                cout << "0: [" << elements[0] << "]; [" << elements[1] << "]" << endl;
+                cout << "0: [" << elements[0] << "]; 1: [" << elements[1] << "]" << endl;
                 
                 scanConfigToCache(*currentConfig);
                 currentConfig->fcache.tagBackup(elements[0], elements[1]);

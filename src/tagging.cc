@@ -101,7 +101,7 @@ vector<string> Tagging::tagsOnBackup(string backup) {
 }
 
 
-bool Tagging::removeTagsOn(string backup) {
+unsigned long Tagging::removeTagsOn(string backup) {
     load();
 
     vector<multimap<string, string>::iterator> deadElements;
@@ -119,7 +119,7 @@ bool Tagging::removeTagsOn(string backup) {
 }
 
 
-bool Tagging::removeTag(string tag) {
+unsigned long Tagging::removeTag(string tag) {
     load();
     
     vector<multimap<string, string>::iterator> deadElements;

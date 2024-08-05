@@ -248,40 +248,45 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
         statStrings.insert(statStrings.end(), "");
         statStrings.insert(statStrings.end(), "");
     }
+
+    vector<headerType> headers { {"Profile"}, {"Most Recent Backup"}, {"Finish@"}, {"Duration"}, {"Size (Total)"}, {"Uniq (T)"}, {"Saved"}, {"Age Range"} };
     
     // determine the longest length entry of each column to allow consistent horizontal formatting
-    int colLen[NUMSTATDETAILS] = {};
     int numberStatStrings = (int)statStrings.size();
     for (int column = 0; column < NUMSTATDETAILS - 1; ++column) {
         int line = 0;
         
         while (NUMSTATDETAILS * line + column < numberStatStrings) {
             if (column == 7)  // cols 7 and 8 get combined
-                colLen[column] = (int)max(colLen[column],
-                                          statStrings[NUMSTATDETAILS * line + column].length() +
-                                          statStrings[NUMSTATDETAILS * line + column+1].length() + 6);
+                headers[column].setMaxLength(statStrings[NUMSTATDETAILS * line + column].length() +
+                                             statStrings[NUMSTATDETAILS * line + column+1].length() + 6);
             else if (column > 7)
-                colLen[column] = (int)max(colLen[column], statStrings[NUMSTATDETAILS * line + column+1].length());
+                headers[column].setMaxLength(statStrings[NUMSTATDETAILS * line + column+1].length());
             else
-                colLen[column] = (int)max(colLen[column], statStrings[NUMSTATDETAILS * line + column].length());
+                headers[column].setMaxLength(statStrings[NUMSTATDETAILS * line + column].length());
             
             ++line;
         }
     }
-        
+
+    // print the header row
     if (numberStatStrings >= NUMSTATDETAILS) {
-        // print the header row
-        // the blank at the end isn't just for termination; it's used for "in process" status
         string headerText = BOLDBLUE;
-        string headers[] = { "Profile", "Most Recent Backup", "Finish@", "Duration", "Size (Total)", "Uniq (T)", "Saved", "Age Range", "" };
         
-        int x = -1;
-        while (headers[++x].length()) {
-            headerText += (x == 0 ? "" : "  ") + headers[x];
+        for (auto &header: headers) {
             
-            // pad the headers to line up with the longest item in each column
-            if (colLen[x] > headers[x].length())
-                headerText += string(colLen[x] - headers[x].length(), ' ');
+            // first column, no leading space
+            if (header.name != headers.begin()->name)
+                headerText += "  ";
+            
+            headerText += header.name;
+            
+            // padding spaces to handle field lengths
+            if (header.maxLength > header.name.length()) {
+                string spaces(header.maxLength - header.name.length(), ' ');
+                headerText += spaces;
+            }
+            
         }
         
         !cacheOnly && cout << headerText << RESET << "\n";
@@ -290,11 +295,10 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
         // setup line formatting
         string lineFormat;
         for (int x = 0; x < NUMSTATDETAILS - 3; ++x)
-            if (max(headers[x].length(), colLen[x]))
-                lineFormat += (lineFormat.length() ? "  " : "") + string("%") + string(x == 6 ? "" : "-") +
-                to_string(max(headers[x].length(), colLen[x])) + "s";   // 6th column is right-justified
+            lineFormat += (lineFormat.length() ? "  " : "") + string("%") + string(x == 6 ? "" : "-") +
+            to_string(headers[x].maxLength) + "s";   // 6th column is right-justified
         lineFormat += "  ";
-                
+        
         // print line by line results
         char result[1000];
         int line = 0;
@@ -329,11 +333,11 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
         // print the totals line
         if (!singleConfig && nonTempConfigs > 1) {
             snprintf(result, sizeof(result), string(
-                                                    "%-" + to_string(max(headers[3].length(), colLen[3])) + "s  " +
-                                                    "%-" + to_string(max(headers[4].length(), colLen[4])) + "s  " +
-                                                    "%-" + to_string(max(headers[5].length(), colLen[5])) + "s  " +
-                                                    "%"  + to_string(max(headers[6].length(), colLen[6])) + "s  " +
-                                                    "%-" + to_string(colLen[7]) + "s").c_str(),
+                                                    "%-" + to_string(headers[3].maxLength) + "s  " +
+                                                    "%-" + to_string(headers[4].maxLength) + "s  " +
+                                                    "%-" + to_string(headers[5].maxLength) + "s  " +
+                                                    "%"  + to_string(headers[6].maxLength) + "s  " +
+                                                    "%-" + to_string(headers[7].maxLength) + "s").c_str(),
                      statStrings[line * NUMSTATDETAILS + 3].c_str(),
                      statStrings[line * NUMSTATDETAILS + 4].c_str(),
                      statStrings[line * NUMSTATDETAILS + 5].c_str(),
@@ -341,7 +345,7 @@ void displaySummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
                      statStrings[line * NUMSTATDETAILS + 7].c_str(),
                      statStrings[line * NUMSTATDETAILS + 8].c_str());
             
-            string spaces(max(headers[0].length(), colLen[0]) + max(headers[1].length(), colLen[1]) + colLen[2], ' ');
+            string spaces(headers[0].maxLength + headers[1].maxLength + headers[2].maxLength, ' ');
             !cacheOnly && cout << BOLDWHITE << "TOTALS" << spaces << result << RESET << "\n";
             fastCache.appendStatus(FASTCACHETYPE (string(BOLDWHITE) + "TOTALS" + spaces + result + RESET, 0, 1));
         }
@@ -365,7 +369,6 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail, Tagging tag
         int saved = floor((1 - (long double)stats.getSize() / (stats.getSize() + stats.getSaved())) * 100 + 0.5);
         
         vector<headerType> headers{ {"Date"}, {"Size"}, {"Used"}, {"Dirs"}, {"SymLks"}, {"Mods"}, {"Duration", 8}, {"Type", 4}, {"Age"}, {"Tags"}};
-        bool summaryShown = false;
         string introSummary = line + "\n";
         if (config.settings[sTitle].value.length())
             introSummary += "Profile: " + config.settings[sTitle].value + "\n";
@@ -429,32 +432,34 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail, Tagging tag
         introSummary += "\t• " + to_string(numYear) + " of " + to_string(config.settings[sYears].ivalue()) + " yearly\n";
         introSummary += line;
         
+        if (!GLOBALS.cli.count(CLI_TAG))
+            cout << introSummary << endl;
+
         string lastMonthYear;
         char result[3000];
+        firstTimeOnly fto;
         auto ageIt = ages.begin();
         backupIt = config.fcache.getFirstBackup();
+        
         while (backupIt != config.fcache.getEnd())  {
             if (!GLOBALS.cli.count(CLI_TAG) || tags.match(GLOBALS.cli[CLI_TAG].as<string>(), backupIt->first)) {
-                
-                if (!summaryShown) {
-                    summaryShown = true;
-                    cout << introSummary << endl;
-                }
-                
                 timeDetail = localtime(&backupIt->second.finishTime);
                 string monthYear = backupIt->second.finishTime ? vars2MY(timeDetail->tm_mon+1, timeDetail->tm_year+1900) : "Unknown";
                 
                 // print the month header
                 if (lastMonthYear != monthYear) {
-                    cout << BOLDBLUE << "\n";
-                    
+                    cout << BOLDBLUE;
+
+                    if (!fto.firstRun() || !GLOBALS.cli.count(CLI_TAG))
+                        cout << "\n";
+                                        
                     for (auto &header: headers) {
                         string shownHeader = header.name == "Date" ? monthYear : header.name;
                         
                         if (header.name != "Tags" || header.override) {
                             
                             // first column, no leading space
-                            if (header.name != "Date")
+                            if (header.name != headers.begin()->name)
                                 cout << "  ";
                             
                             cout << shownHeader;
@@ -611,7 +616,7 @@ void _displayDetailedStats(BackupConfig& config, int statDetail, Tagging &tags) 
                     if (header.name != "Tags" || header.override) {
                         
                         // first column, no leading space
-                        if (header.name != "Date")
+                        if (header.name != headers.begin()->name)
                             cout << "  ";
                         
                         cout << shownHeader;

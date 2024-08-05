@@ -9,12 +9,14 @@
 #include <set>
 #include <iostream>
 
+#include "pcre++.h"
 #include "globals.h"
 #include "math.h"
 #include "globals.h"
 
-
+using namespace pcrepp;
 using namespace std;
+
 
 struct DiskStats {
     size_t usedInBytes;
@@ -109,6 +111,8 @@ string timeDiffSingle(struct timeval, int maxUnits = 2, int precision = 2);
 string perlJoin(string delimiter, vector<string> items);
 
 vector<string> perlSplit(string regex, string haystack);
+
+void splitOnRegex(vector<string>& result, string data, Pcre& re, bool trimQ, bool unEscape);
 
 
 class timer {
@@ -294,6 +298,20 @@ public:
 };
 
 bool statModeOwnerTimeEqual(struct stat a, struct stat b);
+
+vector<string> fullRegexMatch(string re, string data);
+
+
+class firstTimeOnly {
+    bool firstDone;
+public:
+    firstTimeOnly() : firstDone(false) {};
+    bool firstRun() {
+        auto state = firstDone;
+        firstDone = true;
+        return !state;
+    }
+};
 
 #endif
 
