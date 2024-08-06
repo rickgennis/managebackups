@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.7.2d
+% MANAGEBACKUPS(1) managebackups 1.7.3
 % Rick Ennis
 % March 2023
 
@@ -264,17 +264,33 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 : {both} Leave the output from any commands that are executed (create a backup, ssh, SFTP, etc) in a file under /tmp/managebackups_output. This can help facilitate diagnosing authentication or configuration errors.
 
 **-t,--tag** [*tagname*]
+
 **-t,--tag** [*tagname*:*backup*]
 : {FB} There are three uses of the tag directive:
 
-    * (1) tag a backup as it's taken (e.g. "mb -p main -t snapshot")
-    * (2) tag a previously taken backup; syntax is tag:backup (e.g. "mb -p main -t snapshot:/var/backup/main-2024-02-23")
-    * (3) display backups that match a tag (e.g. "mb -1 -t snapshot")
+        * tag a backup as it's taken (e.g. "mb -p main -t snapshot")
+        * tag a previously taken backup; syntax is tag:backup (e.g. "mb -p main -t snapshot:/var/backup/main-2024-02-23")
+        * display backups that match a tag (e.g. "mb -1 -t snapshot")
 
-When tagging a previous backup (2) the full backup name isn't required; only enough to uniquely identify it.  By contrast tag names always need to be precisely specified.
+When tagging a previous backup the full backup name isn't required; only enough to uniquely identify it.  By contrast tag names always need to be precisely specified.
 
 **--tagrm** [*data*]
 : {FB} If a tag is specified it will be removed from all backups.  If a backup is specified, all tags will be removed from it.
+
+**--hold** [*holdtime*]
+
+**--hold** [*holdtime*:*backup*]
+: {FB} There are two uses of the hold directive:
+
+        * set a holdtime while a backup is taken (e.g. "mb -p main --hold 6m" for 6 months)
+        * set a holdtime on an existing backup (e.g. "mb -p main --hold 3w:/var/backup/main-2024-02-23")
+
+When specifying a previous backup the full backupname isn't required; only enough to uniquely identify it. *holdtime* can specify the length of time to hold a backup (prevent deletion according to the configured daily/weekly/monthly/yearly schedule) in any combination of days, weeks, months or years.  Months are computed as 30 days.  Alternatively the end date of the hold can be given.  Specify 0 to remove a hold.  Examples of valid *holdtime*s:
+
+        * 2y3w5d    (for 2 years, 3 weeks, 5 days)
+        * 9w
+        * 12/31
+        * 5/27/2028
 
 **--include** [*pattern*]
 : {FB} Only backup directory entries that match the specified regex pattern. By default this option only filters files and continues to include subdirectories themselves (files in the subdirectories are filtered). To have it apply to the subdirectories see **--filterdirs**. Also note, this is applicable for the client invocation of **managebackups**, the one run with **--path**. To minimize complexity the server side innovation understands **--include** and will automatically append it to the client-side call (**--faub**) if found.

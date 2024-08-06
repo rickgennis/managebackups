@@ -368,7 +368,7 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail, Tagging tag
         auto stats = config.fcache.getTotalStats();
         int saved = floor((1 - (long double)stats.getSize() / (stats.getSize() + stats.getSaved())) * 100 + 0.5);
         
-        vector<headerType> headers{ {"Date"}, {"Size"}, {"Used"}, {"Dirs"}, {"SymLks"}, {"Mods"}, {"Duration", 8}, {"Type", 4}, {"Age"}, {"Tags"}};
+        vector<headerType> headers{ {"Date"}, {"Size"}, {"Used"}, {"Dirs"}, {"SymLks"}, {"Mods"}, {"Duration", 8}, {"Type", 4}, {"Age"}, {"Hold"}, {"Tags"}};
         string introSummary = line + "\n";
         if (config.settings[sTitle].value.length())
             introSummary += "Profile: " + config.settings[sTitle].value + "\n";
@@ -402,11 +402,17 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail, Tagging tag
                 headers[5].setMaxLength(approximate(backupIt->second.modifiedFiles, precisionLevel, statDetail == 3 || statDetail == 5).length());
                 headers[8].setMaxLength(ages.back().length());
                 
-                string itemTags = perlJoin(", ", tags.tagsOnBackup(backupIt->first));
-                headers[9].setMaxLength(itemTags.length());
-                if (itemTags.length())
+                if (backupIt->second.holdDate) {
+                    headers[9].setMaxLength(24);
                     headers[9].override = true;
-
+                }
+                
+                string itemTags = perlJoin(", ", tags.tagsOnBackup(backupIt->first));
+                if (itemTags.length()) {
+                    headers[10].setMaxLength(itemTags.length());
+                    headers[10].override = true;
+                }
+                
                 timeDetail = localtime(&backupIt->second.finishTime);
                 auto timeString = to_string(timeDetail->tm_year) + to_string(timeDetail->tm_mon) + to_string(timeDetail->tm_mday);
                 
@@ -456,7 +462,7 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail, Tagging tag
                     for (auto &header: headers) {
                         string shownHeader = header.name == "Date" ? monthYear : header.name;
                         
-                        if (header.name != "Tags" || header.override) {
+                        if (header.override || (header.name != "Tags" && header.name != "Hold")) {
                             
                             // first column, no leading space
                             if (header.name != headers.begin()->name)
@@ -494,6 +500,8 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail, Tagging tag
                                 "%-4s  " +
                                 // content age
                                 "%-" + to_string(headers[8].maxLength) + "s  " +
+                                // hold
+                                "%-" + (headers[9].override ? to_string(headers[9].maxLength) + "s  " : "s") +
                                 // tags
                                 "%s").c_str(),
                          backupIt->first.c_str(),
@@ -504,8 +512,8 @@ bool _displayDetailedFaubStats(BackupConfig& config, int statDetail, Tagging tag
                          approximate(backupIt->second.modifiedFiles, precisionLevel, statDetail == 3 || statDetail == 5).c_str(),
                          seconds2hms(backupIt->second.duration).c_str(),
                          timeDetail->tm_mon  == 0 && timeDetail->tm_mday == 1 ? "Year" : timeDetail->tm_mday == 1 ? "Mnth" : timeDetail->tm_wday == config.settings[sDOW].ivalue() ? "Week" : "Day",
-                         //backupIt->second.finishTime ? timeDiff(mktimeval(backupIt->second.finishTime)).c_str() : "?",
                          ageIt++->c_str(),
+                         backupIt->second.holdDate > 1 ? timeString(backupIt->second.holdDate).c_str() : backupIt->second.holdDate == 1 ? "Permanent" : "",
                          perlJoin(", ", tags.tagsOnBackup(backupIt->first)).c_str());
                 
                 cout << result << endl;

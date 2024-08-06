@@ -493,6 +493,66 @@ string dw(int which) {
 }
 
 
+time_t userInput2timet(string input) {
+    auto t = time(NULL);
+    auto lt = localtime(&t);
+    auto timeVal = mktime(lt);
+    
+    auto v = fullRegexMatch("^(\\d+)/(\\d+)(?:/(\\d+))*$", input);
+    if (v.size() > 1) {
+        lt->tm_mon = stoi(v[0]) - 1;
+        lt->tm_mday = stoi(v[1]);
+        lt->tm_year = (v.size() > 2) ? stoi(v[2]) : lt->tm_year;
+        lt->tm_year += (lt->tm_year > 1900) ? -1900 : lt->tm_year < 100 ? +100 : 0;
+        timeVal = mktime(lt);
+    }
+    else {
+        int totalLength = 0;
+        Pcre re("(\\d+)([dwmy]*)", "g");
+
+        splitOnRegex(v, input, re, false, false, true);
+        
+        if (v.size()) {
+            int days;
+            for (int i = 0; i < v.size(); i+=2) {
+                
+                switch (v[i+1].c_str()[0]) {
+                    case 'y':
+                        days = 365;
+                        break;
+                        
+                    case 'm':
+                        days = 30;
+                        break;
+                        
+                    case 'w':
+                        days = 7;
+                        break;
+                        
+                    case 'd':
+                    default:
+                        days = 1;
+                }
+
+                timeVal += 86400 * days * stoi(v[i]);
+                totalLength += v[i].length() + v[i+1].length();
+            }
+            
+            if (totalLength != input.length()) {
+                SCREENERR("error parsing: " << input);
+                exit(1);
+            }
+        }
+    }
+
+    // special-case of input 0 output 0 instead of currenttime + 0
+    if (timeVal == mktime(lt))
+        timeVal = 0;
+    
+    return timeVal;
+}
+
+
 void setFilePerms(string filename, struct stat &statData, bool exitOnError) {
     if (!S_ISLNK(statData.st_mode))
         if (chmod(filename.c_str(), statData.st_mode)) {
@@ -601,23 +661,25 @@ string trimQuotes(string s, bool unEscape) {
 
 // splitOnRegex: the RE given matches on the tokens to be returned (the data)
 // perlSplit: the RE given matches the delimiter and tokens are found in between
-void splitOnRegex(vector<string>& result, string data, Pcre& re, bool trimQ, bool unEscape) {
-    Pcre regex(re);
+void splitOnRegex(vector<string>& result, string data, Pcre& regex, bool trimQ, bool unEscape, bool multimatch) {
     string temp;
     int pos = 0;
     
     while (pos <= data.length() && regex.search(data, pos)) {
-        pos = regex.get_match_end(0);
-        ++pos;
-        temp = regex.get_match(0);
         
-        if (unEscape) {
-            size_t altpos;  // remove any remaining backslashes
-            while ((altpos = temp.find("\\")) != string::npos)
-                temp.erase(altpos, 1);
+        for (int x = 0; x < (multimatch ? regex.matches() : 1); x++) {
+            pos = regex.get_match_end(x);
+            ++pos;
+            temp = regex.get_match(x);
+            
+            if (unEscape) {
+                size_t altpos;  // remove any remaining backslashes
+                while ((altpos = temp.find("\\")) != string::npos)
+                    temp.erase(altpos, 1);
+            }
+            
+            result.push_back(trimQ ? trimQuotes(temp) : temp);
         }
-        
-        result.push_back(trimQ ? trimQuotes(temp) : temp);
     }
 }
 
@@ -941,10 +1003,10 @@ void sendEmail(string from, string recipients, string subject, string message) {
 }
 
 
-string todayString() {
+string timeString(time_t given) {
     char text[100];
     time_t now = time(NULL);
-    struct tm *t = localtime(&now);
+    struct tm *t = localtime(&(given ? given : now));
     
     strftime(text, sizeof(text)-1, "%c", t);
     return(text);

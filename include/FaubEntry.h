@@ -37,6 +37,7 @@ public:
     unsigned int mtimeDayAge;
     unsigned long duration;
     int dow;
+    time_t holdDate;
     
     string cacheFilename(string suffix) { return (slashConcat(GLOBALS.cacheDir, uuid, MD5string(directory)) + "." + suffix); }
     string getDir() { return directory; }

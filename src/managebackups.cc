@@ -560,7 +560,16 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
  * criteria.
  *******************************************************************************/
 string pruneShouldKeep(BackupConfig &config, string filename, int filenameAge, int filenameDOW,
-                       int filenameDay, int filenameMonth, int filenameYear) {
+                       int filenameDay, int filenameMonth, int filenameYear, time_t holdDate = 0) {
+    // manual hold date is set
+    if (holdDate) {
+        if (holdDate == 1)
+            return("hold_set: permanent");
+        
+        if (GLOBALS.startupTime < holdDate)
+            return("hold_set: until " + timeString(holdDate));
+    }
+
     //  daily
     if (config.settings[sDays].ivalue() && filenameAge <= config.settings[sDays].ivalue())
         return string("keep_daily: ") + filename + " (age=" + to_string(filenameAge) +
@@ -621,7 +630,7 @@ void pruneFaubBackups(BackupConfig &config) {
         auto shouldKeep =
         pruneShouldKeep(config, cacheEntryIt->second.getDir(), mtimeDayAge, filenameDOW,
                         cacheEntryIt->second.startDay, cacheEntryIt->second.startMonth,
-                        cacheEntryIt->second.startYear);
+                        cacheEntryIt->second.startYear, cacheEntryIt->second.holdDate);
 
         // if no files were changed in this backup and --dataonly is elected, delete this backup
         if (!cacheEntryIt->second.modifiedFiles && !cacheEntryIt->second.ds.getSize() && str2bool(config.settings[sDataOnly].value)) {
@@ -2172,6 +2181,7 @@ int main(int argc, char *argv[]) {
         CLI_ARCHIVE, "Archive profile", cxxopts::value<bool>()->default_value("false"))(
         string("t,") + CLI_TAG, "Tag a backup", cxxopts::value<string>())(
         CLI_TAGRM, "Remove a tag", cxxopts::value<string>())(
+        CLI_HOLD, "Hold a backup", cxxopts::value<string>())(
         CLI_REPLICATETO, "Replicate To", cxxopts::value<std::string>())(
         CLI_RMN, "Remove newest backups", cxxopts::value<int>())(
         CLI_RMO, "Remove oldest backups", cxxopts::value<int>())(
@@ -2351,25 +2361,34 @@ int main(int argc, char *argv[]) {
     
     // --tag snapshot=/var/backups/foo-2024-09-12
     if (GLOBALS.cli.count(CLI_TAG)) {
-        
         auto elements = fullRegexMatch("^([^:\\\\]+):(.+)$", GLOBALS.cli[CLI_TAG].as<string>());
-        
-        //splitOnRegex(elements, GLOBALS.cli[CLI_TAG].as<string>(), regex, false, false);
-   //     auto elements = perlSplit("(?<![:\\\\]):", GLOBALS.cli[CLI_TAG].as<string>());
-//        void splitOnRegex(vector<string>& result, string data, Pcre& re, bool trimQ, bool unEscape) {
-
-        
-        if (elements[0].length() && elements[1].length()) {
+        if (elements.size() > 1) {
             
             if (currentConfig->isFaub()) {
-                cout << "param: [" << GLOBALS.cli[CLI_TAG].as<string>() << "]\n";
-                cout << "0: [" << elements[0] << "]; 1: [" << elements[1] << "]" << endl;
-                
                 scanConfigToCache(*currentConfig);
                 currentConfig->fcache.tagBackup(elements[0], elements[1]);
             }
             else
                 SCREENERR("error: --" << CLI_TAG << " is only compatible with faub-based backups");
+            
+            exit(0);
+        }
+    }
+    
+    if (GLOBALS.cli.count(CLI_HOLD)) {
+        string hold = GLOBALS.cli[CLI_HOLD].as<string>();
+        auto elements = fullRegexMatch("^([^:\\\\]+):(.+)$", hold);
+        bool permanentHold = hold.substr(0,2) == "::" && hold.length() > 2;
+        
+        if (elements.size() > 1 || permanentHold) {
+            
+            if (currentConfig->isFaub()) {
+                scanConfigToCache(*currentConfig);
+                
+                cout << (permanentHold ? currentConfig->fcache.holdBackup("::", hold.substr(2, string::npos)) : currentConfig->fcache.holdBackup(elements[0], elements[1]));
+            }
+            else
+                SCREENERR("error: --" << CLI_HOLD << " is only compatible with faub-based backups");
             
             exit(0);
         }

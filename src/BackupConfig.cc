@@ -229,7 +229,7 @@ void BackupConfig::saveConfig() {
     else {
         // completely new config, first time being written
         string commentLine = "#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#\n";
-        newFile << commentLine << "# Profile created on " << todayString() << "\n" << commentLine;
+        newFile << commentLine << "# Profile created on " << timeString() << "\n" << commentLine;
         newFile << blockp("profile:", -17) << settings[sTitle].value << "\n\n\n";
         newFile << commentLine << "# Backing up\n" << commentLine << "\n";
 

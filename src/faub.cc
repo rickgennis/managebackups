@@ -557,7 +557,12 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             GLOBALS.tags.fastTagBackup(GLOBALS.cli[CLI_TAG].as<string>(), currentDir);
             message1 += " [tagged " + GLOBALS.cli[CLI_TAG].as<string>() + "]";
         }
-                        
+        
+        if (GLOBALS.cli.count(CLI_HOLD)) {
+            config.fcache.holdBackup(GLOBALS.cli[CLI_HOLD].as<string>(), currentDir);
+            message1 +=" [hold set]";
+        }
+        
         log(config.ifTitle() + " " + message1);
         log(config.ifTitle() + " " + message2);
         NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message1 << "\n\t\t" << message2 << endl;

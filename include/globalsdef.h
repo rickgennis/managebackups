@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.7.2d"
+#define VERSION "1.7.3"
 
 #include "cxxopts.hpp"
 #include "colors.h"
@@ -145,6 +145,7 @@
 #define CLI_RMO "rmo"
 #define CLI_TAG "tag"
 #define CLI_TAGRM "tagrm"
+#define CLI_HOLD "hold"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:|\\b)+)(.*?)\\s*?")

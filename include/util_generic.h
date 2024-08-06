@@ -112,8 +112,7 @@ string perlJoin(string delimiter, vector<string> items);
 
 vector<string> perlSplit(string regex, string haystack);
 
-void splitOnRegex(vector<string>& result, string data, Pcre& re, bool trimQ, bool unEscape);
-
+void splitOnRegex(vector<string>& result, string data, Pcre& re, bool trimQ, bool unEscape, bool multimatch = false);
 
 class timer {
     string duration;
@@ -212,7 +211,7 @@ void sendEmail(string from, string recipients, string subject, string message);
 
 size_t approx2bytes(string approx);
 
-string todayString();
+string timeString(time_t given = 0);
 
 string blockp(string data, int width);
 
@@ -221,6 +220,8 @@ string catdir(string dir);
 bool rmrf(string directory, bool includeTopDir = true);
 
 int mkbasedirs(string path);
+
+time_t userInput2timet(string input);
 
 // du -s
 DiskStats dus(string path, set<ino_t>& seenInodes, set<ino_t>& newInodes);
