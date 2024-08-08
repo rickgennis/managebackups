@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.7.3
+% MANAGEBACKUPS(1) managebackups 1.7.4
 % Rick Ennis
 % March 2023
 
@@ -292,6 +292,9 @@ When specifying a previous backup the full backupname isn't required; only enoug
         * 12/31
         * 5/27/2028
 
+**--maptaghold** [*data*]
+: {FB} Associate a tag with a specific hold time.  Once associated, any time the tag is applied to a bag the associated hold time will also be set.  If **--maptaghold** is used to change the hold time of that tag in the future, the previously tagged backups are not updated unless they get re-tagged.
+
 **--include** [*pattern*]
 : {FB} Only backup directory entries that match the specified regex pattern. By default this option only filters files and continues to include subdirectories themselves (files in the subdirectories are filtered). To have it apply to the subdirectories see **--filterdirs**. Also note, this is applicable for the client invocation of **managebackups**, the one run with **--path**. To minimize complexity the server side innovation understands **--include** and will automatically append it to the client-side call (**--faub**) if found.
 
@@ -404,8 +407,17 @@ Full changes provide all detail: files that were added, modified or deleted, how
 ## General
 The **--diff** [*backup*] command, if only specified once, will default to Cached Changes and show the changes between the specified *backup* and the immediately previous one (at the time it was taken).  Use **--force** to generate the Full Changes diff instead.  When **--diff** [*backup*] is specified twice (i.e. which two backups to compare), it always does a Full Changes diff.  Note: Because symlinks and directories can't be hardlinked they always show up as changes and are automatically filtered out of the **--diff** output.  To include them use **--Diff** instead.  **--threshold** can be used to further filter the output to only show files that have changed by a certain size or more.  **--last** can be used as a shortcut to run **--diff** on the most recent backup without having to specify the backup itself.
 
-# TAGGING
+# TAGGING & HOLDING
 Tags can be used to identify and track specific backups within or across profiles.  A tag can be applied when a backup is taken or after the fact.  Tags can be specified with **-1** to see only the backups that match a given tag.  Multiple backups can be given the same tag and multiple tags can be given to the same backup (many to many).
+
+Holding is a method of keeping a backup after its aged out of the configured daily/weekly/monthly/yearly quota. A hold can be set on a backup in either relative terms (x amount of time from when the hold is set) or absolute terms (a specific date).  Relative holds are specified as a number of days, week, months and/or years.  For purposes of a hold a month is calculated as 30 days.
+
+        * 6w for 6 weeks
+        * 1y2m3d for 1 year, 2 months and 3 days
+        * 12/31 for the end of the current year
+        * 10/12/2025 for a specific date
+
+Tagging (backup organization) and holding (deletion prevention) can be used independently.  They can also be associated together.  A given tag can be assigned a hold time (relative or absolute) such that any time the tag is applied, the associated hold time is also applied. See **--maptaghold** for details.
 
 # PERMISSIONS
 Aside from access to read the files being backed up (on a remote server or locally) **managebackups** requires local write access for multiple tasks:

@@ -32,6 +32,19 @@ void Tagging::load() {
             
             tfile.close();
         }
+        
+        tfile.open(GLOBALS.cacheDir + TAGHOLD_FILENAME);
+        
+        if (tfile.is_open()) {
+            string dataTag;
+            string dataHoldTime;
+            
+            while (getline(tfile, dataTag) && getline(tfile, dataHoldTime)) {
+                tag2Hold.insert(tag2Hold.end(), pair<string,string>(dataTag, dataHoldTime));
+            }
+            
+            tfile.close();
+        }
     }
 }
 
@@ -47,19 +60,13 @@ Tagging::~Tagging() {
             
             tfile.close();
         }
-    }
-}
-
-
-void Tagging::fastTagBackup(string tag, string backup) {
-    if (loaded)
-        tagBackup(tag, backup);
-    else {
-        ofstream tfile;
         
-        tfile.open(GLOBALS.cacheDir + TAG_FILENAME, std::ios::app);
+        tfile.open(GLOBALS.cacheDir + TAGHOLD_FILENAME);
+        
         if (tfile.is_open()) {
-            tfile << backup << "\n" << tag << "\n";
+            for (auto &tag: tag2Hold)
+                tfile << tag.first << "\n" << tag.second << endl;
+            
             tfile.close();
         }
     }
@@ -145,4 +152,31 @@ bool Tagging::match(string tag, string backup) {
             return true;
     
     return false;
+}
+
+
+void Tagging::setTagsHoldTime(string tag, string hold) {
+    load();
+    
+    if (tag.length()) {
+        if (hold.length() && hold != "0")
+            tag2Hold.insert(tag2Hold.end(), pair<string, string>(tag, hold));
+        else
+            tag2Hold.erase(tag);
+        
+        modified = true;
+    }
+}
+
+
+string Tagging::getTagsHoldTime(string tag) {
+    load();
+    
+    if (tag.length()) {
+        auto t = tag2Hold.find(tag);
+        if (t != tag2Hold.end())
+            return(t->second);
+    }
+    
+    return "";
 }

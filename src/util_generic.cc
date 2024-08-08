@@ -495,16 +495,18 @@ string dw(int which) {
 
 time_t userInput2timet(string input) {
     auto t = time(NULL);
-    auto lt = localtime(&t);
-    auto timeVal = mktime(lt);
+    auto gt = gmtime(&t);
+    struct tm origGt = *gt;
+    auto timeVal = mktime(gt);
     
     auto v = fullRegexMatch("^(\\d+)/(\\d+)(?:/(\\d+))*$", input);
     if (v.size() > 1) {
-        lt->tm_mon = stoi(v[0]) - 1;
-        lt->tm_mday = stoi(v[1]);
-        lt->tm_year = (v.size() > 2) ? stoi(v[2]) : lt->tm_year;
-        lt->tm_year += (lt->tm_year > 1900) ? -1900 : lt->tm_year < 100 ? +100 : 0;
-        timeVal = mktime(lt);
+        gt->tm_hour = gt->tm_min = gt->tm_sec = gt->tm_wday = gt->tm_yday = gt->tm_isdst = 0;
+        gt->tm_mon = stoi(v[0]) - 1;
+        gt->tm_mday = stoi(v[1]);
+        gt->tm_year = (v.size() > 2) ? stoi(v[2]) : gt->tm_year;
+        gt->tm_year += (gt->tm_year > 1900) ? -1900 : gt->tm_year < 100 ? +100 : 0;
+        timeVal = mktime(gt);
     }
     else {
         int totalLength = 0;
@@ -546,7 +548,7 @@ time_t userInput2timet(string input) {
     }
 
     // special-case of input 0 output 0 instead of currenttime + 0
-    if (timeVal == mktime(lt))
+    if (timeVal == mktime(&origGt))
         timeVal = 0;
     
     return timeVal;

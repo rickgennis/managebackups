@@ -554,7 +554,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             ", size: " + approximate(backupSize + backupSaved) + ", usage: " + approximate(backupSize) + maxLinkMsg + ")";
 
         if (GLOBALS.cli.count(CLI_TAG)) {
-            GLOBALS.tags.fastTagBackup(GLOBALS.cli[CLI_TAG].as<string>(), currentDir);
+            GLOBALS.tags.tagBackup(GLOBALS.cli[CLI_TAG].as<string>(), currentDir);
             message1 += " [tagged " + GLOBALS.cli[CLI_TAG].as<string>() + "]";
         }
         

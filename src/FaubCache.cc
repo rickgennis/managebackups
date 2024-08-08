@@ -354,7 +354,7 @@ void FaubCache::tagBackup(string tagname, string backup) {
     auto b = findBackup(backup, backups.end());
     auto backupname = b->second.getDir();
     
-    GLOBALS.tags.fastTagBackup(tagname, backupname);
+    GLOBALS.tags.tagBackup(tagname, backupname);
     cout << "\t• tagged " << backupname << " as " << tagname << endl;
 }
 
@@ -366,7 +366,7 @@ string FaubCache::holdBackup(string hold, string backup) {
     // 1 is for permanent hold
     b->second.holdDate = (hold == "::") ? 1 : userInput2timet(hold);
     b->second.saveStats();
-
+    
     if (!b->second.holdDate)
         return("\t hold removed for " + backupname + "\n");
 

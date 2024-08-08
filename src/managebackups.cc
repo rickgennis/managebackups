@@ -537,8 +537,9 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
         !GLOBALS.cli.count(CLI_COMPARE) && !GLOBALS.cli.count(CLI_COMPAREFILTER) &&
         !GLOBALS.cli.count(CLI_LAST) &&
         
-        // or removing a tag
+        // or removing a tag or mapping a tag
         !GLOBALS.cli.count(CLI_TAGRM) &&
+        !GLOBALS.cli.count(CLI_MAPTAGHOLD) &&
 
         // & user hasn't selected --all/--All where there's a dir configured in at least one (first)
         // profile
@@ -2182,6 +2183,7 @@ int main(int argc, char *argv[]) {
         string("t,") + CLI_TAG, "Tag a backup", cxxopts::value<string>())(
         CLI_TAGRM, "Remove a tag", cxxopts::value<string>())(
         CLI_HOLD, "Hold a backup", cxxopts::value<string>())(
+        CLI_MAPTAGHOLD, "Map a tag to a hold", cxxopts::value<string>())(
         CLI_REPLICATETO, "Replicate To", cxxopts::value<std::string>())(
         CLI_RMN, "Remove newest backups", cxxopts::value<int>())(
         CLI_RMO, "Remove oldest backups", cxxopts::value<int>())(
@@ -2359,14 +2361,32 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     
-    // --tag snapshot=/var/backups/foo-2024-09-12
+    if (GLOBALS.cli.count(CLI_MAPTAGHOLD)) {
+        auto elements = fullRegexMatch("^([^:\\\\]+):(.+)$", GLOBALS.cli[CLI_MAPTAGHOLD].as<string>());
+        if (elements.size() > 1) {
+            time_t hold = userInput2timet(elements[1]);  // will exit() on parsing error
+            GLOBALS.tags.setTagsHoldTime(elements[0], elements[1]);
+            cout << "\t• mapped tag '" << elements[0] << "' to " << elements[1] << endl;
+        }
+        else
+            SCREENERR("error: --" << CLI_MAPTAGHOLD << " requires a tag and a hold time (e.g. 'snapshots:1y')");
+        exit(0);
+    }
+    
+    // --tag snapshot:/var/backups/foo-2024-09-12
     if (GLOBALS.cli.count(CLI_TAG)) {
         auto elements = fullRegexMatch("^([^:\\\\]+):(.+)$", GLOBALS.cli[CLI_TAG].as<string>());
         if (elements.size() > 1) {
             
+            // set tag on backup
             if (currentConfig->isFaub()) {
                 scanConfigToCache(*currentConfig);
                 currentConfig->fcache.tagBackup(elements[0], elements[1]);
+                
+                // set hold on backup if one is mapped to the tag
+                string hold = GLOBALS.tags.getTagsHoldTime(elements[0]);
+                if (hold.length())
+                    cout << currentConfig->fcache.holdBackup(hold, elements[1]);
             }
             else
                 SCREENERR("error: --" << CLI_TAG << " is only compatible with faub-based backups");
