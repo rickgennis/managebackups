@@ -129,9 +129,10 @@ unsigned long Tagging::removeTagsOn(string backup) {
 unsigned long Tagging::removeTag(string tag) {
     load();
     
-    vector<multimap<string, string>::iterator> deadElements;
     tag2BackupMap.erase(tag);
+    tag2Hold.erase(tag);
     
+    vector<multimap<string, string>::iterator> deadElements;
     for (auto entry = backup2TagMap.begin(); entry != backup2TagMap.end(); ++entry)
         if (entry->second == tag)
             deadElements.insert(deadElements.end(), entry);
@@ -159,10 +160,10 @@ void Tagging::setTagsHoldTime(string tag, string hold) {
     load();
     
     if (tag.length()) {
+        tag2Hold.erase(tag);
+
         if (hold.length() && hold != "0")
             tag2Hold.insert(tag2Hold.end(), pair<string, string>(tag, hold));
-        else
-            tag2Hold.erase(tag);
         
         modified = true;
     }

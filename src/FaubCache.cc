@@ -359,21 +359,25 @@ void FaubCache::tagBackup(string tagname, string backup) {
 }
 
 
-string FaubCache::holdBackup(string hold, string backup) {
+string FaubCache::holdBackup(string hold, string backup, bool briefOutput) {
     auto b = findBackup(backup, backups.end());
     auto backupname = b->second.getDir();
 
-    // 1 is for permanent hold
-    b->second.holdDate = (hold == "::") ? 1 : userInput2timet(hold);
-    b->second.saveStats();
+    if (hold.length()) {
+        // 1 is for permanent hold
+        b->second.holdDate = (hold == "::") ? 1 : userInput2timet(hold);
+        b->second.saveStats();
+        
+        if (!b->second.holdDate)
+            return(briefOutput ? "removed" : "\t hold removed for " + backupname + "\n");
+        
+        if (b->second.holdDate == 1)
+            return(briefOutput ? "permanent" : "\t• permanent hold set on " + backupname + "\n");
+        
+        return(briefOutput ? timeString(b->second.holdDate) : "\t• hold set on " + backupname + " until " + timeString(b->second.holdDate) + "\n");
+    }
     
-    if (!b->second.holdDate)
-        return("\t hold removed for " + backupname + "\n");
-
-    if (b->second.holdDate == 1)
-        return("\t• permanent hold set on " + backupname + "\n");
-    
-    return("\t• hold set on " + backupname + " until " + timeString(b->second.holdDate) + "\n");
+    return "";
 }
 
 

@@ -2362,11 +2362,19 @@ int main(int argc, char *argv[]) {
     }
     
     if (GLOBALS.cli.count(CLI_MAPTAGHOLD)) {
-        auto elements = fullRegexMatch("^([^:\\\\]+):(.+)$", GLOBALS.cli[CLI_MAPTAGHOLD].as<string>());
-        if (elements.size() > 1) {
-            time_t hold = userInput2timet(elements[1]);  // will exit() on parsing error
-            GLOBALS.tags.setTagsHoldTime(elements[0], elements[1]);
-            cout << "\t• mapped tag '" << elements[0] << "' to " << elements[1] << endl;
+        string maptaghold = GLOBALS.cli[CLI_MAPTAGHOLD].as<string>();
+        auto elements = fullRegexMatch("^([^:\\\\]+):(.+)$", maptaghold);
+        bool permanentHold = maptaghold.find("::") != string::npos;
+        
+        if (elements.size() > 1 || permanentHold) {
+            if (permanentHold)
+                GLOBALS.tags.setTagsHoldTime(elements[0], "::");
+            else {
+                time_t hold = userInput2timet(elements[1]);  // will exit() on parsing error
+                GLOBALS.tags.setTagsHoldTime(elements[0], elements[1]);
+            }
+            
+            cout << "\t• mapped tag '" << elements[0] << "' to " << (permanentHold ? "permanent hold" : elements[1]) << endl;
         }
         else
             SCREENERR("error: --" << CLI_MAPTAGHOLD << " requires a tag and a hold time (e.g. 'snapshots:1y')");
@@ -2398,7 +2406,7 @@ int main(int argc, char *argv[]) {
     if (GLOBALS.cli.count(CLI_HOLD)) {
         string hold = GLOBALS.cli[CLI_HOLD].as<string>();
         auto elements = fullRegexMatch("^([^:\\\\]+):(.+)$", hold);
-        bool permanentHold = hold.substr(0,2) == "::" && hold.length() > 2;
+        bool permanentHold = hold.length() > 2 && hold.substr(0,2) == "::";
         
         if (elements.size() > 1 || permanentHold) {
             

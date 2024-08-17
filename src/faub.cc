@@ -554,8 +554,16 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             ", size: " + approximate(backupSize + backupSaved) + ", usage: " + approximate(backupSize) + maxLinkMsg + ")";
 
         if (GLOBALS.cli.count(CLI_TAG)) {
-            GLOBALS.tags.tagBackup(GLOBALS.cli[CLI_TAG].as<string>(), currentDir);
-            message1 += " [tagged " + GLOBALS.cli[CLI_TAG].as<string>() + "]";
+            string tag = GLOBALS.cli[CLI_TAG].as<string>();
+            GLOBALS.tags.tagBackup(tag, currentDir);
+            message1 += " [tagged " + tag;
+            
+            string hold = GLOBALS.tags.getTagsHoldTime(tag);
+                string holdText = config.fcache.holdBackup(hold, currentDir, true);
+                if (holdText.length())
+                    message1 += ", " + holdText + " hold";
+            
+            message1 += "]";
         }
         
         if (GLOBALS.cli.count(CLI_HOLD)) {

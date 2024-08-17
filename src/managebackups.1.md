@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.7.4
+% MANAGEBACKUPS(1) managebackups 1.8
 % Rick Ennis
 % March 2023
 
@@ -275,7 +275,7 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 When tagging a previous backup the full backup name isn't required; only enough to uniquely identify it.  By contrast tag names always need to be precisely specified.
 
 **--tagrm** [*data*]
-: {FB} If a tag is specified it will be removed from all backups.  If a backup is specified, all tags will be removed from it.
+: {FB} If a tag is specified it will be removed from all backups & if any hold time is associated with it, the tag -> hold mapping is removed.  If a backup is specified, all tags will be removed from it.
 
 **--hold** [*holdtime*]
 

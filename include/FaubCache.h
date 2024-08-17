@@ -69,7 +69,7 @@ public:
     void compare(string backupA, string backupB, string threshold);
 
     void tagBackup(string tagname, string backup);
-    string holdBackup(string hold, string backup);
+    string holdBackup(string hold, string backup, bool briefOutput = false);
 
     void cleanup();
     void recache(string targetDir, time_t deletedtime = 0, bool forceAll = false);
