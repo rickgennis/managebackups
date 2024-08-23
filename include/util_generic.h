@@ -61,8 +61,6 @@ struct DiskStats {
 };
 
 
-#define ifcolor(x) (GLOBALS.color ? x : "")
-
 #define max(a,b) \
    ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
@@ -313,6 +311,29 @@ public:
         return !state;
     }
 };
+
+
+class colorRotator {
+    vector<string> colors;
+    vector<string>::iterator currentColor;
+    
+public:
+    colorRotator() : colors({GREEN, MAGENTA, CYAN, BLUE, YELLOW, BOLDGREEN, BOLDMAGENTA, BOLDYELLOW, BOLDCYAN }) {
+        currentColor = colors.begin();
+    };
+    
+    string current() { return (*currentColor); }
+    
+    colorRotator operator++() {
+        ++currentColor;
+        if (currentColor == colors.end())
+            currentColor = colors.begin();
+        return *this;
+    };
+    
+    colorRotator operator++(int) { return operator++(); }
+};
+
 
 #endif
 

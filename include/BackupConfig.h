@@ -54,6 +54,7 @@ public:
     friend bool operator<(const BackupConfig &b1, const BackupConfig &b2);
     friend bool operator>(const BackupConfig &b1, const BackupConfig &b2);
     friend bool operator==(const BackupConfig &b1, const BackupConfig &b2);
+    friend bool operator!=(const BackupConfig &b1, const BackupConfig &b2);
 };
 
 #endif

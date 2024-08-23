@@ -2,7 +2,7 @@
 #ifndef COLORS_H
 #define COLORS_H
 
-#define ifcolor(x) (GLOBALS.color ? x : "")
+#define ifcolor(x) (GLOBALS.color && NOTQUIET ? x : "")
 
 #define RESET   ifcolor("\033[0m")
 #define BLACK   ifcolor("\033[30m")     /* Black */

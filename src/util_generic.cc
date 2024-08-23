@@ -955,8 +955,7 @@ bool str2bool(string text) {
 
 string vars2MY(int month, int year) {
     char monthName[12][15] = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
-    
-    return(string(monthName[month - 1]) + " " + to_string(year));
+    return ((month > 0 && month < 13 && year > 0 && year < 3000) ? (string(monthName[month - 1]) + " " + to_string(year)) : "[Unknown]");
 }
 
 

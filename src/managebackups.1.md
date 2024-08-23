@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.8
+% MANAGEBACKUPS(1) managebackups 1.8a
 % Rick Ennis
 % March 2023
 
@@ -110,7 +110,7 @@ Options are categorized by the three functions of **managebackups** plus general
 : Disable color on console output.
 
 **-q**, **--quiet**
-: Quiet mode is to minimize output; useful for cron invocations where important messages will be seen in the log or via **--notify**.
+: Quiet mode is to minimize output; useful for cron invocations where important messages will be seen in the log or via **--notify**. When used with **-1** it supresses header rows and color output (i.e. **--nocolor**) to facilitate script processing.
 
 **-b**, **--blocks**
 : By default faub backup size values are displayed in bytes (KB, MB, GB, etc). Use **--blocks** to instead display disk usage in terms of 512-byte blocks, like the the 'du' command. This is only relevant for faub-style backups.

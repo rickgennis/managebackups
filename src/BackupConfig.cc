@@ -40,6 +40,11 @@ bool operator==(const BackupConfig& b1, const BackupConfig& b2) {
     return (b1.settings[sTitle].value == b2.settings[sTitle].value);
 }
 
+bool operator!=(const BackupConfig& b1, const BackupConfig& b2) {
+    return (b1.settings[sTitle].value != b2.settings[sTitle].value);
+}
+
+
 BackupConfig::BackupConfig(bool makeTemp) {
     modified = 0;
     temp = makeTemp;

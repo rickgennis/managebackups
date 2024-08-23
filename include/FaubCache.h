@@ -49,6 +49,7 @@ public:
     void restoreCache(string path, string profileName, string aUuid);
     DiskStats getTotalStats();
     long size() { return backups.size(); }
+    bool empty() { return backups.empty(); }
     
     unsigned long getNumberOfBackups() { return backups.size(); }
     myMapIT getBackupByDir(string dir) { return backups.find(dir); }

@@ -146,11 +146,13 @@ unsigned long Tagging::removeTag(string tag) {
 
 
 bool Tagging::match(string tag, string backup) {
-    load();
-    
-    for (auto [start, end] = backup2TagMap.equal_range(backup); start != end; ++start)
-        if (start->second == tag)
-            return true;
+    if (tag.length()) {
+        load();
+        
+        for (auto [start, end] = backup2TagMap.equal_range(backup); start != end; ++start)
+            if (start->second == tag)
+                return true;
+    }
     
     return false;
 }

@@ -2323,8 +2323,10 @@ int main(int argc, char *argv[]) {
     
     DEBUG(D_any) DFMT("about to setup config...");
     ConfigManager configManager;
+
     auto currentConfig = selectOrSetupConfig(configManager, GLOBALS.cli.count(CLI_GO) || GLOBALS.cli.count(CLI_COMPARE) || GLOBALS.cli.count(CLI_COMPAREFILTER)|| GLOBALS.cli.count(CLI_LAST) || GLOBALS.cli.count(CLI_RECALC) || GLOBALS.cli.count(CLI_RELOCATE));
          
+
     if (currentConfig->modified)
         currentConfig->saveConfig();
     
@@ -2594,7 +2596,7 @@ int main(int argc, char *argv[]) {
      * ****************************/
     if (GLOBALS.stats) {
         FastCache fc;
-
+        
         // if we've been called with no arguments (or just -v) and are defaulting to showing stats,
         // show the fast cached version instead of the live -0.
         if ((argc == 1 || (argc == 2 && GLOBALS.debugSelector)) && fc.get().length())
@@ -2610,10 +2612,10 @@ int main(int argc, char *argv[]) {
                 for (auto &config : configManager.configs)
                     if (!config.temp)
                         scanConfigToCache(config);
-            
+
             GLOBALS.cli.count(CLI_STATS1)
-            ? displayDetailedStatsWrapper(configManager, (int)GLOBALS.cli.count(CLI_STATS1))
-            : displaySummaryStatsWrapper(configManager, (int)GLOBALS.cli.count(CLI_STATS2));
+            ? produceDetailedStats(configManager, (int)GLOBALS.cli.count(CLI_STATS1))
+            : produceSummaryStatsWrapper(configManager, (int)GLOBALS.cli.count(CLI_STATS2));
         }
 
     }
@@ -2867,7 +2869,7 @@ int main(int argc, char *argv[]) {
                             scanConfigToCache(config);
                     
                     // update the fast cache
-                    displaySummaryStatsWrapper(configManager, 0, true);
+                    produceSummaryStatsWrapper(configManager, 0, true);
                 }
             }
         }

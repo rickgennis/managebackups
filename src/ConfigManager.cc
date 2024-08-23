@@ -14,7 +14,7 @@ using namespace pcrepp;
 tuple<int, string> ConfigManager::findConfig(string title) {
     int index = 0;
     int partialMatchIdx = 0;
-
+    
     for (auto &config: configs) {
         ++index;
 
@@ -24,7 +24,7 @@ tuple<int, string> ConfigManager::findConfig(string title) {
         if (config.settings[sTitle].value.find(title) != string::npos) {
             if (partialMatchIdx) {
                 DEBUG(D_cache) DFMT("\tconfig second partial match of [" << config.settings[sTitle].value << "]");
-                return {-1, config.settings[sTitle].value + ", " + configs[index].settings[sTitle].value};
+                return {-1, config.settings[sTitle].value + ", " + configs[partialMatchIdx - 1].settings[sTitle].value};
             }
             else {
                 partialMatchIdx = index;
