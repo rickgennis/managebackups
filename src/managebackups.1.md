@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.8a
+% MANAGEBACKUPS(1) managebackups 1.8b
 % Rick Ennis
 % March 2023
 
@@ -285,15 +285,15 @@ When tagging a previous backup the full backup name isn't required; only enough 
         * set a holdtime while a backup is taken (e.g. "mb -p main --hold 6m" for 6 months)
         * set a holdtime on an existing backup (e.g. "mb -p main --hold 3w:/var/backup/main-2024-02-23")
 
-When specifying a previous backup the full backupname isn't required; only enough to uniquely identify it. *holdtime* can specify the length of time to hold a backup (prevent deletion according to the configured daily/weekly/monthly/yearly schedule) in any combination of days, weeks, months or years.  Months are computed as 30 days.  Alternatively the end date of the hold can be given.  Specify 0 to remove a hold.  Examples of valid *holdtime*s:
+When specifying a previous backup the specified name is interpreted as a search string. All matching backups will be updated. *holdtime* can specify the length of time to hold a backup (prevent deletion according to the configured daily/weekly/monthly/yearly schedule) in any combination of days, weeks, months or years.  Months are computed as 30 days.  Alternatively the end date of the hold can be given.  Specify 0 to remove a hold. Use a double-colon and omit the holdtime to set a permanent hold (e.g. "--hold ::2024-08-21" to permanently keep all backups with 2024-08-21 in their name). Examples of valid *holdtime*s:
 
         * 2y3w5d    (for 2 years, 3 weeks, 5 days)
         * 9w
         * 12/31
         * 5/27/2028
 
-**--maptaghold** [*data*]
-: {FB} Associate a tag with a specific hold time.  Once associated, any time the tag is applied to a bag the associated hold time will also be set.  If **--maptaghold** is used to change the hold time of that tag in the future, the previously tagged backups are not updated unless they get re-tagged.
+**--maptaghold** [*tag:holdtime*]
+: {FB} Associate a tag with a specific hold time.  Once associated, any time the tag is applied to a backup, the associated hold time will also be set.  If **--maptaghold** is used to change the hold time of that tag in the future, the previously tagged backups are not updated unless they get re-tagged. *holdtime* can be any of the formats supported by **--hold**.
 
 **--include** [*pattern*]
 : {FB} Only backup directory entries that match the specified regex pattern. By default this option only filters files and continues to include subdirectories themselves (files in the subdirectories are filtered). To have it apply to the subdirectories see **--filterdirs**. Also note, this is applicable for the client invocation of **managebackups**, the one run with **--path**. To minimize complexity the server side innovation understands **--include** and will automatically append it to the client-side call (**--faub**) if found.

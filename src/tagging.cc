@@ -76,7 +76,7 @@ Tagging::~Tagging() {
 void Tagging::tagBackup(string tag, string backup) {
     load();
 
-    // match() check is required because a multimap would allow dupes
+    // match() check is required because a multimap allows dupes
     if (tag.length() && backup.length() && !match(tag, backup)) {
         tag2BackupMap.insert(tag2BackupMap.end(), pair<string,string>(tag, backup));
         backup2TagMap.insert(backup2TagMap.end(), pair<string,string>(backup, tag));

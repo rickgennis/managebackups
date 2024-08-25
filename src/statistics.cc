@@ -21,6 +21,49 @@ using namespace std;
 string oldMessage = ">24H old";
 
 
+headerManager::headerManager(const initializer_list<headerType>& list) {
+    for (const auto &item: list)
+        headers.insert(headers.end(), item);
+}
+
+// override here is a convenience option to set it true; can't update to false here.
+// would have to use override() instead.
+void headerManager::setMaxLength(int idx, long m, bool override) {
+    headers[idx].maxLength = max(headers[idx].maxLength, m);
+    headers[idx].overrideHide = override ? override : headers[idx].overrideHide;
+}
+
+string headerManager::display(string monthYear, bool returnOnly) {
+    string result = BOLDBLUE;
+    
+    for (auto &header: headers) {
+        string shownHeader = header.name == "Date" && monthYear.length() ? monthYear : header.name;
+        
+        if (!header.defaultHide || header.overrideHide) {
+            
+            // first column, no leading space
+            if (header.name != headers[0].name)
+                result += "  ";
+            
+            result += shownHeader;
+            
+            // padding spaces to handle field lengths
+            if (header.maxLength > shownHeader.length()) {
+                string spaces(header.maxLength - shownHeader.length(), ' ');
+                result += spaces;
+            }
+        }
+    }
+    
+    result += RESET + string("\n");
+    
+    if (!returnOnly)
+        cout << result;
+    
+    return (result);
+}
+
+
 /* The summaryStats structure is used to return stat totals on a given config to the calling function.
  * Some data is broken out into individual totals (the longs).  Other is returned as strings for
  * easy display (stringOutput).
@@ -250,7 +293,7 @@ void produceSummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
         statStrings.insert(statStrings.end(), "");
     }
     
-    vector<headerType> headers { {"Profile"}, {"Most Recent Backup"}, {"Finish@"}, {"Duration"}, {"Size (Total)"}, {"Uniq (T)"}, {"Saved"}, {"Age Range"} };
+    headerManager headers { {"Profile"}, {"Most Recent Backup"}, {"Finish@"}, {"Duration"}, {"Size (Total)"}, {"Uniq (T)"}, {"Saved"}, {"Age Range"} };
     
     // determine the longest length entry of each column to allow consistent horizontal formatting
     int numberStatStrings = (int)statStrings.size();
@@ -259,12 +302,12 @@ void produceSummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
         
         while (NUMSTATDETAILS * line + column < numberStatStrings) {
             if (column == 7)  // cols 7 and 8 get combined
-                headers[column].setMaxLength(statStrings[NUMSTATDETAILS * line + column].length() +
+                headers.setMaxLength(column, statStrings[NUMSTATDETAILS * line + column].length() +
                                              statStrings[NUMSTATDETAILS * line + column+1].length() + 6);
             else if (column > 7)
-                headers[column].setMaxLength(statStrings[NUMSTATDETAILS * line + column+1].length());
+                headers.setMaxLength(column, statStrings[NUMSTATDETAILS * line + column+1].length());
             else
-                headers[column].setMaxLength(statStrings[NUMSTATDETAILS * line + column].length());
+                headers.setMaxLength(column, statStrings[NUMSTATDETAILS * line + column].length());
             
             ++line;
         }
@@ -272,25 +315,10 @@ void produceSummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
     
     // print the header row
     if (numberStatStrings >= NUMSTATDETAILS) {
-        string headerText = BOLDBLUE;
+        string headerText;
         
-        for (auto &header: headers) {
-            
-            // first column, no leading space
-            if (header.name != headers.begin()->name)
-                headerText += "  ";
-            
-            headerText += header.name;
-            
-            // padding spaces to handle field lengths
-            if (header.maxLength > header.name.length()) {
-                string spaces(header.maxLength - header.name.length(), ' ');
-                headerText += spaces;
-            }
-            
-        }
-        
-        !cacheOnly && cout << headerText << RESET << "\n";
+        headerText = headers.display("", cacheOnly);
+        !cacheOnly && cout << headerText;
         fastCache.appendStatus(FASTCACHETYPE (headerText + RESET, 0, 1));
         
         // setup line formatting
@@ -360,7 +388,7 @@ void produceSummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
 }
 
 
-void displaySingleLineDetails(map<unsigned int, BackupEntry>::iterator rawIt, BackupCache& cache, vector<headerType>& headers, colorRotator& color, string lastMD5, int dow, int precision, int statDetail) {
+void displaySingleLineDetails(map<unsigned int, BackupEntry>::iterator rawIt, BackupCache& cache, headerManager& headers, colorRotator& color, string lastMD5, int dow, int precision, int statDetail) {
     // file age can be calculated from the mtime which is an accurate number returned by
     // stat(), but in the case of multiple backups hardlinked together (due to identical content)
     // will actually be the mtime of the most recent of those files
@@ -418,7 +446,7 @@ void displaySingleLineDetails(map<unsigned int, BackupEntry>::iterator rawIt, Ba
 }
 
 
-void storeSingleBackupLineDetails(vector<headerType>& headers, detailType& detail, set<ino_t>& countedInode, BackupEntry& raw, int dow, int precision, int statDetail) {
+void storeSingleBackupLineDetails(headerManager& headers, detailType& detail, set<ino_t>& countedInode, BackupEntry& raw, int dow, int precision, int statDetail) {
         if (countedInode.find(raw.inode) == countedInode.end()) {
             countedInode.insert(raw.inode);
             detail.bytesUsed += raw.size;
@@ -440,36 +468,32 @@ void storeSingleBackupLineDetails(vector<headerType>& headers, detailType& detai
                 ++detail.daily;
         }
         
-        headers[0].setMaxLength(raw.filename.length());
-        headers[1].setMaxLength(approximate(raw.size, precision, statDetail == 3 || statDetail == 5).length());
-        headers[4].setMaxLength(approximate(raw.links, precision, statDetail == 3 || statDetail == 5).length());
+        headers.setMaxLength(0, raw.filename.length());
+        headers.setMaxLength(1, approximate(raw.size, precision, statDetail == 3 || statDetail == 5).length());
+        headers.setMaxLength(4, approximate(raw.links, precision, statDetail == 3 || statDetail == 5).length());
 }
 
 
-void storeFaubLineDetails(vector<headerType>& headers, detailType& detail, myMapIT& backupIt, Tagging& tags, int dow, int precision, int statDetail) {
+void storeFaubLineDetails(headerManager& headers, detailType& detail, myMapIT& backupIt, Tagging& tags, int dow, int precision, int statDetail) {
     /* here we pre-calculate (in this 'store' routine) age for faub configs because we need to know the max column length age will require in order to line
        up the fields that come to the right of age (hold, tag).  because singlefile backups don't currently support holds or tags, age isn't calculated in
        that 'store' function, but instead at the time of display. */
     detail.ages.insert(detail.ages.end(), backupIt->second.finishTime ? timeDiff(mktimeval(backupIt->second.finishTime)).c_str() : "?");
 
-    headers[0].setMaxLength(backupIt->first.length());
-    headers[1].setMaxLength(approximate(backupIt->second.ds.getSize() + backupIt->second.ds.getSaved(), precision, statDetail == 3 || statDetail == 5).length());
-    headers[2].setMaxLength(approximate(backupIt->second.ds.getSize(), precision, statDetail == 3 || statDetail == 5).length());
-    headers[3].setMaxLength(approximate(backupIt->second.dirs, precision, statDetail == 3 || statDetail == 5).length());
-    headers[4].setMaxLength(approximate(backupIt->second.slinks, precision, statDetail == 3 || statDetail == 5).length());
-    headers[5].setMaxLength(approximate(backupIt->second.modifiedFiles, precision, statDetail == 3 || statDetail == 5).length());
-    headers[8].setMaxLength(detail.ages.back().length());
+    headers.setMaxLength(0, backupIt->first.length());
+    headers.setMaxLength(1, approximate(backupIt->second.ds.getSize() + backupIt->second.ds.getSaved(), precision, statDetail == 3 || statDetail == 5).length());
+    headers.setMaxLength(2, approximate(backupIt->second.ds.getSize(), precision, statDetail == 3 || statDetail == 5).length());
+    headers.setMaxLength(3, approximate(backupIt->second.dirs, precision, statDetail == 3 || statDetail == 5).length());
+    headers.setMaxLength(4, approximate(backupIt->second.slinks, precision, statDetail == 3 || statDetail == 5).length());
+    headers.setMaxLength(5, approximate(backupIt->second.modifiedFiles, precision, statDetail == 3 || statDetail == 5).length());
+    headers.setMaxLength(8, detail.ages.back().length());
 
-    if (backupIt->second.holdDate) {
-        headers[9].setMaxLength(24);
-        headers[9].override = true;
-    }
+    if (backupIt->second.holdDate)
+        headers.setMaxLength(9, 24, true);
     
     string itemTags = perlJoin(", ", tags.tagsOnBackup(backupIt->first));
-    if (itemTags.length()) {
-        headers[10].setMaxLength(itemTags.length());
-        headers[10].override = true;
-    }
+    if (itemTags.length())
+        headers.setMaxLength(10, itemTags.length(), true);
 
     auto timeDetail = localtime(&backupIt->second.finishTime);
     auto timeString = to_string(timeDetail->tm_year) + to_string(timeDetail->tm_mon) + to_string(timeDetail->tm_mday);
@@ -529,33 +553,7 @@ void displaySectionIntro(BackupConfig& config, detailType& detail, int precision
 }
 
 
-void displayHeaders(vector<headerType>& headers, string monthYear) {
-    cout << BOLDBLUE;
-    
-    for (auto &header: headers) {
-        string shownHeader = header.name == "Date" ? monthYear : header.name;
-        
-        if (header.override || (header.name != "Tags" && header.name != "Hold")) {
-            
-            // first column, no leading space
-            if (header.name != headers.begin()->name)
-                cout << "  ";
-            
-            cout << shownHeader;
-            
-            // padding spaces to handle field lengths
-            if (header.maxLength > shownHeader.length()) {
-                string spaces(header.maxLength - shownHeader.length(), ' ');
-                cout << spaces;
-            }
-        }
-    }
-    
-    cout << RESET << "\n";
-}
-
-
-void displayFaubLineDetails(vector<headerType>& headers, myMapIT& backupIt, Tagging& tags, int dow, int precision, int statDetail, tm* timeDetail, string age) {
+void displayFaubLineDetails(headerManager& headers, myMapIT& backupIt, Tagging& tags, int dow, int precision, int statDetail, tm* timeDetail, string age) {
     char result[3000];
 
     snprintf(result, sizeof(result),
@@ -578,7 +576,7 @@ void displayFaubLineDetails(vector<headerType>& headers, myMapIT& backupIt, Tagg
                     // content age
                     "%-" + to_string(headers[8].maxLength) + "s  " +
                     // hold
-                    "%-" + (headers[9].override ? to_string(headers[9].maxLength) + "s  " : "s") +
+                    "%-" + (headers.visible(9) ? to_string(headers[9].maxLength) + "s  " : "s") +
                     // tags
                     "%s").c_str(),
              backupIt->first.c_str(),
@@ -602,12 +600,12 @@ bool shouldDisplayConfig(BackupConfig& config, ConfigManager& configManager) {
     bool thisConfigSelected = !config.temp && config == configManager.configs[configManager.activeConfig];
     bool pathConfig = config.settings[sPaths].value.length();
     bool tempConfig = config.temp;
-
+    
     if (pathConfig && oneConfigSelected && thisConfigSelected) {
         SCREENERR("--" << CLI_PATHS << " configs are client only and don't have associated backups.");
         exit(1);
     }
-
+    
     if ((oneConfigSelected && !thisConfigSelected) || pathConfig || tempConfig)
         return false;
     
@@ -616,8 +614,9 @@ bool shouldDisplayConfig(BackupConfig& config, ConfigManager& configManager) {
 
 
 void produceDetailedStats(ConfigManager& configManager, int statDetail) {
-    vector<headerType> singleFileHeaders { {"Date"}, {"Size"}, {"Duration", 8}, {"Type", 4}, {"Lnks"}, {"Age"} };
-    vector<headerType> faubHeaders { {"Date"}, {"Size"}, {"Used"}, {"Dirs"}, {"SymLks"}, {"Mods"}, {"Duration", 8}, {"Type", 4}, {"Age"}, {"Hold"}, {"Tags"} };
+    headerManager singleFileHeaders { {"Date"}, {"Size"}, {"Duration", 8}, {"Type", 4}, {"Lnks"}, {"Age"} };
+    headerManager faubHeaders { {"Date"}, {"Size"}, {"Used"}, {"Dirs"}, {"SymLks"}, {"Mods"}, {"Duration", 8}, {"Type", 4}, {"Age"}, {"Hold", -1}, {"Tags", -1} };
+    
     vector<string> colors { { GREEN, MAGENTA, CYAN, BLUE, YELLOW, BOLDGREEN, BOLDMAGENTA, BOLDYELLOW, BOLDCYAN } };
     vector<detailType> details;
     int precisionLevel = statDetail > 3 ? 0 : statDetail > 1 ? 1 : -1;
@@ -700,7 +699,7 @@ void produceDetailedStats(ConfigManager& configManager, int statDetail) {
                         if (lastMonthYear.length())
                             cout << "\n";
 
-                        displayHeaders(faubHeaders, monthYear);
+                        faubHeaders.display(monthYear);
                     }
 
                     displayFaubLineDetails(faubHeaders, backupIt, tags, configItr.first->settings[sDOW].ivalue(), precisionLevel, statDetail, timeDetail, (*ageIt).length() ? *ageIt : "Unknown");
@@ -731,7 +730,7 @@ void produceDetailedStats(ConfigManager& configManager, int statDetail) {
                             if (lastMonthYear.length())
                                 cout << "\n";
                             
-                            displayHeaders(singleFileHeaders, monthYear);
+                            singleFileHeaders.display(monthYear);
                             lastMonthYear = monthYear;
                         }
                         

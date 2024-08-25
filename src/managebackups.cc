@@ -2074,7 +2074,7 @@ bool getGlobalStats(unsigned long& stats, unsigned long& md5s, string& elapsedTi
 int main(int argc, char *argv[]) {
     timer AppTimer;
     AppTimer.start();
-    
+
     signal(SIGTERM, sigTermHandler);
     signal(SIGINT, sigTermHandler);
     

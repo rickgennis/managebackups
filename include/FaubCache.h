@@ -43,7 +43,8 @@ private:
     
     void restoreCache_internal(string backupDir);
     myMapIT findBackup(string backupDir, myMapIT backupIT);
-    
+    vector<string> findBackups(string backupDir);
+
 public:
     void restoreCache(string profileName);
     void restoreCache(string path, string profileName, string aUuid);

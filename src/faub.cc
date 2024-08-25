@@ -567,8 +567,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         }
         
         if (GLOBALS.cli.count(CLI_HOLD)) {
-            config.fcache.holdBackup(GLOBALS.cli[CLI_HOLD].as<string>(), currentDir);
-            message1 +=" [hold set]";
+            string hold = config.fcache.holdBackup(GLOBALS.cli[CLI_HOLD].as<string>(), currentDir, true);
+            message1 += " [" + hold + " hold]";
         }
         
         log(config.ifTitle() + " " + message1);

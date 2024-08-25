@@ -282,18 +282,19 @@ DiskStats FaubCache::getTotalStats() {
 }
 
 
-void FaubCache::updateDiffFiles(string backupDir, set<string> files) {
-    auto backupIt = backups.find(backupDir);
+void FaubCache::updateDiffFiles(string searchTerm, set<string> files) {
+    auto backupIt = backups.find(searchTerm);
     if (backupIt != backups.end())
         backupIt->second.updateDiffFiles(files);
     else
-        cerr << "unable to find " << backupDir << " in cache." << endl;
+        cerr << "unable to find " << searchTerm << " in cache." << endl;
 }
 
 
-myMapIT FaubCache::findBackup(string backupDir, myMapIT backupIT) {
+myMapIT FaubCache::findBackup(string searchTerm, myMapIT backupIT) {
     set<string> contenders;
     
+    // used with --diff when only specified once and with --force
     if (backupIT != backups.end()) {
         if (backupIT != backups.begin())
             return --backupIT;
@@ -301,17 +302,20 @@ myMapIT FaubCache::findBackup(string backupDir, myMapIT backupIT) {
         return backups.end();
     }
     else
-        if (!backupDir.length()) {
+        // used with --last when no search is specified
+        if (!searchTerm.length()) {
             if (backups.rbegin() != backups.rend())
                 return (++backups.rbegin()).base();
             
             return backups.end();
         }
     
-    auto backupIt = backups.find(backupDir);
-    
+    // exact match search
+    auto backupIt = backups.find(searchTerm);
+
+    // regex match search
     if (backupIt == backups.end()) {
-        Pcre regex(backupDir);
+        Pcre regex(searchTerm);
         myMapIT match;
         
         for (auto it = backups.begin(); it != backups.end(); ++it) {
@@ -331,7 +335,7 @@ myMapIT FaubCache::findBackup(string backupDir, myMapIT backupIT) {
                 cout << "be more specific." << endl;
             }
             else
-                cerr << "unable to find " << backupDir << " in cache." << endl;
+                SCREENERR("unable to find " << searchTerm << " in cache.");
             exit(1);
         }
     }
@@ -340,8 +344,25 @@ myMapIT FaubCache::findBackup(string backupDir, myMapIT backupIT) {
 }
 
 
-bool FaubCache::displayDiffFiles(string backupDir) {
-    auto backup = findBackup(backupDir, backups.end());
+vector<string> FaubCache::findBackups(string searchTerm) {
+    Pcre regex(searchTerm);
+    vector<string> matches;
+    
+    for (auto &backup: backups)
+        if (regex.search(backup.first))
+            matches.insert(matches.end(), backup.first);
+    
+    if (!matches.size()) {
+        SCREENERR("unable to find " << searchTerm << " in cache.");
+        exit(1);
+    }
+        
+    return matches;
+}
+
+
+bool FaubCache::displayDiffFiles(string searchTerm) {
+    auto backup = findBackup(searchTerm, backups.end());
     
     if (backup != backups.end())
         return backup->second.displayDiffFiles();
@@ -351,30 +372,41 @@ bool FaubCache::displayDiffFiles(string backupDir) {
 
 
 void FaubCache::tagBackup(string tagname, string backup) {
-    auto b = findBackup(backup, backups.end());
-    auto backupname = b->second.getDir();
+    auto matchingBackups = findBackups(backup);
     
-    GLOBALS.tags.tagBackup(tagname, backupname);
-    cout << "\t• tagged " << backupname << " as " << tagname << endl;
+    for (auto &matchingBackup: matchingBackups) {
+        GLOBALS.tags.tagBackup(tagname, matchingBackup);
+        cout << "\t• tagged " << matchingBackup << " as " << tagname << "\n";
+    }
 }
 
 
-string FaubCache::holdBackup(string hold, string backup, bool briefOutput) {
-    auto b = findBackup(backup, backups.end());
-    auto backupname = b->second.getDir();
-
+string FaubCache::holdBackup(string hold, string searchTerm, bool briefOutput) {
+    auto matchingBackups = findBackups(searchTerm);  // generic search possibly resulting in multiple matches
+    string result;
+    
     if (hold.length()) {
-        // 1 is for permanent hold
-        b->second.holdDate = (hold == "::") ? 1 : userInput2timet(hold);
-        b->second.saveStats();
+        for (auto &matchingBackup: matchingBackups) {
+            auto b = findBackup(matchingBackup, backups.end());  // exact search resulting in a single match
+            
+            b->second.holdDate = (hold == "::") ? 1 : userInput2timet(hold);  // 1 = permanent hold
+            b->second.saveStats();
+            
+            if (!b->second.holdDate)
+                result += briefOutput ? "removed" : "\t hold removed for " + b->first + "\n";
+            else
+                if (b->second.holdDate == 1)
+                    result += briefOutput ? "permanent" : "\t• permanent hold set on " + b->first + "\n";
+                else
+                    result += briefOutput ? timeString(b->second.holdDate) : "\t• hold set on " + b->first + " until " + timeString(b->second.holdDate) + "\n";
+        }
         
-        if (!b->second.holdDate)
-            return(briefOutput ? "removed" : "\t hold removed for " + backupname + "\n");
+        if (!matchingBackups.size()) {
+            SCREENERR("unable to find " << searchTerm << " in cache.");
+            exit(1);
+        }
         
-        if (b->second.holdDate == 1)
-            return(briefOutput ? "permanent" : "\t• permanent hold set on " + backupname + "\n");
-        
-        return(briefOutput ? timeString(b->second.holdDate) : "\t• hold set on " + backupname + " until " + timeString(b->second.holdDate) + "\n");
+        return result;
     }
     
     return "";
