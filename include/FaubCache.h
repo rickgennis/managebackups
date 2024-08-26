@@ -5,9 +5,10 @@
 #include <set>
 #include <map>
 #include <sys/stat.h>
+#include "globals.h"
+#include "util_generic.h"
 #include "FaubEntry.h"
 #include "tagging.h"
-#include "globals.h"
 
 
 using namespace std;

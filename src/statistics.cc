@@ -21,31 +21,41 @@ using namespace std;
 string oldMessage = ">24H old";
 
 
-headerManager::headerManager(const initializer_list<headerType>& list) {
+tableManager::tableManager(const initializer_list<headerType>& list) {
     for (const auto &item: list)
         headers.insert(headers.end(), item);
+    
+    index = 0;
 }
 
 // override here is a convenience option to set it true; can't update to false here.
 // would have to use override() instead.
-void headerManager::setMaxLength(int idx, long m, bool override) {
-    headers[idx].maxLength = max(headers[idx].maxLength, m);
-    headers[idx].overrideHide = override ? override : headers[idx].overrideHide;
+void headerType::setMax(long m) {
+    if (name == "Hold")
+        cout << "SETTING HOLD from " << maxLength << " to " << m << endl;
+    maxLength = max(maxLength, m);
 }
 
-string headerManager::display(string monthYear, bool returnOnly) {
+
+string tableManager::displayHeader(string monthYear, bool returnOnly) {
     string result = BOLDBLUE;
     
     for (auto &header: headers) {
         string shownHeader = header.name == "Date" && monthYear.length() ? monthYear : header.name;
         
-        if (!header.defaultHide || header.overrideHide) {
-            
+        cout << "header " << header.name << " length " << header.maxLength << endl;
+        
+        if (header.maxLength) {
             // first column, no leading space
             if (header.name != headers[0].name)
                 result += "  ";
             
             result += shownHeader;
+            
+            // as we go to display, if max is non-zero then there's some data in at least one row.
+            // so make sure we use the header's length as a minimum
+            if (header.maxLength)
+                header.setMax(header.name.length());
             
             // padding spaces to handle field lengths
             if (header.maxLength > shownHeader.length()) {
@@ -61,6 +71,27 @@ string headerManager::display(string monthYear, bool returnOnly) {
         cout << result;
     
     return (result);
+}
+
+
+void tableManager::addRowData(string data) {
+    if (headers[index].visible()) {
+        int padcount = (int)max(0, (int)(headers[index].maxLength - data.length()));
+        string padding = string(padcount, ' ');
+        row += (row.length() ? "  " : "") + (headers[index].leftJustify ? (data + padding) : (padding + data));
+    }
+    
+    ++index;
+}
+
+
+string tableManager::displayRow() {
+    string temp = row;
+    row.clear();
+    index = 0;
+    
+    //cout << endl;
+    return temp;
 }
 
 
@@ -293,7 +324,7 @@ void produceSummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
         statStrings.insert(statStrings.end(), "");
     }
     
-    headerManager headers { {"Profile"}, {"Most Recent Backup"}, {"Finish@"}, {"Duration"}, {"Size (Total)"}, {"Uniq (T)"}, {"Saved"}, {"Age Range"} };
+    tableManager headers { {"Profile"}, {"Most Recent Backup"}, {"Finish@"}, {"Duration"}, {"Size (Total)"}, {"Uniq (T)"}, {"Saved"}, {"Age Range"} };
     
     // determine the longest length entry of each column to allow consistent horizontal formatting
     int numberStatStrings = (int)statStrings.size();
@@ -302,12 +333,11 @@ void produceSummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
         
         while (NUMSTATDETAILS * line + column < numberStatStrings) {
             if (column == 7)  // cols 7 and 8 get combined
-                headers.setMaxLength(column, statStrings[NUMSTATDETAILS * line + column].length() +
-                                             statStrings[NUMSTATDETAILS * line + column+1].length() + 6);
+                headers[column].setMax(statStrings[NUMSTATDETAILS * line + column].length() + statStrings[NUMSTATDETAILS * line + column+1].length() + 6);
             else if (column > 7)
-                headers.setMaxLength(column, statStrings[NUMSTATDETAILS * line + column+1].length());
+                headers[column].setMax(statStrings[NUMSTATDETAILS * line + column+1].length());
             else
-                headers.setMaxLength(column, statStrings[NUMSTATDETAILS * line + column].length());
+                headers[column].setMax(statStrings[NUMSTATDETAILS * line + column].length());
             
             ++line;
         }
@@ -317,7 +347,7 @@ void produceSummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
     if (numberStatStrings >= NUMSTATDETAILS) {
         string headerText;
         
-        headerText = headers.display("", cacheOnly);
+        headerText = headers.displayHeader("", cacheOnly);
         !cacheOnly && cout << headerText;
         fastCache.appendStatus(FASTCACHETYPE (headerText + RESET, 0, 1));
         
@@ -388,7 +418,7 @@ void produceSummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
 }
 
 
-void displaySingleLineDetails(map<unsigned int, BackupEntry>::iterator rawIt, BackupCache& cache, headerManager& headers, colorRotator& color, string lastMD5, int dow, int precision, int statDetail) {
+void displaySingleLineDetails(map<unsigned int, BackupEntry>::iterator rawIt, BackupCache& cache, tableManager& table, colorRotator& color, string lastMD5, int dow, int precision, int statDetail) {
     // file age can be calculated from the mtime which is an accurate number returned by
     // stat(), but in the case of multiple backups hardlinked together (due to identical content)
     // will actually be the mtime of the most recent of those files
@@ -403,28 +433,15 @@ void displaySingleLineDetails(map<unsigned int, BackupEntry>::iterator rawIt, Ba
     //
     // if the mtime and the name_mtime refer to completely different days then go non-precise and use
     // the name_mtime.
-    bool prectime = mtimesAreSameDay(rawIt->second.mtime, rawIt->second.name_mtime) &&
-    (rawIt->second.links == 1 || !rawIt->second.fnameDayAge);
+    bool prectime = mtimesAreSameDay(rawIt->second.mtime, rawIt->second.name_mtime) && (rawIt->second.links == 1 || !rawIt->second.fnameDayAge);
+    bool commas = statDetail == 3 || statDetail == 5;
     
-    // format the detail for output
-    char result[2000];
-    snprintf(result, sizeof(result),
-             // filename
-             string(string("%-") + to_string(headers[0].maxLength) + "s  " +
-                    // size
-                    "%" + to_string(headers[1].maxLength) + "s  " +
-                    // duration
-                    "%s  " +
-                    // type
-                    "%-" + to_string(headers[3].maxLength) + "s  " +
-                    // links
-                    "%" + to_string(headers[4].maxLength) + "u  " +
-                    // content age
-                    "%s").c_str(),
-             rawIt->second.filename.c_str(), approximate(rawIt->second.size, precision, statDetail == 3 || statDetail == 5).c_str(),
-             seconds2hms(rawIt->second.duration).c_str(),
-             rawIt->second.date_month == 1 && rawIt->second.date_day == 1 ? "Year" : rawIt->second.date_day == 1 ? "Mnth" : rawIt->second.dow == dow ? "Week" : "Day",
-             rawIt->second.links, rawIt->second.mtime ? timeDiff(mktimeval(prectime ? rawIt->second.mtime : rawIt->second.name_mtime)).c_str() : "?");
+    table.addRowData(rawIt->second.filename);
+    table.addRowData(approximate(rawIt->second.size, precision, commas));
+    table.addRowData(seconds2hms(rawIt->second.duration));
+    table.addRowData(rawIt->second.date_month == 1 && rawIt->second.date_day == 1 ? "Year" : rawIt->second.date_day == 1 ? "Mnth" : rawIt->second.dow == dow ? "Week" : "Day");
+    table.addRowData(to_string(rawIt->second.links));
+    table.addRowData(rawIt->second.mtime ? timeDiff(mktimeval(prectime ? rawIt->second.mtime : rawIt->second.name_mtime)) : "?");
     
     // if there's more than 1 file with this MD5 then color code it as a set; otherwise no color
     if (cache.getByMD5(rawIt->second.md5).size() > 1) {
@@ -435,65 +452,59 @@ void displaySingleLineDetails(map<unsigned int, BackupEntry>::iterator rawIt, Ba
         
         cout << color.current();
     }
+        
+    cout << table.displayRow() << RESET << "\n";
+}
+
+
+void analyseSingleBackupLineDetails(tableManager& table, detailType& detail, set<ino_t>& countedInode, BackupEntry& raw, int dow, int precision, int statDetail) {
+    bool commas = statDetail == 3 || statDetail == 5;
+    
+    if (countedInode.find(raw.inode) == countedInode.end()) {
+        countedInode.insert(raw.inode);
+        detail.bytesUsed += raw.size;
+    }
     else
-        cout << RESET;
+        detail.bytesSaved += raw.size;
     
-    // print it out
-    cout << result << endl;
+    auto timeString = to_string(raw.date_year) + to_string(raw.date_month) + to_string(raw.date_day);
     
-    
-    cout << RESET;
-}
-
-
-void storeSingleBackupLineDetails(headerManager& headers, detailType& detail, set<ino_t>& countedInode, BackupEntry& raw, int dow, int precision, int statDetail) {
-        if (countedInode.find(raw.inode) == countedInode.end()) {
-            countedInode.insert(raw.inode);
-            detail.bytesUsed += raw.size;
-        }
+    if (detail.dayUnique.find(timeString) == detail.dayUnique.end()) {
+        detail.dayUnique.insert(timeString);
+        if (raw.date_month == 1 && raw.date_day == 1)
+            ++detail.yearly;
+        else if (raw.date_day == 1)
+            ++detail.monthly;
+        else if (raw.dow == dow)
+            ++detail.weekly;
         else
-            detail.bytesSaved += raw.size;
-        
-        auto timeString = to_string(raw.date_year) + to_string(raw.date_month) + to_string(raw.date_day);
-        
-        if (detail.dayUnique.find(timeString) == detail.dayUnique.end()) {
-            detail.dayUnique.insert(timeString);
-            if (raw.date_month == 1 && raw.date_day == 1)
-                ++detail.yearly;
-            else if (raw.date_day == 1)
-                ++detail.monthly;
-            else if (raw.dow == dow)
-                ++detail.weekly;
-            else
-                ++detail.daily;
-        }
-        
-        headers.setMaxLength(0, raw.filename.length());
-        headers.setMaxLength(1, approximate(raw.size, precision, statDetail == 3 || statDetail == 5).length());
-        headers.setMaxLength(4, approximate(raw.links, precision, statDetail == 3 || statDetail == 5).length());
+            ++detail.daily;
+    }
+    
+    table[0].setMax(raw.filename.length());
+    table[1].setMax(approximate(raw.size, precision, commas).length());
+    table[4].setMax(approximate(raw.links, precision, commas).length());
 }
 
 
-void storeFaubLineDetails(headerManager& headers, detailType& detail, myMapIT& backupIt, Tagging& tags, int dow, int precision, int statDetail) {
+void analyseFaubLineDetails(tableManager& table, detailType& detail, myMapIT& backupIt, Tagging& tags, int dow, int precision, int statDetail) {
+    bool commas = statDetail == 3 || statDetail == 5;
+
     /* here we pre-calculate (in this 'store' routine) age for faub configs because we need to know the max column length age will require in order to line
        up the fields that come to the right of age (hold, tag).  because singlefile backups don't currently support holds or tags, age isn't calculated in
        that 'store' function, but instead at the time of display. */
+    
     detail.ages.insert(detail.ages.end(), backupIt->second.finishTime ? timeDiff(mktimeval(backupIt->second.finishTime)).c_str() : "?");
 
-    headers.setMaxLength(0, backupIt->first.length());
-    headers.setMaxLength(1, approximate(backupIt->second.ds.getSize() + backupIt->second.ds.getSaved(), precision, statDetail == 3 || statDetail == 5).length());
-    headers.setMaxLength(2, approximate(backupIt->second.ds.getSize(), precision, statDetail == 3 || statDetail == 5).length());
-    headers.setMaxLength(3, approximate(backupIt->second.dirs, precision, statDetail == 3 || statDetail == 5).length());
-    headers.setMaxLength(4, approximate(backupIt->second.slinks, precision, statDetail == 3 || statDetail == 5).length());
-    headers.setMaxLength(5, approximate(backupIt->second.modifiedFiles, precision, statDetail == 3 || statDetail == 5).length());
-    headers.setMaxLength(8, detail.ages.back().length());
-
-    if (backupIt->second.holdDate)
-        headers.setMaxLength(9, 24, true);
-    
-    string itemTags = perlJoin(", ", tags.tagsOnBackup(backupIt->first));
-    if (itemTags.length())
-        headers.setMaxLength(10, itemTags.length(), true);
+    table[0].setMax(backupIt->first.length());
+    table[1].setMax(approximate(backupIt->second.ds.getSize() + backupIt->second.ds.getSaved(), precision, commas).length());
+    table[2].setMax(approximate(backupIt->second.ds.getSize(), precision, commas).length());
+    table[3].setMax(approximate(backupIt->second.dirs, precision, commas).length());
+    table[4].setMax(approximate(backupIt->second.slinks, precision, commas).length());
+    table[5].setMax(approximate(backupIt->second.modifiedFiles, precision, commas).length());
+    table[8].setMax(detail.ages.back().length());
+    table[9].setMax(backupIt->second.holdDate ? 24 : 0);
+    table[10].setMax(perlJoin(", ", tags.tagsOnBackup(backupIt->first)).length());
 
     auto timeDetail = localtime(&backupIt->second.finishTime);
     auto timeString = to_string(timeDetail->tm_year) + to_string(timeDetail->tm_mon) + to_string(timeDetail->tm_mday);
@@ -553,45 +564,22 @@ void displaySectionIntro(BackupConfig& config, detailType& detail, int precision
 }
 
 
-void displayFaubLineDetails(headerManager& headers, myMapIT& backupIt, Tagging& tags, int dow, int precision, int statDetail, tm* timeDetail, string age) {
-    char result[3000];
-
-    snprintf(result, sizeof(result),
-             // filename
-             string(string("%-") + to_string(headers[0].maxLength) + "s  " +
-                    // size
-                    "%" + to_string(headers[1].maxLength) + "s  " +
-                    // used
-                    "%" + to_string(headers[2].maxLength) + "s  " +
-                    // dirs
-                    "%" + to_string(headers[3].maxLength) + "s  " +
-                    // symlinks
-                    "%" + to_string(headers[4].maxLength) + "s  " +
-                    // modifies
-                    "%" + to_string(headers[5].maxLength) + "s  " +
-                    // duration
-                    "%s  " +
-                    // type
-                    "%-4s  " +
-                    // content age
-                    "%-" + to_string(headers[8].maxLength) + "s  " +
-                    // hold
-                    "%-" + (headers.visible(9) ? to_string(headers[9].maxLength) + "s  " : "s") +
-                    // tags
-                    "%s").c_str(),
-             backupIt->first.c_str(),
-             approximate(backupIt->second.ds.getSize() + backupIt->second.ds.getSaved(), precision, statDetail == 3 || statDetail == 5).c_str(),
-             approximate(backupIt->second.ds.getSize(), precision, statDetail == 3 || statDetail == 5).c_str(),
-             approximate(backupIt->second.dirs, precision, statDetail == 3 || statDetail == 5).c_str(),
-             approximate(backupIt->second.slinks, precision, statDetail == 3 || statDetail == 5).c_str(),
-             approximate(backupIt->second.modifiedFiles, precision, statDetail == 3 || statDetail == 5).c_str(),
-             seconds2hms(backupIt->second.duration).c_str(),
-             timeDetail->tm_mon == 0 && timeDetail->tm_mday == 1 ? "Year" : timeDetail->tm_mday == 1 ? "Mnth" : timeDetail->tm_wday == dow ? "Week" : "Day",
-             age.c_str(),
-             backupIt->second.holdDate > 1 ? timeString(backupIt->second.holdDate).c_str() : backupIt->second.holdDate == 1 ? "Permanent" : "",
-             perlJoin(", ", tags.tagsOnBackup(backupIt->first)).c_str());
+void displayFaubLineDetails(tableManager& table, myMapIT& backupIt, Tagging& tags, int dow, int precision, int statDetail, tm* timeDetail, string age) {
+    bool commas = statDetail == 3 || statDetail == 5;
     
-    cout << result << endl;
+    table.addRowData(backupIt->first);
+    table.addRowData(approximate(backupIt->second.ds.getSize() + backupIt->second.ds.getSaved(), precision, commas));
+    table.addRowData(approximate(backupIt->second.ds.getSize(), precision, commas));
+    table.addRowData(approximate(backupIt->second.dirs, precision, commas));
+    table.addRowData(approximate(backupIt->second.slinks, precision, commas));
+    table.addRowData(approximate(backupIt->second.modifiedFiles, precision, commas));
+    table.addRowData(seconds2hms(backupIt->second.duration));
+    table.addRowData(timeDetail->tm_mon == 0 && timeDetail->tm_mday == 1 ? "Year" : timeDetail->tm_mday == 1 ? "Mnth" : timeDetail->tm_wday == dow ? "Week" : "Day");
+    table.addRowData(age);
+    table.addRowData(backupIt->second.holdDate > 1 ? timeString(backupIt->second.holdDate) : backupIt->second.holdDate == 1 ? "Permanent" : "");
+    table.addRowData(perlJoin(", ", tags.tagsOnBackup(backupIt->first)));
+    
+    cout << table.displayRow() << "\n";
 }
 
 
@@ -614,8 +602,8 @@ bool shouldDisplayConfig(BackupConfig& config, ConfigManager& configManager) {
 
 
 void produceDetailedStats(ConfigManager& configManager, int statDetail) {
-    headerManager singleFileHeaders { {"Date"}, {"Size"}, {"Duration", 8}, {"Type", 4}, {"Lnks"}, {"Age"} };
-    headerManager faubHeaders { {"Date"}, {"Size"}, {"Used"}, {"Dirs"}, {"SymLks"}, {"Mods"}, {"Duration", 8}, {"Type", 4}, {"Age"}, {"Hold", -1}, {"Tags", -1} };
+    tableManager singleFileTable { {"Date", 0, 1}, {"Size"}, {"Duration", 8}, {"Type", 4, 1}, {"Lnks"}, {"Age", 0, 1} };
+    tableManager faubTable { {"Date", 0, 1}, {"Size"}, {"Used"}, {"Dirs"}, {"SymLks"}, {"Mods"}, {"Duration", 8}, {"Type", 4, 1}, {"Age", 0, 1}, {"Hold", 0, 1}, {"Tags"} };
     
     vector<string> colors { { GREEN, MAGENTA, CYAN, BLUE, YELLOW, BOLDGREEN, BOLDMAGENTA, BOLDYELLOW, BOLDCYAN } };
     vector<detailType> details;
@@ -641,7 +629,7 @@ void produceDetailedStats(ConfigManager& configManager, int statDetail) {
                 
                 // no tag is specified (i.e. everything is valid) or the specified tag matches
                 if (!GLOBALS.cli.count(CLI_TAG) || tags.match(GLOBALS.cli[CLI_TAG].as<string>(), backupIt->first)) {
-                    storeFaubLineDetails(faubHeaders, detail, backupIt, tags, config.settings[sDOW].ivalue(), precisionLevel, statDetail);
+                    analyseFaubLineDetails(faubTable, detail, backupIt, tags, config.settings[sDOW].ivalue(), precisionLevel, statDetail);
                 }
                 ++backupIt;
             }
@@ -655,7 +643,7 @@ void produceDetailedStats(ConfigManager& configManager, int statDetail) {
             detailType detail;
 
             for (auto &raw: config.cache.rawData) {
-                storeSingleBackupLineDetails(singleFileHeaders, detail, countedInode, raw.second, config.settings[sDOW].ivalue(), precisionLevel, statDetail);
+                analyseSingleBackupLineDetails(singleFileTable, detail, countedInode, raw.second, config.settings[sDOW].ivalue(), precisionLevel, statDetail);
             }
             
             details.insert(details.end(), detail);
@@ -699,10 +687,10 @@ void produceDetailedStats(ConfigManager& configManager, int statDetail) {
                         if (lastMonthYear.length())
                             cout << "\n";
 
-                        faubHeaders.display(monthYear);
+                        faubTable.displayHeader(monthYear);
                     }
 
-                    displayFaubLineDetails(faubHeaders, backupIt, tags, configItr.first->settings[sDOW].ivalue(), precisionLevel, statDetail, timeDetail, (*ageIt).length() ? *ageIt : "Unknown");
+                    displayFaubLineDetails(faubTable, backupIt, tags, configItr.first->settings[sDOW].ivalue(), precisionLevel, statDetail, timeDetail, (*ageIt).length() ? *ageIt : "Unknown");
                     lastMonthYear = monthYear;
                     ++ageIt;
                 }
@@ -730,11 +718,11 @@ void produceDetailedStats(ConfigManager& configManager, int statDetail) {
                             if (lastMonthYear.length())
                                 cout << "\n";
                             
-                            singleFileHeaders.display(monthYear);
+                            singleFileTable.displayHeader(monthYear);
                             lastMonthYear = monthYear;
                         }
                         
-                        displaySingleLineDetails(rawIt, configItr.first->cache, singleFileHeaders, color, lastMD5, configItr.first->settings[sDOW].ivalue(), precisionLevel, statDetail);
+                        displaySingleLineDetails(rawIt, configItr.first->cache, singleFileTable, color, lastMD5, configItr.first->settings[sDOW].ivalue(), precisionLevel, statDetail);
                         lastMD5 = rawIt->second.md5;
                     }
                 }

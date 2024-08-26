@@ -8,10 +8,9 @@
 #include <sys/stat.h>
 #include <set>
 #include <iostream>
+#include <math.h>
 
 #include "pcre++.h"
-#include "globals.h"
-#include "math.h"
 #include "globals.h"
 
 using namespace pcrepp;

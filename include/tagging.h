@@ -39,17 +39,3 @@ public:
 
 #endif
 
-
-/*
-mb -p laptop -t snapshot
-mb -g -t snapshot
-
-mb --last -t snapshot
-
-mb -1 -t snapshot
-
-mb -p laptop --hold 90
-
-mb --hold 90 /var/backups/laptop/foo-2024-09-23
-*/
-

@@ -2352,7 +2352,7 @@ int main(int argc, char *argv[]) {
     
     if (GLOBALS.cli.count(CLI_TAGRM)) {
         string tag = GLOBALS.cli[CLI_TAGRM].as<string>();
-        
+            
         if (auto count = GLOBALS.tags.removeTag(tag))
             cout << "\t• removed all " << plural(count, "occurrence") << " of tag " << tag << endl;
         else
