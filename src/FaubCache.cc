@@ -392,13 +392,20 @@ string FaubCache::holdBackup(string hold, string searchTerm, bool briefOutput) {
             b->second.holdDate = (hold == "::") ? 1 : userInput2timet(hold);  // 1 = permanent hold
             b->second.saveStats();
             
-            if (!b->second.holdDate)
+            if (!b->second.holdDate) {
                 result += briefOutput ? "removed" : "\t hold removed for " + b->first + "\n";
+                log("hold removed for " + b->first);
+            }
             else
-                if (b->second.holdDate == 1)
+                if (b->second.holdDate == 1) {
                     result += briefOutput ? "permanent" : "\t• permanent hold set on " + b->first + "\n";
-                else
-                    result += briefOutput ? timeString(b->second.holdDate) : "\t• hold set on " + b->first + " until " + timeString(b->second.holdDate) + "\n";
+                    log("permanent hold set on " + b->first);
+                }
+                else {
+                    auto endDate = timeString(b->second.holdDate);
+                    result += briefOutput ? timeString(b->second.holdDate) : "\t• hold set on " + b->first + " until " + endDate + "\n";
+                    log("hold set on " + b->first + " until " + endDate);
+                }
         }
         
         if (!matchingBackups.size()) {

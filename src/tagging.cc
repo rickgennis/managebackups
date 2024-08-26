@@ -2,6 +2,7 @@
 
 #include "tagging.h"
 #include "globals.h"
+#include "util_generic.h"
 
 
 Tagging::Tagging() {
@@ -82,6 +83,7 @@ void Tagging::tagBackup(string tag, string backup) {
         backup2TagMap.insert(backup2TagMap.end(), pair<string,string>(backup, tag));
         
         modified = true;
+        log(backup + " tagged as " + tag);
     }
 }
 
@@ -118,8 +120,10 @@ unsigned long Tagging::removeTagsOn(string backup) {
         if (entry->second == backup)
             deadElements.insert(deadElements.end(), entry);
     
-    for (auto &dead: deadElements)
+    for (auto &dead: deadElements) {
         tag2BackupMap.erase(dead);
+        log(dead->first + " tag removed from " + dead->second);
+    }
     
     modified = modified || deadElements.size();
     return deadElements.size();
@@ -137,8 +141,10 @@ unsigned long Tagging::removeTag(string tag) {
         if (entry->second == tag)
             deadElements.insert(deadElements.end(), entry);
     
-    for (auto &dead: deadElements)
+    for (auto &dead: deadElements) {
         backup2TagMap.erase(dead);
+        log(dead->second + " tag removed from " + dead->first);
+    }
 
     modified = modified || deadElements.size();
     return deadElements.size();
@@ -164,8 +170,12 @@ void Tagging::setTagsHoldTime(string tag, string hold) {
     if (tag.length()) {
         tag2Hold.erase(tag);
 
-        if (hold.length() && hold != "0")
+        if (hold.length() && hold != "0") {
             tag2Hold.insert(tag2Hold.end(), pair<string, string>(tag, hold));
+            log("tag " + tag + " mapped to " + (hold == "::" ? "permanent" : hold) + " hold");
+        }
+        else
+            log("hold time mapping removed from tag " + tag);
         
         modified = true;
     }
