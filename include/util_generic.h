@@ -334,5 +334,8 @@ public:
 };
 
 
+string searchreplace(string needle, string haystack, string replacement);
+
+
 #endif
 

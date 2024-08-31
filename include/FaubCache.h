@@ -43,8 +43,6 @@ private:
     string inProcessFilename;
     
     void restoreCache_internal(string backupDir);
-    myMapIT findBackup(string backupDir, myMapIT backupIT);
-    vector<string> findBackups(string backupDir);
 
 public:
     void restoreCache(string profileName);
@@ -58,10 +56,11 @@ public:
     myMapIT getFirstBackup() { return (backups.begin()); }
     myMapIT getLastBackup() { return (backups.size() ? --backups.end() : backups.end()); }
     myMapIT getEnd() { return backups.end(); }
-    void removeBackup(map<string, FaubEntry>::iterator which) {
-        //Tagging tags;
-        //tags.removeTagsOn(which->first);
 
+    myMapIT findBackup(string backupDir, myMapIT backupIT);
+    vector<string> findBackups(string backupDir);
+
+    void removeBackup(map<string, FaubEntry>::iterator which) {
         GLOBALS.tags.removeTagsOn(which->first);
         which->second.removeEntry();
         backups.erase(which);
@@ -71,7 +70,7 @@ public:
     bool displayDiffFiles(string backupDir);
     void compare(string backupA, string backupB, string threshold);
 
-    void tagBackup(string tagname, string backup);
+    bool tagBackup(string tagname, string backup);
     string holdBackup(string hold, string backup, bool briefOutput = false);
 
     void cleanup();

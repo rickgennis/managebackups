@@ -80,7 +80,7 @@ void BackupCache::saveCache(string oldBaseDir, string newBaseDir) {
 bool BackupCache::restoreCache(bool nukeFirst) {
     ifstream cacheFile;
     string cFname = cacheFilename();
-
+    
     cacheFile.open(cFname);
     if (cacheFile.is_open()) {
         

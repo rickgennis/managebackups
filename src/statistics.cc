@@ -31,8 +31,6 @@ tableManager::tableManager(const initializer_list<headerType>& list) {
 // override here is a convenience option to set it true; can't update to false here.
 // would have to use override() instead.
 void headerType::setMax(long m) {
-    if (name == "Hold")
-        cout << "SETTING HOLD from " << maxLength << " to " << m << endl;
     maxLength = max(maxLength, m);
 }
 
@@ -42,9 +40,7 @@ string tableManager::displayHeader(string monthYear, bool returnOnly) {
     
     for (auto &header: headers) {
         string shownHeader = header.name == "Date" && monthYear.length() ? monthYear : header.name;
-        
-        cout << "header " << header.name << " length " << header.maxLength << endl;
-        
+                
         if (header.maxLength) {
             // first column, no leading space
             if (header.name != headers[0].name)
@@ -347,8 +343,8 @@ void produceSummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
     if (numberStatStrings >= NUMSTATDETAILS) {
         string headerText;
         
-        headerText = headers.displayHeader("", cacheOnly);
-        !cacheOnly && cout << headerText;
+        headerText = headers.displayHeader("", true);
+        !cacheOnly && NOTQUIET && cout << headerText;
         fastCache.appendStatus(FASTCACHETYPE (headerText + RESET, 0, 1));
         
         // setup line formatting

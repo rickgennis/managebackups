@@ -2,15 +2,16 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "1.8c"
+#define VERSION "1.9"
+
+#include <unistd.h>
+#include <set>
 
 #include "cxxopts.hpp"
 #include "colors.h"
 #include "debug.h"
 #include "tagging.h"
 
-#include <unistd.h>
-#include <set>
 
 /*
  Adding a commandline option vs adding a backup config setting.

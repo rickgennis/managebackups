@@ -320,22 +320,17 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
     
     // if --profile is specified on the command line set the active config
     if (bProfile) {
-        auto [configNumber, msg] = configManager.findConfig(GLOBALS.cli[CLI_PROFILE].as<string>());
-        if (configNumber > 0) {
+        auto configNumber = configManager.findConfig(GLOBALS.cli[CLI_PROFILE].as<string>());
+        if (configNumber) {
             configManager.activeConfig = configNumber - 1;
             currentConf = &configManager.configs[configManager.activeConfig];
         }
         else
-            if (configNumber == -1) {
-                SCREENERR("error: more than one profile matches selection (" + msg + ").");
+            if (!bSave) {
+                SCREENERR("error: profile not found; try -0 or -1 with no profile to see all backups\n"
+                          << "or use --save to create this profile.");
                 exit(1);
             }
-            else
-                if (!bSave) {
-                    SCREENERR("error: profile not found; try -0 or -1 with no profile to see all backups\n"
-                              << "or use --save to create this profile.");
-                    exit(1);
-                }
         
         if (currentConf->settings[sTitle].value.length() && currentConf->settings[sTitle].value != GLOBALS.cli[CLI_PROFILE].as<string>() && bSave) {
             SCREENERR("error: the specified partial profile name matches an existing profile (" << currentConf->settings[sTitle].value
@@ -345,27 +340,24 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
         
         currentConf->loadConfigsCache();
     }
-    else
+    else {
+        if (bSave)
+            saveErrorAndExit();
+        
         if (allowDefaultProfile) {
-            if (bSave)
-                saveErrorAndExit();
-            
             if (configManager.defaultConfig.length()) {
-                auto [activeC, msg] = configManager.findConfig(configManager.defaultConfig);
+                auto activeC = configManager.findConfig(configManager.defaultConfig);
                 configManager.activeConfig = activeC - 1;
                 currentConf = &configManager.configs[configManager.activeConfig];
-                
             }
         }
         else {
-            if (bSave)
-                saveErrorAndExit();
-            
-            if (GLOBALS.stats || GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_CRONS))
+            if (GLOBALS.stats || GLOBALS.cli.count(CLI_ALLSEQ) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_TAG))
                 configManager.loadAllConfigCaches();
             else
                 currentConf->loadConfigsCache();
         }
+    }
     
     // if any other settings are given on the command line, incorporate them into the selected
     // config. that config will be the one found from --profile above (if any), or a temp config
@@ -523,6 +515,9 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
         currentConf = &configManager.configs[configManager.activeConfig];
     }
     
+    // commandline args that bypass requiring a --profile
+    // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    
     // user doesn't want to show stats & this isn't a faub client run via --path
     if (!GLOBALS.stats && !currentConf->settings[sPaths].value.length() &&
         
@@ -530,15 +525,14 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
         // dir specified
         !currentConf->settings[sDirectory].value.length() &&
         
-        // or relocate
-        !GLOBALS.cli.count(CLI_RELOCATE) &&
-        
         // or compare
         !GLOBALS.cli.count(CLI_COMPARE) && !GLOBALS.cli.count(CLI_COMPAREFILTER) &&
         !GLOBALS.cli.count(CLI_LAST) &&
         
-        // or removing a tag or mapping a tag
+        // or anything with tagging or holding
+        !GLOBALS.cli.count(CLI_TAG) &&
         !GLOBALS.cli.count(CLI_TAGRM) &&
+        !GLOBALS.cli.count(CLI_HOLD) &&
         !GLOBALS.cli.count(CLI_MAPTAGHOLD) &&
 
         // & user hasn't selected --all/--All where there's a dir configured in at least one (first)
@@ -1819,8 +1813,10 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
     NOTQUIET && ANIMATE && cout << "\nupdating caches..." << flush;
     
     // update the directory in all the cache files
-    if (config.isFaub())
+    if (config.isFaub()) {
         config.fcache.renameBaseDirTo(newBaseDir);
+        GLOBALS.tags.renameProfile(oldBaseDir, newBaseDir);
+    }
     else {
         config.cache.setUUID(config.settings[sUUID].value);
         config.cache.saveCache(oldBaseDir, newBaseDir);
@@ -2324,8 +2320,7 @@ int main(int argc, char *argv[]) {
     DEBUG(D_any) DFMT("about to setup config...");
     ConfigManager configManager;
 
-    auto currentConfig = selectOrSetupConfig(configManager, GLOBALS.cli.count(CLI_GO) || GLOBALS.cli.count(CLI_COMPARE) || GLOBALS.cli.count(CLI_COMPAREFILTER)|| GLOBALS.cli.count(CLI_LAST) || GLOBALS.cli.count(CLI_RECALC) || GLOBALS.cli.count(CLI_RELOCATE));
-         
+    auto currentConfig = selectOrSetupConfig(configManager, GLOBALS.cli.count(CLI_GO) || GLOBALS.cli.count(CLI_COMPARE) || GLOBALS.cli.count(CLI_COMPAREFILTER)|| GLOBALS.cli.count(CLI_LAST) || GLOBALS.cli.count(CLI_RECALC));
 
     if (currentConfig->modified)
         currentConfig->saveConfig();
@@ -2343,7 +2338,7 @@ int main(int argc, char *argv[]) {
     if (haveProfile(&configManager) && GLOBALS.cli.count(CLI_ARCHIVE)) {
         currentConfig->settings[sArchive].value = "1";
         currentConfig->saveConfig();
-        cout << "profile " << currentConfig->settings[sTitle].value << " has been archived." << endl;
+        NOTQUIET && cout << "profile " << currentConfig->settings[sTitle].value << " has been archived." << endl;
 
         FastCache fc;
         fc.invalidate();
@@ -2353,12 +2348,15 @@ int main(int argc, char *argv[]) {
     if (GLOBALS.cli.count(CLI_TAGRM)) {
         string tag = GLOBALS.cli[CLI_TAGRM].as<string>();
             
-        if (auto count = GLOBALS.tags.removeTag(tag))
-            cout << "\t• removed all " << plural(count, "occurrence") << " of tag " << tag << endl;
-        else
-            if (auto count = GLOBALS.tags.removeTagsOn(tag))
-                cout << "\t• removed all " << plural(count, "tag") << " from backup " << tag << endl;
-            else
+        string profile;
+        if (GLOBALS.cli.count(CLI_PROFILE)) {
+            auto idx = configManager.findConfig(GLOBALS.cli[CLI_PROFILE].as<string>());
+            if (idx)
+                profile = configManager.configs[idx - 1].settings[sTitle].value;
+        }
+            
+        if (!GLOBALS.tags.removeTag(tag, profile))
+            if (!GLOBALS.tags.removeTagsOn(tag))
                 SCREENERR("error: no tags or backups found matching " << tag);
         exit(1);
     }
@@ -2376,30 +2374,52 @@ int main(int argc, char *argv[]) {
                 GLOBALS.tags.setTagsHoldTime(elements[0], elements[1]);
             }
             
-            cout << "\t• mapped tag '" << elements[0] << "' to " << (permanentHold ? "permanent hold" : elements[1]) << endl;
+            NOTQUIET && cout << "\t• mapped tag '" << elements[0] << "' to " << (permanentHold ? "permanent hold" : elements[1]) << endl;
         }
         else
             SCREENERR("error: --" << CLI_MAPTAGHOLD << " requires a tag and a hold time (e.g. 'snapshots:1y')");
         exit(0);
     }
     
+    /*
+     Tagging & Holding
+     
+     Tag and hold functions exist at 3 levels.  Which level to call depends on the needed functionality:
+     
+     1. Tagging class - Tagging::holdBackup(), Tagging::tagBackup()
+     These do the actual tag or hold, updating the flat file database.
+     
+     2. FaubCache class - FaubCache::holdBackup(), FaubCache::tagBackup()
+     These call the Tagging class implementions and then add text output to show the results.
+     
+     3. ConfigManager class - ConfigManager::holdBackup(), ConfigManager::tagBackup()
+     These call the FaubCache versions for each profile the user wants.  i.e. if --profile is specified,
+     then just call it on that profile; otherwise call it on all profiles.  The ConfigManager versions
+     assume the caches in each profile/config's FaubCache has already been loaded, otherwise they have
+     nothing to search.
+     
+     */
+    
     // --tag snapshot:/var/backups/foo-2024-09-12
     if (GLOBALS.cli.count(CLI_TAG)) {
         auto elements = fullRegexMatch("^([^:\\\\]+):(.+)$", GLOBALS.cli[CLI_TAG].as<string>());
         if (elements.size() > 1) {
             
-            // set tag on backup
-            if (currentConfig->isFaub()) {
-                scanConfigToCache(*currentConfig);
-                currentConfig->fcache.tagBackup(elements[0], elements[1]);
-                
-                // set hold on backup if one is mapped to the tag
-                string hold = GLOBALS.tags.getTagsHoldTime(elements[0]);
-                if (hold.length())
-                    cout << currentConfig->fcache.holdBackup(hold, elements[1]);
+            // load up all faub caches in prep for tagging
+            configManager.loadAllConfigCaches();
+            for (auto &config : configManager.configs)
+                if (!config.temp)
+                    scanConfigToCache(config);
+            
+            // set tag on backups
+            configManager.tagBackup(elements[0], elements[1]);
+            
+            // set hold on backups if one is mapped to the tag
+            string hold = GLOBALS.tags.getTagsHoldTime(elements[0]);
+            if (hold.length()) {
+                string result = currentConfig->fcache.holdBackup(hold, elements[1]);
+                NOTQUIET && cout << result;
             }
-            else
-                SCREENERR("error: --" << CLI_TAG << " is only compatible with faub-based backups");
             
             exit(0);
         }
@@ -2412,18 +2432,19 @@ int main(int argc, char *argv[]) {
         
         if (elements.size() > 1 || permanentHold) {
             
-            if (currentConfig->isFaub()) {
-                scanConfigToCache(*currentConfig);
-                
-                cout << (permanentHold ? currentConfig->fcache.holdBackup("::", hold.substr(2, string::npos)) : currentConfig->fcache.holdBackup(elements[0], elements[1]));
-            }
-            else
-                SCREENERR("error: --" << CLI_HOLD << " is only compatible with faub-based backups");
+            // load up all faub caches in prep for holding
+            configManager.loadAllConfigCaches();
+            for (auto &config : configManager.configs)
+                if (!config.temp)
+                    scanConfigToCache(config);
+            
+            string result = (permanentHold ? configManager.holdBackup("::", hold.substr(2, string::npos)) : configManager.holdBackup(elements[0], elements[1]));
+            NOTQUIET && cout << result;
             
             exit(0);
         }
     }
-
+    
     if (GLOBALS.cli.count(CLI_RMN) || GLOBALS.cli.count(CLI_RMO)) {
         if (GLOBALS.cli.count(CLI_RMN) && GLOBALS.cli.count(CLI_RMO)) {
             SCREENERR("error: --" << CLI_RMN << " and --" << CLI_RMO << " are mutuall-exclusive");
@@ -2687,7 +2708,7 @@ int main(int argc, char *argv[]) {
         ValueParamIfSpecified(CLI_NOS) + ValueParamIfSpecified(CLI_DAYS) +
         ValueParamIfSpecified(CLI_WEEKS) + ValueParamIfSpecified(CLI_MONTHS) +
         ValueParamIfSpecified(CLI_TRIPWIRE) + ValueParamIfSpecified(CLI_NOTIFYEVERY) +
-        ValueParamIfSpecified(CLI_TAG) +
+        ValueParamIfSpecified(CLI_TAG) + ValueParamIfSpecified(CLI_HOLD) +
         ValueParamIfSpecified(CLI_YEARS) + ValueParamIfSpecified(CLI_NICE) +
         ValueParamIfSpecified(CLI_INCLUDE) + ValueParamIfSpecified(CLI_EXCLUDE) +
         (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) || GLOBALS.cli.count(CLI_CRONP) ? " -x" : "") +

@@ -408,7 +408,6 @@ void BackupConfig::loadConfigsCache() {
     }
 }
 
-
 string BackupConfig::ifTitle() {
     return (settings[sTitle].value.length() ? string("[") + settings[sTitle].value + "]" : "");
 }

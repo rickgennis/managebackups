@@ -17,7 +17,7 @@ class Tagging {
     
     multimap<string, string> backup2TagMap;
     multimap<string, string> tag2BackupMap;
-    map<string, string> tag2Hold;  // save holdTime as a string so it can be a relative time offset or a hard date
+    map<string, string> tag2Hold;               // save holdTime as a string so it can be a relative time offset or a hard date
     
     void load();
 
@@ -29,12 +29,13 @@ public:
     vector<string> tagsOnBackup(string backup);
     string getTagsHoldTime(string tag);
     bool match(string tag, string backup);
+    void renameProfile(string oldBaseDir, string newBaseDir);
     
-    void tagBackup(string tag, string backup);
+    bool tagBackup(string tag, string backup);
     void setTagsHoldTime(string tag, string hold);
     
     unsigned long removeTagsOn(string backup);
-    unsigned long removeTag(string tag);
+    unsigned long removeTag(string tag, string profile = "");
 };
 
 #endif

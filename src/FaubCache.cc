@@ -311,10 +311,10 @@ myMapIT FaubCache::findBackup(string searchTerm, myMapIT backupIT) {
         }
     
     // exact match search
-    auto backupIt = backups.find(searchTerm);
+    auto resultIT = backups.find(searchTerm);
 
     // regex match search
-    if (backupIt == backups.end()) {
+    if (resultIT == backups.end()) {
         Pcre regex(searchTerm);
         myMapIT match;
         
@@ -340,7 +340,7 @@ myMapIT FaubCache::findBackup(string searchTerm, myMapIT backupIT) {
         }
     }
     
-    return backupIt;
+    return resultIT;
 }
 
 
@@ -352,11 +352,6 @@ vector<string> FaubCache::findBackups(string searchTerm) {
         if (regex.search(backup.first))
             matches.insert(matches.end(), backup.first);
     
-    if (!matches.size()) {
-        SCREENERR("unable to find " << searchTerm << " in cache.");
-        exit(1);
-    }
-        
     return matches;
 }
 
@@ -371,49 +366,37 @@ bool FaubCache::displayDiffFiles(string searchTerm) {
 }
 
 
-void FaubCache::tagBackup(string tagname, string backup) {
-    auto matchingBackups = findBackups(backup);
-    
-    for (auto &matchingBackup: matchingBackups) {
-        GLOBALS.tags.tagBackup(tagname, matchingBackup);
-        cout << "\t• tagged " << matchingBackup << " as " << tagname << "\n";
+bool FaubCache::tagBackup(string tagname, string backup) {
+    if (GLOBALS.tags.tagBackup(tagname, backup)) {
+        cout << "\t• tagged " << backup << " as " << tagname << "\n";
+        return true;
     }
+    
+    return false;
 }
 
 
-string FaubCache::holdBackup(string hold, string searchTerm, bool briefOutput) {
-    auto matchingBackups = findBackups(searchTerm);  // generic search possibly resulting in multiple matches
-    string result;
-    
+string FaubCache::holdBackup(string hold, string backup, bool briefOutput) {   
     if (hold.length()) {
-        for (auto &matchingBackup: matchingBackups) {
-            auto b = findBackup(matchingBackup, backups.end());  // exact search resulting in a single match
-            
-            b->second.holdDate = (hold == "::") ? 1 : userInput2timet(hold);  // 1 = permanent hold
-            b->second.saveStats();
-            
-            if (!b->second.holdDate) {
-                result += briefOutput ? "removed" : "\t hold removed for " + b->first + "\n";
-                log("hold removed for " + b->first);
+        auto b = findBackup(backup, backups.end());  // exact search resulting in a single match
+        
+        b->second.holdDate = (hold == "::") ? 1 : userInput2timet(hold);  // 1 = permanent hold
+        b->second.saveStats();
+        
+        if (!b->second.holdDate) {
+            log("hold removed for " + b->first);
+            return (briefOutput ? "removed" : "\t hold removed for " + b->first + "\n");
+        }
+        else
+            if (b->second.holdDate == 1) {
+                log("permanent hold set on " + b->first);
+                return (briefOutput ? "permanent" : "\t• permanent hold set on " + b->first + "\n");
             }
-            else
-                if (b->second.holdDate == 1) {
-                    result += briefOutput ? "permanent" : "\t• permanent hold set on " + b->first + "\n";
-                    log("permanent hold set on " + b->first);
-                }
-                else {
-                    auto endDate = timeString(b->second.holdDate);
-                    result += briefOutput ? timeString(b->second.holdDate) : "\t• hold set on " + b->first + " until " + endDate + "\n";
-                    log("hold set on " + b->first + " until " + endDate);
-                }
-        }
-        
-        if (!matchingBackups.size()) {
-            SCREENERR("unable to find " << searchTerm << " in cache.");
-            exit(1);
-        }
-        
-        return result;
+            else {
+                auto endDate = timeString(b->second.holdDate);
+                log("hold set on " + b->first + " until " + endDate);
+                return (briefOutput ? endDate : "\t• hold set on " + b->first + " until " + endDate + "\n");
+            }
     }
     
     return "";

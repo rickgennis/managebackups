@@ -15,11 +15,14 @@ public:
     int activeConfig;
     string defaultConfig;
     vector<BackupConfig> configs;
-    tuple<int, string> findConfig(string title);
+    int findConfig(string title);
+    
     void fullDump();
     void loadAllConfigCaches();
-    
     void housekeeping();
+    
+    void tagBackup(string tagname, string backup);
+    string holdBackup(string hold, string backup, bool briefOutput = false);
     
     ConfigManager();
 };

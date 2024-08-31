@@ -1,4 +1,6 @@
 #include <fstream>
+#include <utility>
+#include <functional>
 
 #include "tagging.h"
 #include "globals.h"
@@ -74,7 +76,7 @@ Tagging::~Tagging() {
 }
 
 
-void Tagging::tagBackup(string tag, string backup) {
+bool Tagging::tagBackup(string tag, string backup) {
     load();
 
     // match() check is required because a multimap allows dupes
@@ -84,7 +86,10 @@ void Tagging::tagBackup(string tag, string backup) {
         
         modified = true;
         log(backup + " tagged as " + tag);
+        return true;
     }
+    
+    return false;
 }
 
 
@@ -112,7 +117,7 @@ vector<string> Tagging::tagsOnBackup(string backup) {
 
 unsigned long Tagging::removeTagsOn(string backup) {
     load();
-
+    
     vector<multimap<string, string>::iterator> deadElements;
     backup2TagMap.erase(backup);
         
@@ -121,8 +126,9 @@ unsigned long Tagging::removeTagsOn(string backup) {
             deadElements.insert(deadElements.end(), entry);
     
     for (auto &dead: deadElements) {
-        tag2BackupMap.erase(dead);
         log(dead->first + " tag removed from " + dead->second);
+        NOTQUIET && cout << "\t• removed " << dead->first << " tag from " << dead->second << "\n";
+        tag2BackupMap.erase(dead);
     }
     
     modified = modified || deadElements.size();
@@ -130,22 +136,38 @@ unsigned long Tagging::removeTagsOn(string backup) {
 }
 
 
-unsigned long Tagging::removeTag(string tag) {
+unsigned long Tagging::removeTag(string tag, string profile) {
     load();
-    
-    tag2BackupMap.erase(tag);
-    tag2Hold.erase(tag);
+        
+    string p = profile.length() ? "/" + profile + "-2" : "";
     
     vector<multimap<string, string>::iterator> deadElements;
-    for (auto entry = backup2TagMap.begin(); entry != backup2TagMap.end(); ++entry)
-        if (entry->second == tag)
+    for (auto entry = backup2TagMap.begin(); entry != backup2TagMap.end(); ++entry) {
+
+        // tag has to match and either no profile specified or profile matches too
+        if (entry->second == tag && (!p.length() || entry->first.find(p) != string::npos))
             deadElements.insert(deadElements.end(), entry);
+    }
     
     for (auto &dead: deadElements) {
-        backup2TagMap.erase(dead);
         log(dead->second + " tag removed from " + dead->first);
+        NOTQUIET && cout << "\t• removed tag " << tag << " from " << dead->first << "\n";
+        backup2TagMap.erase(dead);
     }
-
+    
+    deadElements.clear();
+    
+    for (auto entry = tag2BackupMap.begin(); entry != tag2BackupMap.end(); ++entry)
+        
+        // tag has to match and either no profile specified or profile matches too
+        if (entry->first == tag && (!p.length() || entry->second.find(p) != string::npos))
+            deadElements.insert(deadElements.end(), entry);
+    
+    for (auto &dead: deadElements)
+        tag2BackupMap.erase(dead);
+    
+    tag2Hold.erase(tag);
+    
     modified = modified || deadElements.size();
     return deadElements.size();
 }
@@ -192,4 +214,27 @@ string Tagging::getTagsHoldTime(string tag) {
     }
     
     return "";
+}
+
+
+void Tagging::renameProfile(string oldBaseDir, string newBaseDir) {
+    load();
+    
+    multimap<string, string> newMMap;
+    for (auto entry = tag2BackupMap.begin(); entry != tag2BackupMap.end(); ++entry)
+        newMMap.insert(newMMap.end(), make_pair(searchreplace(oldBaseDir, entry->first, newBaseDir), searchreplace(oldBaseDir, entry->second, newBaseDir)));
+    tag2BackupMap = newMMap;
+
+    newMMap.clear();
+    for (auto entry = backup2TagMap.begin(); entry != backup2TagMap.end(); ++entry)
+        newMMap.insert(newMMap.end(), make_pair(searchreplace(oldBaseDir, entry->first, newBaseDir), searchreplace(oldBaseDir, entry->second, newBaseDir)));
+    backup2TagMap = newMMap;
+
+    map<string, string> newMap;
+    for (auto entry = tag2Hold.begin(); entry != tag2Hold.end(); ++entry)
+        newMap.insert(newMap.end(), make_pair(searchreplace(oldBaseDir, entry->first, newBaseDir), searchreplace(oldBaseDir, entry->second, newBaseDir)));
+    tag2Hold = newMap;
+    
+    modified = true;
+    // Tagging destructor will write this back to disk
 }

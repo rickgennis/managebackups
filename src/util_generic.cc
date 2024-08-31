@@ -1808,3 +1808,9 @@ bool statModeOwnerTimeEqual(struct stat a, struct stat b) {
 #endif
             a.st_mode == b.st_mode);
 }
+
+
+string searchreplace(string needle, string haystack, string replacement) {
+    auto pos = haystack.find(needle);
+    return (pos == string::npos ? haystack : haystack.replace(pos, needle.length(), replacement));
+}

@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.8c
+% MANAGEBACKUPS(1) managebackups 1.9
 % Rick Ennis
 % March 2023
 
@@ -275,7 +275,7 @@ Backups options are noted as {1F} for single-file applicable, {FB} for faub-back
 When tagging a previous backup the full backup name isn't required; only enough to uniquely identify it.  By contrast tag names always need to be precisely specified.
 
 **--tagrm** [*data*]
-: {FB} If a tag is specified it will be removed from all backups & if any hold time is associated with it, the tag -> hold mapping is removed.  If a backup is specified, all tags will be removed from it.
+: {FB} If a tag is specified it will be removed from all backups & if any hold time is associated with it, the tag -> hold mapping is removed.  If a backup is specified, all tags will be removed from it. Removing a specified tag from all backups can be limited in scope by specifying **--profile**, though tag -> hold mapping removal is global.
 
 **--hold** [*holdtime*]
 
@@ -448,7 +448,6 @@ On a system with multiple profiles where one is used most of the time that profi
         --Diff
         --last
         --recalc
-        --relocate
         --go
 
 Even with a default specified **-p** can always be used to override.
