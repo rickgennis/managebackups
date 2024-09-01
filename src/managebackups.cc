@@ -2424,6 +2424,13 @@ int main(int argc, char *argv[]) {
             exit(0);
         }
     }
+        
+    configManager.loadAllConfigCaches();
+    for (auto &config : configManager.configs)
+        if (!config.temp)
+            scanConfigToCache(config);
+    currentConfig->fcache.analyze();
+    exit(1);
     
     if (GLOBALS.cli.count(CLI_HOLD)) {
         string hold = GLOBALS.cli[CLI_HOLD].as<string>();

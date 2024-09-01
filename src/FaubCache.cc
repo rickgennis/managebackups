@@ -638,3 +638,58 @@ void FaubCache::renameBaseDirTo(string newDir) {
     
     baseDir = newDir;
 }
+
+
+struct changeDataType {
+    map<string, set<ino_t>> byChange;
+    map<string, long long> bySize;
+};
+
+
+bool analyzeCallback(pdCallbackData &file) {
+    changeDataType *cd = (changeDataType*)file.dataPtr;
+
+    if (S_ISREG(file.statData.st_mode)) {
+        file.filename.erase(0, file.topLevelDir.length());
+        
+        auto item = cd->byChange.find(file.filename);
+        if (item != cd->byChange.end()) {
+            item->second.insert(item->second.end(), file.statData.st_ino);
+        }
+        else {
+            cd->byChange.insert(cd->byChange.end(), pair<string, set<ino_t>>(file.filename, {file.statData.st_ino}));
+        }
+    }
+    
+    return true;
+}
+
+
+void FaubCache::analyze() {
+    changeDataType cd;
+    
+    for (auto &b: backups) {
+        cout << "analyzing " << b.second.getDir() << "\n";
+        processDirectory(b.second.getDir(), "", false, false, analyzeCallback, &cd);
+    }
+    
+    multimap<long, string> changes;
+    for (auto const &c: cd.byChange) {
+        changes.insert(changes.end(), pair<long,string>(c.second.size(), c.first));
+    }
+    
+    
+    long count = 0;
+    for (auto chgIt = changes.rbegin(); chgIt != changes.rend(); ++chgIt) {
+        char percentage[10];
+        snprintf(percentage, 5, "%4.1f", (float(chgIt->first) / float(backups.size()) * 100));
+        string p = percentage;
+        if (p.back() == '.')
+            p.pop_back();
+            
+        cout << p << "%\t" << chgIt->second << "\n";
+
+       if (++count > 20)
+           break;
+    }
+}
