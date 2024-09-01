@@ -79,7 +79,7 @@ public:
     void renameBaseDirTo(string newDir);
     string getBaseDir() { return baseDir; }
     
-    void analyze();
+    void analyze(int numBackups);
     
     FaubCache(string path, string profileName, string uuid);
     FaubCache() {}

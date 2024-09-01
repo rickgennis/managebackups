@@ -641,23 +641,54 @@ void FaubCache::renameBaseDirTo(string newDir) {
 
 
 struct changeDataType {
-    map<string, set<ino_t>> byChange;
-    map<string, long long> bySize;
+    set<ino_t> inodes;
+    long long changeSize;
+    
+    changeDataType(set<ino_t> s, long long l) : inodes(s), changeSize(l) {};
+};
+
+
+struct analyzeDataType {
+    map<string, changeDataType> cd;
+    long long totalDataOfChanges;
+    
+    analyzeDataType() : totalDataOfChanges(0) {};
 };
 
 
 bool analyzeCallback(pdCallbackData &file) {
-    changeDataType *cd = (changeDataType*)file.dataPtr;
+    analyzeDataType *ad = (analyzeDataType*)file.dataPtr;
 
     if (S_ISREG(file.statData.st_mode)) {
         file.filename.erase(0, file.topLevelDir.length());
         
-        auto item = cd->byChange.find(file.filename);
-        if (item != cd->byChange.end()) {
-            item->second.insert(item->second.end(), file.statData.st_ino);
+        // have we seen this filename already?
+        auto item = ad->cd.find(file.filename);
+
+        // yes, previously seen
+        if (item != ad->cd.end()) {
+            
+            // have we seen this file's starting inode already?
+            auto ino = item->second.inodes.find(file.statData.st_ino);
+                            
+            // no, not previously seen inode
+            if (ino == item->second.inodes.end()) {
+                item->second.inodes.insert(item->second.inodes.end(), file.statData.st_ino);
+
+                // track disk usage of this filename's changes (all backups/revisions of this file)
+                item->second.changeSize += file.statData.st_size;
+                
+                // track disk usage of all changes
+                ad->totalDataOfChanges += file.statData.st_size;
+            }
+            
+            // previously seen inodes are already counted
         }
+        
+        // no, not previously seen filename
         else {
-            cd->byChange.insert(cd->byChange.end(), pair<string, set<ino_t>>(file.filename, {file.statData.st_ino}));
+            ad->cd.insert(ad->cd.end(), make_pair(file.filename, changeDataType({file.statData.st_ino}, file.statData.st_size)));
+            ad->totalDataOfChanges += file.statData.st_size;
         }
     }
     
@@ -665,31 +696,79 @@ bool analyzeCallback(pdCallbackData &file) {
 }
 
 
-void FaubCache::analyze() {
-    changeDataType cd;
+void FaubCache::analyze(int numBackups) {
+    analyzeDataType ad;
+    long count = 0;
+    auto bsz = backups.size();
+    multimap<long, string> byChanges;
+    multimap<long long, string> bySize;
+    
+    int statDetail = GLOBALS.cli.count(CLI_FORMAT) ? GLOBALS.cli[CLI_FORMAT].as<int>() : 0;
+    bool commas = statDetail == 3 || statDetail == 5;
+    int precisionLevel = statDetail > 3 ? 0 : statDetail > 1 ? 1 : -1;
+
+    /*
+        Analyze each backup
+     */
     
     for (auto &b: backups) {
-        cout << "analyzing " << b.second.getDir() << "\n";
-        processDirectory(b.second.getDir(), "", false, false, analyzeCallback, &cd);
+        NOTQUIET && ANIMATE && cout << progressPercentageA(bsz, 1, count++, 1, b.second.getDir()) << flush;
+        processDirectory(b.second.getDir(), "", false, false, analyzeCallback, &ad);
+    }
+    NOTQUIET && ANIMATE && cout << progressPercentageA(0);
+        
+    for (auto const &c: ad.cd) {
+        byChanges.insert(byChanges.end(), pair<long, string>(c.second.inodes.size(), c.first));
+        bySize.insert(bySize.end(), pair<long long, string>(c.second.changeSize, c.first));
     }
     
-    multimap<long, string> changes;
-    for (auto const &c: cd.byChange) {
-        changes.insert(changes.end(), pair<long,string>(c.second.size(), c.first));
-    }
+    /*
+        Show first result table - ordered by frequency a file changes
+     */
     
-    
-    long count = 0;
-    for (auto chgIt = changes.rbegin(); chgIt != changes.rend(); ++chgIt) {
-        char percentage[10];
-        snprintf(percentage, 5, "%4.1f", (float(chgIt->first) / float(backups.size()) * 100));
-        string p = percentage;
-        if (p.back() == '.')
-            p.pop_back();
-            
-        cout << p << "%\t" << chgIt->second << "\n";
+    tableManager table1 { { "Changes", 7}, { "Usage", 6 }, { "Count", 5 }, { "Filename", 1 } };
+    if (statDetail)
+        count = 0;
+        for (auto chgIt = byChanges.rbegin(); chgIt != byChanges.rend() && count < numBackups; ++chgIt, ++count)
+            table1[1].setMax(approximate(ad.cd.find(chgIt->second)->second.changeSize, precisionLevel, commas).length());
 
-       if (++count > 20)
-           break;
+    if (NOTQUIET)
+        table1.displayHeader("", false, "MOST FREQUENTLY CHANGING FILES");
+    
+    count = 0;
+    for (auto chgIt = byChanges.rbegin(); chgIt != byChanges.rend() && count < numBackups; ++chgIt, ++count) {
+        table1.addRowData(percentage(float(chgIt->first) / float(backups.size()) * 100));
+        table1.addRowData(approximate(ad.cd.find(chgIt->second)->second.changeSize, precisionLevel, commas));
+        table1.addRowData(to_string(ad.cd.find(chgIt->second)->second.inodes.size()));
+        table1.addRowData(chgIt->second);
+        cout << table1.displayRow() << "\n";
     }
+    cout << "\n";
+    
+    /*
+        Show second result able - ordered by magnitude of changed files, i.e. space used on disk
+     */
+    
+    tableManager table2 { { "Impact", 6}, { "Usage", 6 }, { "Count", 5 }, { "Filename", 1 } };
+        
+    if (statDetail) {
+        count = 0;
+        for (auto chgIt = bySize.rbegin(); chgIt != bySize.rend() && count < numBackups; ++chgIt, ++count) {
+            auto a = approximate(chgIt->first, precisionLevel, commas);
+            table2[1].setMax(approximate(chgIt->first, precisionLevel, commas).length());
+        }
+    }
+    
+    if (NOTQUIET)
+        table2.displayHeader("", false, "MOST SPACE CONSUMING CHANGES");
+    
+    count = 0;
+    for (auto chgIt = bySize.rbegin(); chgIt != bySize.rend() && count < numBackups; ++chgIt, ++count) {
+        table2.addRowData(percentage(float(chgIt->first) / float(ad.totalDataOfChanges) * 100));
+        table2.addRowData(approximate(chgIt->first, precisionLevel, commas));
+        table2.addRowData(to_string(ad.cd.find(chgIt->second)->second.inodes.size()));
+        table2.addRowData(chgIt->second);
+        cout << table2.displayRow() << "\n";
+    }
+
 }

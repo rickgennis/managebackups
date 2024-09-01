@@ -1608,7 +1608,7 @@ string processDirectoryBackups(string directory, string pattern, bool filterDirs
 }
 
 
-string progressPercentageA(int totalIterations, int totalSteps, int iterationsComplete, int stepsComplete, string detail) {
+string progressPercentageA(long totalIterations, int totalSteps, long iterationsComplete, int stepsComplete, string detail) {
     static int prevLength = 0;
     string result;
     
@@ -1620,8 +1620,8 @@ string progressPercentageA(int totalIterations, int totalSteps, int iterationsCo
             result = string(prevLength, '\b') + string(prevLength, ' ') + string(prevLength, '\b');
     
     if (totalIterations > 0) {
-        int target = totalIterations * totalSteps;
-        int current = iterationsComplete * totalSteps + stepsComplete;
+        long target = totalIterations * totalSteps;
+        long current = iterationsComplete * totalSteps + stepsComplete;
         string currentProgress = to_string(int((float)current / (float)target * 100)) + "% " + detail + " ";
         prevLength = (int)currentProgress.length();
         result += currentProgress;
@@ -1813,4 +1813,83 @@ bool statModeOwnerTimeEqual(struct stat a, struct stat b) {
 string searchreplace(string needle, string haystack, string replacement) {
     auto pos = haystack.find(needle);
     return (pos == string::npos ? haystack : haystack.replace(pos, needle.length(), replacement));
+}
+
+
+tableManager::tableManager(const initializer_list<headerType>& list) {
+    for (const auto &item: list)
+        headers.insert(headers.end(), item);
+    
+    index = 0;
+}
+
+// override here is a convenience option to set it true; can't update to false here.
+// would have to use override() instead.
+void headerType::setMax(long m) {
+    maxLength = max(maxLength, m);
+}
+
+
+string tableManager::displayHeader(string monthYear, bool returnOnly, string title) {
+    string result = BOLDBLUE;
+
+    if (title.length())
+        result += title + "\n";
+    
+    for (auto &header: headers) {
+        string shownHeader = header.name == "Date" && monthYear.length() ? monthYear : header.name;
+                
+        if (header.maxLength) {
+            // first column, no leading space
+            if (header.name != headers[0].name)
+                result += "  ";
+            
+            result += shownHeader;
+            
+            // as we go to display, if max is non-zero then there's some data in at least one row.
+            // so make sure we use the header's length as a minimum
+            if (header.maxLength)
+                header.setMax(header.name.length());
+            
+            // padding spaces to handle field lengths
+            if (header.maxLength > shownHeader.length()) {
+                string spaces(header.maxLength - shownHeader.length(), ' ');
+                result += spaces;
+            }
+        }
+    }
+    
+    result += RESET + string("\n");
+    
+    if (!returnOnly)
+        cout << result;
+    
+    return (result);
+}
+
+
+void tableManager::addRowData(string data) {
+    if (headers[index].visible()) {
+        int padcount = (int)max(0, (int)(headers[index].maxLength - data.length()));
+        string padding = string(padcount, ' ');
+        row += (row.length() ? "  " : "") + (headers[index].leftJustify ? (data + padding) : (padding + data));
+    }
+    
+    ++index;
+}
+
+
+string tableManager::displayRow() {
+    string temp = row;
+    row.clear();
+    index = 0;
+    return temp;
+}
+
+
+string percentage(float p, int width, int precision) {
+    char s[width+20];
+    string format = "%" + to_string(width) + "." + to_string(precision) + "f%%";
+    snprintf(s, width+2, format.c_str(), p);
+    return s;
 }

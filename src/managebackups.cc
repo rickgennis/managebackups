@@ -2183,6 +2183,8 @@ int main(int argc, char *argv[]) {
         CLI_REPLICATETO, "Replicate To", cxxopts::value<std::string>())(
         CLI_RMN, "Remove newest backups", cxxopts::value<int>())(
         CLI_RMO, "Remove oldest backups", cxxopts::value<int>())(
+        CLI_ANALYZE, "Analyze backup sets", cxxopts::value<int>())(
+        CLI_FORMAT, "Format output numbers", cxxopts::value<int>())(
         CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
     
     try {
@@ -2424,13 +2426,15 @@ int main(int argc, char *argv[]) {
             exit(0);
         }
     }
-        
-    configManager.loadAllConfigCaches();
-    for (auto &config : configManager.configs)
-        if (!config.temp)
-            scanConfigToCache(config);
-    currentConfig->fcache.analyze();
-    exit(1);
+    
+    if (GLOBALS.cli.count(CLI_ANALYZE)) {
+        configManager.loadAllConfigCaches();
+        for (auto &config : configManager.configs)
+            if (!config.temp)
+                scanConfigToCache(config);
+        currentConfig->fcache.analyze(GLOBALS.cli[CLI_ANALYZE].as<int>());
+        exit(1);
+    }
     
     if (GLOBALS.cli.count(CLI_HOLD)) {
         string hold = GLOBALS.cli[CLI_HOLD].as<string>();
@@ -2641,9 +2645,8 @@ int main(int argc, char *argv[]) {
                     if (!config.temp)
                         scanConfigToCache(config);
 
-            GLOBALS.cli.count(CLI_STATS1)
-            ? produceDetailedStats(configManager, (int)GLOBALS.cli.count(CLI_STATS1))
-            : produceSummaryStatsWrapper(configManager, (int)GLOBALS.cli.count(CLI_STATS2));
+            int format = GLOBALS.cli.count(CLI_FORMAT) ? GLOBALS.cli[CLI_FORMAT].as<int>() : 0;
+            GLOBALS.cli.count(CLI_STATS1) ? produceDetailedStats(configManager, format) : produceSummaryStatsWrapper(configManager, format);
         }
 
     }

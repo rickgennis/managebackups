@@ -264,8 +264,10 @@ enum backupTypes { SINGLE_ONLY, FAUB_ONLY, ALL_BACKUPS };
 string processDirectory(string directory, string pattern, bool exclude, bool filterDirs, bool (*callback)(pdCallbackData&), void *passData, int maxDepth = -1, bool includeTopDir = false, bool followSymLinks = false);
 string processDirectoryBackups(string directory, string pattern, bool exclude, bool (*callback)(pdCallbackData&), void *passData, backupTypes backupType, int maxDepth = -1, bool followSymLinks = true);
 
-string progressPercentageA(int totalIterations, int totalSteps = 7, int iterationsComplete = 0, int stepsComplete = 0, string detail = "");
+string progressPercentageA(long totalIterations, int totalSteps = 7, long iterationsComplete = 0, int stepsComplete = 0, string detail = "");
 string progressPercentageB(long totalBytes, long completedBytes);
+
+string percentage(float p, int width = 5, int precision = 1);
 
 int mylstat(string filename, struct stat *buf);
 int mystat(string filename, struct stat *buf);
@@ -335,6 +337,42 @@ public:
 
 
 string searchreplace(string needle, string haystack, string replacement);
+
+
+struct headerType {
+    string name;
+    long maxLength;
+    bool leftJustify;
+
+    /* header length (m)
+          x to specify length of the field (will be padded on output)
+          -1 to specify to hide the field unless override is later set (for conditionally displayed fields)
+          0 or unspecified to set length of field to length of header
+     */
+    headerType(string n, long m = 0, bool left = false) : name(n), maxLength(m), leftJustify(left) {};
+    bool visible() { return maxLength; }
+    void setMax(long m);
+
+};
+
+typedef vector<string> tableRow;
+
+class tableManager {
+    vector<headerType> headers;
+    string row;
+    int index;
+    
+public:
+    tableManager(const initializer_list<headerType>& list);
+    
+    // Headers
+    string displayHeader(string monthYear = "", bool returnOnly = false, string title = "");
+    headerType& operator[](int idx) { return headers[idx]; }
+    
+    // Rows
+    void addRowData(string row);
+    string displayRow();
+};
 
 
 #endif

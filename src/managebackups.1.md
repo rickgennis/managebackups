@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 1.9
+% MANAGEBACKUPS(1) managebackups 2.0
 % Rick Ennis
 % March 2023
 
@@ -92,10 +92,16 @@ Options are categorized by the three functions of **managebackups** plus general
 : Run (backup, prune, link) the default profile. Or can be combined with limiting options like **--nobackup**, **--noprune**. Normally running a profile is achieved by specifying the **--profile** name and **-g** is not required.  **-g** is simply a shortcut for the default profile, if defined.
 
 **-0**
-: Provide a summary of backups. **-0** can be specified up to 5 times for different formatting of sizes. It can also be combined with **-p** to limit output to a single profile. Note: Profiles containing the 'path' directive are excluded.
+: Provide a summary of backups. It can be combined with **-p** to limit output to a single profile or **--format** to change how numbers are displayed. Note: Profiles containing the 'path' directive are excluded.
 
 **-1**
-: Provide detail of backups. **-1** can be specified up to 5 times for different formatting of sizes. It can also be combined with **-p** to limit output to a single profile. Note: Profiles containing the 'path' directive are excluded.
+: Provide detail of backups. It can be combined with **-p** to limit output to a single profile or **--format** to change how numbers are displayed. Note: Profiles containing the 'path' directive are excluded.
+
+**--format** *[number]*
+: Specify an alternate number format for use with **-0**, **-1**, or **--analyze**.  Formats 1 through 5 are supported.
+
+**--analyze** *[number]*
+: Analyze a backup set and determine the files that change most frequently and the files consuming the most actual disk space. Show the top *number* files.
 
 **--test**
 : Run in test mode. No changes are actually made to disk (no backups, pruning or linking).
