@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 2.0
+% MANAGEBACKUPS(1) managebackups 2.0a
 % Rick Ennis
 % March 2023
 
@@ -101,7 +101,7 @@ Options are categorized by the three functions of **managebackups** plus general
 : Specify an alternate number format for use with **-0**, **-1**, or **--analyze**.  Formats 1 through 5 are supported.
 
 **--analyze** *[number]*
-: Analyze a backup set and determine the files that change most frequently and the files consuming the most actual disk space. Show the top *number* files.
+: Analyze a backup set and determine the files that change most frequently and the files consuming the most actual disk space. Show the top *number* files. In MOST FREQUENTLY CHANGING FILES the percentage is how many of the profile's backups have a different copy of the shown file (percentages will not sum to 100 as they're individual).  In MOST SPACE CONSUMING CHANGES the percentage is how much of the total backup space is consumed by the shown file (percentages would sum to 100 if all files were shown).  In both cases, the Usage number is a total for all copies (changes) of the shown file - i.e. how much disk space that file is actually using across the backup set.
 
 **--test**
 : Run in test mode. No changes are actually made to disk (no backups, pruning or linking).

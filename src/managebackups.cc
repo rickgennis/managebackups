@@ -2428,11 +2428,12 @@ int main(int argc, char *argv[]) {
     }
     
     if (GLOBALS.cli.count(CLI_ANALYZE)) {
-        configManager.loadAllConfigCaches();
-        for (auto &config : configManager.configs)
-            if (!config.temp)
-                scanConfigToCache(config);
-        currentConfig->fcache.analyze(GLOBALS.cli[CLI_ANALYZE].as<int>());
+        if (currentConfig->isFaub()) {
+            scanConfigToCache(*currentConfig);
+            currentConfig->fcache.analyze(GLOBALS.cli[CLI_ANALYZE].as<int>());
+        }
+        else
+            SCREENERR("error: can only --" << CLI_ANALYZE << " faub-based profiles.");
         exit(1);
     }
     
