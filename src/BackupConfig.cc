@@ -237,11 +237,15 @@ void BackupConfig::saveConfig() {
         newFile << commentLine << "# Profile created on " << timeString() << "\n" << commentLine;
         newFile << blockp("profile:", -17) << settings[sTitle].value << "\n\n\n";
         newFile << commentLine << "# Backing up\n" << commentLine << "\n";
-
         newFile << settings[sDirectory].confPrint("/var/backups");
+        
+        newFile << "\n# faub-style backups\n";
+        newFile << settings[sFaub].confPrint("ssh remoteserver managebackups --path /usr/local/bin");
+        newFile << "\n# single-file-style backup (alternative to faub)\n";
         newFile << settings[sBackupFilename].confPrint("myuser.tgz");
         newFile << settings[sBackupCommand].confPrint("tar czf - /usr/local/bin");
-        newFile << settings[sFaub].confPrint("ssh remoteserver managebackups --path /usr/local/bin");
+
+        newFile << "\n# common backup settings\n";
         newFile << settings[sNotify].confPrint("me@zmail.com, marvin@ymail.com");
         newFile << settings[sSFTPTo].confPrint("myremotebox:/backups");
         newFile << settings[sSCPTo].confPrint("myremotebox:/backups/{subdir}/{file}");

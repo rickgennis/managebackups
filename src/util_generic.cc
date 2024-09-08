@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <utime.h>
+#include <filesystem>
 #include <pwd.h>
 #include <vector>
 #include <list>
@@ -45,6 +46,10 @@ string ies(int number) {
 
 string plural(size_t number, string text) {
     return (to_string(number) + " " + text + (number == 1 ? "" : "s"));
+}
+
+string plural(string number, string text) {
+    return (number + " " + text + (number == "1" ? "" : "s"));
 }
 
 string plurali(size_t number, string text) {

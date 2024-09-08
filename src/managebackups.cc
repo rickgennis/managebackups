@@ -86,6 +86,7 @@
 #include "statistics.h"
 #include "util_generic.h"
 #include "tagging.h"
+#include "interactive.h"
 
 
 using namespace pcrepp;
@@ -1829,11 +1830,17 @@ void relocateBackups(BackupConfig &config, string newBaseDir) {
 }
 
 
+struct replicateDataType {
+    string dataDir;
+    unsigned long changes;
+};
+
+
 bool replicateCallback1(pdCallbackData &file) {
-    string *dataDir = (string*)file.dataPtr;
+    replicateDataType *replicateData = (replicateDataType*)file.dataPtr;
     string newFilename = file.filename;
     newFilename.replace(0, file.topLevelDir.length(), "");
-    newFilename = slashConcat(*dataDir, newFilename);
+    newFilename = slashConcat(replicateData->dataDir, newFilename);
     struct stat targetStat;
     
     auto targetExists = !mylstat(newFilename.c_str(), &targetStat);
@@ -1846,6 +1853,7 @@ bool replicateCallback1(pdCallbackData &file) {
                 exit(1);
             }
             setFilePerms(newFilename, file.statData);
+            replicateData->changes++;
         }
     }
     else {
@@ -1876,6 +1884,7 @@ bool replicateCallback1(pdCallbackData &file) {
                     exit(1);
                 }
                 setFilePerms(newFilename, file.statData);
+                replicateData->changes++;
             }
             
         }
@@ -1905,6 +1914,8 @@ bool replicateCallback1(pdCallbackData &file) {
                     SCREENERR("error: unable to create link " + newFilename + " to " + file.filename + errtext());
                     exit(1);
                 }
+
+                replicateData->changes++;
                 // owner/mode/time don't need to be set on hardlinks because they share them with the original file
             }
     }
@@ -1914,10 +1925,10 @@ bool replicateCallback1(pdCallbackData &file) {
 
 
 bool replicateCallback2(pdCallbackData &file) {
-    string *dataDir = (string*)file.dataPtr;
+    replicateDataType *replicateData = (replicateDataType*)file.dataPtr;
     string sourceFilename = file.filename;
     sourceFilename.replace(0, file.topLevelDir.length(), "");
-    sourceFilename = slashConcat(*dataDir, sourceFilename);
+    sourceFilename = slashConcat(replicateData->dataDir, sourceFilename);
 
     if (!exists(sourceFilename)) {
         if (S_ISDIR(file.statData.st_mode)) {
@@ -1933,6 +1944,8 @@ bool replicateCallback2(pdCallbackData &file) {
                 SCREENERR("error: unable to remove " + file.filename + errtext());
                 exit(1);
             }
+
+        replicateData->changes++;
     }
     
     return true;
@@ -1953,7 +1966,7 @@ bool replicateCallback2(pdCallbackData &file) {
  (2) Walking through the target directory tree and removing things that aren't in the source.
 
  */
-void replicateBackup(BackupConfig &config, string newBaseDir) {
+unsigned long replicateBackup(BackupConfig &config, string newBaseDir) {
     if (!config.isFaub()) {
         log("error: replication aborted due to backup not being faub-style");
         SCREENERR("error: replication is only applicable to faub-style backups; use 'ln ...' for single-file backups.");
@@ -1996,22 +2009,28 @@ void replicateBackup(BackupConfig &config, string newBaseDir) {
     
     statusMessage screenMessage(config.ifTitle() + " replicating " + lastBackupDir + " to " + newBaseDir);
     NOTQUIET && ANIMATE && screenMessage.show();
+        
+    replicateDataType replicateData;
+    replicateData.changes = 0;
     
     timer replicateTimer;
     replicateTimer.start();
     
     /* Pass 1 - walk source to add/update to target */
-    processDirectory(lastBackupDir, "", false, false, replicateCallback1, &newBaseDir);
+    replicateData.dataDir = newBaseDir;
+    processDirectory(lastBackupDir, "", false, false, replicateCallback1, &replicateData);
 
     /* Pass 2 - walk target to delete what's no longer in source */
-    processDirectory(newBaseDir, "", false, false, replicateCallback2, &lastBackupDir);
+    replicateData.dataDir = lastBackupDir;
+    processDirectory(newBaseDir, "", false, false, replicateCallback2, &replicateData);
 
     replicateTimer.stop();
     
     NOTQUIET && ANIMATE && screenMessage.remove();
-    string message = "replication completed to " + newBaseDir + " in " + replicateTimer.elapsed();
+    string message = "replication completed to " + newBaseDir + " [" + plural(approximate(replicateData.changes), "change") + "] in " + replicateTimer.elapsed();
     NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message << endl;
     log(message);
+    return replicateData.changes;
 }
 
 
@@ -2185,6 +2204,7 @@ int main(int argc, char *argv[]) {
         CLI_RMO, "Remove oldest backups", cxxopts::value<int>())(
         CLI_ANALYZE, "Analyze backup sets", cxxopts::value<int>())(
         CLI_FORMAT, "Format output numbers", cxxopts::value<int>())(
+        CLI_INTERACTIVE, "Interactive install", cxxopts::value<bool>()->default_value("false"))(
         CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
     
     try {
@@ -2317,6 +2337,11 @@ int main(int argc, char *argv[]) {
         (GLOBALS.cli.count(CLI_SFTPTO) || GLOBALS.cli.count(CLI_SCPTO))) {
         SCREENERR("error: --faub and --paths are incompatible with --sftp and --scp");
         exit(1);
+    }
+    
+    if (GLOBALS.cli.count(CLI_INTERACTIVE)) {
+        interactive(argv[0]);
+        exit(0);
     }
     
     DEBUG(D_any) DFMT("about to setup config...");

@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 2.0a
+% MANAGEBACKUPS(1) managebackups 2.1
 % Rick Ennis
 % March 2023
 
@@ -66,6 +66,9 @@ Options are categorized by the three functions of **managebackups** plus general
 
 **--installman**
 : Only install the man page to /usr/local/share/man/man1.
+
+**--interactive**
+: Launch the initial setup interactive wizard to assist creating a faub-backup config from scratch.
 
 **-p**, **--profile** [*profile*]
 : Use *profile* for the current run.  

@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "2.0a"
+#define VERSION "2.1"
 
 #include <unistd.h>
 #include <set>
@@ -150,6 +150,7 @@
 #define CLI_MAPTAGHOLD "maptaghold"
 #define CLI_ANALYZE "analyze"
 #define CLI_FORMAT "format"
+#define CLI_INTERACTIVE "interactive"
 
 // conf file regexes
 #define CAPTURE_VALUE string("((?:\\s|=|:|\\b)+)(.*?)\\s*?")
