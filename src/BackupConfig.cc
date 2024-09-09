@@ -297,11 +297,25 @@ bool BackupConfig::loadConfig(string filename) {
                 // compare the line against each of the config settings until there's a match
                 bool identified = false;
                 for (auto &setting: settings) {
-                    // if (setting.regex.search(dataLine) && setting.regex.matches() > 2) {
                     if (setting.regex.search(dataLine) && setting.regex.matches()) {
 
-                        if (setting.regex.matches() > 2)
-                            setting.value = setting.regex.get_match(2);
+                        if (setting.regex.matches() > 2) {
+                            bool delimiterJunkFound = 0;
+                            string delimiter = setting.regex.get_match(1);
+                            for (int i=0; i < delimiter.length(); ++i)
+                                delimiterJunkFound = delimiterJunkFound || !isspace(delimiter[i]);
+
+                            // if the delimiter is blank and the value is blank then we have
+                            // just a directive on a line.  if said directive is a bool, assume
+                            // they mean true.
+                            if (!delimiterJunkFound &&                   // delimiter is blank
+                                !setting.regex.get_match(2).length() &&  // specified value is blank
+                                setting.data_type == BOOL)
+                                setting.value = "true";
+                            else
+                                // otherwise use the user-specified value
+                                setting.value = setting.regex.get_match(2);
+                        }
                         else
                             setting.value = "";
                         
@@ -329,6 +343,14 @@ bool BackupConfig::loadConfig(string filename) {
                                 }
                         }
                         
+                        if (setting.data_type == BOOL) {
+                            Pcre re("^(0|1|t|f|true|false)$", regex_constants::icase);
+                            if (!re.search(setting.value)) {
+                                SCREENERR("error: value of '" << setting.display_name << "' on line " <<
+                                          line << " of " << filename << " should be true or false");
+                                exit(1);
+                            }
+                        }
                         if (setting.data_type == INT)
                             stoi(setting.value);    // will throw on invalid value
                         else 
