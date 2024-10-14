@@ -2027,7 +2027,7 @@ unsigned long replicateBackup(BackupConfig &config, string newBaseDir) {
     replicateTimer.stop();
     
     NOTQUIET && ANIMATE && screenMessage.remove();
-    string message = "replication completed to " + newBaseDir + " [" + plural(approximate(replicateData.changes), "change") + "] in " + replicateTimer.elapsed();
+    string message = string("replication completed to ") + BOLDMAGENTA + newBaseDir + RESET + " [" + plural(approximate(replicateData.changes), "change") + "] in " + replicateTimer.elapsed();
     NOTQUIET && cout << "\t• " << config.ifTitle() << " " << message << endl;
     log(message);
     return replicateData.changes;
@@ -2656,8 +2656,9 @@ int main(int argc, char *argv[]) {
         FastCache fc;
         
         // if we've been called with no arguments (or just -v) and are defaulting to showing stats,
-        // show the fast cached version instead of the live -0.
-        if ((argc == 1 || (argc == 2 && GLOBALS.debugSelector)) && fc.get().length())
+        // show the fast cached version instead of the live -0, unless a backup is currently running.
+        // for 'currently running' we look for locks, meaning we'll only catch ones with locking enabled (-x)
+        if ((argc == 1 || (argc == 2 && GLOBALS.debugSelector)) && fc.get().length() && !configManager.numberActiveLocks())
             cout << fc.get();
         else {
             
@@ -2862,7 +2863,7 @@ int main(int argc, char *argv[]) {
                             notify(
                                    *currentConfig,
                                    errorcom(currentConfig->ifTitle(),
-                                            "abandoning previous lock because its over 24 hours old"),
+                                            "abandoning previous lock because it's over 24 hours old"),
                                    false, true);
                             kill(pid, 15);
                         }
@@ -2899,10 +2900,9 @@ int main(int argc, char *argv[]) {
                 /***********************************************************/
                 
                 if (performTripwire(*currentConfig)) {
-                    
                     if (shouldPrune(*currentConfig))
                         pruneBackups(*currentConfig);
-                    
+
                     /* faub configurations */
                     if (currentConfig->isFaub())
                         fs_startServer(*currentConfig);

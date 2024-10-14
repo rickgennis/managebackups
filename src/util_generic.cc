@@ -1400,7 +1400,7 @@ mode_t resolveLinkMode(string dirEntryName, mode_t origMode) {
     'passData' additional data pointer for the callback function
  
     'maxDepth' can be specified to only go x subdirectory levels deep. depth is defined as
- an entries number of subdirs below the provided 'directory'.  for example, given a provided
+ an entry's number of subdirs below the provided 'directory'.  for example, given a provided
  directory of '/tmp/foo' and these entries:
     /tmp/foo/cases
     /tmp/foo/cases/case1
@@ -1414,7 +1414,7 @@ mode_t resolveLinkMode(string dirEntryName, mode_t origMode) {
  
  callback() is passed a structure that contains the full path of the filename to
  process, its stat() information, and a void pointer that can be setup before processing
- begins to pass any additional data into or out of the callback() functions.
+ begins to pass any additional data into or out of the callback() functions, such as counters.
  
  processDirectory() returns a blank string on success.  on error, the error is logged,
  shown on the screen (via SCREENERR) and returned to the calling function.
@@ -1836,7 +1836,7 @@ void headerType::setMax(long m) {
 
 
 string tableManager::displayHeader(string monthYear, bool returnOnly, string title) {
-    string result = BOLDBLUE;
+    string result;
 
     if (title.length())
         result += title + "\n";
@@ -1856,19 +1856,20 @@ string tableManager::displayHeader(string monthYear, bool returnOnly, string tit
             if (header.maxLength)
                 header.setMax(header.name.length());
             
-            // padding spaces to handle field lengths
-            if (header.maxLength > shownHeader.length()) {
+            // padding spaces to handle field lengths unless we're on the last header
+            if (header != *headers.rbegin() && header.maxLength > shownHeader.length()) {
                 string spaces(header.maxLength - shownHeader.length(), ' ');
                 result += spaces;
             }
         }
     }
-    
-    result += RESET + string("\n");
-    
+        
     if (!returnOnly)
-        cout << result;
+        cout << BOLDBLUE << result << RESET << "\n";
     
+    // color is only used on STDOUT not in the returned string because the string may also end up
+    // in FastCache, which may be later displayed with or without color. and adding color later is
+    // easier than removing it.
     return (result);
 }
 
@@ -1897,4 +1898,12 @@ string percentage(float p, int width, int precision) {
     string format = "%" + to_string(width) + "." + to_string(precision) + "f%%";
     snprintf(s, width+2, format.c_str(), p);
     return s;
+}
+
+
+string perlChomp(string data) {
+    if (data.back() == '\n')
+        data.pop_back();
+
+    return data;
 }

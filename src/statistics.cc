@@ -258,7 +258,7 @@ void produceSummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
         int line = 0;
         
         while (NUMSTATDETAILS * line + column < numberStatStrings) {
-            if (column == 7)  // cols 7 and 8 get combined
+            if (column == 7) // cols 7 and 8 get combined
                 headers[column].setMax(statStrings[NUMSTATDETAILS * line + column].length() + statStrings[NUMSTATDETAILS * line + column+1].length() + 6);
             else if (column > 7)
                 headers[column].setMax(statStrings[NUMSTATDETAILS * line + column+1].length());
@@ -268,14 +268,14 @@ void produceSummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
             ++line;
         }
     }
-    
+        
     // print the header row
     if (numberStatStrings >= NUMSTATDETAILS) {
         string headerText;
         
         headerText = headers.displayHeader("", true);
-        !cacheOnly && NOTQUIET && cout << headerText;
-        fastCache.appendStatus(FASTCACHETYPE (headerText + RESET, 0, 1));
+        !cacheOnly && NOTQUIET && cout << BOLDBLUE << headerText << RESET << "\n";
+        fastCache.appendStatus(FASTCACHETYPE (headerText, 0, 1));
         
         // setup line formatting
         string lineFormat;
@@ -322,7 +322,9 @@ void produceSummaryStatsWrapper(ConfigManager& configManager, int statDetail, bo
                                                     "%-" + to_string(headers[4].maxLength) + "s  " +
                                                     "%-" + to_string(headers[5].maxLength) + "s  " +
                                                     "%"  + to_string(headers[6].maxLength) + "s  " +
-                                                    "%-" + to_string(headers[7].maxLength) + "s").c_str(),
+                                                    "%s").c_str(),
+                                                    // for now 7th is the last column and doesn't need a width specified
+                                                    //"%-" + to_string(headers[7].maxLength) + "s").c_str(),
                      statStrings[line * NUMSTATDETAILS + 3].c_str(),
                      statStrings[line * NUMSTATDETAILS + 4].c_str(),
                      statStrings[line * NUMSTATDETAILS + 5].c_str(),

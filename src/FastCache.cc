@@ -57,33 +57,37 @@ string FastCache::get() {
     // return the cached output (i.e. blank), as that will show an empty cache.
     if (cachedOutput.length() || !verifyFileMtimes())
         return cachedOutput;
-        
+            
     cacheFile.open(fastCacheFilename(FC_TEXT));
     
     if (cacheFile.is_open()) {
         string tempString;
         string lineText;
-        time_t firstTime;
-        time_t lastTime;
-        
+        time_t initialBackupTime;
+        time_t finalBackupTime;
+        firstTimeOnly iteration;
+
         try {
             while (!cacheFile.eof()) {
                 getline(cacheFile, lineText);
                 
                 if (lineText.length()) {
                     getline(cacheFile, tempString);
-                    firstTime = stol(tempString);
-                    
+                    initialBackupTime = stol(tempString);
+
                     getline(cacheFile, tempString);
-                    lastTime = stol(tempString);
+                    finalBackupTime = stol(tempString);
                     
-                    
-                    if (!firstTime && lastTime == 1)
-                        result += lineText + "\n";
+                    if (!initialBackupTime && finalBackupTime == 1) {
+                        if (iteration.firstRun())
+                            result += BOLDBLUE + lineText + RESET + "\n";   // i.e. first line of the cache file (headers)
+                        else
+                            result += BOLDWHITE + lineText + RESET + "\n";  // i.e. last line of the cache file (totals)
+                    }
                     else
                         result += lineText + BOLDBLUE + "[" + RESET +
-                        (firstTime || lastTime ? timeDiff(mktimeval(firstTime)) +
-                         BOLDBLUE + " -> " + RESET + timeDiff(mktimeval(lastTime)) : "-") + BOLDBLUE + "]" + RESET + "\n";
+                        (initialBackupTime || finalBackupTime ? timeDiff(mktimeval(initialBackupTime)) +
+                         BOLDBLUE + " -> " + RESET + timeDiff(mktimeval(finalBackupTime)) : "-") + BOLDBLUE + "]" + RESET + "\n";
                 }
             }
         }
@@ -117,7 +121,7 @@ void FastCache::commit() {
     
     if (cacheFile.is_open()) {
         for (auto &[lineText, firstTime, lastTime]: cachedData) {
-            cacheFile << lineText << endl;
+            cacheFile << perlChomp(lineText) << endl;
             cacheFile << firstTime << endl;
             cacheFile << lastTime << endl;
         }

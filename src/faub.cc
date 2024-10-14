@@ -546,7 +546,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
         GLOBALS.interruptFilename = "";  // here we consider the backup complete; only notification & screen UI remain
 
         string maxLinkMsg = maxLinksReached ? " [" + plural(maxLinksReached, "max link") + " reached]" : "";
-        string message1 = "backup completed to " + currentDir + " in " + backupTime.elapsed();
+        string message1 = string("backup completed to ") + BOLDMAGENTA + currentDir + RESET + " in " + backupTime.elapsed();
         string message2 = "(total: " +
             to_string(fileTotal) + ", modified: " + to_string(filesModified - unmodDirs) + ", unmodified: " + to_string(filesHardLinked) + ", dirs: " +
             to_string(unmodDirs) + ", symlinks: " + to_string(filesSymLinked + receivedSymLinks) +

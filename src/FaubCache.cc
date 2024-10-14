@@ -746,7 +746,7 @@ void FaubCache::analyze(int numBackups) {
     cout << "\n";
     
     /*
-        Show second result able - ordered by magnitude of changed files, i.e. space used on disk
+        Show second result table - ordered by magnitude of changed files, i.e. space used on disk
      */
     
     tableManager table2 { { "Impact", 6}, { "Usage", 6 }, { "Count", 5 }, { "Filename", 1 } };

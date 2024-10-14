@@ -303,12 +303,12 @@ vector<string> fullRegexMatch(string re, string data);
 
 
 class firstTimeOnly {
-    bool firstDone;
+    bool done;
 public:
-    firstTimeOnly() : firstDone(false) {};
+    firstTimeOnly() : done(false) {};
     bool firstRun() {
-        auto state = firstDone;
-        firstDone = true;
+        bool state = done;
+        done = true;
         return !state;
     }
 };
@@ -352,6 +352,9 @@ struct headerType {
     headerType(string n, long m = 0, bool left = false) : name(n), maxLength(m), leftJustify(left) {};
     bool visible() { return maxLength; }
     void setMax(long m);
+    
+    bool operator==(headerType h1) { return (h1.name == name); }
+    bool operator!=(headerType h1) { return (h1.name != name); }
 
 };
 
@@ -374,6 +377,7 @@ public:
     string displayRow();
 };
 
+string perlChomp(string data);
 
 #endif
 

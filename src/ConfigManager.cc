@@ -197,3 +197,15 @@ string ConfigManager::holdBackup(string hold, string backup, bool briefOutput) {
         
     return (result.length() ? result : "no faub backups found matching " + backup + "\n");
 }
+
+
+int ConfigManager::numberActiveLocks() {
+    int locks = 0;
+    
+    for (auto &config: configs) {
+        auto [pid, startTime] = config.getLockPID();
+        locks += (pid != 0);
+    }
+    
+    return locks;
+}

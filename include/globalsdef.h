@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "2.1a"
+#define VERSION "2.1b"
 
 #include <unistd.h>
 #include <set>

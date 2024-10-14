@@ -24,6 +24,8 @@ public:
     void tagBackup(string tagname, string backup);
     string holdBackup(string hold, string backup, bool briefOutput = false);
     
+    int numberActiveLocks();
+
     ConfigManager();
 };
 

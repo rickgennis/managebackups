@@ -498,7 +498,7 @@ void BackupConfig::removeEmptyDirs(string directory) {
 tuple<int, time_t> BackupConfig::getLockPID() {
     string lockFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value + settings[sTitle].value) + ".lock";
     unsigned int pid = 0;
-
+    
     ifstream lockFile;
     lockFile.open(lockFilename);
 
@@ -521,7 +521,7 @@ tuple<int, time_t> BackupConfig::getLockPID() {
 string BackupConfig::setLockPID(unsigned int pid) {
     string lockFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value + settings[sTitle].value) + ".lock";
     mkdirp(GLOBALS.cacheDir);
-
+    
     if (pid) {
         ofstream lockFile;
         lockFile.open(lockFilename);
