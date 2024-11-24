@@ -471,7 +471,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             DEBUG(D_netproto) DFMT(fs << " server phase 4 complete; created " << plural(hardLinkList.size() - linkErrors, "link")  <<
                                    " to previously backed up files" << (linkErrors ? string(" (" + plural(linkErrors, "error") + ")") : ""));
             log(config.ifTitle() + " processed " + fs + ": " + plurali((int)fileTotal - checkpointTotal, "entr") + ", " +
-                plural(neededFiles.size(), "request") + ", " + plural(hardLinkList.size() - linkErrors, "link"));
+                plural(neededFiles.size(), "request") + ", " + plural(hardLinkList.size() - linkErrors, "hardlink") + ", " + plural(symLinkList.size(), "symlink"));
             
             filesModified += neededFiles.size();
             filesHardLinked += hardLinkList.size();

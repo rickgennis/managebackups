@@ -727,11 +727,12 @@ void FaubCache::analyze(int numBackups) {
      */
     
     tableManager table1 { { "Changes", 7}, { "Usage", 6 }, { "Count", 5 }, { "Filename", 1 } };
-    if (statDetail)
+    if (statDetail) {
         count = 0;
         for (auto chgIt = byChanges.rbegin(); chgIt != byChanges.rend() && count < numBackups; ++chgIt, ++count)
             table1[1].setMax(approximate(ad.cd.find(chgIt->second)->second.changeSize, precisionLevel, commas).length());
-
+    }
+    
     if (NOTQUIET)
         table1.displayHeader("", false, "MOST FREQUENTLY CHANGING FILES");
     
@@ -753,10 +754,8 @@ void FaubCache::analyze(int numBackups) {
         
     if (statDetail) {
         count = 0;
-        for (auto chgIt = bySize.rbegin(); chgIt != bySize.rend() && count < numBackups; ++chgIt, ++count) {
-            auto a = approximate(chgIt->first, precisionLevel, commas);
+        for (auto chgIt = bySize.rbegin(); chgIt != bySize.rend() && count < numBackups; ++chgIt, ++count)
             table2[1].setMax(approximate(chgIt->first, precisionLevel, commas).length());
-        }
     }
     
     if (NOTQUIET)
