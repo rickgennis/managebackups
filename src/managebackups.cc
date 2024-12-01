@@ -533,6 +533,7 @@ BackupConfig *selectOrSetupConfig(ConfigManager &configManager, bool allowDefaul
         // or anything with tagging or holding
         !GLOBALS.cli.count(CLI_TAG) &&
         !GLOBALS.cli.count(CLI_TAGRM) &&
+        !GLOBALS.cli.count(CLI_TAGLS) &&
         !GLOBALS.cli.count(CLI_HOLD) &&
         !GLOBALS.cli.count(CLI_MAPTAGHOLD) &&
 
@@ -2197,6 +2198,7 @@ int main(int argc, char *argv[]) {
         CLI_ARCHIVE, "Archive profile", cxxopts::value<bool>()->default_value("false"))(
         string("t,") + CLI_TAG, "Tag a backup", cxxopts::value<string>())(
         CLI_TAGRM, "Remove a tag", cxxopts::value<string>())(
+        CLI_TAGLS, "List all tags and hold times", cxxopts::value<bool>()->default_value("false"))(
         CLI_HOLD, "Hold a backup", cxxopts::value<string>())(
         CLI_MAPTAGHOLD, "Map a tag to a hold", cxxopts::value<string>())(
         CLI_REPLICATETO, "Replicate To", cxxopts::value<std::string>())(
@@ -2370,6 +2372,11 @@ int main(int argc, char *argv[]) {
         FastCache fc;
         fc.invalidate();
         exit(0);
+    }
+    
+    if (GLOBALS.cli.count(CLI_TAGLS)) {
+        cout << GLOBALS.tags.listTags();
+        exit(1);
     }
     
     if (GLOBALS.cli.count(CLI_TAGRM)) {

@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 2.1d
+% MANAGEBACKUPS(1) managebackups 2.1f
 % Rick Ennis
 % March 2023
 
@@ -161,7 +161,7 @@ Options are categorized by the three functions of **managebackups** plus general
 : Relocating backups for a profile entails updating the internal caches, updating the profile's configuration and moving all the backups' files in a hardlink-aware way. The **--relocate** option handles all three of these. Use it in conjunction with **-p**.
 
 **--replicateto** [*targetDir*]
-: {FB} The replicate option makes a hardlink-aware copy (i.e. no appreciable additional storage) of the most recent backup of the specified (**-p**) profile to the *targetDir*.  The copy is placed directly in *targetDir* with no year, month or day subdirectories. This is useful for when you want to store a copy of your faub-style backup in a cloud syncing service (Apple's iCloud Drive, Microsoft's OneDrive, etc).  By replicating to a directory in one of your cloud synced services, you can gain off-site replication of a single backup. Without the replicate option, the choices would be to create a symlink in your cloud sync directory to where your backups are housed -- this would be useless because the cloud providers don't follow links, resulting in no backup making it to the cloud.  Or you would have to store all of your backups in the cloud sync directory, resulting in a larger cloud bill because the provider would ignore the hardlinks and see each copy as additional storage. The copy of the backup in *targetDir* is not tracked and doesn't not appear in **-1** output.
+: {FB} The replicate option makes a hardlink-aware copy (i.e. no appreciable additional storage) of the most recent backup of the specified (**-p**) profile to the *targetDir*.  The copy is placed directly in *targetDir* with no year, month or day subdirectories. This is useful for when you want to store a copy of your faub-style backup in a cloud syncing service (Apple's iCloud Drive, Microsoft's OneDrive, etc).  By replicating to a directory in one of your cloud synced services, you can gain off-site replication of a single backup. Without the replicate option, the choices would be to create a symlink in your cloud sync directory to where your backups are housed -- this would be useless because the cloud providers don't follow links, resulting in no backup making it to the cloud.  Or you would have to store all of your backups in the cloud sync directory, resulting in a larger cloud bill because the provider would ignore the hardlinks and see each copy as additional storage. The copy of the backup in *targetDir* is not tracked and does not appear in **-1** output.
 
 **--rmo** [*num*]
 : {FB} Remove the *num* oldest backups from the specified profile (**-p**). This can also be done manually from the commandline via "rm -rf" and caches would be updated automatically on the next run.  This is purely a convenience function.
@@ -285,6 +285,9 @@ When tagging a previous backup the full backup name isn't required; only enough 
 
 **--tagrm** [*data*]
 : {FB} If a tag is specified it will be removed from all backups & if any hold time is associated with it, the tag -> hold mapping is removed.  If a backup is specified, all tags will be removed from it. Removing a specified tag from all backups can be limited in scope by specifying **--profile**, though tag -> hold mapping removal is global.
+
+**--tagls**
+: {FB} List all defined tags and any associated hold times.
 
 **--hold** [*holdtime*]
 

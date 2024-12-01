@@ -34,6 +34,7 @@ public:
     bool tagBackup(string tag, string backup);
     void setTagsHoldTime(string tag, string hold);
     
+    string listTags();
     unsigned long removeTagsOn(string backup);
     unsigned long removeTag(string tag, string profile = "");
 };

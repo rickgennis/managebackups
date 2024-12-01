@@ -598,8 +598,10 @@ size_t BackupConfig::getRecentAvgSize(int maxBackups) {
                 if (rawIt != cache.rawData.end()) {
                     
                     // check for overflow
-                    if (runningTotal > SIZE_MAX - rawIt->second.size)
+                    if (runningTotal > SIZE_MAX - rawIt->second.size) {
+                        log("warning: used " + to_string(counted) + " instead of " + to_string(maxBackups) + " backups to determine average size due to variable overflow");
                         break;
+                    }
                     
                     ++counted;
                     runningTotal += rawIt->second.size;
@@ -613,16 +615,15 @@ size_t BackupConfig::getRecentAvgSize(int maxBackups) {
             while (--backupIt != fcache.getFirstBackup() && counted < maxBackups) {
                 
                 // check for overflow
-                if (runningTotal > SIZE_MAX - backupIt->second.ds.usedInBytes)
+                if (runningTotal > SIZE_MAX - backupIt->second.ds.usedInBytes) {
+                    log("warning: used " + to_string(counted) + " instead of " + to_string(maxBackups) + " backups to determine average size due to variable overflow");
                     break;
+                }
                 
                 ++counted;
                 runningTotal += backupIt->second.ds.usedInBytes;
             }
     }
-
-    if (counted < maxBackups)
-        log("warning: used " + to_string(counted) + " instead of " + to_string(maxBackups) + " backups for average due to variable overflow");
     
     DEBUG(D_backup) DFMT("examined " << counted << " out of " << maxBackups << ", average is " << (counted ? runningTotal / counted : 0));
     return (counted ? runningTotal / counted : 0);

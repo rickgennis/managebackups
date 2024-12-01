@@ -2,7 +2,7 @@
 #ifndef GLOBALSDEF_H
 #define GLOBALSDEF_H
 
-#define VERSION "2.1d"
+#define VERSION "2.1f"
 
 #include <unistd.h>
 #include <set>
@@ -146,6 +146,7 @@
 #define CLI_RMO "rmo"
 #define CLI_TAG "tag"
 #define CLI_TAGRM "tagrm"
+#define CLI_TAGLS "tagls"
 #define CLI_HOLD "hold"
 #define CLI_MAPTAGHOLD "maptaghold"
 #define CLI_ANALYZE "analyze"

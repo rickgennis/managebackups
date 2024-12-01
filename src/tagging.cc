@@ -173,6 +173,43 @@ unsigned long Tagging::removeTag(string tag, string profile) {
 }
 
 
+string Tagging::listTags() {
+    load();
+    string result;
+
+    // make copies so we don't alter the originals
+    multimap<string,string> m1(tag2BackupMap);
+    map<string,string> m2(tag2Hold);
+
+    // merge them to a master copy
+    multimap<string,string> combinedList;
+    combinedList.merge(m1);
+    combinedList.merge(m2);
+
+    
+    if (combinedList.size()) {
+        unsigned int maxLen = 0;
+
+        for (auto tag: combinedList)
+            if (tag.first.length() > maxLen)
+                maxLen = (unsigned int)tag.first.length();
+        
+        for (auto tag: combinedList) {
+            auto holdItr = tag2Hold.find(tag.first);
+            
+            if (holdItr != tag2Hold.end())
+                result += tag.first + string(5 + maxLen - tag.first.length(), ' ') + "[" + holdItr->second + "]\n";
+            else
+                result += tag.first + "\n";
+        }
+    }
+    else
+        result = "no tags are defined.\n";
+
+    return result;
+}
+
+
 bool Tagging::match(string tag, string backup) {
     if (tag.length()) {
         load();
