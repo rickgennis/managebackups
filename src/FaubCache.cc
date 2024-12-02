@@ -293,6 +293,11 @@ void FaubCache::updateDiffFiles(string searchTerm, set<string> files) {
 
 myMapIT FaubCache::findBackup(string searchTerm, myMapIT backupIT) {
     set<string> contenders;
+    string tagMatch;
+    
+    auto tagMatches = GLOBALS.tags.backupsMatchingTag(searchTerm);
+    if (tagMatches.size() == 1)
+        tagMatch = *tagMatches.begin();
     
     // used with --diff when only specified once and with --force
     if (backupIT != backups.end()) {
@@ -312,7 +317,8 @@ myMapIT FaubCache::findBackup(string searchTerm, myMapIT backupIT) {
     
     // exact match search
     auto resultIT = backups.find(searchTerm);
-
+    auto tagIT = tagMatch.length() ? backups.find(tagMatch) : backups.end();
+    
     // regex match search
     if (resultIT == backups.end()) {
         Pcre regex(searchTerm);
@@ -325,13 +331,30 @@ myMapIT FaubCache::findBackup(string searchTerm, myMapIT backupIT) {
             }
         }
         
+        // if all matches have failed, let's check to see if the regex matches a tag.
+        // tagging only works as an exact match and, in this case, needs to match only
+        // a single backup. so if the matching tag is on multiple backups, we error
+        // out on that too.
+        if (!contenders.size()) {
+            if (tagIT != backups.end())
+                return tagIT;
+
+            if (tagMatches.size() > 1) {
+                cout << "error: multiple backups match the specified tag -\n";
+                for (auto &bkup: tagMatches)
+                    cout << "\t" << bkup << "\n";
+                cout << "be more specific." << endl;
+                exit(1);
+            }
+        }
+        
         if (contenders.size() == 1)
             return match;
         else {
             if (contenders.size() > 1) {
-                cout << "error: multiple backups match -" << endl;
+                cout << "error: multiple backups match -\n";
                 for (auto &bkup: contenders)
-                    cout << "\t" << bkup << endl;
+                    cout << "\t" << bkup << "\n";
                 cout << "be more specific." << endl;
             }
             else
@@ -339,7 +362,8 @@ myMapIT FaubCache::findBackup(string searchTerm, myMapIT backupIT) {
             exit(1);
         }
     }
-    
+
+    cerr << "final\n";
     return resultIT;
 }
 

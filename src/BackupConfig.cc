@@ -497,7 +497,7 @@ void BackupConfig::removeEmptyDirs(string directory) {
 
 tuple<int, time_t> BackupConfig::getLockPID() {
     string lockFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value + settings[sTitle].value) + ".lock";
-    unsigned int pid = 0;
+    int pid = 0;
     
     ifstream lockFile;
     lockFile.open(lockFilename);
@@ -518,7 +518,12 @@ tuple<int, time_t> BackupConfig::getLockPID() {
 }
 
 
-string BackupConfig::setLockPID(unsigned int pid) {
+// the lock pid can be positive or negative. a positive number respresents a real pid
+// and a user-requested lock.  a negative number is an informational lock;  one that isn't
+// requested by the user but we use internally just to know the process is running.  its
+// primary value is in allowing the -1 status output to bypass FastCache and give live
+// output to show the running job.
+string BackupConfig::setLockPID(int pid) {
     string lockFilename = GLOBALS.cacheDir + "/" + MD5string(settings[sDirectory].value + settings[sBackupFilename].value + settings[sTitle].value) + ".lock";
     mkdirp(GLOBALS.cacheDir);
     

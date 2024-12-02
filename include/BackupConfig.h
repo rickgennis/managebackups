@@ -44,7 +44,7 @@ public:
     void setPreviousFailures(unsigned int count);
     unsigned int getPreviousFailures();
     
-    string setLockPID(unsigned int pid);
+    string setLockPID(int pid);
     tuple<int, time_t> getLockPID();
     
     string ifTitle();

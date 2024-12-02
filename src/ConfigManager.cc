@@ -204,7 +204,8 @@ int ConfigManager::numberActiveLocks() {
     
     for (auto &config: configs) {
         auto [pid, startTime] = config.getLockPID();
-        locks += (pid != 0);
+        locks += (pid != 0);  // positive and negative pids count in this use case
+        // negative denotes a running process where the user didn't request locking
     }
     
     return locks;

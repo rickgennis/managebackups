@@ -2693,7 +2693,7 @@ int main(int argc, char *argv[]) {
             
             auto [pid, lockTime] = currentConfig->getLockPID();
             
-            if (pid) {
+            if (pid > 0) {
                 if (!kill(pid, 0)) {
                     if (GLOBALS.cli.count(CLI_FORCE)) {
                         NOTQUIET && cerr << "[ALL] previous profile lock (running as pid " << pid <<
@@ -2729,6 +2729,8 @@ int main(int argc, char *argv[]) {
             if (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) ||
                 GLOBALS.cli.count(CLI_CRONP))
                 GLOBALS.interruptLock = currentConfig->setLockPID(GLOBALS.pid);
+            else
+                GLOBALS.interruptLock = currentConfig->setLockPID(-GLOBALS.pid);
         }
         
 #define BoolParamIfSpecified(x) (GLOBALS.cli.count(x) ? string(" --") + x : "")
@@ -2847,7 +2849,7 @@ int main(int argc, char *argv[]) {
             else {
                 auto [pid, lockTime] = currentConfig->getLockPID();
                 
-                if (pid) {
+                if (pid > 0) {
                     if (!kill(pid, 0)) {
                         if (GLOBALS.cli.count(CLI_FORCE)) {
                             kill(pid, 15);
@@ -2880,9 +2882,12 @@ int main(int argc, char *argv[]) {
                             to_string(pid) + " has vanished");
                 }
                 
+                // locking requested
                 if (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) ||
                     GLOBALS.cli.count(CLI_CRONP))
                     GLOBALS.interruptLock = currentConfig->setLockPID(GLOBALS.pid);
+                else
+                    GLOBALS.interruptLock = currentConfig->setLockPID(-GLOBALS.pid);
                 
                 int n = nice(0);
                 if (currentConfig->settings[sNice].ivalue() != n) {
@@ -2945,9 +2950,9 @@ int main(int argc, char *argv[]) {
         DEBUG(D_any) DFMT("completed primary tasks");
         
         // remove lock
-        if (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) ||
-            GLOBALS.cli.count(CLI_CRONP))
-            GLOBALS.interruptLock = currentConfig->setLockPID(0);
+        // if (GLOBALS.cli.count(CLI_LOCK) || GLOBALS.cli.count(CLI_CRONS) ||
+        //    GLOBALS.cli.count(CLI_CRONP))
+        GLOBALS.interruptLock = currentConfig->setLockPID(0);
     }
     
     AppTimer.stop();
