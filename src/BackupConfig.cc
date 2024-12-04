@@ -95,6 +95,7 @@ BackupConfig::BackupConfig(bool makeTemp) {
     settings.insert(settings.end(), Setting(CLI_PATHS, RE_PATHS, STRING_VECTOR, ""));
     settings.insert(settings.end(), Setting(CLI_ARCHIVE, RE_ARCHIVE, BOOL, "false"));
     settings.insert(settings.end(), Setting(CLI_REPLICATETO, RE_REPLICATETO, STRING, ""));
+    settings.insert(settings.end(), Setting(CLI_IGNORETOUCH, RE_IGNORETOUCH, BOOL, "false"));
 }
 
 

@@ -2207,6 +2207,7 @@ int main(int argc, char *argv[]) {
         CLI_ANALYZE, "Analyze backup sets", cxxopts::value<int>())(
         CLI_FORMAT, "Format output numbers", cxxopts::value<int>())(
         CLI_INTERACTIVE, "Interactive install", cxxopts::value<bool>()->default_value("false"))(
+        CLI_IGNORETOUCH, "Ignore touch", cxxopts::value<bool>()->default_value("false"))(
         CLI_TRIPWIRE, "Tripwire", cxxopts::value<std::string>());
     
     try {

@@ -363,7 +363,6 @@ myMapIT FaubCache::findBackup(string searchTerm, myMapIT backupIT) {
         }
     }
 
-    cerr << "final\n";
     return resultIT;
 }
 

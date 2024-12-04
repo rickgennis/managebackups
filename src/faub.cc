@@ -295,8 +295,8 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                         }
                     }
                     else {
-                        // if the mtimes don't match or the file doesn't exist in the previous backup, add it to the list of
-                        // ones we need the client to send in full
+                        // if the mtimes don't match or the file doesn't exist in the previous backup
+                        // add it to the list of ones we need the client to send in full
                         fsTotalBytesNeeded += size;
                         neededFiles.insert(neededFiles.end(), remoteFilename);
                         modifiedFiles.insert(modifiedFiles.end(), remoteFilename);
@@ -339,14 +339,47 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
             auto blanks = string(label.length(), ' ');
             showDetail && cout << label;
             
+            bool ignoreTouch = str2bool(config.settings[sIgnoreTouch].value);
             for (auto &file: neededFiles) {
-                //DEBUG(D_netproto) DFMT("server waiting for " << file);
                 auto currentFilename = slashConcat(currentDir, file);
                 auto [errorMsg, mode, mtime, size] = client.ipcReadToFile(currentFilename, !incTime);
                 fsBytesReceived += size;
 
                 if (S_ISDIR(mode))
                     dirMtimes.insert(dirMtimes.end(), make_pair(currentFilename, mtime));
+                else
+                    if (ignoreTouch && !S_ISLNK(mode)) {
+                        string prevFilename = slashConcat(prevDir, file);
+                        
+                        struct stat statBuf;
+                        if (!mylstat(prevFilename, &statBuf))
+                            if (statBuf.st_size == size) {
+                                /* perform one last check.  if --ignoretouch is set then the user wants to consider 'touch' changes
+                                   (i.e. only the mtime has been updated, not the file contents) to be the same as no change.  that means
+                                    if only the mtime has changed then still hardlink it to the previous backup's copy.
+                                 
+                                   At this point we've verified:
+                                        - user wants ignoretouch
+                                        - file is not a dir or a symlink
+                                        - previousDir (previous backup) copy exists
+                                        - size of previous copy matches what was just sent over the wire by the client (though different mtime)
+                                   At this point we do an expensive MD5 of both the previous copy and the new copy just sent by the client.  If
+                                   they match, we hardlink the file instead of keeping the new copy.
+                                */
+                                
+                                string md5A = MD5file(prevFilename, true);
+                                string md5B = MD5file(currentFilename, true);
+                                
+                                if (md5A.length() && md5A == md5B) {
+                                    DEBUG(D_netproto) DFMTNOPREFIX(file << " [ignoretouch match]");
+                                    unlink(currentFilename.c_str());
+                                    if (link(prevFilename.c_str(), currentFilename.c_str())) {
+                                        errorMsg = "error: unable to link " + currentFilename + " to " + prevFilename + " - " + strerror(errno);
+                                        mode = 0;
+                                    }
+                                }
+                            }
+                    }
                 
                 if (errorMsg.length()) {
                     SCREENERR(fs << " " << errorMsg);
