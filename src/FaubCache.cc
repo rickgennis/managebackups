@@ -211,15 +211,15 @@ void FaubCache::recache(string targetDir, time_t deletedTime, bool forceAll) {
                               to_string(nextOneToo) + ")" +
                               (gotPrev ? "; " + prevDesc : "; -"));
 
-            string reason = targetDir.length() && targetDir == aBackup->first ? "specific" :
-                (!targetDir.length() && (!aBackup->second.ds.usedInBytes && !aBackup->second.ds.savedInBytes)) ? "missing" :
-                (!targetDir.length() && deletedMatch) ? "post-delete" :
-                nextOneToo ? "next" : "?";
-            
-            log("stat calc " + aBackup->first + " (" + reason + "): " +
-                              to_string(ds.usedInBytes + ds.savedInBytes) + " total, " +
-                              to_string(ds.usedInBytes) + " used" +
-                              (gotPrev ? "; vs " + prevDesc : "; -"));
+//            string reason = targetDir.length() && targetDir == aBackup->first ? "specific" :
+//                (!targetDir.length() && (!aBackup->second.ds.usedInBytes && !aBackup->second.ds.savedInBytes)) ? "missing" :
+//                (!targetDir.length() && deletedMatch) ? "post-delete" :
+//                nextOneToo ? "next" : "?";
+//            
+//            log("stat calc " + aBackup->first + " (" + reason + "): " +
+//                              to_string(ds.usedInBytes + ds.savedInBytes) + " total, " +
+//                              to_string(ds.usedInBytes) + " used" +
+//                              (gotPrev ? "; vs " + prevDesc : "; -"));
             
             aBackup->second.ds = ds;
             aBackup->second.updated = true;

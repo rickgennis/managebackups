@@ -363,7 +363,7 @@ void fs_serverProcessing(PipeExec& client, BackupConfig& config, string prevDir,
                                         - file is not a dir or a symlink
                                         - previousDir (previous backup) copy exists
                                         - size of previous copy matches what was just sent over the wire by the client (though different mtime)
-                                   At this point we do an expensive MD5 of both the previous copy and the new copy just sent by the client.  If
+                                   Now we do an expensive MD5 of both the previous copy and the new copy just sent by the client.  If
                                    they match, we hardlink the file instead of keeping the new copy.
                                 */
                                 
