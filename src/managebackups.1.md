@@ -1,4 +1,4 @@
-% MANAGEBACKUPS(1) managebackups 2.3
+% MANAGEBACKUPS(1) managebackups 2.3a
 % Rick Ennis
 % March 2023
 
@@ -320,7 +320,7 @@ When specifying a previous backup the specified name is interpreted as a search 
 : {FB-remote} Specifies which directories to backup in a faub-style backup.  This option is only used on the REMOTE end, i.e. the server being backed up. See the FAUB-STYLE BACKUPS section below. Multiple paths can be specified via quoted parameters that are space delimited (--path "/usr /usr/local /root") or multiple directives (--path /usr --path /usr/local). Note: If specified on the commandline and in a selected profile, the commandline paths replace *all* of the ones in the profile for that one.
 
 **--ignoretouch**
-: {FB} Ignore changes to files compatible with the command-line 'touch' command (i.e. mtime changes but the content of the file is still identical).  For example, the DHCP daemon often updates the mtime on /etc/resolv.conf even though its contents are still the same. This causes resolv.conf to get backed up each time and the entire backup to persist even with **--dataonly** selected, as now the backup has as least one change.  **--ignoretouch** ignores such mtime-only changes, which would result in resolv.conf getting hardlinked on the backup server to the previous backup's copy, the same as if it hadn't been 'touch'ed at all.  Note:  This means that the mtime of such files (e.g. resolv.conf) in that backup will show the mtime of the previous time the file was backed up.  But it will allow the entire backup to be removed on the next run if **--dataonly** is selected and no other files had actual content changes. 
+: {FB} Ignore changes to files compatible with the command-line 'touch' command (i.e. mtime changes but the content of the file is still identical).  For example, the DHCP daemon often updates the mtime on /etc/resolv.conf even though its contents are still the same. This causes resolv.conf to get backed up each time and the entire backup to persist even with **--dataonly** selected, as now the backup has as least one change.  **--ignoretouch** ignores such mtime-only changes, which would result in resolv.conf getting hardlinked on the backup server to the previous backup's copy, the same as if it hadn't been 'touch'ed at all.  Note:  This means that the mtime of such files (such as resolv.conf) in that backup will show the mtime of the previous time the file was backed up.  Such files will appear as modifications in the **-1** listing but they won't use any disk space or be verifiable via mtime.  This will allow the entire backup to be removed on the next run if **--dataonly** is selected and no other files had actual content changes. 
 
 ## 2. Pruning Options
 

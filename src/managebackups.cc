@@ -2620,7 +2620,7 @@ int main(int argc, char *argv[]) {
                     exit(0);
                 }
                 else {
-                    SCREENERR("error: --" << CLI_COMPARE << " is only valid with a faub-backup profile");
+                    SCREENERR("error: --" << CLI_COMPARE << " and --" << CLI_LAST << " are only valid with a faub-backup profile");
                     exit(1);
                 }
             }
