@@ -451,10 +451,14 @@ i.e.\ a \f[B]-x\f[R] run will successfully lock the profile even for
 other invocations that fail to specify \f[B]-x\f[R].
 .TP
 \f[B]-f\f[R], \f[B]\[en]force\f[R]
-If used when executing a profile \f[B]\[en]force\f[R] will override any
+Force has different functions in different contexts:
+.RS
+.IP \[bu] 2
+While executing a profile \f[B]\[en]force\f[R] will override any
 existing lock and force the profile to run (backup, prune, etc).
-If used with \f[B]\[en]relocate\f[R], \f[B]\[en]force\f[R] will make
-every attempt to continue a previously failed \f[B]\[en]relocate\f[R] by
+.IP \[bu] 2
+With \f[B]\[en]relocate\f[R], \f[B]\[en]force\f[R] will make every
+attempt to continue a previously failed \f[B]\[en]relocate\f[R] by
 handling errors.
 Some assumptions are made in this context.
 For example, if a backup is to be renamed A to B and A no longer exists
@@ -462,8 +466,10 @@ but B already does, it\[cq]s assumed to have previously succeeded and
 processing continues.
 If a symlink needs to be created and is found to already exist, its
 deleted and recreated automatically.
-If used with \f[B]\[en]diff\f[R] or \f[B]\[en]Diff\f[R] the Full Changes
-form of the diff will be run instead of the Cached Changes.
+.IP \[bu] 2
+With \f[B]\[en]diff\f[R] or \f[B]\[en]Diff\f[R] the Full Changes form of
+the diff will be run instead of the Cached Changes.
+.RE
 .TP
 \f[B]\[en]tripwire\f[R] [\f[I]string\f[R]]
 The tripwire setting can be used as a rudimentary guard against

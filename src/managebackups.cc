@@ -859,7 +859,7 @@ void pruneBackups(BackupConfig &config) {
             else {
                 // delete the file and remove it from all caches
                 if (!unlink(raw_it->second.filename.c_str())) {
-                    NOTQUIET && cout << "\t• removed " << raw_it->second.filename << (shouldConsolidate ? " (consolidation)" : "") << endl;
+                    NOTQUIET && cout << "\t• " << config.ifTitle() + " removed " << raw_it->second.filename << (shouldConsolidate ? " (consolidation)" : "") << endl;
                     log(config.ifTitle() + " removed " + raw_it->second.filename +
                         " (age=" + to_string(filenameAge) + ", dow=" + dw(filenameDOW) + ")" + (shouldConsolidate ? " consolidation" : ""));
                     
